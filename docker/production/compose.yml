@@ -20,8 +20,7 @@ services:
   documenso:
     image: documenso/documenso:latest
     depends_on:
-      database:
-        condition: service_healthy
+      - database
     environment:
       - PORT=3000
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-x35VX45nC9KxxsTqrv5LqA}
