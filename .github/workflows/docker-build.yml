@@ -1,11 +1,11 @@
-name: CI: Lingui + Docker Build + Push
+name: CI: Docker Build & Push
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  build-and-deploy:
+  docker-build-and-push:
     runs-on: ubuntu-latest
 
     steps:
@@ -14,7 +14,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: ⚙️ Set up Node.js
+      - name: ⚙️ Set up Node.js (for build scripts, if needed)
         uses: actions/setup-node@v3
         with:
           node-version: 18
@@ -22,18 +22,6 @@ jobs:
 
       - name: 📦 Install dependencies
         run: npm ci || npm install
-
-      - name: 🈂️ Extract translations (with fallback)
-        run: |
-          echo "Running Lingui extract..."
-          npm run extract || npx lingui extract
-        continue-on-error: true
-
-      - name: 📚 Compile translations (with fallback)
-        run: |
-          echo "Running Lingui compile..."
-          npm run compile || npx lingui compile
-        continue-on-error: true
 
       - name: 🔐 Validate Docker credentials
         run: |
