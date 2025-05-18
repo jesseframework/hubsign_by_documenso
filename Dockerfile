@@ -24,19 +24,23 @@ RUN npm install -g turbo@^1.9.3
 RUN turbo prune --scope=@documenso/remix --docker
 
 # --- Installer stage ---
+# --- Installer stage ---
 FROM base AS installer
 
 WORKDIR /app
 
-# Copy pruned output from builder
+# Copy Turbo pruned outputs and config
 COPY --from=builder /app/out/json/ ./
 COPY --from=builder /app/out/package-lock.json ./package-lock.json
 COPY --from=builder /app/lingui.config.ts ./lingui.config.ts
 COPY turbo.json ./
 
-# 🚨 ADD THIS: Copy the full source tree
+# ✅ Add the app and packages to bring in source code
 COPY --from=builder /app/apps ./apps
 COPY --from=builder /app/packages ./packages
+
+# Debug step to confirm
+RUN ls -la /app/apps/remix/app
 
 
 # Install all dependencies
@@ -49,8 +53,6 @@ RUN npx turbo run build --filter=!@documenso/remix...
 WORKDIR /app/apps/remix
 
 #RUN npx lingui extract && npx lingui compile
-RUN ls -la /app/apps/remix/app
-
 RUN npm run build:app
 RUN npm run build:server
 RUN cp server/main.js build/server/main.js
