@@ -41,7 +41,7 @@ RUN npx turbo run build --filter=!@documenso/remix...
 # Build remix app
 WORKDIR /app/apps/remix
 
-RUN npx lingui extract && npx lingui compile
+#RUN npx lingui extract && npx lingui compile
 RUN npm run build:app
 RUN npm run build:server
 RUN cp server/main.js build/server/main.js
