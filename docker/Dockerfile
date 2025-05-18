@@ -41,7 +41,7 @@ RUN npx turbo run build --filter=!@documenso/remix...
 # Build remix app
 WORKDIR /app/apps/remix
 
-RUN npm run translate --prefix ../../
+RUN npm run translate
 RUN npm run build:app
 RUN npm run build:server
 RUN cp server/main.js build/server/main.js
