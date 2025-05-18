@@ -28,4 +28,4 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: fepro/hubsign_by_documenso:latest
+          tags: jesseframework/hubsign_by_documenso:latest
