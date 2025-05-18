@@ -40,11 +40,13 @@ RUN npx turbo run build --filter=!@documenso/remix...
 
 # Build remix app
 WORKDIR /app/apps/remix
-RUN npm run translate --prefix ../../ && \
-    npm run build:app && \
-    npm run build:server && \
-    cp server/main.js build/server/main.js && \
-    cp -r ../../packages/lib/translations build/server/hono/packages/lib/translations
+
+RUN npm run translate --prefix ../../
+RUN npm run build:app
+RUN npm run build:server
+RUN cp server/main.js build/server/main.js
+RUN cp -r ../../packages/lib/translations build/server/hono/packages/lib/translations
+
 
 # Clean up before shipping
 WORKDIR /app
