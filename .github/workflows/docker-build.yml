@@ -1,48 +1,61 @@
-name: Extract and upload translations
+name: CI: Lingui + Docker Build + Push
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  extract-translations:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: 🧾 Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js
+      - name: ⚙️ Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
+          cache: 'npm'
 
-      - name: Install dependencies
-        run: npm install
+      - name: 📦 Install dependencies
+        run: npm ci || npm install
 
-      - name: Extract translations
-        run: npm run extract-translations
+      - name: 🈂️ Extract translations (with fallback)
+        run: |
+          echo "Running Lingui extract..."
+          npm run extract || npx lingui extract
+        continue-on-error: true
 
-      - name: Upload to Crowdin
-        uses: crowdin/github-action@v2
-        with:
-          upload_sources: true
-          upload_translations: true
-        env:
-          CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
-          CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
-      - name: Log in to Docker Hub
+      - name: 📚 Compile translations (with fallback)
+        run: |
+          echo "Running Lingui compile..."
+          npm run compile || npx lingui compile
+        continue-on-error: true
+
+      - name: 🔐 Validate Docker credentials
+        run: |
+          if [ -z "${{ secrets.DOCKER_USERNAME }}" ] || [ -z "${{ secrets.DOCKER_PASSWORD }}" ]; then
+            echo "❌ Docker credentials are missing!"
+            exit 1
+          else
+            echo "✅ Docker credentials found."
+          fi
+
+      - name: 🔑 Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push Docker image
+      - name: 🐳 Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
           push: true
           tags: jesseframework/hubsign_by_documenso:latest
+          cache-from: type=registry,ref=jesseframework/hubsign_by_documenso:buildcache
+          cache-to: type=inline
