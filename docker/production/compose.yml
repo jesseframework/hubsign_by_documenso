@@ -65,16 +65,11 @@ services:
       - "3000:3000"
     volumes:
       - /opt/documenso/cert.p12:/opt/documenso/cert.p12
+    extra_hosts:
+      - "bulk-smtp.fepro.io:172.16.12.21"
     networks:
       - documenso-net
-      - traefik-public
     deploy:
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.documenso.rule=Host(`hubsign.io`)"
-        - "traefik.http.routers.documenso.entrypoints=websecure"
-        - "traefik.http.routers.documenso.tls.certresolver=le"
-        - "traefik.http.services.documenso.loadbalancer.server.port=3000"
       restart_policy:
         condition: on-failure
 
@@ -84,5 +79,3 @@ volumes:
 networks:
   documenso-net:
     driver: overlay
-  traefik-public:
-    external: true
