@@ -53,6 +53,8 @@ RUN npx turbo run build --filter=!@documenso/remix...
 WORKDIR /app/apps/remix
 
 #RUN npx lingui extract && npx lingui compile
+RUN npm install -g dotenv-cli
+
 RUN npm run build:app
 RUN npm run build:server
 RUN cp server/main.js build/server/main.js
@@ -82,4 +84,14 @@ RUN npx prisma generate --schema ./packages/prisma/schema.prisma
 COPY --chown=nodejs:nodejs ./docker/start.sh /app/apps/remix/start.sh
 
 WORKDIR /app/apps/remix
-CMD ["sh", "start.sh"]
+
+
+RUN apt-get update && apt-get install -y bash
+
+
+
+COPY docker/start.sh /start.sh
+RUN chmod +x /start.sh
+
+
+CMD ["bash", "/start.sh"]
