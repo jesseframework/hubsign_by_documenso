@@ -18,7 +18,7 @@ services:
       - documenso-net
 
   documenso:
-    image: documenso/documenso:v1.11.0
+    image: jesseframework/hubsign_by_documenso:latest
     depends_on:
       - database
     environment:
