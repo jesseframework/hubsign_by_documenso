@@ -32,7 +32,7 @@ import { themeSessionResolver } from './storage/theme-session.server';
 import { appMetaTags } from './utils/meta';
 
 const { trackPageview } = Plausible({
-  domain: 'documenso.com',
+  domain: 'hubsign.io',
   trackLocalhost: false,
 });
 

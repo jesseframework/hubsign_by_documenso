@@ -50,7 +50,7 @@ export const AppNavMobile = ({ isMenuOpen, onMenuOpenChange }: AppNavMobileProps
         <Link to="/" onClick={handleMenuItemClick}>
           <img
             src={LogoImage}
-            alt="Documenso Logo"
+            alt="Hub Sign Logo"
             className="dark:invert"
             width={170}
             height={25}

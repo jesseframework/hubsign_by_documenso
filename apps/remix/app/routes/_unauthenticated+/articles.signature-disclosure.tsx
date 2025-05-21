@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 
 import { Button } from '@documenso/ui/primitives/button';
 
-const SUPPORT_EMAIL = 'support@documenso.com';
+const SUPPORT_EMAIL = 'support@hubsign.io';
 
 export default function SignatureDisclosure() {
   return (
@@ -18,7 +18,7 @@ export default function SignatureDisclosure() {
         </h2>
         <p>
           <Trans>
-            Thank you for using Documenso to perform your electronic document signing. The purpose
+            Thank you for using Hub Sign to perform your electronic document signing. The purpose
             of this disclosure is to inform you about the process, legality, and your rights
             regarding the use of electronic signatures on our platform. By opting to use an
             electronic signature, you are agreeing to the terms and conditions outlined below.

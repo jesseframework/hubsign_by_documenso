@@ -13,7 +13,7 @@ export function meta({ params: { slug } }: Route.MetaArgs) {
   }
 
   return [
-    { title: 'Documenso - Share' },
+    { title: 'Hubsign - Share' },
     { description: 'I just signed a document in style with Documenso!' },
     {
       property: 'og:title',
@@ -21,7 +21,7 @@ export function meta({ params: { slug } }: Route.MetaArgs) {
     },
     {
       property: 'og:description',
-      content: 'I just signed with Documenso!',
+      content: 'I just signed with Hub Sign!',
     },
     {
       property: 'og:type',
@@ -45,7 +45,7 @@ export function meta({ params: { slug } }: Route.MetaArgs) {
     },
     {
       name: 'twitter:description',
-      content: 'I just signed with Documenso!',
+      content: 'I just signed with Hub Sign!',
     },
   ];
 }
@@ -70,7 +70,7 @@ export const loader = async ({ request, params: { slug } }: Route.LoaderArgs) =>
   }
 
   // Is hardcoded because this whole meta is hardcoded anyway for Documenso.
-  throw redirect('https://documenso.com');
+  throw redirect('https://hubsign.io');
 };
 
 export default function SharePage() {
