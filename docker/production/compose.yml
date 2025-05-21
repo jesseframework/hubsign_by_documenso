@@ -16,7 +16,13 @@ services:
       - database:/var/lib/postgresql/data
     networks:
       - documenso-net
-
+    deploy:
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints: [node.role == manager]  # optional, can adjust
+    ports:
+      - "6432:5432"
   documenso:
     image: jesseframework/hubsign_by_documenso:latest
     depends_on:
