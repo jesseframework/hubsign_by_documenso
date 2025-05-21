@@ -12,13 +12,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      ports:
-      - "6532:5433"
     volumes:
       - database:/var/lib/postgresql/data
     networks:
       - documenso-net
-
+    deploy:
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints: [node.role == manager]  # optional, can adjust
+    ports:
+      - "6432:5432"
   documenso:
     image: jesseframework/hubsign_by_documenso:latest
     depends_on:
