@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 5
       ports:
-      - "6532:5432"
+      - "6532:5433"
     volumes:
       - database:/var/lib/postgresql/data
     networks:
