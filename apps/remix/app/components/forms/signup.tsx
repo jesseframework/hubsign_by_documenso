@@ -215,7 +215,7 @@ export const SignUpForm = ({
 
   return (
     <div className={cn('flex justify-center gap-x-12', className)}>
-      <div className="border-border relative hidden flex-1 overflow-hidden rounded-xl border xl:flex">
+      {/* <div className="border-border relative hidden flex-1 overflow-hidden rounded-xl border xl:flex">
         <div className="absolute -inset-8 -z-[2] backdrop-blur">
           <img
             src={communityCardsImage}
@@ -252,7 +252,7 @@ export const SignUpForm = ({
 
           <div />
         </div>
-      </div>
+      </div> */}
 
       <div className="border-border dark:bg-background relative z-10 flex min-h-[min(850px,80vh)] w-full max-w-lg flex-col rounded-xl border bg-neutral-100 p-6">
         {step === 'BASIC_DETAILS' && (
