@@ -549,6 +549,8 @@ model Signature {
   fieldId                Int      @unique
   signatureImageAsBase64 String?
   typedSignature         String?
+  signaturePositionX     Decimal?
+  signaturePositionY     Decimal?
 
   recipient Recipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
   field     Field     @relation(fields: [fieldId], references: [id], onDelete: Cascade)

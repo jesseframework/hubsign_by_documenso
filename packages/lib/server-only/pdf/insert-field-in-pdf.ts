@@ -88,8 +88,16 @@ export const insertFieldInPDF = async (pdf: PDFDocument, field: FieldWithSignatu
   const fieldWidth = pageWidth * (Number(field.width) / 100);
   const fieldHeight = pageHeight * (Number(field.height) / 100);
 
-  const fieldX = pageWidth * (Number(field.positionX) / 100);
-  const fieldY = pageHeight * (Number(field.positionY) / 100);
+  // Use signature-level coordinates for signature fields; otherwise use Field coords
+  const useX = isSignatureField
+    ? Number(field.signature?.signaturePositionX)
+    : Number(field.positionX);
+  const useY = isSignatureField
+    ? Number(field.signature?.signaturePositionY)
+    : Number(field.positionY);
+
+  const fieldX = pageWidth * (useX / 100);
+  const fieldY = pageHeight * (useY / 100);
 
   // Draw debug box if debug mode is enabled
   if (isDebugMode) {

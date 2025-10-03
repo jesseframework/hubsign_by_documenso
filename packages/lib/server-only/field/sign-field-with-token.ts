@@ -33,6 +33,8 @@ export type SignFieldWithTokenOptions = {
   userId?: number;
   authOptions?: TRecipientActionAuth;
   requestMetadata?: RequestMetadata;
+  signaturePositionX?: number;
+  signaturePositionY?: number;
 };
 
 /**
@@ -53,6 +55,8 @@ export const signFieldWithToken = async ({
   userId,
   authOptions,
   requestMetadata,
+  signaturePositionX,
+  signaturePositionY,
 }: SignFieldWithTokenOptions) => {
   const recipient = await prisma.recipient.findFirstOrThrow({
     where: {
@@ -200,6 +204,26 @@ export const signFieldWithToken = async ({
   if (isSignatureField && !signatureImageAsBase64 && !typedSignature) {
     throw new Error('Signature field must have a signature');
   }
+  // Validate and coerce coordinates for signature fields
+  let coordX: number | undefined;
+  let coordY: number | undefined;
+
+  if (isSignatureField) {
+    if (signaturePositionX === undefined || signaturePositionY === undefined) {
+      throw new Error('Signature coordinates are required for signature fields');
+    }
+
+    coordX = signaturePositionX;
+    coordY = signaturePositionY;
+
+    if (!Number.isFinite(coordX) || !Number.isFinite(coordY)) {
+      throw new Error('Invalid signature coordinates');
+    }
+
+    if (coordX < 0 || coordX > 100 || coordY < 0 || coordY > 100) {
+      throw new Error('Signature coordinates must be between 0 and 100');
+    }
+  }
 
   if (isSignatureField && documentMeta?.typedSignatureEnabled === false && typedSignature) {
     throw new Error('Typed signatures are not allowed. Please draw your signature');
@@ -228,10 +252,14 @@ export const signFieldWithToken = async ({
           recipientId: field.recipientId,
           signatureImageAsBase64: signatureImageAsBase64,
           typedSignature: typedSignature,
+          signaturePositionX: coordX,
+          signaturePositionY: coordY,
         },
         update: {
           signatureImageAsBase64: signatureImageAsBase64,
           typedSignature: typedSignature,
+          signaturePositionX: coordX,
+          signaturePositionY: coordY,
         },
       });
 
@@ -263,6 +291,10 @@ export const signFieldWithToken = async ({
             .with(FieldType.SIGNATURE, FieldType.FREE_SIGNATURE, (type) => ({
               type,
               data: signatureImageAsBase64 || typedSignature || '',
+              coords:
+                isSignatureField && coordX !== undefined && coordY !== undefined
+                  ? { x: coordX, y: coordY }
+                  : undefined,
             }))
             .with(
               FieldType.DATE,
