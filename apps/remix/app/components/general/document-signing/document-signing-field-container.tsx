@@ -52,6 +52,10 @@ export type DocumentSigningFieldContainerProps = {
     | 'Number'
     | 'Checkbox';
   tooltipText?: string | null;
+  overrideCoords?: { x: number; y: number; width?: number; height?: number };
+  onSignaturePointerDown?: (e: React.PointerEvent) => void;
+  onSignaturePointerMove?: (e: React.PointerEvent) => void;
+  onSignaturePointerUp?: (e: React.PointerEvent) => boolean;
 };
 
 export const DocumentSigningFieldContainer = ({
@@ -63,6 +67,10 @@ export const DocumentSigningFieldContainer = ({
   children,
   type,
   tooltipText,
+  overrideCoords,
+  onSignaturePointerDown,
+  onSignaturePointerMove,
+  onSignaturePointerUp,
 }: DocumentSigningFieldContainerProps) => {
   const { executeActionAuthProcedure, isAuthRedirectRequired } =
     useRequiredDocumentSigningAuthContext();
@@ -131,14 +139,43 @@ export const DocumentSigningFieldContainer = ({
 
   return (
     <div className={cn('[container-type:size]')}>
-      <FieldRootContainer color={RECIPIENT_COLOR_STYLES.green} field={field}>
-        {!field.inserted && !loading && !readOnlyField && (
-          <button
-            type="submit"
-            className="absolute inset-0 z-10 h-full w-full rounded-[2px]"
-            onClick={async () => handleInsertField()}
-          />
-        )}
+      <FieldRootContainer
+        color={RECIPIENT_COLOR_STYLES.green}
+        field={field}
+        overrideCoords={overrideCoords}
+      >
+        {!field.inserted &&
+          !loading &&
+          !readOnlyField &&
+          (type === 'Signature' ? (
+            <div
+              className="absolute inset-0 z-10 h-full w-full touch-none select-none rounded-[2px] hover:cursor-move"
+              onPointerDown={(e) => {
+                try {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                } catch {
+                  // Do nothing.
+                }
+                e.preventDefault();
+                onSignaturePointerDown?.(e);
+              }}
+              onPointerMove={(e) => {
+                e.preventDefault();
+                onSignaturePointerMove?.(e);
+              }}
+              onPointerUp={async (e) => {
+                e.preventDefault();
+                const didDrag = onSignaturePointerUp?.(e);
+                if (!didDrag) await handleInsertField();
+              }}
+            />
+          ) : (
+            <button
+              type="submit"
+              className="absolute inset-0 z-10 h-full w-full rounded-[2px]"
+              onClick={async () => handleInsertField()}
+            />
+          ))}
 
         {readOnlyField && (
           <button className="bg-background/40 absolute inset-0 z-10 flex h-full w-full items-center justify-center rounded-md text-sm opacity-0 duration-200 group-hover:opacity-100">

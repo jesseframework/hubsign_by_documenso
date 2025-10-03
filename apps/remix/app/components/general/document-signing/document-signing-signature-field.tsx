@@ -6,6 +6,7 @@ import { Trans } from '@lingui/react/macro';
 import { Loader } from 'lucide-react';
 import { useRevalidator } from 'react-router';
 
+import { useDraggableSignaturePosition } from '@documenso/lib/client-only/hooks/use-draggable-signature-position';
 import { DO_NOT_INVALIDATE_QUERY_ON_MUTATION } from '@documenso/lib/constants/trpc';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import type { TRecipientActionAuth } from '@documenso/lib/types/document-auth';
@@ -70,6 +71,9 @@ export const DocumentSigningSignatureField = ({
   } = trpc.field.removeSignedFieldWithToken.useMutation(DO_NOT_INVALIDATE_QUERY_ON_MUTATION);
 
   const { signature } = field;
+  const canDrag = !field.inserted;
+  const drag = useDraggableSignaturePosition({ field, enabled: canDrag });
+  const pixels = drag.toPixels();
 
   const isLoading = isSignFieldWithTokenLoading || isRemoveSignedFieldWithTokenLoading;
 
@@ -140,6 +144,8 @@ export const DocumentSigningSignatureField = ({
         value,
         isBase64: !isTypedSignature,
         authOptions,
+        signaturePositionX: drag.posPercent.x,
+        signaturePositionY: drag.posPercent.y,
       };
 
       if (onSignField) {
@@ -234,6 +240,14 @@ export const DocumentSigningSignatureField = ({
       onSign={onSign}
       onRemove={onRemove}
       type="Signature"
+      overrideCoords={
+        pixels
+          ? { x: pixels.x, y: pixels.y, width: pixels.width, height: pixels.height }
+          : undefined
+      }
+      onSignaturePointerDown={drag.onPointerDown}
+      onSignaturePointerMove={drag.onPointerMove}
+      onSignaturePointerUp={drag.onPointerUp}
     >
       {isLoading && (
         <div className="bg-background absolute inset-0 flex items-center justify-center rounded-md">
@@ -242,7 +256,7 @@ export const DocumentSigningSignatureField = ({
       )}
 
       {state === 'empty' && (
-        <p className="group-hover:text-primary font-signature text-muted-foreground group-hover:text-recipient-green text-[clamp(0.575rem,25cqw,1.2rem)] text-xl duration-200">
+        <p className="group-hover:text-primary font-signature text-muted-foreground hover:text-background text-[clamp(0.575rem,25cqw,1.2rem)] text-xl duration-200">
           <Trans>Signature</Trans>
         </p>
       )}
