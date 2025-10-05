@@ -13,23 +13,25 @@ export type FieldContainerPortalProps = {
   field: Field;
   className?: string;
   children: React.ReactNode;
+  overrideCoords?: { x: number; y: number; width?: number; height?: number };
 };
 
 export function FieldContainerPortal({
   field,
   children,
   className = '',
+  overrideCoords,
 }: FieldContainerPortalProps) {
   const coords = useFieldPageCoords(field);
 
   const isCheckboxOrRadioField = field.type === 'CHECKBOX' || field.type === 'RADIO';
 
-  const style = {
-    top: `${coords.y}px`,
-    left: `${coords.x}px`,
+  const style: React.CSSProperties = {
+    top: `${overrideCoords?.y ?? coords.y}px`,
+    left: `${overrideCoords?.x ?? coords.x}px`,
     ...(!isCheckboxOrRadioField && {
-      height: `${coords.height}px`,
-      width: `${coords.width}px`,
+      height: `${overrideCoords?.height ?? coords.height}px`,
+      width: `${overrideCoords?.width ?? coords.width}px`,
     }),
   };
 
@@ -46,9 +48,16 @@ export type FieldRootContainerProps = {
   color?: RecipientColorStyles;
   children: React.ReactNode;
   className?: string;
+  overrideCoords?: { x: number; y: number; width?: number; height?: number };
 };
 
-export function FieldRootContainer({ field, children, color, className }: FieldRootContainerProps) {
+export function FieldRootContainer({
+  field,
+  children,
+  color,
+  className,
+  overrideCoords,
+}: FieldRootContainerProps) {
   const [isValidating, setIsValidating] = useState(false);
   const ref = React.useRef<HTMLDivElement>(null);
 
@@ -73,7 +82,7 @@ export function FieldRootContainer({ field, children, color, className }: FieldR
   }, []);
 
   return (
-    <FieldContainerPortal field={field}>
+    <FieldContainerPortal field={field} overrideCoords={overrideCoords}>
       <div
         id={`field-${field.id}`}
         ref={ref}

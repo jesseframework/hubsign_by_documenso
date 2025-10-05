@@ -441,6 +441,8 @@ export const createDocumentFromDirectTemplate = async ({
                   recipientId: createdDirectRecipient.id,
                   signatureImageAsBase64: signature.signatureImageAsBase64,
                   typedSignature: signature.typedSignature,
+                  signaturePositionX: templateField.positionX,
+                  signaturePositionY: templateField.positionY,
                 },
               },
             },
