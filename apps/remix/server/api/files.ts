@@ -1,17 +1,23 @@
 import { sValidator } from '@hono/standard-validator';
 import { Hono } from 'hono';
 import { PDFDocument } from 'pdf-lib';
+import { z } from 'zod';
 
+import { getOptionalSession } from '@documenso/auth/server/lib/utils/get-session';
 import { APP_DOCUMENT_UPLOAD_SIZE_LIMIT } from '@documenso/lib/constants/app';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import { createDocumentData } from '@documenso/lib/server-only/document-data/create-document-data';
+import { getDocumentAndRecipientByToken } from '@documenso/lib/server-only/document/get-document-by-token';
+import { getApiTokenByToken } from '@documenso/lib/server-only/public-api/get-api-token-by-token';
 import { putFileServerSide } from '@documenso/lib/universal/upload/put-file.server';
 import {
   getPresignGetUrl,
   getPresignPostUrl,
 } from '@documenso/lib/universal/upload/server-actions';
+import { prisma } from '@documenso/prisma';
 
 import type { HonoEnv } from '../router';
+import { buildSignedResponse } from './files.helpers';
 import {
   type TGetPresignedGetUrlResponse,
   type TGetPresignedPostUrlResponse,
@@ -96,5 +102,75 @@ export const filesRoute = new Hono<HonoEnv>()
       console.error(err);
 
       throw new AppError(AppErrorCode.UNKNOWN_ERROR);
+    }
+  })
+  .get('/download/signed', async (c) => {
+    try {
+      const searchParams = new URL(c.req.url).searchParams;
+      const recipientToken = searchParams.get('recipientToken');
+      const apiTokenParam = searchParams.get('apiToken');
+      const documentIdParam = searchParams.get('documentId');
+      const documentId = z.coerce.number().int().positive().parse(documentIdParam);
+      if (!documentId) {
+        throw new AppError(AppErrorCode.NOT_FOUND, { message: 'Document not found' });
+      }
+
+      let userId: number | undefined;
+
+      if (recipientToken) {
+        const byToken = await getDocumentAndRecipientByToken({ token: recipientToken });
+
+        if (byToken.id !== documentId) throw new AppError(AppErrorCode.UNAUTHORIZED);
+
+        if (!byToken.documentData)
+          throw new AppError(AppErrorCode.NOT_FOUND, { message: 'Document data not found' });
+
+        return c.json(
+          await buildSignedResponse(byToken.documentData.type, byToken.documentData.data),
+        );
+      }
+
+      let requesterEmail: string | undefined;
+
+      const token = apiTokenParam;
+      if (token) {
+        const apiToken = await getApiTokenByToken({ token }).catch(() => null);
+
+        if (!apiToken || apiToken.user.disabled)
+          throw new AppError(AppErrorCode.UNAUTHORIZED, { message: 'Invalid API token' });
+
+        userId = apiToken.user.id;
+        requesterEmail = apiToken.user.email.toLowerCase();
+      } else {
+        const { user } = await getOptionalSession(c);
+        if (!user) throw new AppError(AppErrorCode.UNAUTHORIZED);
+
+        userId = user.id;
+        requesterEmail = user.email.toLowerCase();
+      }
+
+      const doc = await prisma.document.findFirst({
+        where: { id: documentId },
+        include: {
+          documentData: true,
+          user: { select: { id: true, email: true } },
+          recipients: { select: { email: true } },
+        },
+      });
+      if (!doc) throw new AppError(AppErrorCode.NOT_FOUND, { message: 'Document not found' });
+
+      const isOwner = !!userId && doc.user?.id === userId;
+      const isRecipient =
+        doc.recipients?.some((r) => r.email.toLowerCase() === requesterEmail) ?? false;
+      if (!isOwner && !isRecipient) throw new AppError(AppErrorCode.UNAUTHORIZED);
+      if (!doc.documentData)
+        throw new AppError(AppErrorCode.NOT_FOUND, { message: 'Document data not found' });
+
+      return c.json(await buildSignedResponse(doc.documentData.type, doc.documentData.data));
+    } catch (error) {
+      console.error('Download failed:', error);
+      const appErr = AppError.parseError(error);
+      const { status, body } = AppError.toRestAPIError(appErr);
+      return c.json(body, status);
     }
   });

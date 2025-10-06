@@ -165,6 +165,79 @@ Once the document is successfully uploaded, you can access it in your Documenso 
 
 </Steps>
 
+## Download Signed Document
+
+GET `/api/files/download/signed`
+
+- Returns the signed PDF for a document. Depending on storage, the response contains either:
+  - `{ "type": "S3_PATH", "url": "<presigned-url>" }` when the file is stored in S3
+  - `{ "type": "BYTES_64", "data": "<base64>" }` when the app stores base64
+  - `{ "type": "BYTES", "data": "<bytes>" }` when the app stores plain bytes
+
+### Query Parameters (search params)
+
+- `documentId` (required, number): The document ID.
+- `recipientToken` (optional, string): A recipient's token for this document. If present, no session/API key is required; the token must belong to a recipient on the same `documentId`.
+- `apiToken` (optional, string): A Documenso API token. If present, the token's user must be the document owner or a recipient on the document.
+
+### Authentication Rules
+
+1. Recipient token flow (priority): If `recipientToken` is provided, the endpoint validates the token against the `documentId` and returns the signed file without requiring a user session.
+2. API token flow: If `apiToken` is provided, the token's user must either:
+   - own the document (creator), or
+   - be a recipient on the document (email match)
+3. Session flow: If neither of the above is provided, the endpoint uses the cookie session. The logged-in user must own the document or be a recipient on it.
+
+### Responses
+
+- 200 OK
+
+```json
+{ "type": "S3_PATH", "url": "https://signed-url.example" }
+```
+
+```json
+{ "type": "BYTES_64", "data": "<base64>" }
+```
+
+```json
+{ "type": "BYTES", "data": "<bytes>" }
+```
+
+- 401 Unauthorized: Invalid/expired token, missing session, or the user isn't permitted to access this document.
+- 404 Not Found: Document or document data not found.
+
+### Examples
+
+Recipient token (no session required):
+
+```bash
+curl -G \
+  --data-urlencode "documentId=123" \
+  --data-urlencode "recipientToken=<recipient-token>" \
+  https://app.documenso.com/api/files/download/signed
+```
+
+API token (query param):
+
+```bash
+curl -G \
+  --data-urlencode "documentId=123" \
+  --data-urlencode "apiToken=api_xxx" \
+  https://app.documenso.com/api/files/download/signed
+```
+
+Session (cookie-based):
+
+```bash
+curl -G \
+  --cookie "session=<your-session-cookie>" \
+  --data-urlencode "documentId=123" \
+  https://app.documenso.com/api/files/download/signed
+```
+
+<Callout type="info">If the response returns `{ type: "S3_PATH", url }`, perform a second GET to `url` to retrieve the PDF bytes.</Callout>
+
 ## Generate Document From Template
 
 Documenso allows you to generate documents from templates. This is useful when you have a standard document format you want to reuse.
