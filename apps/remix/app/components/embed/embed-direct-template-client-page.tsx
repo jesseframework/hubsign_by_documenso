@@ -120,6 +120,8 @@ export const EmbedDirectTemplateClientPage = ({
               payload.value && payload.value.startsWith('data:') ? payload.value : null,
             typedSignature:
               payload.value && !payload.value.startsWith('data:') ? payload.value : null,
+            signaturePositionX: null,
+            signaturePositionY: null,
           } satisfies Signature;
         }
 
@@ -311,6 +313,8 @@ export const EmbedDirectTemplateClientPage = ({
           created: new Date(),
           signatureImageAsBase64: signature?.startsWith('data:') ? signature : null,
           typedSignature: signature?.startsWith('data:') ? null : signature,
+          signaturePositionX: null,
+          signaturePositionY: null,
         }}
       />
     );

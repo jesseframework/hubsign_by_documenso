@@ -40,7 +40,7 @@ export default defineConfig({
   optimizeDeps: {
     entries: ['./app/**/*', '../../packages/ui/**/*', '../../packages/lib/**/*'],
     include: ['prop-types', 'file-selector', 'attr-accept'],
-    exclude: ['node_modules', '@node-rs/bcrypt', '@documenso/pdf-sign', 'sharp'],
+    exclude: ['node_modules', '@node-rs/bcrypt', '@documenso/pdf-sign', 'sharp', '@prisma/client'],
   },
   resolve: {
     alias: {

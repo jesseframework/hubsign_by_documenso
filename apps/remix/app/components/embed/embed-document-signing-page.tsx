@@ -258,6 +258,8 @@ export const EmbedSignDocumentClientPage = ({
           created: new Date(),
           signatureImageAsBase64: signature?.startsWith('data:') ? signature : null,
           typedSignature: signature?.startsWith('data:') ? null : signature,
+          signaturePositionX: null,
+          signaturePositionY: null,
         }}
       />
     );

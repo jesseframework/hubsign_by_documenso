@@ -1,0 +1,132 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 2.61kB done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/library/node:20-slim
+#2 DONE 0.4s
+
+#3 [base 1/2] FROM docker.io/library/node:20-slim@sha256:f679d7699517426eb148a5698c717477fd3f8a48f6c1eaf771e390a9bb8268c8
+#3 resolve docker.io/library/node:20-slim@sha256:f679d7699517426eb148a5698c717477fd3f8a48f6c1eaf771e390a9bb8268c8 done
+#3 DONE 0.0s
+
+#4 [base 2/2] RUN apt-get update && apt-get install -y   build-essential   python3   libvips-dev   git   bash   ca-certificates   curl &&   rm -rf /var/lib/apt/lists/*
+#4 CACHED
+
+#5 [runner  2/10] RUN addgroup --system --gid 1001 nodejs &&     adduser --system --uid 1001 nodejs
+#5 CACHED
+
+#6 [runner  1/10] RUN apt-get update && apt-get install -y bash && rm -rf /var/lib/apt/lists/*
+#6 CACHED
+
+#7 [runner  3/10] WORKDIR /app
+#7 CACHED
+
+#8 [builder 1/4] WORKDIR /app
+#8 CACHED
+
+#9 [internal] load .dockerignore
+#9 transferring context: 445B done
+#9 DONE 0.0s
+
+#10 [internal] load build context
+#10 transferring context: 458.03MB 4.8s done
+#10 DONE 4.9s
+
+#11 [builder 2/4] COPY . .
+#11 DONE 2.4s
+
+#12 [builder 3/4] RUN npm install -g turbo@^1.9.3
+#12 3.010 
+#12 3.010 added 2 packages in 2s
+#12 3.011 npm notice
+#12 3.011 npm notice New major version of npm available! 10.8.2 -> 11.6.1
+#12 3.011 npm notice Changelog: https://github.com/npm/cli/releases/tag/v11.6.1
+#12 3.011 npm notice To update run: npm install -g npm@11.6.1
+#12 3.011 npm notice
+#12 DONE 3.1s
+
+#13 [builder 4/4] RUN turbo prune --scope=@documenso/remix --docker
+#13 0.613 
+#13 0.613 Attention:
+#13 0.613 Turborepo now collects completely anonymous telemetry regarding usage.
+#13 0.613 This information is used to shape the Turborepo roadmap and prioritize features.
+#13 0.613 You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+#13 0.613 https://turbo.build/repo/docs/telemetry
+#13 0.613 
+#13 0.775 Generating pruned monorepo for @documenso/remix in /app/out
+#13 0.780  - Added @documenso/api
+#13 0.798  - Added @documenso/assets
+#13 0.799  - Added @documenso/auth
+#13 0.801  - Added @documenso/ee
+#13 0.804  - Added @documenso/email
+#13 0.824  - Added @documenso/lib
+#13 0.842  - Added @documenso/prisma
+#13 0.868  - Added @documenso/remix
+#13 0.869  - Added @documenso/signing
+#13 0.870  - Added @documenso/tailwind-config
+#13 0.872  - Added @documenso/trpc
+#13 0.873  - Added @documenso/tsconfig
+#13 0.878  - Added @documenso/ui
+#13 DONE 1.3s
+
+#14 [installer  5/18] COPY --from=builder /app/turbo.json ./turbo.json
+#14 CACHED
+
+#15 [installer  6/18] COPY --from=builder /app/apps ./apps
+#15 DONE 0.1s
+
+#16 [installer  7/18] COPY --from=builder /app/packages ./packages
+#16 DONE 0.1s
+
+#17 [installer  8/18] RUN ls -la /app/apps/remix/app
+#17 0.152 total 56
+#17 0.152 drwxr-xr-x  8 root root 4096 Oct  7 22:27 .
+#17 0.152 drwxr-xr-x  1 root root 4096 Oct  7 23:11 ..
+#17 0.152 -rw-r--r--  1 root root  467 Oct  7 22:27 app.css
+#17 0.152 drwxr-xr-x  7 root root 4096 Oct  7 22:27 components
+#17 0.152 -rw-r--r--  1 root root 1177 Oct  7 22:27 entry.client.tsx
+#17 0.152 -rw-r--r--  1 root root 2938 Oct  7 22:27 entry.server.tsx
+#17 0.152 drwxr-xr-x  2 root root 4096 Oct  7 22:27 providers
+#17 0.152 -rw-r--r--  1 root root 5449 Oct  7 22:27 root.tsx
+#17 0.152 drwxr-xr-x 11 root root 4096 Oct  7 22:27 routes
+#17 0.152 -rw-r--r--  1 root root  560 Oct  7 22:27 routes.ts
+#17 0.152 drwxr-xr-x  2 root root 4096 Oct  7 22:27 storage
+#17 0.152 drwxr-xr-x  2 root root 4096 Oct  7 22:27 types
+#17 0.152 drwxr-xr-x  2 root root 4096 Oct  7 22:27 utils
+#17 DONE 0.2s
+
+#18 [installer  9/18] RUN npm install
+#18 35.81 npm warn EBADENGINE Unsupported engine {
+#18 35.81 npm warn EBADENGINE   package: '@documenso/root@1.10.3',
+#18 35.81 npm warn EBADENGINE   required: { npm: '>=10.7.0', node: '>=22.0.0' },
+#18 35.81 npm warn EBADENGINE   current: { node: 'v20.19.5', npm: '10.8.2' }
+#18 35.81 npm warn EBADENGINE }
+#18 46.40 npm warn deprecated read-package-json@6.0.4: This package is no longer supported. Please use @npmcli/package-json instead.
+#18 49.83 npm warn deprecated oslo@0.17.0: Package is no longer supported. Please see https://oslojs.dev for the successor project.
+#18 50.26 npm warn deprecated npmlog@6.0.2: This package is no longer supported.
+#18 51.70 npm warn deprecated lodash.get@4.4.2: This package is deprecated. Use the optional chaining (?.) operator instead.
+#18 53.55 npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
+#18 54.29 npm warn deprecated glob@7.2.3: Glob versions prior to v9 are no longer supported
+#18 54.48 npm warn deprecated gauge@4.0.4: This package is no longer supported.
+#18 54.49 npm warn deprecated fstream@1.0.12: This package is no longer supported.
+#18 58.16 npm warn deprecated eslint@8.57.1: This version is no longer supported. Please see https://eslint.org/version-support for other options.
+#18 58.50 npm warn deprecated are-we-there-yet@3.0.1: This package is no longer supported.
+#18 65.52 npm warn deprecated @npmcli/move-file@2.0.1: This functionality has been moved to @npmcli/fs
+#18 66.56 npm warn deprecated @humanwhocodes/object-schema@2.0.3: Use @eslint/object-schema instead
+#18 66.60 npm warn deprecated @humanwhocodes/config-array@0.13.0: Use @eslint/config-array instead
+#18 70.70 npm warn deprecated glob@8.0.3: Glob versions prior to v9 are no longer supported
+#18 78.63 npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+#18 78.85 npm warn deprecated glob@8.1.0: Glob versions prior to v9 are no longer supported
+#18 80.16 npm warn deprecated rimraf@2.7.1: Rimraf versions prior to v4 are no longer supported
+#18 80.19 npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+#18 80.94 npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+#18 88.80 npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+#18 88.86 npm warn deprecated glob@8.1.0: Glob versions prior to v9 are no longer supported
+#18 89.25 npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+#18 89.34 npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+#18 89.36 npm warn deprecated glob@7.1.7: Glob versions prior to v9 are no longer supported
+#18 89.39 npm warn deprecated npmlog@5.0.1: This package is no longer supported.
+#18 89.53 npm warn deprecated are-we-there-yet@2.0.0: This package is no longer supported.
+#18 90.04 npm warn deprecated gauge@3.0.2: This package is no longer supported.

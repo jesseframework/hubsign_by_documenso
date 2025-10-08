@@ -143,7 +143,7 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
           {/* Card with recipient */}
           <SigningCard3D
             name={recipientName}
-            signature={signatures.at(0)}
+            signature={signatures.at(0) as any}
             signingCelebrationImage={signingCelebration}
           />
 
