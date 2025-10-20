@@ -5,14 +5,13 @@ import type { MessageDescriptor } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useForm } from 'react-hook-form';
 import { FaIdCardClip } from 'react-icons/fa6';
 import { FcGoogle } from 'react-icons/fc';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { z } from 'zod';
 
-import communityCardsImage from '@documenso/assets/images/community-cards.png';
 import { authClient } from '@documenso/auth/client';
 import { useAnalytics } from '@documenso/lib/client-only/hooks/use-analytics';
 import { NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
@@ -32,9 +31,6 @@ import { Input } from '@documenso/ui/primitives/input';
 import { PasswordInput } from '@documenso/ui/primitives/password-input';
 import { SignaturePadDialog } from '@documenso/ui/primitives/signature-pad/signature-pad-dialog';
 import { useToast } from '@documenso/ui/primitives/use-toast';
-
-import { UserProfileSkeleton } from '~/components/general/user-profile-skeleton';
-import { UserProfileTimur } from '~/components/general/user-profile-timur';
 
 type SignUpStep = 'BASIC_DETAILS' | 'CLAIM_USERNAME';
 
@@ -278,8 +274,8 @@ export const SignUpForm = ({
 
             <p className="text-muted-foreground mt-2 text-xs md:text-sm">
               <Trans>
-                You will get notified & be able to set up your documenso public profile when we
-                launch the feature.
+                You will get notified & be able to set up your HubSign public profile when we launch
+                the feature.
               </Trans>
             </p>
           </div>

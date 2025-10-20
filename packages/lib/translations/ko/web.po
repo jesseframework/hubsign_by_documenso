@@ -133,13 +133,13 @@ msgstr "{0}님이 문서를 {recipientActionVerb}하도록 초대했습니다"
 
 #. placeholder {0}: memberName || memberEmail
 #: packages/email/templates/team-join.tsx
-msgid "{0} joined the team {teamName} on Documenso"
-msgstr "{0}님이 Documenso의 팀 {teamName}에 가입했습니다"
+msgid "{0} joined the team {teamName} on HubSign"
+msgstr "{0}님이 HubSign의 팀 {teamName}에 가입했습니다"
 
 #. placeholder {0}: memberName || memberEmail
 #: packages/email/templates/team-leave.tsx
-msgid "{0} left the team {teamName} on Documenso"
-msgstr "{0}님이 Documenso의 팀 {teamName}을 떠났습니다."
+msgid "{0} left the team {teamName} on HubSign"
+msgstr "{0}님이 HubSign의 팀 {teamName}을 떠났습니다."
 
 #. placeholder {0}: remaining.documents
 #. placeholder {1}: quota.documents
@@ -412,8 +412,8 @@ msgid "<0>{senderName}</0> has requested that you take ownership of the followin
 msgstr "<0>{senderName}</0>이(가) 다음 팀의 소유권을 맡기도록 요청했습니다"
 
 #: packages/email/templates/confirm-team-email.tsx
-msgid "<0>{teamName}</0> has requested to use your email address for their team on Documenso."
-msgstr "<0>{teamName}</0>이 귀하의 이메일 주소를 Documenso에서 그들의 팀에 사용하도록 요청했습니다．"
+msgid "<0>{teamName}</0> has requested to use your email address for their team on HubSign."
+msgstr "<0>{teamName}</0>이 귀하의 이메일 주소를 HubSign에서 그들의 팀에 사용하도록 요청했습니다．"
 
 #: apps/remix/app/components/dialogs/template-use-dialog.tsx
 msgid "<0>Click to upload</0> or drag and drop"
@@ -591,25 +591,25 @@ msgstr "이 팀의 소유권을 <0>{0} ({1})</0>에게 이전 요청이 발송�
 
 #. placeholder {0}: team.name
 #: packages/lib/server-only/team/create-team-email-verification.ts
-msgid "A request to use your email has been initiated by {0} on Documenso"
-msgstr "Documenso에서 {0}님이 이메일 사용 요청을 시작했습니다"
+msgid "A request to use your email has been initiated by {0} on HubSign"
+msgstr "HubSign에서 {0}님이 이메일 사용 요청을 시작했습니다"
 
 #: apps/remix/app/components/dialogs/webhook-create-dialog.tsx
-msgid "A secret that will be sent to your URL so you can verify that the request has been sent by Documenso"
-msgstr "Documenso가 요청을 보냈음을 확인할 수 있도록 귀하의 URL로 비밀 정보가 전송됩니다"
+msgid "A secret that will be sent to your URL so you can verify that the request has been sent by HubSign"
+msgstr "HubSign가 요청을 보냈음을 확인할 수 있도록 귀하의 URL로 비밀 정보가 전송됩니다"
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks.$id.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks.$id.tsx
-msgid "A secret that will be sent to your URL so you can verify that the request has been sent by Documenso."
-msgstr "Documenso가 요청을 보냈음을 확인할 수 있도록 귀하의 URL로 비밀 정보가 전송됩니다．"
+msgid "A secret that will be sent to your URL so you can verify that the request has been sent by HubSign."
+msgstr "HubSign가 요청을 보냈음을 확인할 수 있도록 귀하의 URL로 비밀 정보가 전송됩니다．"
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "A stable internet connection"
 msgstr "안정적인 인터넷 연결"
 
 #: packages/email/templates/team-join.tsx
-msgid "A team member has joined a team on Documenso"
-msgstr "Documenso에서 팀 멤버가 팀에 합류했습니다"
+msgid "A team member has joined a team on HubSign"
+msgstr "HubSign에서 팀 멤버가 팀에 합류했습니다"
 
 #. placeholder {0}: team.name
 #: packages/lib/jobs/definitions/emails/send-team-member-left-email.handler.ts
@@ -617,8 +617,8 @@ msgid "A team member has left {0}"
 msgstr "팀원이 {0}에서 나갔습니다"
 
 #: packages/email/templates/team-leave.tsx
-msgid "A team member has left a team on Documenso"
-msgstr "Documenso에서 팀원이 팀을 나갔습니다"
+msgid "A team member has left a team on HubSign"
+msgstr "HubSign에서 팀원이 팀을 나갔습니다"
 
 #: packages/email/templates/team-delete.tsx
 #: packages/email/templates/team-delete.tsx
@@ -646,16 +646,16 @@ msgid "Accept"
 msgstr "수락"
 
 #: packages/email/templates/team-invite.tsx
-msgid "Accept invitation to join a team on Documenso"
-msgstr "Documenso에서 팀 합류 초대를 수락하세요"
+msgid "Accept invitation to join a team on HubSign"
+msgstr "HubSign에서 팀 합류 초대를 수락하세요"
 
 #: packages/email/templates/confirm-team-email.tsx
-msgid "Accept team email request for {teamName} on Documenso"
-msgstr "Documenso에서 {teamName} 팀 이메일 요청을 수락하세요"
+msgid "Accept team email request for {teamName} on HubSign"
+msgstr "HubSign에서 {teamName} 팀 이메일 요청을 수락하세요"
 
 #: packages/email/templates/team-transfer-request.tsx
-msgid "Accept team transfer request on Documenso"
-msgstr "Documenso에서 팀 전송 요청을 수락하세요"
+msgid "Accept team transfer request on HubSign"
+msgstr "HubSign에서 팀 전송 요청을 수락하세요"
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Acceptance and Consent"
@@ -1406,8 +1406,8 @@ msgid "By enabling 2FA, you will be required to enter a code from your authentic
 msgstr "2단계 인증을 활성화하면 이메일 비밀번호를 통해 서명할 때마다 인증 앱에서 코드를 입력해야 합니다."
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
-msgid "By proceeding to use the electronic signature service provided by Documenso, you affirm that you have read and understood this disclosure. You agree to all terms and conditions related to the use of electronic signatures and electronic transactions as outlined herein."
-msgstr "Documenso에서 제공하는 전자 서명 서비스를 계속 사용함으로써 귀하는 이 공개를 읽고 이해했음을 확인하게 됩니다. 귀하는 전자 서명 및 전자 거래 사용과 관련된 모든 조건에 동의합니다．"
+msgid "By proceeding to use the electronic signature service provided by HubSign, you affirm that you have read and understood this disclosure. You agree to all terms and conditions related to the use of electronic signatures and electronic transactions as outlined herein."
+msgstr "HubSign에서 제공하는 전자 서명 서비스를 계속 사용함으로써 귀하는 이 공개를 읽고 이해했음을 확인하게 됩니다. 귀하는 전자 서명 및 전자 거래 사용과 관련된 모든 조건에 동의합니다．"
 
 #: apps/remix/app/components/general/document-signing/document-signing-disclosure.tsx
 msgid "By proceeding with your electronic signature, you acknowledge and consent that it will be used to sign the given document and holds the same legal validity as a handwritten signature. By completing the electronic signing process, you affirm your understanding and acceptance of these conditions."
@@ -2226,8 +2226,8 @@ msgid "Do you want to duplicate this template?"
 msgstr "이 템플릿을 복제하시겠습니까？"
 
 #: apps/remix/app/components/dialogs/account-delete-dialog.tsx
-msgid "Documenso will delete <0>all of your documents</0>, along with all of your completed documents, signatures, and all other resources belonging to your Account."
-msgstr "Documenso는 모든 완료된 문서와 서명을 포함하여 계정에 속한 <0>모든 문서</0>와 기타 모든 자원을 삭제할 것입니다．"
+msgid "HubSign will delete <0>all of your documents</0>, along with all of your completed documents, signatures, and all other resources belonging to your Account."
+msgstr "HubSign는 모든 완료된 문서와 서명을 포함하여 계정에 속한 <0>모든 문서</0>와 기타 모든 자원을 삭제할 것입니다．"
 
 #: apps/remix/app/routes/_authenticated+/documents.$id.logs.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
@@ -3227,8 +3227,8 @@ msgid "It's currently not your turn to sign. You will receive an email with inst
 msgstr "현재 서명할 차례가 아닙니다． 서명할 차례가 되면 이메일로 지침을 받게 됩니다．"
 
 #: packages/email/templates/team-invite.tsx
-msgid "Join {teamName} on Documenso"
-msgstr "Documenso에서 {teamName}에 가입하세요"
+msgid "Join {teamName} on HubSign"
+msgstr "HubSign에서 {teamName}에 가입하세요"
 
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/radio-field.tsx
@@ -5121,8 +5121,8 @@ msgstr "팀"
 
 #. placeholder {0}: team.name
 #: packages/lib/server-only/team/delete-team.ts
-msgid "Team \"{0}\" has been deleted on Documenso"
-msgstr "팀 \"{0}\"이 Documenso에서 삭제되었습니다"
+msgid "Team \"{0}\" has been deleted on HubSign"
+msgstr "팀 \"{0}\"이 HubSign에서 삭제되었습니다"
 
 #: apps/remix/app/components/dialogs/team-checkout-create-dialog.tsx
 msgid "Team checkout"
@@ -5155,8 +5155,8 @@ msgid "Team email removed"
 msgstr "팀 이메일 제거됨"
 
 #: packages/email/templates/team-email-removed.tsx
-msgid "Team email removed for {teamName} on Documenso"
-msgstr "Documenso에서 {teamName}의 팀 이메일이 제거되었습니다"
+msgid "Team email removed for {teamName} on HubSign"
+msgstr "HubSign에서 {teamName}의 팀 이메일이 제거되었습니다"
 
 #: apps/remix/app/routes/_unauthenticated+/team.verify.email.$token.tsx
 msgid "Team email verification"
@@ -5338,8 +5338,8 @@ msgid "Text Color"
 msgstr "텍스트 색상"
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
-msgid "Thank you for using Documenso to perform your electronic document signing. The purpose of this disclosure is to inform you about the process, legality, and your rights regarding the use of electronic signatures on our platform. By opting to use an electronic signature, you are agreeing to the terms and conditions outlined below."
-msgstr "Documenso를 사용하여 전자 문서 서명을 수행해 주셔서 감사합니다． 이 공개의 목적은 전자 서명의 프로세스, 합법성 및 귀하의 권리에 대해 알리는 것입니다． 전자 서명을 사용하기로 선택함으로써 귀하는 아래에 명시된 약관에 동의하게 됩니다．"
+msgid "Thank you for using HubSign to perform your electronic document signing. The purpose of this disclosure is to inform you about the process, legality, and your rights regarding the use of electronic signatures on our platform. By opting to use an electronic signature, you are agreeing to the terms and conditions outlined below."
+msgstr "HubSign를 사용하여 전자 문서 서명을 수행해 주셔서 감사합니다． 이 공개의 목적은 전자 서명의 프로세스, 합법성 및 귀하의 권리에 대해 알리는 것입니다． 전자 서명을 사용하기로 선택함으로써 귀하는 아래에 명시된 약관에 동의하게 됩니다．"
 
 #: packages/email/template-components/template-forgot-password.tsx
 msgid "That's okay, it happens! Click the button below to reset your password."
@@ -5566,8 +5566,8 @@ msgstr "수신자가 문서 서명 시 사용할 수 있는 서명 유형입니�
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks.$id.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks.$id.tsx
 #: apps/remix/app/components/dialogs/webhook-create-dialog.tsx
-msgid "The URL for Documenso to send webhook events to."
-msgstr "웹훅 이벤트를 Documenso로 전송할 URL입니다．"
+msgid "The URL for HubSign to send webhook events to."
+msgstr "웹훅 이벤트를 HubSign로 전송할 URL입니다．"
 
 #: apps/remix/app/components/dialogs/webhook-delete-dialog.tsx
 msgid "The webhook has been successfully deleted."
@@ -5665,8 +5665,8 @@ msgid "This document was created using a direct link."
 msgstr "이 문서는 직접 링크를 사용하여 생성되었습니다．"
 
 #: packages/email/template-components/template-footer.tsx
-msgid "This document was sent using <0>Documenso.</0>"
-msgstr "이 문서는 <0>Documenso.</0> 를 사용하여 발송되었습니다."
+msgid "This document was sent using <0>HubSign.</0>"
+msgstr "이 문서는 <0>HubSign.</0> 를 사용하여 발송되었습니다."
 
 #: packages/email/template-components/template-document-rejection-confirmed.tsx
 msgid "This email confirms that you have rejected the document <0>\"{documentName}\"</0> sent by {documentOwnerName}."
@@ -6438,8 +6438,8 @@ msgid "Waiting for Your Turn"
 msgstr "당신의 차례를 기다리는 중"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
-msgid "Want to send slick signing links like this one? <0>Check out Documenso.</0>"
-msgstr "멋진 서명 링크를 보내고 싶으신가요? <0>Documenso를 확인하세요.</0>"
+msgid "Want to send slick signing links like this one? <0>Check out HubSign.</0>"
+msgstr "멋진 서명 링크를 보내고 싶으신가요? <0>HubSign를 확인하세요.</0>"
 
 #: apps/remix/app/routes/_profile+/_layout.tsx
 msgid "Want your own public profile?"
@@ -6723,8 +6723,8 @@ msgid "Welcome back, we are lucky to have you."
 msgstr "다시 돌아오신 것을 환영합니다. 여러분과 함께 할 수 있어 기쁩니다．"
 
 #: packages/email/template-components/template-confirmation-email.tsx
-msgid "Welcome to Documenso!"
-msgstr "Documenso에 오신 것을 환영합니다！"
+msgid "Welcome to HubSign!"
+msgstr "HubSign에 오신 것을 환영합니다！"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/waiting.tsx
 msgid "Were you trying to edit this document instead?"
@@ -6748,8 +6748,8 @@ msgid "When you use our platform to affix your electronic signature to documents
 msgstr "플랫폼을 사용하여 문서에 전자 서명을 추가하면 세계 및 국내 상거래에서의 전자 서명법(E-Sign법) 및 기타 관련 법률에 따라 이를 수행하는 데 동의하게 됩니다． 이 행동은 문서에 서명하고 알림을 전자적으로 받는 것에 대한 귀하의 동의를 나타냅니다．"
 
 #: apps/remix/app/routes/_profile+/p.$url.tsx
-msgid "While waiting for them to do so you can create your own Documenso account and get started with document signing right away."
-msgstr "그들이 그렇게 하기 전에 Documenso 계정을 만들고 바로 문서 서명을 시작할 수 있습니다．"
+msgid "While waiting for them to do so you can create your own HubSign account and get started with document signing right away."
+msgstr "그들이 그렇게 하기 전에 HubSign 계정을 만들고 바로 문서 서명을 시작할 수 있습니다．"
 
 #: apps/remix/app/components/dialogs/document-resend-dialog.tsx
 msgid "Who do you want to remind?"
@@ -6853,8 +6853,8 @@ msgid "You can copy and share these links to recipients so they can action the d
 msgstr "이 링크를 복사하고 수신자에게 공유하여 문서를 처리할 수 있도록 하십시오．"
 
 #: packages/email/templates/confirm-team-email.tsx
-msgid "You can revoke access at any time in your team settings on Documenso <0>here.</0>"
-msgstr "Documenso의 팀 설정에서 언제든지 <0>여기</0>에서 액세스를 취소할 수 있습니다"
+msgid "You can revoke access at any time in your team settings on HubSign <0>here.</0>"
+msgstr "HubSign의 팀 설정에서 언제든지 <0>여기</0>에서 액세스를 취소할 수 있습니다"
 
 #: apps/remix/app/components/forms/public-profile-form.tsx
 msgid "You can update the profile URL by updating the team URL in the general settings page."
@@ -6932,8 +6932,8 @@ msgstr "<0>{0}</0>의 초대로 그들의 팀에 가입했습니다."
 
 #. placeholder {0}: team.name
 #: packages/lib/server-only/team/create-team-member-invites.ts
-msgid "You have been invited to join {0} on Documenso"
-msgstr "Documenso에서 {0}에 초대되었습니다"
+msgid "You have been invited to join {0} on HubSign"
+msgstr "HubSign에서 {0}에 초대되었습니다"
 
 #: packages/email/templates/team-invite.tsx
 msgid "You have been invited to join the following team"
@@ -6946,8 +6946,8 @@ msgstr "문서에서 제거되었습니다"
 
 #. placeholder {0}: team.name
 #: packages/lib/server-only/team/request-team-ownership-transfer.ts
-msgid "You have been requested to take ownership of team {0} on Documenso"
-msgstr "Documenso에서 팀 {0}의 소유권을 요청받았습니다"
+msgid "You have been requested to take ownership of team {0} on HubSign"
+msgstr "HubSign에서 팀 {0}의 소유권을 요청받았습니다"
 
 #. placeholder {0}: data.teamName
 #: apps/remix/app/routes/_unauthenticated+/team.decline.$token.tsx
@@ -7069,8 +7069,8 @@ msgid "You need to setup 2FA to mark this document as viewed."
 msgstr "이 문서를 봤다고 표시하려면 2단계 인증을 설정해야 합니다．"
 
 #: apps/remix/app/components/forms/signup.tsx
-msgid "You will get notified & be able to set up your documenso public profile when we launch the feature."
-msgstr "기능이 출시되면 알림을 받고 Documenso 공개 프로필을 설정할 수 있습니다．"
+msgid "You will get notified & be able to set up your hubsign public profile when we launch the feature."
+msgstr "기능이 출시되면 알림을 받고 HubSign 공개 프로필을 설정할 수 있습니다．"
 
 #: apps/remix/app/components/forms/2fa/enable-authenticator-app-dialog.tsx
 msgid "You will now be required to enter a code from your authenticator app when signing in."
@@ -7157,12 +7157,12 @@ msgid "Your documents"
 msgstr "내 문서"
 
 #: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
-msgid "Your email has already been confirmed. You can now use all features of Documenso."
-msgstr "이메일이 이미 확인되었습니다. 지금 Documenso의 모든 기능을 사용할 수 있습니다."
+msgid "Your email has already been confirmed. You can now use all features of HubSign."
+msgstr "이메일이 이미 확인되었습니다. 지금 HubSign의 모든 기능을 사용할 수 있습니다."
 
 #: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
-msgid "Your email has been successfully confirmed! You can now use all features of Documenso."
-msgstr "이메일이 성공적으로 확인되었습니다! 이제 Documenso의 모든 기능을 사용할 수 있습니다．"
+msgid "Your email has been successfully confirmed! You can now use all features of HubSign."
+msgstr "이메일이 성공적으로 확인되었습니다! 이제 HubSign의 모든 기능을 사용할 수 있습니다．"
 
 #. placeholder {0}: teamEmail.team.name
 #. placeholder {1}: teamEmail.team.url
