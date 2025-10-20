@@ -17,7 +17,7 @@ export const TemplateFooter = ({ isDocument = true }: TemplateFooterProps) => {
           <Trans>
             This document was sent using{' '}
             <Link className="text-[#7AC455]" href="https://hubsign.io/mail-footer">
-              Hub Sign.
+              HubSign.
             </Link>
           </Trans>
         </Text>
@@ -36,9 +36,8 @@ export const TemplateFooter = ({ isDocument = true }: TemplateFooterProps) => {
         </Text>
       ) : (
         <Text className="my-8 text-sm text-slate-400">
-          Hub Sign Part Of Future Edge Ind.
+          HubSign Part Of Future Edge Technology Inc
           <br />
-          
         </Text>
       )}
     </Section>

@@ -191,7 +191,7 @@ export default function WebhookPage() {
                   <FormDescription>
                     <Trans>
                       A secret that will be sent to your URL so you can verify that the request has
-                      been sent by Documenso.
+                      been sent by HubSign.
                     </Trans>
                   </FormDescription>
                   <FormMessage />
