@@ -111,10 +111,9 @@ msgstr "{0, plural, one {1 odbiorca} few {# odbiorców} many {# odbiorców} othe
 msgid "{0, plural, one {Waiting on 1 recipient} other {Waiting on # recipients}}"
 msgstr "{0, plural, one {Czekam na 1 odbiorcę} few {Czekam na # odbiorców} many {Czekam na # odbiorców} other {Czekam na # odbiorców}}"
 
-#. placeholder {0}: selectedValues.length
 #: apps/remix/app/components/general/webhook-multiselect-combobox.tsx
-msgid "{0, plural, zero {Select values} other {# selected...}}"
-msgstr "{0, plural, zero {Wybierz wartości} one {# wybrana...} few {# wybrane...} many {# wybranych...} other {# wybranych...}}"
+#~ msgid "{0, plural, zero {Select values} other {# selected...}}"
+#~ msgstr "{0, plural, zero {Wybierz wartości} one {# wybrana...} few {# wybrane...} many {# wybranych...} other {# wybranych...}}"
 
 #. placeholder {0}: _(FRIENDLY_FIELD_TYPE[fieldType as FieldType])
 #: apps/remix/app/components/general/document-signing/document-signing-auto-sign.tsx
@@ -721,8 +720,8 @@ msgstr "Akcja"
 msgid "Actions"
 msgstr "Akcje"
 
-#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.members.tsx
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings._index.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.members.tsx
 #: apps/remix/app/components/tables/user-settings-teams-page-table.tsx
 msgid "Active"
 msgstr "Aktywne"
@@ -873,6 +872,7 @@ msgstr "Opcje zaawansowane"
 
 #: apps/remix/app/components/embed/authoring/field-advanced-settings-drawer.tsx
 #: packages/ui/primitives/template-flow/add-template-fields.tsx
+#: packages/ui/primitives/document-flow/field-item.tsx
 #: packages/ui/primitives/document-flow/add-fields.tsx
 msgid "Advanced settings"
 msgstr "Ustawienia zaawansowane"
@@ -2607,12 +2607,12 @@ msgid "Document will be permanently deleted"
 msgstr "Dokument zostanie trwale usunięty"
 
 #: apps/remix/app/routes/_profile+/p.$url.tsx
-#: apps/remix/app/routes/_authenticated+/documents.f.$folderId._index.tsx
-#: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id.edit.tsx
-#: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/documents._index.tsx
-#: apps/remix/app/routes/_authenticated+/documents.$id.edit.tsx
+#: apps/remix/app/routes/_authenticated+/documents.f.$folderId._index.tsx
+#: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id.edit.tsx
 #: apps/remix/app/routes/_authenticated+/documents.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/documents.$id.edit.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
 #: apps/remix/app/components/tables/admin-dashboard-users-table.tsx
 #: apps/remix/app/components/general/user-profile-timur.tsx
@@ -2725,8 +2725,13 @@ msgstr "Z powodu nieopłaconej faktury Twój zespół został ograniczony. Prosz
 #: apps/remix/app/components/dialogs/template-duplicate-dialog.tsx
 #: apps/remix/app/components/dialogs/document-duplicate-dialog.tsx
 #: apps/remix/app/components/dialogs/document-duplicate-dialog.tsx
+#: packages/ui/primitives/document-flow/field-item.tsx
 msgid "Duplicate"
 msgstr "Zduplikuj"
+
+#: packages/ui/primitives/document-flow/field-item.tsx
+msgid "Duplicate on all pages"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks._index.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks._index.tsx
@@ -2914,12 +2919,12 @@ msgstr "Wprowadź swoje imię"
 msgid "Enter your text here"
 msgstr "Wprowadź swój tekst tutaj"
 
-#: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
-#: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
-#: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
-#: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
+#: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
+#: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
+#: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
+#: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
 #: apps/remix/app/components/general/verify-email-banner.tsx
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/template/template-edit-form.tsx
@@ -3186,8 +3191,8 @@ msgstr "Wróć"
 msgid "Go back home"
 msgstr "Wróć do domu"
 
-#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
 #: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
 msgid "Go Back Home"
 msgstr "Wróć do domu"
 
@@ -3915,7 +3920,6 @@ msgstr "Nie znaleziono ważnych szablonów bezpośrednich"
 msgid "No valid recipients found"
 msgstr "Nie znaleziono ważnych odbiorców"
 
-#: apps/remix/app/components/general/webhook-multiselect-combobox.tsx
 #: apps/remix/app/components/general/multiselect-role-combobox.tsx
 #: packages/ui/primitives/multi-select-combobox.tsx
 #: packages/ui/primitives/combobox.tsx
@@ -4091,8 +4095,8 @@ msgstr "Nazwa klucza dostępu"
 msgid "Passkey Re-Authentication"
 msgstr "Ponowna Autoryzacja Klucza Dostępu"
 
-#: apps/remix/app/routes/_authenticated+/settings+/security.passkeys.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/security._index.tsx
+#: apps/remix/app/routes/_authenticated+/settings+/security.passkeys.tsx
 msgid "Passkeys"
 msgstr "Klucze dostępu"
 
@@ -4607,6 +4611,7 @@ msgstr "Przypomnienie: Proszę {recipientActionVerb} Twój dokument"
 #: apps/remix/app/components/dialogs/template-direct-link-dialog.tsx
 #: apps/remix/app/components/dialogs/template-bulk-send-dialog.tsx
 #: apps/remix/app/components/dialogs/team-email-delete-dialog.tsx
+#: packages/ui/primitives/document-flow/field-item.tsx
 #: packages/ui/primitives/document-flow/add-fields.tsx
 msgid "Remove"
 msgstr "Usuń"
@@ -4848,6 +4853,11 @@ msgstr "Wybierz domyślną opcję"
 #: apps/remix/app/components/general/document-signing/document-signing-auth-passkey.tsx
 msgid "Select passkey"
 msgstr "Wybierz klucz uwierzytelniający"
+
+#: apps/remix/app/components/general/webhook-multiselect-combobox.tsx
+#: apps/remix/app/components/general/webhook-multiselect-combobox.tsx
+msgid "Select triggers"
+msgstr ""
 
 #: packages/ui/primitives/document-flow/send-document-action-dialog.tsx
 #: packages/ui/primitives/document-flow/send-document-action-dialog.tsx
@@ -5191,8 +5201,8 @@ msgstr "Od {0}"
 msgid "Site Banner"
 msgstr "Baner strony"
 
-#: apps/remix/app/routes/_authenticated+/admin+/site-settings.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
+#: apps/remix/app/routes/_authenticated+/admin+/site-settings.tsx
 msgid "Site Settings"
 msgstr "Ustawienia strony"
 
@@ -5340,9 +5350,9 @@ msgstr "Subskrypcja"
 msgid "Subscriptions"
 msgstr "Subskrypcje"
 
+#: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 #: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
 #: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
-#: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 #: apps/remix/app/components/tables/user-settings-pending-teams-table-actions.tsx
 #: apps/remix/app/components/tables/team-settings-member-invites-table.tsx
 #: apps/remix/app/components/tables/team-settings-member-invites-table.tsx
@@ -5539,10 +5549,10 @@ msgstr "Zespoły"
 msgid "Teams restricted"
 msgstr "Zespoły ograniczone"
 
-#: apps/remix/app/routes/_authenticated+/templates.f.$folderId.$id.edit.tsx
 #: apps/remix/app/routes/_authenticated+/templates.f.$folderId.$id._index.tsx
-#: apps/remix/app/routes/_authenticated+/templates.$id.edit.tsx
+#: apps/remix/app/routes/_authenticated+/templates.f.$folderId.$id.edit.tsx
 #: apps/remix/app/routes/_authenticated+/templates.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/templates.$id.edit.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
@@ -5600,9 +5610,9 @@ msgstr "Tytuł szablonu"
 msgid "Template updated successfully"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates.f.$folderId._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates.f.$folderId.$id._index.tsx
-#: apps/remix/app/routes/_authenticated+/templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates.$id._index.tsx
 #: apps/remix/app/components/general/app-nav-mobile.tsx
 #: apps/remix/app/components/general/app-nav-desktop.tsx
@@ -5636,8 +5646,12 @@ msgid "Text Color"
 msgstr "Kolor tekstu"
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
-msgid "Thank you for using Documenso to perform your electronic document signing. The purpose of this disclosure is to inform you about the process, legality, and your rights regarding the use of electronic signatures on our platform. By opting to use an electronic signature, you are agreeing to the terms and conditions outlined below."
-msgstr "Dziękujemy za korzystanie z Documenso do wykonywania podpisu elektronicznego dokumentu. Celem tego ujawnienia jest poinformowanie Cię o procesie, legalności oraz Twoich prawach dotyczących korzystania z podpisów elektronicznych na naszej platformie. Decydując się na korzystanie z podpisu elektronicznego, zgadzasz się na warunki opisane poniżej."
+#~ msgid "Thank you for using Documenso to perform your electronic document signing. The purpose of this disclosure is to inform you about the process, legality, and your rights regarding the use of electronic signatures on our platform. By opting to use an electronic signature, you are agreeing to the terms and conditions outlined below."
+#~ msgstr "Dziękujemy za korzystanie z Documenso do wykonywania podpisu elektronicznego dokumentu. Celem tego ujawnienia jest poinformowanie Cię o procesie, legalności oraz Twoich prawach dotyczących korzystania z podpisów elektronicznych na naszej platformie. Decydując się na korzystanie z podpisu elektronicznego, zgadzasz się na warunki opisane poniżej."
+
+#: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
+msgid "Thank you for using Hub Sign to perform your electronic document signing. The purpose of this disclosure is to inform you about the process, legality, and your rights regarding the use of electronic signatures on our platform. By opting to use an electronic signature, you are agreeing to the terms and conditions outlined below."
+msgstr ""
 
 #: packages/email/template-components/template-forgot-password.tsx
 msgid "That's okay, it happens! Click the button below to reset your password."
@@ -5897,10 +5911,13 @@ msgid "The types of signatures that recipients are allowed to use when signing t
 msgstr "Rodzaje podpisów, jakie odbiorcy mogą używać przy podpisywaniu dokumentu."
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks.$id.tsx
-#: apps/remix/app/routes/_authenticated+/settings+/webhooks.$id.tsx
-#: apps/remix/app/components/dialogs/webhook-create-dialog.tsx
 msgid "The URL for Documenso to send webhook events to."
 msgstr "URL dla Documenso do wysyłania zdarzeń webhook."
+
+#: apps/remix/app/routes/_authenticated+/settings+/webhooks.$id.tsx
+#: apps/remix/app/components/dialogs/webhook-create-dialog.tsx
+msgid "The URL for Hub Sign to send webhook events to."
+msgstr ""
 
 #: apps/remix/app/components/dialogs/webhook-delete-dialog.tsx
 msgid "The webhook has been successfully deleted."
@@ -6017,8 +6034,12 @@ msgid "This document was created using a direct link."
 msgstr "Ten dokument został stworzony przy użyciu bezpośredniego linku."
 
 #: packages/email/template-components/template-footer.tsx
-msgid "This document was sent using <0>Documenso.</0>"
-msgstr "Ten dokument został wysłany za pomocą <0>Documenso.</0>"
+#~ msgid "This document was sent using <0>Documenso.</0>"
+#~ msgstr "Ten dokument został wysłany za pomocą <0>Documenso.</0>"
+
+#: packages/email/template-components/template-footer.tsx
+msgid "This document was sent using <0>Hub Sign.</0>"
+msgstr ""
 
 #: packages/email/template-components/template-document-rejection-confirmed.tsx
 msgid "This email confirms that you have rejected the document <0>\"{documentName}\"</0> sent by {documentOwnerName}."
@@ -6642,8 +6663,8 @@ msgid "User not found."
 msgstr "Nie znaleziono użytkownika."
 
 #: apps/remix/app/components/forms/signup.tsx
-msgid "User profiles are here!"
-msgstr "Profile użytkowników są tutaj!"
+#~ msgid "User profiles are here!"
+#~ msgstr "Profile użytkowników są tutaj!"
 
 #: apps/remix/app/components/general/menu-switcher.tsx
 msgid "User settings"
@@ -7052,8 +7073,8 @@ msgstr "Wygenerujemy dla Ciebie linki do podpisania, które możesz wysłać do 
 msgid "We won't send anything to notify recipients."
 msgstr "Nie wyślemy nic, aby powiadomić odbiorców."
 
-#: apps/remix/app/routes/_authenticated+/templates.f.$folderId._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates._index.tsx
+#: apps/remix/app/routes/_authenticated+/templates.f.$folderId._index.tsx
 #: apps/remix/app/components/tables/documents-table-empty-state.tsx
 msgid "We're all empty"
 msgstr "Pusto"
@@ -7355,8 +7376,8 @@ msgstr "Rozpocząłeś dokument {0}, który wymaga, abyś go {recipientActionVer
 msgid "You have no webhooks yet. Your webhooks will be shown here once you create them."
 msgstr "Nie masz jeszcze żadnych webhooków. Twoje webhooki będą tutaj widoczne, gdy je utworzysz."
 
-#: apps/remix/app/routes/_authenticated+/templates.f.$folderId._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates._index.tsx
+#: apps/remix/app/routes/_authenticated+/templates.f.$folderId._index.tsx
 msgid "You have not yet created any templates. To create a template please upload one."
 msgstr "Brak utworzonych szablonów. Prześlij, aby utworzyć."
 
@@ -7561,12 +7582,20 @@ msgid "Your documents"
 msgstr "Twoje dokumenty"
 
 #: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
-msgid "Your email has already been confirmed. You can now use all features of Documenso."
-msgstr "Twój e-mail został już potwierdzony. Możesz teraz korzystać z wszystkich funkcji Documenso."
+#~ msgid "Your email has already been confirmed. You can now use all features of Documenso."
+#~ msgstr "Twój e-mail został już potwierdzony. Możesz teraz korzystać z wszystkich funkcji Documenso."
 
 #: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
-msgid "Your email has been successfully confirmed! You can now use all features of Documenso."
-msgstr "Twój adres e-mail został pomyślnie potwierdzony! Możesz teraz korzystać ze wszystkich funkcji Documenso."
+msgid "Your email has already been confirmed. You can now use all features of Hub Sign."
+msgstr ""
+
+#: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
+#~ msgid "Your email has been successfully confirmed! You can now use all features of Documenso."
+#~ msgstr "Twój adres e-mail został pomyślnie potwierdzony! Możesz teraz korzystać ze wszystkich funkcji Documenso."
+
+#: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
+msgid "Your email has been successfully confirmed! You can now use all features of Hub Sign."
+msgstr ""
 
 #. placeholder {0}: teamEmail.team.name
 #. placeholder {1}: teamEmail.team.url
