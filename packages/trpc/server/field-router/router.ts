@@ -454,6 +454,8 @@ export const fieldRouter = router({
         authOptions,
         signaturePositionX,
         signaturePositionY,
+        fieldSignedPositionX,
+        fieldSignedPositionY,
       } = input;
 
       return await signFieldWithToken({
@@ -466,6 +468,8 @@ export const fieldRouter = router({
         requestMetadata: ctx.metadata.requestMetadata,
         signaturePositionX,
         signaturePositionY,
+        fieldSignedPositionX,
+        fieldSignedPositionY,
       });
     }),
 

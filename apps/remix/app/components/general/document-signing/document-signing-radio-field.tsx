@@ -17,6 +17,7 @@ import type {
 import { Label } from '@documenso/ui/primitives/label';
 import { RadioGroup, RadioGroupItem } from '@documenso/ui/primitives/radio-group';
 import { useToast } from '@documenso/ui/primitives/use-toast';
+import { useDraggableFieldPosition } from '@documenso/lib/client-only/hooks/use-draggable-field-position';
 
 import { useRequiredDocumentSigningAuthContext } from './document-signing-auth-provider';
 import { DocumentSigningFieldContainer } from './document-signing-field-container';
@@ -52,6 +53,10 @@ export const DocumentSigningRadioField = ({
 
   const { executeActionAuthProcedure } = useRequiredDocumentSigningAuthContext();
 
+  const canDrag = !field.inserted;
+  const drag = useDraggableFieldPosition({ field, enabled: canDrag });
+  const pixels = drag.toPixels();
+
   const { mutateAsync: signFieldWithToken, isPending: isSignFieldWithTokenLoading } =
     trpc.field.signFieldWithToken.useMutation(DO_NOT_INVALIDATE_QUERY_ON_MUTATION);
 
@@ -78,6 +83,8 @@ export const DocumentSigningRadioField = ({
         value: selectedOption,
         isBase64: true,
         authOptions,
+        fieldSignedPositionX: drag.posPercent.x,
+        fieldSignedPositionY: drag.posPercent.y,
       };
 
       if (onSignField) {
@@ -149,7 +156,18 @@ export const DocumentSigningRadioField = ({
   }, [selectedOption, field]);
 
   return (
-    <DocumentSigningFieldContainer field={field} onSign={onSign} onRemove={onRemove} type="Radio">
+    <DocumentSigningFieldContainer
+      field={field}
+      onSign={onSign}
+      onRemove={onRemove}
+      type="Radio"
+      overrideCoords={
+        pixels ? { x: pixels.x, y: pixels.y, width: pixels.width, height: pixels.height } : undefined
+      }
+      onSignaturePointerDown={drag.onPointerDown}
+      onSignaturePointerMove={drag.onPointerMove}
+      onSignaturePointerUp={drag.onPointerUp}
+    >
       {isLoading && <DocumentSigningFieldsLoader />}
 
       {!field.inserted && (

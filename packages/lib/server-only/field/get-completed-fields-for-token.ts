@@ -23,6 +23,7 @@ export const getCompletedFieldsForToken = async ({ token }: GetCompletedFieldsFo
     },
     include: {
       signature: true,
+      fieldSignedPosition: true,
       recipient: {
         select: {
           name: true,

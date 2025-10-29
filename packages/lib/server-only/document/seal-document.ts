@@ -99,6 +99,7 @@ export const sealDocument = async ({
     },
     include: {
       signature: true,
+      fieldSignedPosition: true,
     },
   });
 

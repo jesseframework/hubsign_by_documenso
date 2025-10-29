@@ -158,6 +158,8 @@ export const ZSignFieldWithTokenMutationSchema = z.object({
   authOptions: ZRecipientActionAuthSchema.optional(),
   signaturePositionX: z.number().optional(),
   signaturePositionY: z.number().optional(),
+  fieldSignedPositionX: z.number().optional(),
+  fieldSignedPositionY: z.number().optional(),
 });
 
 export type TSignFieldWithTokenMutationSchema = z.infer<typeof ZSignFieldWithTokenMutationSchema>;

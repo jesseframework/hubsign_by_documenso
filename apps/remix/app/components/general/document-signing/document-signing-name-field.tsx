@@ -16,6 +16,7 @@ import type {
   TSignFieldWithTokenMutationSchema,
 } from '@documenso/trpc/server/field-router/schema';
 import { Button } from '@documenso/ui/primitives/button';
+import { useDraggableFieldPosition } from '@documenso/lib/client-only/hooks/use-draggable-field-position';
 import { Dialog, DialogContent, DialogFooter, DialogTitle } from '@documenso/ui/primitives/dialog';
 import { Input } from '@documenso/ui/primitives/input';
 import { Label } from '@documenso/ui/primitives/label';
@@ -91,6 +92,10 @@ export const DocumentSigningNameField = ({
     });
   };
 
+  const canDrag = !field.inserted;
+  const drag = useDraggableFieldPosition({ field, enabled: canDrag });
+  const pixels = drag.toPixels();
+
   const onSign = async (authOptions?: TRecipientActionAuth, name?: string) => {
     try {
       const value = name || providedFullName || '';
@@ -106,6 +111,8 @@ export const DocumentSigningNameField = ({
         value,
         isBase64: false,
         authOptions,
+        fieldSignedPositionX: drag.posPercent.x,
+        fieldSignedPositionY: drag.posPercent.y,
       };
 
       if (onSignField) {
@@ -168,6 +175,12 @@ export const DocumentSigningNameField = ({
       onSign={onSign}
       onRemove={onRemove}
       type="Name"
+      overrideCoords={
+        pixels ? { x: pixels.x, y: pixels.y, width: pixels.width, height: pixels.height } : undefined
+      }
+      onSignaturePointerDown={drag.onPointerDown}
+      onSignaturePointerMove={drag.onPointerMove}
+      onSignaturePointerUp={drag.onPointerUp}
     >
       {isLoading && <DocumentSigningFieldsLoader />}
 

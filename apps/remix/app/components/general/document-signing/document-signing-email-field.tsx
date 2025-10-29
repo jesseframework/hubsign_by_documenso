@@ -14,6 +14,7 @@ import type {
   TSignFieldWithTokenMutationSchema,
 } from '@documenso/trpc/server/field-router/schema';
 import { useToast } from '@documenso/ui/primitives/use-toast';
+import { useDraggableFieldPosition } from '@documenso/lib/client-only/hooks/use-draggable-field-position';
 
 import { DocumentSigningFieldContainer } from './document-signing-field-container';
 import {
@@ -53,6 +54,10 @@ export const DocumentSigningEmailField = ({
 
   const isLoading = isSignFieldWithTokenLoading || isRemoveSignedFieldWithTokenLoading;
 
+  const canDrag = !field.inserted;
+  const drag = useDraggableFieldPosition({ field, enabled: canDrag });
+  const pixels = drag.toPixels();
+
   const safeFieldMeta = ZEmailFieldMeta.safeParse(field.fieldMeta);
   const parsedFieldMeta = safeFieldMeta.success ? safeFieldMeta.data : null;
 
@@ -66,6 +71,8 @@ export const DocumentSigningEmailField = ({
         value,
         isBase64: false,
         authOptions,
+        fieldSignedPositionX: drag.posPercent.x,
+        fieldSignedPositionY: drag.posPercent.y,
       };
 
       if (onSignField) {
@@ -122,7 +129,18 @@ export const DocumentSigningEmailField = ({
   };
 
   return (
-    <DocumentSigningFieldContainer field={field} onSign={onSign} onRemove={onRemove} type="Email">
+    <DocumentSigningFieldContainer
+      field={field}
+      onSign={onSign}
+      onRemove={onRemove}
+      type="Email"
+      overrideCoords={
+        pixels ? { x: pixels.x, y: pixels.y, width: pixels.width, height: pixels.height } : undefined
+      }
+      onSignaturePointerDown={drag.onPointerDown}
+      onSignaturePointerMove={drag.onPointerMove}
+      onSignaturePointerUp={drag.onPointerUp}
+    >
       {isLoading && <DocumentSigningFieldsLoader />}
 
       {!field.inserted && (

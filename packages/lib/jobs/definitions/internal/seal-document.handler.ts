@@ -117,6 +117,7 @@ export const run = async ({
     },
     include: {
       signature: true,
+      fieldSignedPosition: true,
     },
   });
 

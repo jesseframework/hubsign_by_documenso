@@ -3,6 +3,7 @@ import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import { useRevalidator } from 'react-router';
 
+import { useDraggableFieldPosition } from '@documenso/lib/client-only/hooks/use-draggable-field-position';
 import { DO_NOT_INVALIDATE_QUERY_ON_MUTATION } from '@documenso/lib/constants/trpc';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import type { TRecipientActionAuth } from '@documenso/lib/types/document-auth';
@@ -55,6 +56,10 @@ export const DocumentSigningInitialsField = ({
 
   const isLoading = isSignFieldWithTokenLoading || isRemoveSignedFieldWithTokenLoading;
 
+  const canDrag = !field.inserted;
+  const drag = useDraggableFieldPosition({ field, enabled: canDrag });
+  const pixels = drag.toPixels();
+
   const safeFieldMeta = ZInitialsFieldMeta.safeParse(field.fieldMeta);
   const parsedFieldMeta = safeFieldMeta.success ? safeFieldMeta.data : null;
 
@@ -68,6 +73,8 @@ export const DocumentSigningInitialsField = ({
         value,
         isBase64: false,
         authOptions,
+        fieldSignedPositionX: drag.posPercent.x,
+        fieldSignedPositionY: drag.posPercent.y,
       };
 
       if (onSignField) {
@@ -129,6 +136,14 @@ export const DocumentSigningInitialsField = ({
       onSign={onSign}
       onRemove={onRemove}
       type="Initials"
+      overrideCoords={
+        pixels
+          ? { x: pixels.x, y: pixels.y, width: pixels.width, height: pixels.height }
+          : undefined
+      }
+      onSignaturePointerDown={drag.onPointerDown}
+      onSignaturePointerMove={drag.onPointerMove}
+      onSignaturePointerUp={drag.onPointerUp}
     >
       {isLoading && <DocumentSigningFieldsLoader />}
 
