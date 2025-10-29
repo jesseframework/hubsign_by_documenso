@@ -44,6 +44,7 @@ export const getFieldsForToken = async ({ token }: GetFieldsForTokenOptions) => 
       },
       include: {
         signature: true,
+        fieldSignedPosition: true,
       },
     });
   }
@@ -54,6 +55,7 @@ export const getFieldsForToken = async ({ token }: GetFieldsForTokenOptions) => 
     },
     include: {
       signature: true,
+      fieldSignedPosition: true,
     },
   });
 };

@@ -5,6 +5,7 @@ import { useLingui } from '@lingui/react';
 import { Loader } from 'lucide-react';
 import { useRevalidator } from 'react-router';
 
+import { useDraggableFieldPosition } from '@documenso/lib/client-only/hooks/use-draggable-field-position';
 import { DO_NOT_INVALIDATE_QUERY_ON_MUTATION } from '@documenso/lib/constants/trpc';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import type { TRecipientActionAuth } from '@documenso/lib/types/document-auth';
@@ -62,6 +63,10 @@ export const DocumentSigningDropdownField = ({
   } = trpc.field.removeSignedFieldWithToken.useMutation(DO_NOT_INVALIDATE_QUERY_ON_MUTATION);
 
   const isLoading = isSignFieldWithTokenLoading || isRemoveSignedFieldWithTokenLoading;
+
+  const canDrag = !field.inserted;
+  const drag = useDraggableFieldPosition({ field, enabled: canDrag });
+  const pixels = drag.toPixels();
   const shouldAutoSignField =
     (!field.inserted && localChoice) || (!field.inserted && isReadOnly && defaultValue);
 
@@ -77,6 +82,8 @@ export const DocumentSigningDropdownField = ({
         value: localChoice,
         isBase64: true,
         authOptions,
+        fieldSignedPositionX: drag.posPercent.x,
+        fieldSignedPositionY: drag.posPercent.y,
       };
 
       if (onSignField) {
@@ -169,6 +176,14 @@ export const DocumentSigningDropdownField = ({
         onSign={onSign}
         onRemove={onRemove}
         type="Dropdown"
+        overrideCoords={
+          pixels
+            ? { x: pixels.x, y: pixels.y, width: pixels.width, height: pixels.height }
+            : undefined
+        }
+        onSignaturePointerDown={drag.onPointerDown}
+        onSignaturePointerMove={drag.onPointerMove}
+        onSignaturePointerUp={drag.onPointerUp}
       >
         {isLoading && (
           <div className="bg-background absolute inset-0 flex items-center justify-center rounded-md">

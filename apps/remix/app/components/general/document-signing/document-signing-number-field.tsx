@@ -6,6 +6,7 @@ import { Trans } from '@lingui/react/macro';
 import { useRevalidator } from 'react-router';
 
 import { validateNumberField } from '@documenso/lib/advanced-fields-validation/validate-number';
+import { useDraggableFieldPosition } from '@documenso/lib/client-only/hooks/use-draggable-field-position';
 import { DO_NOT_INVALIDATE_QUERY_ON_MUTATION } from '@documenso/lib/constants/trpc';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import type { TRecipientActionAuth } from '@documenso/lib/types/document-auth';
@@ -78,6 +79,10 @@ export const DocumentSigningNumberField = ({
 
   const { executeActionAuthProcedure } = useRequiredDocumentSigningAuthContext();
 
+  const canDrag = !field.inserted;
+  const drag = useDraggableFieldPosition({ field, enabled: canDrag });
+  const pixels = drag.toPixels();
+
   const { mutateAsync: signFieldWithToken, isPending: isSignFieldWithTokenLoading } =
     trpc.field.signFieldWithToken.useMutation(DO_NOT_INVALIDATE_QUERY_ON_MUTATION);
 
@@ -131,6 +136,8 @@ export const DocumentSigningNumberField = ({
         value: localNumber,
         isBase64: true,
         authOptions,
+        fieldSignedPositionX: drag.posPercent.x,
+        fieldSignedPositionY: drag.posPercent.y,
       };
 
       if (onSignField) {
@@ -248,6 +255,14 @@ export const DocumentSigningNumberField = ({
       onSign={onSign}
       onRemove={onRemove}
       type="Number"
+      overrideCoords={
+        pixels
+          ? { x: pixels.x, y: pixels.y, width: pixels.width, height: pixels.height }
+          : undefined
+      }
+      onSignaturePointerDown={drag.onPointerDown}
+      onSignaturePointerMove={drag.onPointerMove}
+      onSignaturePointerUp={drag.onPointerUp}
     >
       {isLoading && <DocumentSigningFieldsLoader />}
 

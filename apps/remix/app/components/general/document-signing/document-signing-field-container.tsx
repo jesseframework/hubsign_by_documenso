@@ -147,7 +147,7 @@ export const DocumentSigningFieldContainer = ({
         {!field.inserted &&
           !loading &&
           !readOnlyField &&
-          (type === 'Signature' ? (
+          (onSignaturePointerDown ? (
             <div
               className="absolute inset-0 z-10 h-full w-full touch-none select-none rounded-[2px] hover:cursor-move"
               onPointerDown={(e) => {

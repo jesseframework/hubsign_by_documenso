@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 
 import { msg } from '@lingui/core/macro';
-import type { Field, Signature } from '@prisma/client';
+import type { Field, FieldSignedPosition, Signature } from '@prisma/client';
 import {
   DocumentSigningOrder,
   DocumentSource,
@@ -69,7 +69,7 @@ export type CreateDocumentFromDirectTemplateOptions = {
 };
 
 type CreatedDirectRecipientField = {
-  field: Field & { signature?: Signature | null };
+  field: Field & { signature?: Signature | null; fieldSignedPosition?: FieldSignedPosition | null };
   derivedRecipientActionAuth: TRecipientActionAuthTypes | null;
 };
 
@@ -392,27 +392,47 @@ export const createDocumentFromDirectTemplate = async ({
         sendStatus: SendStatus.SENT,
         signedAt: initialRequestTime,
         signingOrder: directTemplateRecipient.signingOrder,
-        fields: {
-          createMany: {
-            data: directTemplateNonSignatureFields.map(({ templateField, customText }) => ({
-              documentId: document.id,
-              type: templateField.type,
-              page: templateField.page,
-              positionX: templateField.positionX,
-              positionY: templateField.positionY,
-              width: templateField.width,
-              height: templateField.height,
-              customText: customText ?? '',
-              inserted: true,
-              fieldMeta: templateField.fieldMeta || Prisma.JsonNull,
-            })),
-          },
-        },
       },
       include: {
         fields: true,
       },
     });
+
+    // Create non-signature fields individually so we can attach FieldSignedPosition from payload
+    const createdDirectRecipientNonSignatureFields: Field[] = [];
+    for (const { templateField, customText } of directTemplateNonSignatureFields) {
+      const sv = signedFieldValues.find((v) => v.fieldId === templateField.id);
+      const fx = sv?.fieldSignedPositionX ?? Number(templateField.positionX);
+      const fy = sv?.fieldSignedPositionY ?? Number(templateField.positionY);
+
+      const createdField = await tx.field.create({
+        data: {
+          documentId: document.id,
+          recipientId: createdDirectRecipient.id,
+          type: templateField.type,
+          page: templateField.page,
+          positionX: templateField.positionX,
+          positionY: templateField.positionY,
+          width: templateField.width,
+          height: templateField.height,
+          customText: customText ?? '',
+          inserted: true,
+          fieldMeta: templateField.fieldMeta || Prisma.JsonNull,
+          fieldSignedPosition: {
+            create: {
+              recipientId: createdDirectRecipient.id,
+              fieldSignedPositionX: fx,
+              fieldSignedPositionY: fy,
+            },
+          },
+        },
+        include: {
+          fieldSignedPosition: true,
+        },
+      });
+
+      createdDirectRecipientNonSignatureFields.push(createdField);
+    }
 
     // Create any direct recipient signature fields.
     // Note: It's done like this because we can't nest things in createMany.
@@ -460,7 +480,7 @@ export const createDocumentFromDirectTemplate = async ({
     );
 
     const createdDirectRecipientFields: CreatedDirectRecipientField[] = [
-      ...createdDirectRecipient.fields.map((field) => ({
+      ...createdDirectRecipientNonSignatureFields.map((field) => ({
         field,
         derivedRecipientActionAuth: null,
       })),
@@ -544,6 +564,16 @@ export const createDocumentFromDirectTemplate = async ({
                 (type) => ({
                   type,
                   data: field.customText,
+                  coords: field.fieldSignedPosition
+                    ? {
+                        x: Number(
+                          field.fieldSignedPosition.fieldSignedPositionX ?? field.positionX,
+                        ),
+                        y: Number(
+                          field.fieldSignedPosition.fieldSignedPositionY ?? field.positionY,
+                        ),
+                      }
+                    : undefined,
                 }),
               )
               .exhaustive(),

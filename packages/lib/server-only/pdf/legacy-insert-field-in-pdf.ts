@@ -84,10 +84,10 @@ export const legacy_insertFieldInPDF = async (pdf: PDFDocument, field: FieldWith
   // Use signature-level coordinates for signature fields; otherwise use Field coords
   const useX = isSignatureField
     ? Number(field.signature?.signaturePositionX)
-    : Number(field.positionX);
+    : Number(field.fieldSignedPosition?.fieldSignedPositionX);
   const useY = isSignatureField
     ? Number(field.signature?.signaturePositionY)
-    : Number(field.positionY);
+    : Number(field.fieldSignedPosition?.fieldSignedPositionY);
 
   const fieldX = pageWidth * (useX / 100);
   const fieldY = pageHeight * (useY / 100);

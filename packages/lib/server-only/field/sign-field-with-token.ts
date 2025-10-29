@@ -35,6 +35,8 @@ export type SignFieldWithTokenOptions = {
   requestMetadata?: RequestMetadata;
   signaturePositionX?: number;
   signaturePositionY?: number;
+  fieldSignedPositionX?: number;
+  fieldSignedPositionY?: number;
 };
 
 /**
@@ -57,6 +59,8 @@ export const signFieldWithToken = async ({
   requestMetadata,
   signaturePositionX,
   signaturePositionY,
+  fieldSignedPositionX,
+  fieldSignedPositionY,
 }: SignFieldWithTokenOptions) => {
   const recipient = await prisma.recipient.findFirstOrThrow({
     where: {
@@ -207,6 +211,9 @@ export const signFieldWithToken = async ({
   // Validate and coerce coordinates for signature fields
   let coordX: number | undefined;
   let coordY: number | undefined;
+  // Coordinates for non-signature fields
+  let fieldCoordX: number | undefined;
+  let fieldCoordY: number | undefined;
 
   if (isSignatureField) {
     if (signaturePositionX === undefined || signaturePositionY === undefined) {
@@ -222,6 +229,22 @@ export const signFieldWithToken = async ({
 
     if (coordX < 0 || coordX > 100 || coordY < 0 || coordY > 100) {
       throw new Error('Signature coordinates must be between 0 and 100');
+    }
+  }
+  // For non-signature fields, compute field-level coords
+  if (!isSignatureField) {
+    const fallbackX = Number(field.positionX);
+    const fallbackY = Number(field.positionY);
+
+    fieldCoordX = fieldSignedPositionX ?? fallbackX;
+    fieldCoordY = fieldSignedPositionY ?? fallbackY;
+
+    if (!Number.isFinite(fieldCoordX) || !Number.isFinite(fieldCoordY)) {
+      throw new Error('Invalid field coordinates');
+    }
+
+    if (fieldCoordX < 0 || fieldCoordX > 100 || fieldCoordY < 0 || fieldCoordY > 100) {
+      throw new Error('Field coordinates must be between 0 and 100');
     }
   }
 
@@ -268,6 +291,24 @@ export const signFieldWithToken = async ({
         signature,
       });
     }
+    // Upsert per-field signed position for non-signature fields
+    if (!isSignatureField && fieldCoordX !== undefined && fieldCoordY !== undefined) {
+      await tx.fieldSignedPosition.upsert({
+        where: {
+          fieldId: field.id,
+        },
+        create: {
+          fieldId: field.id,
+          recipientId: field.recipientId,
+          fieldSignedPositionX: fieldCoordX,
+          fieldSignedPositionY: fieldCoordY,
+        },
+        update: {
+          fieldSignedPositionX: fieldCoordX,
+          fieldSignedPositionY: fieldCoordY,
+        },
+      });
+    }
 
     await tx.documentAuditLog.create({
       data: createDocumentAuditLogData({
@@ -305,6 +346,10 @@ export const signFieldWithToken = async ({
               (type) => ({
                 type,
                 data: updatedField.customText,
+                coords:
+                  !isSignatureField && fieldCoordX !== undefined && fieldCoordY !== undefined
+                    ? { x: fieldCoordX, y: fieldCoordY }
+                    : undefined,
               }),
             )
             .with(
@@ -315,6 +360,10 @@ export const signFieldWithToken = async ({
               (type) => ({
                 type,
                 data: updatedField.customText,
+                coords:
+                  !isSignatureField && fieldCoordX !== undefined && fieldCoordY !== undefined
+                    ? { x: fieldCoordX, y: fieldCoordY }
+                    : undefined,
               }),
             )
             .exhaustive(),
