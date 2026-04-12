@@ -10,6 +10,7 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ['var(--font-sans)', ...fontFamily.sans],
+        display: ['var(--font-display)', 'Georgia', 'serif'],
         signature: ['var(--font-signature)'],
       },
       zIndex: {
@@ -65,6 +66,42 @@ module.exports = {
           DEFAULT: 'hsl(var(--widget))',
           foreground: 'hsl(var(--widget-foreground))',
         },
+        sidebar: {
+          bg: 'hsl(var(--sidebar-bg))',
+          border: 'hsl(var(--sidebar-border))',
+          text: 'hsl(var(--sidebar-text))',
+          'text-active': 'hsl(var(--sidebar-text-active))',
+          hover: 'hsl(var(--sidebar-hover))',
+        },
+        status: {
+          'complete-bg': 'hsl(var(--status-complete-bg))',
+          'complete-text': 'hsl(var(--status-complete-text))',
+          'pending-bg': 'hsl(var(--status-pending-bg))',
+          'pending-text': 'hsl(var(--status-pending-text))',
+          'draft-bg': 'hsl(var(--status-draft-bg))',
+          'draft-text': 'hsl(var(--status-draft-text))',
+          'inbox-bg': 'hsl(var(--status-inbox-bg))',
+          'inbox-text': 'hsl(var(--status-inbox-text))',
+        },
+        gold: {
+          DEFAULT: 'hsl(var(--gold))',
+          foreground: 'hsl(var(--gold-foreground))',
+          light: 'hsl(var(--gold-light))',
+          muted: 'hsl(var(--gold-muted))',
+          border: 'hsl(var(--gold-border))',
+          // Static scale for use outside CSS variable context
+          50: '#fffbeb',
+          100: '#fef3c7',
+          200: '#fde68a',
+          300: '#fcd34d',
+          400: '#fbbf24',
+          500: '#f59e0b',
+          600: '#d97706',
+          700: '#b45309',
+          800: '#92400e',
+          900: '#78350f',
+          950: '#451a03',
+        },
         documenso: {
           DEFAULT: '#A2E771',
           50: '#FFFFFF',
@@ -119,6 +156,9 @@ module.exports = {
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic': 'conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))',
+        'gradient-brand': 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--gold)) 100%)',
+        'gradient-brand-subtle': 'linear-gradient(135deg, hsl(var(--secondary)) 0%, hsl(var(--gold-light)) 100%)',
+        'gradient-gold': 'linear-gradient(135deg, hsl(var(--gold)) 0%, hsl(43 96% 68%) 100%)',
       },
       borderRadius: {
         DEFAULT: 'calc(var(--radius) - 3px)',

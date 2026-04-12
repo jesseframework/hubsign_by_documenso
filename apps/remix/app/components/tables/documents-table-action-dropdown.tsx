@@ -135,8 +135,11 @@ export const DocumentsTableActionDropdown = ({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger data-testid="document-table-action-btn">
-        <MoreHorizontal className="text-muted-foreground h-5 w-5" />
+      <DropdownMenuTrigger
+        data-testid="document-table-action-btn"
+        className="flex h-[26px] w-[26px] items-center justify-center rounded-[5px] border border-border bg-transparent text-[12px] text-muted-foreground transition-colors hover:bg-muted"
+      >
+        ···
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-52" align="start" forceMount>

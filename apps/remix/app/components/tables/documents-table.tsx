@@ -52,8 +52,18 @@ export const DocumentsTable = ({
       {
         header: _(msg`Created`),
         accessorKey: 'createdAt',
-        cell: ({ row }) =>
-          i18n.date(row.original.createdAt, { ...DateTime.DATETIME_SHORT, hourCycle: 'h12' }),
+        cell: ({ row }) => {
+          const date = new Date(row.original.createdAt);
+          const dateStr = i18n.date(date, { month: 'short', day: 'numeric' });
+          const timeStr = i18n.date(date, { hour: 'numeric', minute: '2-digit', hourCycle: 'h12' });
+          return (
+            <div className="whitespace-nowrap text-[12px] text-muted-foreground">
+              <div>{dateStr}</div>
+              <div className="text-[10px] opacity-60">{timeStr}</div>
+            </div>
+          );
+        },
+        size: 130,
       },
       {
         header: _(msg`Title`),
@@ -62,10 +72,15 @@ export const DocumentsTable = ({
       {
         id: 'sender',
         header: _(msg`Sender`),
-        cell: ({ row }) => row.original.user.name ?? row.original.user.email,
+        cell: ({ row }) => (
+          <span className="text-[12px] text-muted-foreground">
+            {row.original.user.name ?? row.original.user.email}
+          </span>
+        ),
+        size: 170,
       },
       {
-        header: _(msg`Recipient`),
+        header: _(msg`Recip.`),
         accessorKey: 'recipient',
         cell: ({ row }) => (
           <StackAvatarsWithTooltip
@@ -73,18 +88,20 @@ export const DocumentsTable = ({
             documentStatus={row.original.status}
           />
         ),
+        size: 90,
       },
       {
         header: _(msg`Status`),
         accessorKey: 'status',
-        cell: ({ row }) => <DocumentStatus status={row.original.status} />,
-        size: 140,
+        cell: ({ row }) => <DocumentStatus status={row.original.status} asBadge />,
+        size: 110,
       },
       {
-        header: _(msg`Actions`),
+        header: () => <span className="block text-right">{_(msg`Actions`)}</span>,
+        id: 'actions',
         cell: ({ row }) =>
           (!row.original.deletedAt || isDocumentCompleted(row.original.status)) && (
-            <div className="flex items-center gap-x-4">
+            <div className="flex items-center justify-end gap-x-1.5">
               <DocumentsTableActionButton row={row.original} />
               <DocumentsTableActionDropdown
                 row={row.original}
@@ -92,6 +109,7 @@ export const DocumentsTable = ({
               />
             </div>
           ),
+        size: 140,
       },
     ] satisfies DataTableColumnDef<DocumentsTableRow>[];
   }, [team, onMoveDocument]);
@@ -114,47 +132,70 @@ export const DocumentsTable = ({
 
   return (
     <div className="relative">
-      <DataTable
-        columns={columns}
-        data={results.data}
-        perPage={results.perPage}
-        currentPage={results.currentPage}
-        totalPages={results.totalPages}
-        onPaginationChange={onPaginationChange}
-        columnVisibility={{
-          sender: team !== undefined,
-        }}
-        error={{
-          enable: isLoadingError || false,
-        }}
-        skeleton={{
-          enable: isLoading || false,
-          rows: 5,
-          component: (
-            <>
-              <TableCell>
-                <Skeleton className="h-4 w-40 rounded-full" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-4 w-20 rounded-full" />
-              </TableCell>
-              <TableCell className="py-4">
-                <div className="flex w-full flex-row items-center">
-                  <Skeleton className="h-10 w-10 flex-shrink-0 rounded-full" />
-                </div>
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-4 w-20 rounded-full" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-10 w-24 rounded" />
-              </TableCell>
-            </>
-          ),
-        }}
-      >
-        {(table) => <DataTablePagination additionalInformation="VisibleCount" table={table} />}
-      </DataTable>
+      {/* Desktop table */}
+      <div className="hidden sm:block">
+        <DataTable
+          columns={columns}
+          data={results.data}
+          perPage={results.perPage}
+          currentPage={results.currentPage}
+          totalPages={results.totalPages}
+          onPaginationChange={onPaginationChange}
+          columnVisibility={{
+            sender: team !== undefined,
+          }}
+          error={{
+            enable: isLoadingError || false,
+          }}
+          skeleton={{
+            enable: isLoading || false,
+            rows: 5,
+            component: (
+              <>
+                <TableCell>
+                  <Skeleton className="h-4 w-20 rounded-full" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-40 rounded-full" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-4 w-20 rounded-full" />
+                </TableCell>
+                <TableCell className="py-4">
+                  <div className="flex w-full flex-row items-center">
+                    <Skeleton className="h-8 w-8 flex-shrink-0 rounded-full" />
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-20 rounded-full" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-8 w-24 rounded" />
+                </TableCell>
+              </>
+            ),
+          }}
+        >
+          {(table) => <DataTablePagination additionalInformation="VisibleCount" table={table} />}
+        </DataTable>
+      </div>
+
+      {/* Mobile card list */}
+      <div className="flex flex-col gap-2 sm:hidden">
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : results.data.length === 0 ? (
+          <div className="py-8 text-center text-[13px] text-muted-foreground">
+            No documents found
+          </div>
+        ) : (
+          results.data.map((row) => (
+            <MobileDocumentCard key={row.id} row={row} teamUrl={team?.url} onMoveDocument={onMoveDocument} />
+          ))
+        )}
+      </div>
 
       {isPending && (
         <div className="bg-background/50 absolute inset-0 flex items-center justify-center">
@@ -165,6 +206,56 @@ export const DocumentsTable = ({
   );
 };
 
+/* ── Mobile Document Card ── */
+type MobileDocumentCardProps = {
+  row: DocumentsTableRow;
+  teamUrl?: string;
+  onMoveDocument?: (documentId: number) => void;
+};
+
+const MobileDocumentCard = ({ row, teamUrl, onMoveDocument }: MobileDocumentCardProps) => {
+  const { i18n } = useLingui();
+  const date = new Date(row.createdAt);
+  const dateStr = i18n.date(date, { month: 'short', day: 'numeric' });
+  const timeStr = i18n.date(date, { hour: 'numeric', minute: '2-digit', hourCycle: 'h12' });
+
+  return (
+    <div className="flex flex-col gap-2 rounded-[var(--r)] border border-border bg-card p-3.5 transition-colors hover:border-primary/20">
+      {/* Top: title + badge */}
+      <div className="flex items-start justify-between gap-2.5">
+        <DataTableTitle row={row} teamUrl={teamUrl} />
+        <DocumentStatus status={row.status} asBadge />
+      </div>
+
+      {/* Meta: sender + date */}
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] text-muted-foreground">
+          {row.user.name ?? row.user.email}
+        </span>
+        <span className="text-[11px] text-muted-foreground">
+          {dateStr} · {timeStr}
+        </span>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1.5">
+          {(!row.deletedAt || isDocumentCompleted(row.status)) && (
+            <>
+              <DocumentsTableActionButton row={row} />
+              <DocumentsTableActionDropdown
+                row={row}
+                onMoveDocument={onMoveDocument ? () => onMoveDocument(row.id) : undefined}
+              />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ── Title link ── */
 type DataTableTitleProps = {
   row: DocumentsTableRow;
   teamUrl?: string;
@@ -184,32 +275,25 @@ const DataTableTitle = ({ row, teamUrl }: DataTableTitleProps) => {
     ? `${documentsPath}/f/${row.folderId}/${row.id}`
     : `${documentsPath}/${row.id}`;
 
+  const titleClass =
+    'block max-w-[10rem] truncate text-[13px] font-medium text-foreground hover:underline md:max-w-[20rem]';
+
   return match({
     isOwner,
     isRecipient,
     isCurrentTeamDocument,
   })
     .with({ isOwner: true }, { isCurrentTeamDocument: true }, () => (
-      <Link
-        to={formatPath}
-        title={row.title}
-        className="block max-w-[10rem] truncate font-medium hover:underline md:max-w-[20rem]"
-      >
+      <Link to={formatPath} title={row.title} className={titleClass}>
         {row.title}
       </Link>
     ))
     .with({ isRecipient: true }, () => (
-      <Link
-        to={`/sign/${recipient?.token}`}
-        title={row.title}
-        className="block max-w-[10rem] truncate font-medium hover:underline md:max-w-[20rem]"
-      >
+      <Link to={`/sign/${recipient?.token}`} title={row.title} className={titleClass}>
         {row.title}
       </Link>
     ))
     .otherwise(() => (
-      <span className="block max-w-[10rem] truncate font-medium hover:underline md:max-w-[20rem]">
-        {row.title}
-      </span>
+      <span className={titleClass}>{row.title}</span>
     ));
 };

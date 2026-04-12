@@ -1,13 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { Trans } from '@lingui/react/macro';
-import { FolderIcon, HomeIcon, Loader2 } from 'lucide-react';
+import {
+  CheckCircle2Icon,
+  ClockIcon,
+  FileTextIcon,
+  FolderIcon,
+  HomeIcon,
+  Loader2,
+  MailIcon,
+} from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Link } from 'react-router';
 import { z } from 'zod';
 
 import { FolderType } from '@documenso/lib/types/folder-type';
-import { formatAvatarUrl } from '@documenso/lib/utils/avatars';
 import { parseToIntegerArray } from '@documenso/lib/utils/params';
 import { formatDocumentsPath } from '@documenso/lib/utils/teams';
 import { ExtendedDocumentStatus } from '@documenso/prisma/types/extended-document-status';
@@ -17,10 +24,10 @@ import {
   ZFindDocumentsInternalRequestSchema,
 } from '@documenso/trpc/server/document-router/schema';
 import { type TFolderWithSubfolders } from '@documenso/trpc/server/folder-router/schema';
-import { Avatar, AvatarFallback, AvatarImage } from '@documenso/ui/primitives/avatar';
 import { Button } from '@documenso/ui/primitives/button';
 import { Tabs, TabsList, TabsTrigger } from '@documenso/ui/primitives/tabs';
 
+import { CardMetric } from '~/components/general/metric-card';
 import { DocumentMoveToFolderDialog } from '~/components/dialogs/document-move-to-folder-dialog';
 import { CreateFolderDialog } from '~/components/dialogs/folder-create-dialog';
 import { FolderDeleteDialog } from '~/components/dialogs/folder-delete-dialog';
@@ -142,17 +149,18 @@ export default function DocumentsPage() {
 
   return (
     <DocumentDropZoneWrapper>
-      <div className="mx-auto w-full max-w-screen-xl px-4 md:px-8">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-1 items-center">
+      <div className="w-full">
+        {/* Actions bar */}
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-1 items-center overflow-hidden">
             <Button
               variant="ghost"
               size="sm"
-              className="flex items-center space-x-2 pl-0 hover:bg-transparent"
+              className="flex flex-shrink-0 items-center space-x-2 pl-0 hover:bg-transparent"
               onClick={() => navigateToFolder(null)}
             >
               <HomeIcon className="h-4 w-4" />
-              <span>Home</span>
+              <span className="hidden sm:inline">Home</span>
             </Button>
 
             {foldersData?.breadcrumbs.map((folder) => (
@@ -165,16 +173,52 @@ export default function DocumentsPage() {
                   onClick={() => navigateToFolder(folder.id)}
                 >
                   <FolderIcon className="h-4 w-4" />
-                  <span>{folder.name}</span>
+                  <span className="max-w-[80px] truncate sm:max-w-none">{folder.name}</span>
                 </Button>
               </div>
             ))}
           </div>
 
-          <div className="flex gap-4 sm:flex-row sm:justify-end">
+          <div className="hidden gap-3 sm:flex">
             <DocumentUploadDropzone />
             <CreateFolderDialog />
           </div>
+        </div>
+
+        {/* Stats grid */}
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 lg:grid-cols-4">
+          <CardMetric
+            icon={FileTextIcon}
+            title="Total"
+            value={stats[ExtendedDocumentStatus.ALL]}
+            subtitle="All time"
+            accentColor="#7c5cfc"
+            iconBg="bg-primary/10"
+          />
+          <CardMetric
+            icon={MailIcon}
+            title="Inbox"
+            value={stats[ExtendedDocumentStatus.INBOX]}
+            subtitle="Needs action"
+            accentColor="#3b5bdb"
+            iconBg="bg-status-inbox-bg"
+          />
+          <CardMetric
+            icon={ClockIcon}
+            title="Pending"
+            value={stats[ExtendedDocumentStatus.PENDING]}
+            subtitle="Awaiting others"
+            accentColor="#c07a00"
+            iconBg="bg-status-pending-bg"
+          />
+          <CardMetric
+            icon={CheckCircle2Icon}
+            title="Completed"
+            value={stats[ExtendedDocumentStatus.COMPLETED]}
+            subtitle="Fully signed"
+            accentColor="#1a9b6e"
+            iconBg="bg-status-complete-bg"
+          />
         </div>
 
         {isFoldersLoading ? (
@@ -183,9 +227,27 @@ export default function DocumentsPage() {
           </div>
         ) : (
           <>
+            {foldersData?.folders && foldersData.folders.length > 0 && (
+              <div className="mt-5 flex items-center justify-between">
+                <span className="text-[13px] font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                  <Trans>Folders</Trans>
+                </span>
+                {foldersData.folders.length > 12 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-[11px]"
+                    onClick={() => void handleViewAllFolders()}
+                  >
+                    See all
+                  </Button>
+                )}
+              </div>
+            )}
+
             {foldersData?.folders?.some((folder) => folder.pinned) && (
-              <div className="mt-6">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              <div className="mt-2.5">
+                <div className="scrollbar-hide flex gap-2.5 overflow-x-auto pb-1">
                   {foldersData.folders
                     .filter((folder) => folder.pinned)
                     .map((folder) => (
@@ -214,7 +276,7 @@ export default function DocumentsPage() {
             )}
 
             <div className="mt-6">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              <div className="scrollbar-hide flex gap-2.5 overflow-x-auto pb-1">
                 {foldersData?.folders
                   ?.filter((folder) => !folder.pinned)
                   .slice(0, 12)
@@ -257,81 +319,74 @@ export default function DocumentsPage() {
           </>
         )}
 
-        <div className="mt-12 flex flex-wrap items-center justify-between gap-x-4 gap-y-8">
-          <div className="flex flex-row items-center">
-            {team && (
-              <Avatar className="dark:border-border mr-3 h-12 w-12 border-2 border-solid border-white">
-                {team.avatarImageId && <AvatarImage src={formatAvatarUrl(team.avatarImageId)} />}
-                <AvatarFallback className="text-muted-foreground text-xs">
-                  {team.name.slice(0, 1)}
-                </AvatarFallback>
-              </Avatar>
-            )}
+        {/* Documents section title */}
+        <div className="mt-8 mb-3">
+          <h2 className="font-display text-[22px] font-semibold tracking-tight">
+            <Trans>Documents</Trans>
+          </h2>
+        </div>
 
-            <h2 className="text-4xl font-semibold">
-              <Trans>Documents</Trans>
-            </h2>
-          </div>
-
-          <div className="-m-1 flex flex-wrap gap-x-4 gap-y-6 overflow-hidden p-1">
-            <Tabs value={findDocumentSearchParams.status || 'ALL'} className="overflow-x-auto">
-              <TabsList>
-                {[
-                  ExtendedDocumentStatus.INBOX,
-                  ExtendedDocumentStatus.PENDING,
-                  ExtendedDocumentStatus.COMPLETED,
-                  ExtendedDocumentStatus.DRAFT,
-                  ExtendedDocumentStatus.ALL,
-                ].map((value) => (
-                  <TabsTrigger
-                    key={value}
-                    className="hover:text-foreground min-w-[60px]"
-                    value={value}
-                    asChild
-                  >
-                    <Link to={getTabHref(value)} preventScrollReset>
-                      <DocumentStatus status={value} />
-
-                      {value !== ExtendedDocumentStatus.ALL && (
-                        <span className="ml-1 inline-block opacity-50">{stats[value]}</span>
-                      )}
-                    </Link>
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-
-            {team && <DocumentsTableSenderFilter teamId={team.id} />}
-
-            <div className="flex w-48 flex-wrap items-center justify-between gap-x-2 gap-y-4">
-              <PeriodSelector />
+        {/* Table card with filters inside */}
+        <div className="overflow-hidden rounded-[var(--r)] border border-border bg-card">
+          {/* Filter bar inside card */}
+          <div className="flex items-center gap-2 border-b border-border p-2 sm:p-3">
+            {/* Tab pills - scrollable */}
+            <div className="scrollbar-hide min-w-0 flex-1 overflow-x-auto">
+              <Tabs value={findDocumentSearchParams.status || 'ALL'}>
+                <TabsList className="inline-flex w-auto gap-0.5 rounded-md border border-border bg-background p-[3px]">
+                  {[
+                    ExtendedDocumentStatus.ALL,
+                    ExtendedDocumentStatus.INBOX,
+                    ExtendedDocumentStatus.PENDING,
+                    ExtendedDocumentStatus.COMPLETED,
+                    ExtendedDocumentStatus.DRAFT,
+                  ].map((value) => (
+                    <TabsTrigger
+                      key={value}
+                      className="gap-1 whitespace-nowrap rounded px-2 py-1 text-[12px] font-medium data-[state=active]:bg-card data-[state=active]:font-semibold sm:gap-1.5 sm:px-3 sm:py-1.5"
+                      value={value}
+                      asChild
+                    >
+                      <Link to={getTabHref(value)} preventScrollReset>
+                        <DocumentStatus status={value} />
+                        <span className={`text-[10px] font-semibold rounded-full px-1.5 py-px ${
+                          findDocumentSearchParams.status === value || (!findDocumentSearchParams.status && value === 'ALL')
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-muted text-muted-foreground'
+                        }`}>
+                          {stats[value]}
+                        </span>
+                      </Link>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
             </div>
-            <div className="flex w-48 flex-wrap items-center justify-between gap-x-2 gap-y-4">
+
+            {/* Right side filters */}
+            <div className="ml-auto hidden flex-shrink-0 items-center gap-2 sm:flex">
+              {team && <DocumentsTableSenderFilter teamId={team.id} />}
+              <PeriodSelector />
               <DocumentSearch initialValue={findDocumentSearchParams.query} />
             </div>
           </div>
-        </div>
-
-        <div className="mt-8">
-          <div>
-            {data &&
-            data.count === 0 &&
-            (!foldersData?.folders.length || foldersData.folders.length === 0) ? (
-              <DocumentsTableEmptyState
-                status={findDocumentSearchParams.status || ExtendedDocumentStatus.ALL}
-              />
-            ) : (
-              <DocumentsTable
-                data={data}
-                isLoading={isLoading}
-                isLoadingError={isLoadingError}
-                onMoveDocument={(documentId) => {
-                  setDocumentToMove(documentId);
-                  setIsMovingDocument(true);
-                }}
-              />
-            )}
-          </div>
+          {data &&
+          data.count === 0 &&
+          (!foldersData?.folders.length || foldersData.folders.length === 0) ? (
+            <DocumentsTableEmptyState
+              status={findDocumentSearchParams.status || ExtendedDocumentStatus.ALL}
+            />
+          ) : (
+            <DocumentsTable
+              data={data}
+              isLoading={isLoading}
+              isLoadingError={isLoadingError}
+              onMoveDocument={(documentId) => {
+                setDocumentToMove(documentId);
+                setIsMovingDocument(true);
+              }}
+            />
+          )}
         </div>
 
         {documentToMove && (

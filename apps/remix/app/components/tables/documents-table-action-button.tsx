@@ -12,7 +12,6 @@ import type { TDocumentMany as TDocumentRow } from '@documenso/lib/types/documen
 import { isDocumentCompleted } from '@documenso/lib/utils/document';
 import { formatDocumentsPath } from '@documenso/lib/utils/teams';
 import { trpc as trpcClient } from '@documenso/trpc/client';
-import { Button } from '@documenso/ui/primitives/button';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { useOptionalCurrentTeam } from '~/providers/team';
@@ -20,6 +19,12 @@ import { useOptionalCurrentTeam } from '~/providers/team';
 export type DocumentsTableActionButtonProps = {
   row: TDocumentRow;
 };
+
+const actionBtnClass =
+  'inline-flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-[11px] font-medium transition-colors cursor-pointer';
+
+const accentLight = `${actionBtnClass} bg-primary/10 text-primary hover:bg-primary/15`;
+const inboxLight = `${actionBtnClass} bg-status-inbox-bg text-status-inbox-text hover:bg-status-inbox-bg/80`;
 
 export const DocumentsTableActionButton = ({ row }: DocumentsTableActionButtonProps) => {
   const { user } = useSession();
@@ -94,50 +99,46 @@ export const DocumentsTableActionButton = ({ row }: DocumentsTableActionButtonPr
     .with(
       isOwner ? { isDraft: true, isOwner: true } : { isDraft: true, isCurrentTeamDocument: true },
       () => (
-        <Button className="w-32" asChild>
-          <Link to={formatPath}>
-            <Edit className="-ml-1 mr-2 h-4 w-4" />
-            <Trans>Edit</Trans>
-          </Link>
-        </Button>
+        <Link to={formatPath} className={accentLight}>
+          <Edit className="h-3 w-3" />
+          <Trans>Edit</Trans>
+        </Link>
       ),
     )
     .with({ isRecipient: true, isPending: true, isSigned: false }, () => (
-      <Button className="w-32" asChild>
-        <Link to={`/sign/${recipient?.token}`}>
-          {match(role)
-            .with(RecipientRole.SIGNER, () => (
-              <>
-                <Pencil className="-ml-1 mr-2 h-4 w-4" />
-                <Trans>Sign</Trans>
-              </>
-            ))
-            .with(RecipientRole.APPROVER, () => (
-              <>
-                <CheckCircle className="-ml-1 mr-2 h-4 w-4" />
-                <Trans>Approve</Trans>
-              </>
-            ))
-            .otherwise(() => (
-              <>
-                <EyeIcon className="-ml-1 mr-2 h-4 w-4" />
-                <Trans>View</Trans>
-              </>
-            ))}
-        </Link>
-      </Button>
+      <Link to={`/sign/${recipient?.token}`} className={inboxLight}>
+        {match(role)
+          .with(RecipientRole.SIGNER, () => (
+            <>
+              <Pencil className="h-3 w-3" />
+              <Trans>Sign</Trans>
+            </>
+          ))
+          .with(RecipientRole.APPROVER, () => (
+            <>
+              <CheckCircle className="h-3 w-3" />
+              <Trans>Approve</Trans>
+            </>
+          ))
+          .otherwise(() => (
+            <>
+              <EyeIcon className="h-3 w-3" />
+              <Trans>View</Trans>
+            </>
+          ))}
+      </Link>
     ))
     .with({ isPending: true, isSigned: true }, () => (
-      <Button className="w-32" disabled={true}>
-        <EyeIcon className="-ml-1 mr-2 h-4 w-4" />
+      <span className={`${accentLight} opacity-50 cursor-default`}>
+        <EyeIcon className="h-3 w-3" />
         <Trans>View</Trans>
-      </Button>
+      </span>
     ))
     .with({ isComplete: true }, () => (
-      <Button className="w-32" onClick={onDownloadClick}>
-        <Download className="-ml-1 mr-2 inline h-4 w-4" />
+      <button className={accentLight} onClick={onDownloadClick}>
+        <Download className="h-3 w-3" />
         <Trans>Download</Trans>
-      </Button>
+      </button>
     ))
     .otherwise(() => <div></div>);
 };
