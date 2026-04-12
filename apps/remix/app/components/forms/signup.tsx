@@ -414,7 +414,7 @@ export const SignUpForm = ({
                 <p className="text-muted-foreground mt-4 text-sm">
                   <Trans>
                     Already have an account?{' '}
-                    <Link to="/signin" className="text-documenso-700 duration-200 hover:opacity-70">
+                    <Link to="/signin" className="text-primary duration-200 hover:opacity-70">
                       Sign in instead
                     </Link>
                   </Trans>
@@ -477,7 +477,7 @@ export const SignUpForm = ({
                 <motion.div
                   layout="size"
                   layoutId="document-flow-container-step"
-                  className="bg-documenso absolute inset-y-0 left-0 rounded-full"
+                  className="bg-primary absolute inset-y-0 left-0 rounded-full"
                   style={{
                     width: step === 'BASIC_DETAILS' ? '50%' : '100%',
                   }}
@@ -532,7 +532,7 @@ export const SignUpForm = ({
             <Link
               to="https://documen.so/terms"
               target="_blank"
-              className="text-documenso-700 duration-200 hover:opacity-70"
+              className="text-primary duration-200 hover:opacity-70"
             >
               Terms of Service
             </Link>{' '}
@@ -540,7 +540,7 @@ export const SignUpForm = ({
             <Link
               to="https://documen.so/privacy"
               target="_blank"
-              className="text-documenso-700 duration-200 hover:opacity-70"
+              className="text-primary duration-200 hover:opacity-70"
             >
               Privacy Policy
             </Link>

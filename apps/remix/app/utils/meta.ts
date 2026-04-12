@@ -2,7 +2,7 @@ import { NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 
 export const appMetaTags = (title?: string) => {
   const description =
-    'Join HubSign Fork, the open signing infrastructure, and get a 10x better signing experience. Sign in now and enjoy a faster, smarter, and more beautiful document signing process. Integrates with your favorite tools, customizable, and expandable. Support our mission and become a part of our open-source community.';
+    'HubSign is the open signing infrastructure for modern businesses. Get a 10x better document signing experience — fast, smart, and beautiful. Integrates with your favorite tools, fully customizable and expandable.';
 
   return [
     {
@@ -15,11 +15,11 @@ export const appMetaTags = (title?: string) => {
     {
       name: 'keywords',
       content:
-        'HubSign is, open source, DocuSign alternative, document signing, open signing infrastructure, open-source community, fast signing, beautiful signing, smart templates. HubSign is fork from Documentso',
+        'HubSign, digital signatures, document signing, e-signature, open signing infrastructure, smart templates, secure signing, electronic documents',
     },
     {
       name: 'author',
-      content: 'Future Edgen, Inc.',
+      content: 'Future Edge Technology Inc.',
     },
     {
       name: 'robots',

@@ -141,11 +141,11 @@ export default function TemplatesPage() {
                           className="flex items-center space-x-2 text-left"
                           onClick={() => navigateToFolder(folder.id)}
                         >
-                          <FolderIcon className="text-documenso h-6 w-6" />
+                          <FolderIcon className="text-primary h-6 w-6" />
                           <div>
                             <div className="flex items-center gap-2">
                               <h3 className="font-medium">{folder.name}</h3>
-                              <PinIcon className="text-documenso h-3 w-3" />
+                              <PinIcon className="text-primary h-3 w-3" />
                             </div>
                             <div className="mt-1 flex space-x-2 text-xs text-gray-500">
                               <span>{folder._count.templates || 0} templates</span>
@@ -220,7 +220,7 @@ export default function TemplatesPage() {
                       className="flex items-center space-x-2 text-left"
                       onClick={() => navigateToFolder(folder.id)}
                     >
-                      <FolderIcon className="text-documenso h-6 w-6" />
+                      <FolderIcon className="text-primary h-6 w-6" />
                       <div>
                         <h3 className="font-medium">{folder.name}</h3>
                         <div className="mt-1 flex space-x-2 text-xs text-gray-500">

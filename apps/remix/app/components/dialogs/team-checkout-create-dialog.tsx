@@ -94,7 +94,7 @@ export const TeamCheckoutCreateDialog = ({
         {(isLoading || !data) && (
           <div className="flex h-20 items-center justify-center text-sm">
             {isLoading ? (
-              <Loader className="text-documenso h-6 w-6 animate-spin" />
+              <Loader className="text-primary h-6 w-6 animate-spin" />
             ) : (
               <p>
                 <Trans>Something went wrong</Trans>

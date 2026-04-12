@@ -19,8 +19,8 @@ export type TeamEmailRemovedTemplateProps = {
 
 export const TeamEmailRemovedTemplate = ({
   assetBaseUrl = 'http://localhost:3002',
-  baseUrl = 'https://documenso.com',
-  teamEmail = 'example@documenso.com',
+  baseUrl = 'https://app.hubsign.io',
+  teamEmail = 'team@hubsign.io',
   teamName = 'Team Name',
   teamUrl = 'demo',
 }: TeamEmailRemovedTemplateProps) => {

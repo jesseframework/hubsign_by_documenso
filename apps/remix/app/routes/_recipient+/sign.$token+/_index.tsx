@@ -207,7 +207,7 @@ export default function SigningPage() {
           </p>
 
           {user ? (
-            <Link to="/documents" className="text-documenso-700 hover:text-documenso-600 mt-36">
+            <Link to="/documents" className="text-primary hover:text-primary/80 mt-36">
               <Trans>Go Back Home</Trans>
             </Link>
           ) : (
@@ -216,7 +216,7 @@ export default function SigningPage() {
                 Want to send slick signing links like this one?{' '}
                 <Link
                   to="https://hubsign.io"
-                  className="text-documenso-700 hover:text-documenso-600"
+                  className="text-primary hover:text-primary/80"
                 >
                   Check out HubSign.
                 </Link>

@@ -62,7 +62,7 @@ export default function SignIn({ loaderData }: Route.ComponentProps) {
           <p className="text-muted-foreground mt-6 text-center text-sm">
             <Trans>
               Don't have an account?{' '}
-              <Link to="/signup" className="text-documenso-700 duration-200 hover:opacity-70">
+              <Link to="/signup" className="text-primary duration-200 hover:opacity-70">
                 Sign up
               </Link>
             </Trans>
