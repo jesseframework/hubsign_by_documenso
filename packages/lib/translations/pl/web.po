@@ -676,6 +676,10 @@ msgstr "Akceptacja i Zgoda"
 msgid "Accepted team invitation"
 msgstr "Akceptowane zaproszenie do zespołu"
 
+#: apps/remix/app/components/general/app-bottom-nav.tsx
+msgid "Account"
+msgstr ""
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 msgid "Account Authentication"
 msgstr "Uwierzytelnianie konta"
@@ -720,8 +724,8 @@ msgstr "Akcja"
 msgid "Actions"
 msgstr "Akcje"
 
-#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings._index.tsx
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.members.tsx
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings._index.tsx
 #: apps/remix/app/components/tables/user-settings-teams-page-table.tsx
 msgid "Active"
 msgstr "Aktywne"
@@ -853,6 +857,8 @@ msgstr "Dodawanie i usuwanie miejsc dostosuje fakturę odpowiednio."
 msgid "Additional brand information to display at the bottom of emails"
 msgstr "Dodatkowe informacje o marce do wyświetlenia na dole wiadomości e-mail"
 
+#: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: packages/lib/constants/teams.ts
 msgid "Admin"
 msgstr "Administrator"
@@ -2338,9 +2344,9 @@ msgstr "Czy chcesz usunąć ten szablon?"
 msgid "Do you want to duplicate this template?"
 msgstr "Czy chcesz zduplikować ten szablon?"
 
-#: apps/remix/app/components/dialogs/account-delete-dialog.tsx
-msgid "HubSign will delete <0>all of your documents</0>, along with all of your completed documents, signatures, and all other resources belonging to your Account."
-msgstr "HubSign usunie <0>wszystkie twoje dokumenty</0>, wraz ze wszystkimi zakończonymi dokumentami, podpisami i wszystkimi innymi zasobami należącymi do twojego konta."
+#: apps/remix/app/components/general/app-bottom-nav.tsx
+msgid "Docs"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id.logs.tsx
 #: apps/remix/app/routes/_authenticated+/documents.$id.logs.tsx
@@ -2607,16 +2613,17 @@ msgid "Document will be permanently deleted"
 msgstr "Dokument zostanie trwale usunięty"
 
 #: apps/remix/app/routes/_profile+/p.$url.tsx
-#: apps/remix/app/routes/_authenticated+/documents._index.tsx
 #: apps/remix/app/routes/_authenticated+/documents.f.$folderId._index.tsx
-#: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id.edit.tsx
-#: apps/remix/app/routes/_authenticated+/documents.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/documents._index.tsx
 #: apps/remix/app/routes/_authenticated+/documents.$id.edit.tsx
+#: apps/remix/app/routes/_authenticated+/documents.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
 #: apps/remix/app/components/tables/admin-dashboard-users-table.tsx
 #: apps/remix/app/components/general/user-profile-timur.tsx
 #: apps/remix/app/components/general/generic-error-layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/app-nav-mobile.tsx
 #: apps/remix/app/components/general/app-nav-desktop.tsx
 #: apps/remix/app/components/general/app-command-menu.tsx
@@ -2919,12 +2926,12 @@ msgstr "Wprowadź swoje imię"
 msgid "Enter your text here"
 msgstr "Wprowadź swój tekst tutaj"
 
+#: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
+#: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
+#: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
+#: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
-#: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
-#: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
-#: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
-#: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
 #: apps/remix/app/components/general/verify-email-banner.tsx
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/template/template-edit-form.tsx
@@ -3119,6 +3126,11 @@ msgstr ""
 msgid "Folder updated successfully"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/templates._index.tsx
+#: apps/remix/app/routes/_authenticated+/documents._index.tsx
+msgid "Folders"
+msgstr ""
+
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/name-field.tsx
@@ -3191,8 +3203,8 @@ msgstr "Wróć"
 msgid "Go back home"
 msgstr "Wróć do domu"
 
-#: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+#: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
 msgid "Go Back Home"
 msgstr "Wróć do domu"
 
@@ -3283,6 +3295,10 @@ msgstr "Ukryj"
 msgid "Hide additional information"
 msgstr "Ukryj dodatkowe informacje"
 
+#: apps/remix/app/components/dialogs/account-delete-dialog.tsx
+msgid "HubSign will delete <0>all of your documents</0>, along with all of your completed documents, signatures, and all other resources belonging to your Account."
+msgstr "HubSign usunie <0>wszystkie twoje dokumenty</0>, wraz ze wszystkimi zakończonymi dokumentami, podpisami i wszystkimi innymi zasobami należącymi do twojego konta."
+
 #: packages/lib/constants/recipient-roles.ts
 msgid "I am a signer of this document"
 msgstr "Jestem sygnatariuszem tego dokumentu"
@@ -3328,6 +3344,7 @@ msgstr "Jeśli nie znajdziesz linku potwierdzającego w swojej skrzynce odbiorcz
 msgid "If your authenticator app does not support QR codes, you can use the following code instead:"
 msgstr "Jeśli Twoja aplikacja uwierzytelniająca nie obsługuje kodów QR, możesz użyć poniższego kodu:"
 
+#: apps/remix/app/components/general/app-bottom-nav.tsx
 #: apps/remix/app/components/general/document/document-status.tsx
 msgid "Inbox"
 msgstr "Skrzynka odbiorcza"
@@ -3580,6 +3597,10 @@ msgstr "Ładowanie..."
 #: apps/remix/app/components/general/direct-template/direct-template-signing-auth-page.tsx
 msgid "Login"
 msgstr "Zaloguj się"
+
+#: apps/remix/app/components/general/app-sidebar.tsx
+msgid "Main"
+msgstr ""
 
 #: apps/remix/app/components/tables/user-settings-current-teams-table.tsx
 msgid "Manage"
@@ -4095,8 +4116,8 @@ msgstr "Nazwa klucza dostępu"
 msgid "Passkey Re-Authentication"
 msgstr "Ponowna Autoryzacja Klucza Dostępu"
 
-#: apps/remix/app/routes/_authenticated+/settings+/security._index.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/security.passkeys.tsx
+#: apps/remix/app/routes/_authenticated+/settings+/security._index.tsx
 msgid "Passkeys"
 msgstr "Klucze dostępu"
 
@@ -4487,6 +4508,9 @@ msgid "Recent documents"
 msgstr "Ostatnie dokumenty"
 
 #: apps/remix/app/components/tables/documents-table.tsx
+msgid "Recip."
+msgstr ""
+
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/dialogs/template-direct-link-dialog.tsx
 #: packages/lib/utils/document-audit-logs.ts
@@ -4792,6 +4816,10 @@ msgstr "Szukaj dokumentów..."
 msgid "Search languages..."
 msgstr "Szukaj języków..."
 
+#: apps/remix/app/components/general/app-topbar.tsx
+msgid "Search..."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks.$id.tsx
 #: apps/remix/app/components/dialogs/webhook-create-dialog.tsx
 msgid "Secret"
@@ -4952,6 +4980,7 @@ msgid "Set up your template properties and recipient information"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/settings+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/app-nav-mobile.tsx
 #: apps/remix/app/components/general/app-command-menu.tsx
 #: apps/remix/app/components/general/app-command-menu.tsx
@@ -5201,8 +5230,8 @@ msgstr "Od {0}"
 msgid "Site Banner"
 msgstr "Baner strony"
 
-#: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/site-settings.tsx
+#: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
 msgid "Site Settings"
 msgstr "Ustawienia strony"
 
@@ -5350,9 +5379,9 @@ msgstr "Subskrypcja"
 msgid "Subscriptions"
 msgstr "Subskrypcje"
 
-#: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 #: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
 #: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
+#: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 #: apps/remix/app/components/tables/user-settings-pending-teams-table-actions.tsx
 #: apps/remix/app/components/tables/team-settings-member-invites-table.tsx
 #: apps/remix/app/components/tables/team-settings-member-invites-table.tsx
@@ -5407,6 +5436,7 @@ msgstr "Motyw systemowy"
 
 #: apps/remix/app/components/tables/user-settings-pending-teams-table.tsx
 #: apps/remix/app/components/tables/user-settings-current-teams-table.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Team"
 msgstr "Zespół"
 
@@ -5549,10 +5579,10 @@ msgstr "Zespoły"
 msgid "Teams restricted"
 msgstr "Zespoły ograniczone"
 
-#: apps/remix/app/routes/_authenticated+/templates.f.$folderId.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates.f.$folderId.$id.edit.tsx
-#: apps/remix/app/routes/_authenticated+/templates.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/templates.f.$folderId.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates.$id.edit.tsx
+#: apps/remix/app/routes/_authenticated+/templates.$id._index.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
@@ -5610,13 +5640,15 @@ msgstr "Tytuł szablonu"
 msgid "Template updated successfully"
 msgstr ""
 
-#: apps/remix/app/routes/_authenticated+/templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates.f.$folderId._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates.f.$folderId.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates.$id._index.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/app-nav-mobile.tsx
 #: apps/remix/app/components/general/app-nav-desktop.tsx
 #: apps/remix/app/components/general/app-command-menu.tsx
+#: apps/remix/app/components/general/app-bottom-nav.tsx
 msgid "Templates"
 msgstr "Szablony"
 
@@ -5646,12 +5678,12 @@ msgid "Text Color"
 msgstr "Kolor tekstu"
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
-#~ msgid "Thank you for using HubSign to perform your electronic document signing. The purpose of this disclosure is to inform you about the process, legality, and your rights regarding the use of electronic signatures on our platform. By opting to use an electronic signature, you are agreeing to the terms and conditions outlined below."
-#~ msgstr "Dziękujemy za korzystanie z HubSign do wykonywania podpisu elektronicznego dokumentu. Celem tego ujawnienia jest poinformowanie Cię o procesie, legalności oraz Twoich prawach dotyczących korzystania z podpisów elektronicznych na naszej platformie. Decydując się na korzystanie z podpisu elektronicznego, zgadzasz się na warunki opisane poniżej."
+#~ msgid "Thank you for using Hub Sign to perform your electronic document signing. The purpose of this disclosure is to inform you about the process, legality, and your rights regarding the use of electronic signatures on our platform. By opting to use an electronic signature, you are agreeing to the terms and conditions outlined below."
+#~ msgstr ""
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
-msgid "Thank you for using Hub Sign to perform your electronic document signing. The purpose of this disclosure is to inform you about the process, legality, and your rights regarding the use of electronic signatures on our platform. By opting to use an electronic signature, you are agreeing to the terms and conditions outlined below."
-msgstr ""
+msgid "Thank you for using HubSign to perform your electronic document signing. The purpose of this disclosure is to inform you about the process, legality, and your rights regarding the use of electronic signatures on our platform. By opting to use an electronic signature, you are agreeing to the terms and conditions outlined below."
+msgstr "Dziękujemy za korzystanie z HubSign do wykonywania podpisu elektronicznego dokumentu. Celem tego ujawnienia jest poinformowanie Cię o procesie, legalności oraz Twoich prawach dotyczących korzystania z podpisów elektronicznych na naszej platformie. Decydując się na korzystanie z podpisu elektronicznego, zgadzasz się na warunki opisane poniżej."
 
 #: packages/email/template-components/template-forgot-password.tsx
 msgid "That's okay, it happens! Click the button below to reset your password."
@@ -5910,14 +5942,14 @@ msgstr "Podany kod dwuskładnikowy jest nieprawidłowy"
 msgid "The types of signatures that recipients are allowed to use when signing the document."
 msgstr "Rodzaje podpisów, jakie odbiorcy mogą używać przy podpisywaniu dokumentu."
 
-#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks.$id.tsx
-msgid "The URL for HubSign to send webhook events to."
-msgstr "URL dla HubSign do wysyłania zdarzeń webhook."
-
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks.$id.tsx
 #: apps/remix/app/components/dialogs/webhook-create-dialog.tsx
 msgid "The URL for Hub Sign to send webhook events to."
 msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks.$id.tsx
+msgid "The URL for HubSign to send webhook events to."
+msgstr "URL dla HubSign do wysyłania zdarzeń webhook."
 
 #: apps/remix/app/components/dialogs/webhook-delete-dialog.tsx
 msgid "The webhook has been successfully deleted."
@@ -6034,12 +6066,12 @@ msgid "This document was created using a direct link."
 msgstr "Ten dokument został stworzony przy użyciu bezpośredniego linku."
 
 #: packages/email/template-components/template-footer.tsx
-#~ msgid "This document was sent using <0>HubSign.</0>"
-#~ msgstr "Ten dokument został wysłany za pomocą <0>HubSign.</0>"
+#~ msgid "This document was sent using <0>Hub Sign.</0>"
+#~ msgstr ""
 
 #: packages/email/template-components/template-footer.tsx
-msgid "This document was sent using <0>Hub Sign.</0>"
-msgstr ""
+msgid "This document was sent using <0>HubSign.</0>"
+msgstr "Ten dokument został wysłany za pomocą <0>HubSign.</0>"
 
 #: packages/email/template-components/template-document-rejection-confirmed.tsx
 msgid "This email confirms that you have rejected the document <0>\"{documentName}\"</0> sent by {documentOwnerName}."
@@ -7073,8 +7105,8 @@ msgstr "Wygenerujemy dla Ciebie linki do podpisania, które możesz wysłać do 
 msgid "We won't send anything to notify recipients."
 msgstr "Nie wyślemy nic, aby powiadomić odbiorców."
 
-#: apps/remix/app/routes/_authenticated+/templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates.f.$folderId._index.tsx
+#: apps/remix/app/routes/_authenticated+/templates._index.tsx
 #: apps/remix/app/components/tables/documents-table-empty-state.tsx
 msgid "We're all empty"
 msgstr "Pusto"
@@ -7167,6 +7199,10 @@ msgstr "Kogo chcesz przypomnieć?"
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Withdrawing Consent"
 msgstr "Wycofanie zgody"
+
+#: apps/remix/app/components/general/app-sidebar.tsx
+msgid "Workspace"
+msgstr ""
 
 #: apps/remix/app/components/forms/public-profile-form.tsx
 msgid "Write about the team"
@@ -7376,8 +7412,8 @@ msgstr "Rozpocząłeś dokument {0}, który wymaga, abyś go {recipientActionVer
 msgid "You have no webhooks yet. Your webhooks will be shown here once you create them."
 msgstr "Nie masz jeszcze żadnych webhooków. Twoje webhooki będą tutaj widoczne, gdy je utworzysz."
 
-#: apps/remix/app/routes/_authenticated+/templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates.f.$folderId._index.tsx
+#: apps/remix/app/routes/_authenticated+/templates._index.tsx
 msgid "You have not yet created any templates. To create a template please upload one."
 msgstr "Brak utworzonych szablonów. Prześlij, aby utworzyć."
 
@@ -7487,8 +7523,12 @@ msgid "You need to setup 2FA to mark this document as viewed."
 msgstr "Musisz skonfigurować 2FA, aby oznaczyć ten dokument jako przeczytany."
 
 #: apps/remix/app/components/forms/signup.tsx
-msgid "You will get notified & be able to set up your hubsign public profile when we launch the feature."
-msgstr "Otrzymasz powiadomienie i będziesz mógł skonfigurować swój publiczny profil hubsign, gdy uruchomimy tę funkcję."
+#~ msgid "You will get notified & be able to set up your hubsign public profile when we launch the feature."
+#~ msgstr "Otrzymasz powiadomienie i będziesz mógł skonfigurować swój publiczny profil hubsign, gdy uruchomimy tę funkcję."
+
+#: apps/remix/app/components/forms/signup.tsx
+msgid "You will get notified & be able to set up your HubSign public profile when we launch the feature."
+msgstr ""
 
 #: apps/remix/app/components/forms/2fa/enable-authenticator-app-dialog.tsx
 msgid "You will now be required to enter a code from your authenticator app when signing in."
@@ -7582,20 +7622,20 @@ msgid "Your documents"
 msgstr "Twoje dokumenty"
 
 #: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
+msgid "Your email has already been confirmed. You can now use all features of Hub Sign."
+msgstr ""
+
+#: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
 #~ msgid "Your email has already been confirmed. You can now use all features of HubSign."
 #~ msgstr "Twój e-mail został już potwierdzony. Możesz teraz korzystać z wszystkich funkcji HubSign."
 
 #: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
-msgid "Your email has already been confirmed. You can now use all features of Hub Sign."
+msgid "Your email has been successfully confirmed! You can now use all features of Hub Sign."
 msgstr ""
 
 #: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
 #~ msgid "Your email has been successfully confirmed! You can now use all features of HubSign."
 #~ msgstr "Twój adres e-mail został pomyślnie potwierdzony! Możesz teraz korzystać ze wszystkich funkcji HubSign."
-
-#: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
-msgid "Your email has been successfully confirmed! You can now use all features of Hub Sign."
-msgstr ""
 
 #. placeholder {0}: teamEmail.team.name
 #. placeholder {1}: teamEmail.team.url

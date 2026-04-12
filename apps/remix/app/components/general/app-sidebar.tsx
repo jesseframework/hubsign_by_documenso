@@ -10,7 +10,8 @@ import {
 } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router';
 
-import type { SessionUser, TGetTeamsResponse } from '@documenso/lib/client-only/providers/session';
+import type { SessionUser } from '@documenso/auth/server/lib/session/session';
+import type { TGetTeamsResponse } from '@documenso/lib/server-only/team/get-teams';
 import { Role } from '@prisma/client';
 
 import { BrandingLogo } from './branding-logo';

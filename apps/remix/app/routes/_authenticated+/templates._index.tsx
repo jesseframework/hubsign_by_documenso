@@ -8,6 +8,8 @@ import { FolderType } from '@documenso/lib/types/folder-type';
 import { formatDocumentsPath, formatTemplatesPath } from '@documenso/lib/utils/teams';
 import { trpc } from '@documenso/trpc/react';
 import type { TFolderWithSubfolders } from '@documenso/trpc/server/folder-router/schema';
+import { Button } from '@documenso/ui/primitives/button';
+
 import { TemplateCreateDialog } from '~/components/dialogs/template-create-dialog';
 import { TemplateFolderCreateDialog } from '~/components/dialogs/template-folder-create-dialog';
 import { TemplateFolderDeleteDialog } from '~/components/dialogs/template-folder-delete-dialog';
