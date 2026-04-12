@@ -5,7 +5,6 @@ import { Link, Outlet, redirect, useLocation } from 'react-router';
 import { getSession } from '@documenso/auth/server/lib/utils/get-session';
 import { isAdmin } from '@documenso/lib/utils/is-admin';
 import { cn } from '@documenso/ui/lib/utils';
-import { Button } from '@documenso/ui/primitives/button';
 
 import type { Route } from './+types/_layout';
 
@@ -17,104 +16,74 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 }
 
+const navItems = [
+  { to: '/admin/stats', icon: BarChart3, label: <Trans>Stats</Trans> },
+  { to: '/admin/users', icon: Users, label: <Trans>Users</Trans> },
+  { to: '/admin/documents', icon: FileStack, label: <Trans>Documents</Trans> },
+  { to: '/admin/subscriptions', icon: Wallet2, label: <Trans>Subscriptions</Trans> },
+  { to: '/admin/leaderboard', icon: Trophy, label: <Trans>Leaderboard</Trans> },
+  { to: '/admin/site-settings', icon: Settings, label: <Trans>Site Settings</Trans>, match: '/admin/banner' },
+];
+
 export default function AdminLayout() {
   const { pathname } = useLocation();
 
   return (
-    <div className="mx-auto mt-16 w-full max-w-screen-xl px-4 md:px-8">
-      <div className="grid grid-cols-12 md:mt-8 md:gap-8">
-        <div
-          className={cn(
-            'col-span-12 flex gap-x-2.5 gap-y-2 overflow-hidden overflow-x-auto md:col-span-3 md:flex md:flex-col',
-          )}
-        >
-          <Button
-            variant="ghost"
-            className={cn(
-              'justify-start md:w-full',
-              pathname?.startsWith('/admin/stats') && 'bg-secondary',
-            )}
-            asChild
-          >
-            <Link to="/admin/stats">
-              <BarChart3 className="mr-2 h-5 w-5" />
-              <Trans>Stats</Trans>
-            </Link>
-          </Button>
+    <div className="w-full">
+      <h1 className="font-display text-[22px] font-semibold tracking-tight">
+        <Trans>Admin</Trans>
+      </h1>
 
-          <Button
-            variant="ghost"
-            className={cn(
-              'justify-start md:w-full',
-              pathname?.startsWith('/admin/users') && 'bg-secondary',
-            )}
-            asChild
-          >
-            <Link to="/admin/users">
-              <Users className="mr-2 h-5 w-5" />
-              <Trans>Users</Trans>
-            </Link>
-          </Button>
-
-          <Button
-            variant="ghost"
-            className={cn(
-              'justify-start md:w-full',
-              pathname?.startsWith('/admin/documents') && 'bg-secondary',
-            )}
-            asChild
-          >
-            <Link to="/admin/documents">
-              <FileStack className="mr-2 h-5 w-5" />
-              <Trans>Documents</Trans>
-            </Link>
-          </Button>
-
-          <Button
-            variant="ghost"
-            className={cn(
-              'justify-start md:w-full',
-              pathname?.startsWith('/admin/subscriptions') && 'bg-secondary',
-            )}
-            asChild
-          >
-            <Link to="/admin/subscriptions">
-              <Wallet2 className="mr-2 h-5 w-5" />
-              <Trans>Subscriptions</Trans>
-            </Link>
-          </Button>
-
-          <Button
-            variant="ghost"
-            className={cn(
-              'justify-start md:w-full',
-              pathname?.startsWith('/admin/leaderboard') && 'bg-secondary',
-            )}
-            asChild
-          >
-            <Link to="/admin/leaderboard">
-              <Trophy className="mr-2 h-5 w-5" />
-              <Trans>Leaderboard</Trans>
-            </Link>
-          </Button>
-
-          <Button
-            variant="ghost"
-            className={cn(
-              'justify-start md:w-full',
-              pathname?.startsWith('/admin/banner') && 'bg-secondary',
-            )}
-            asChild
-          >
-            <Link to="/admin/site-settings">
-              <Settings className="mr-2 h-5 w-5" />
-              <Trans>Site Settings</Trans>
-            </Link>
-          </Button>
+      <div className="mt-5 flex gap-6">
+        {/* Desktop nav */}
+        <div className="hidden w-[220px] flex-shrink-0 md:block">
+          <div className="sticky top-20 rounded-[var(--r)] border border-border bg-card p-2">
+            <nav className="flex flex-col gap-0.5">
+              {navItems.map((item) => {
+                const isActive = pathname?.startsWith(item.to) || (item.match && pathname?.startsWith(item.match));
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={cn(
+                      'flex items-center gap-2.5 rounded-md px-3 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
+                      isActive && 'bg-primary/10 text-primary',
+                    )}
+                  >
+                    <item.icon className="h-4 w-4 flex-shrink-0" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
         </div>
 
-        <div className="col-span-12 mt-12 md:col-span-9 md:mt-0">
-          <Outlet />
+        {/* Mobile nav */}
+        <div className="scrollbar-hide mb-4 flex gap-1 overflow-x-auto rounded-[var(--r)] border border-border bg-card p-1.5 md:hidden">
+          {navItems.map((item) => {
+            const isActive = pathname?.startsWith(item.to) || (item.match && pathname?.startsWith(item.match));
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  'flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-[12px] font-medium text-muted-foreground transition-colors',
+                  isActive && 'bg-primary/10 text-primary',
+                )}
+              >
+                <item.icon className="h-3.5 w-3.5" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Content */}
+        <div className="min-w-0 flex-1">
+          <div className="rounded-[var(--r)] border border-border bg-card p-4 sm:p-6">
+            <Outlet />
+          </div>
         </div>
       </div>
     </div>

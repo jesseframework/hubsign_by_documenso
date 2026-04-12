@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { Trans } from '@lingui/react/macro';
 import { HomeIcon, ChevronRightIcon, MenuIcon, SearchIcon } from 'lucide-react';
-import { useLocation } from 'react-router';
+import { Link, useLocation } from 'react-router';
 
 import { AppCommandMenu } from './app-command-menu';
 
@@ -33,8 +33,10 @@ export const AppTopbar = ({ onHamburgerClick, title }: AppTopbarProps) => {
           </button>
 
           <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-            <HomeIcon className="h-3.5 w-3.5" />
-            <span>Home</span>
+            <Link to="/documents" className="flex items-center gap-1.5 transition-colors hover:text-foreground">
+              <HomeIcon className="h-3.5 w-3.5" />
+              <span>Home</span>
+            </Link>
             <ChevronRightIcon className="h-3 w-3" />
             <span className="font-medium text-foreground">{displayName}</span>
           </div>

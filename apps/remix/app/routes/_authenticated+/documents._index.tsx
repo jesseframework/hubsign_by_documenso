@@ -5,8 +5,6 @@ import {
   CheckCircle2Icon,
   ClockIcon,
   FileTextIcon,
-  FolderIcon,
-  HomeIcon,
   Loader2,
   MailIcon,
 } from 'lucide-react';
@@ -151,38 +149,9 @@ export default function DocumentsPage() {
     <DocumentDropZoneWrapper>
       <div className="w-full">
         {/* Actions bar */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex flex-1 items-center overflow-hidden">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex flex-shrink-0 items-center space-x-2 pl-0 hover:bg-transparent"
-              onClick={() => navigateToFolder(null)}
-            >
-              <HomeIcon className="h-4 w-4" />
-              <span className="hidden sm:inline">Home</span>
-            </Button>
-
-            {foldersData?.breadcrumbs.map((folder) => (
-              <div key={folder.id} className="flex items-center space-x-2">
-                <span>/</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="flex items-center space-x-2 pl-1 hover:bg-transparent"
-                  onClick={() => navigateToFolder(folder.id)}
-                >
-                  <FolderIcon className="h-4 w-4" />
-                  <span className="max-w-[80px] truncate sm:max-w-none">{folder.name}</span>
-                </Button>
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden gap-3 sm:flex">
-            <DocumentUploadDropzone />
-            <CreateFolderDialog />
-          </div>
+        <div className="flex items-center justify-end gap-3">
+          <DocumentUploadDropzone />
+          <CreateFolderDialog />
         </div>
 
         {/* Stats grid */}

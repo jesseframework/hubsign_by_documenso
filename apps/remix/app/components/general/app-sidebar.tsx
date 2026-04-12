@@ -65,16 +65,9 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
       <aside className={`sidebar-nav ${isOpen ? 'open' : ''}`}>
         {/* Logo */}
         <div className="flex items-center gap-2.5 border-b border-[hsl(var(--sidebar-border))] px-5 py-4">
-          <div className="flex h-7 w-7 items-center justify-center rounded-[7px] bg-primary">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 12L6 9L12 3L14 5L8 11L5 14Z" />
-              <path d="M12 3L13.5 1.5L14.5 2.5L13 4Z" fill="white" />
-              <path d="M3 12L4 14L5 14Z" fill="white" />
-            </svg>
-          </div>
-          <span className="text-[15px] font-semibold tracking-tight text-[hsl(var(--sidebar-text-active))]">
-            HubSign
-          </span>
+          <Link to="/documents" className="flex items-center gap-2.5" onClick={onClose}>
+            <BrandingLogo className="h-8 w-auto brightness-0 invert" />
+          </Link>
           <span className="ml-0.5 rounded bg-[#1e1e2a] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider text-primary">
             Pro
           </span>

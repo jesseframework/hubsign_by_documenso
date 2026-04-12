@@ -21,15 +21,14 @@ export const SettingsHeader = ({
     <>
       <div className={cn('flex flex-row items-center justify-between', className)}>
         <div>
-          <h3 className="text-lg font-medium">{title}</h3>
-
-          <p className="text-muted-foreground text-sm md:mt-2">{subtitle}</p>
+          <h3 className="text-[15px] font-semibold text-foreground">{title}</h3>
+          <p className="text-muted-foreground mt-1 text-[13px]">{subtitle}</p>
         </div>
 
         {children}
       </div>
 
-      {!hideDivider && <hr className="my-4" />}
+      {!hideDivider && <hr className="my-4 border-border" />}
     </>
   );
 };
