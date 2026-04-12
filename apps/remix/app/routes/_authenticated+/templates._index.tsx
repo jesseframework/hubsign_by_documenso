@@ -138,7 +138,7 @@ export default function TemplatesPage() {
 
       {/* Templates heading */}
       <div className="mt-8 mb-3">
-        <h2 className="font-display text-[22px] font-semibold tracking-tight">
+        <h2 className="text-xl font-semibold tracking-tight">
           <Trans>Templates</Trans>
         </h2>
       </div>

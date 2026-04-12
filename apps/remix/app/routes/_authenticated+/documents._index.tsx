@@ -290,7 +290,7 @@ export default function DocumentsPage() {
 
         {/* Documents section title */}
         <div className="mt-8 mb-3">
-          <h2 className="font-display text-[22px] font-semibold tracking-tight">
+          <h2 className="text-xl font-semibold tracking-tight">
             <Trans>Documents</Trans>
           </h2>
         </div>

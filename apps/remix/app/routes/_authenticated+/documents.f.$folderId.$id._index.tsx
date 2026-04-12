@@ -134,33 +134,32 @@ export default function DocumentPage() {
   const isDocumentHistoryEnabled = false;
 
   return (
-    <div className="mx-auto -mt-4 w-full max-w-screen-xl px-4 md:px-8">
+    <div className="w-full">
       {document.status === DocumentStatus.PENDING && (
         <DocumentRecipientLinkCopyDialog recipients={recipients} />
       )}
 
       <Link
         to={folderId ? `${documentRootPath}/f/${folderId}` : documentRootPath}
-        className="flex items-center text-[#7AC455] hover:opacity-80"
+        className="flex items-center text-sm text-muted-foreground hover:text-foreground"
       >
-        <ChevronLeft className="mr-2 inline-block h-5 w-5" />
+        <ChevronLeft className="mr-1 inline-block h-4 w-4" />
         <Trans>Documents</Trans>
       </Link>
 
-      <div className="flex flex-row justify-between truncate">
+      <div className="mt-3 flex flex-row justify-between truncate">
         <div>
           <h1
-            className="mt-4 block max-w-[20rem] truncate text-2xl font-semibold md:max-w-[30rem] md:text-3xl"
+            className="block max-w-[20rem] truncate text-xl font-semibold tracking-tight md:max-w-[30rem] md:text-2xl"
             title={document.title}
           >
             {document.title}
           </h1>
 
-          <div className="mt-2.5 flex items-center gap-x-6">
+          <div className="mt-2 flex items-center gap-x-4">
             <DocumentStatusComponent
-              inheritColor
+              asBadge
               status={document.status}
-              className="text-muted-foreground"
             />
 
             {recipients.length > 0 && (
@@ -199,9 +198,9 @@ export default function DocumentPage() {
         )}
       </div>
 
-      <div className="mt-6 grid w-full grid-cols-12 gap-8">
+      <div className="mt-5 grid w-full grid-cols-12 gap-5">
         <Card
-          className="relative col-span-12 rounded-xl before:rounded-xl lg:col-span-6 xl:col-span-7"
+          className="relative col-span-12 overflow-hidden rounded-[var(--r)] border border-border before:rounded-[var(--r)] lg:col-span-6 xl:col-span-7"
           gradient
         >
           <CardContent className="p-2">
@@ -214,10 +213,10 @@ export default function DocumentPage() {
         )}
 
         <div className="col-span-12 lg:col-span-6 xl:col-span-5">
-          <div className="space-y-6">
-            <section className="border-border bg-widget flex flex-col rounded-xl border pb-4 pt-6">
+          <div className="space-y-4">
+            <section className="flex flex-col rounded-[var(--r)] border border-border bg-card pb-4 pt-5">
               <div className="flex flex-row items-center justify-between px-4">
-                <h3 className="text-foreground text-2xl font-semibold">
+                <h3 className="text-foreground text-lg font-semibold">
                   {_(FRIENDLY_STATUS_MAP[document.status].labelExtended)}
                 </h3>
 

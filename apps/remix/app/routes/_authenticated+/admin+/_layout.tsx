@@ -30,7 +30,7 @@ export default function AdminLayout() {
 
   return (
     <div className="w-full">
-      <h1 className="font-display text-[22px] font-semibold tracking-tight">
+      <h1 className="text-xl font-semibold tracking-tight">
         <Trans>Admin</Trans>
       </h1>
 

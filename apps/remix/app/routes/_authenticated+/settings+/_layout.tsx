@@ -12,7 +12,7 @@ export function meta() {
 export default function SettingsLayout() {
   return (
     <div className="w-full">
-      <h1 className="font-display text-[22px] font-semibold tracking-tight">
+      <h1 className="text-xl font-semibold tracking-tight">
         <Trans>Settings</Trans>
       </h1>
 

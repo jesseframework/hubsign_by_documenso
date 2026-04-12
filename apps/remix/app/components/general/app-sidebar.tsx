@@ -12,7 +12,6 @@ import { Link, useLocation, useParams } from 'react-router';
 
 import type { SessionUser } from '@documenso/auth/server/lib/session/session';
 import type { TGetTeamsResponse } from '@documenso/lib/server-only/team/get-teams';
-import { Role } from '@prisma/client';
 
 import { BrandingLogo } from './branding-logo';
 
@@ -28,7 +27,7 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
   const params = useParams();
 
   const teamUrl = params?.teamUrl;
-  const isAdmin = user.roles.includes(Role.ADMIN);
+  const isAdmin = user.roles.includes('ADMIN' as never);
 
   const getRootHref = (path: string) => {
     if (teamUrl) {
