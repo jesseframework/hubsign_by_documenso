@@ -1,35 +1,41 @@
 import { Trans } from '@lingui/react/macro';
 import { Mails } from 'lucide-react';
 
+import { BrandingLogo } from '~/components/general/branding-logo';
 import { SendConfirmationEmailForm } from '~/components/forms/send-confirmation-email';
 
 export default function UnverifiedAccount() {
   return (
-    <div className="w-screen max-w-lg px-4">
-      <div className="flex items-start">
-        <div className="mr-4 mt-1 hidden md:block">
-          <Mails className="text-primary h-10 w-10" strokeWidth={2} />
-        </div>
-        <div className="">
-          <h2 className="text-2xl font-bold md:text-4xl">
-            <Trans>Confirm email</Trans>
-          </h2>
+    <div className="w-full px-4">
+      <div className="mb-8 flex justify-center">
+        <BrandingLogo className="h-10 w-auto" />
+      </div>
 
-          <p className="text-muted-foreground mt-4">
-            <Trans>
-              To gain access to your account, please confirm your email address by clicking on the
-              confirmation link from your inbox.
-            </Trans>
-          </p>
+      <div className="rounded-[var(--r)] border border-border bg-card p-6 shadow-sm">
+        <div className="flex items-start gap-3">
+          <Mails className="mt-1 hidden h-8 w-8 flex-shrink-0 text-primary md:block" strokeWidth={1.8} />
 
-          <p className="text-muted-foreground mt-4">
-            <Trans>
-              If you don't find the confirmation link in your inbox, you can request a new one
-              below.
-            </Trans>
-          </p>
+          <div>
+            <h2 className="text-xl font-semibold">
+              <Trans>Confirm email</Trans>
+            </h2>
 
-          <SendConfirmationEmailForm />
+            <p className="text-muted-foreground mt-3 text-[13px]">
+              <Trans>
+                To gain access to your account, please confirm your email address by clicking on the
+                confirmation link from your inbox.
+              </Trans>
+            </p>
+
+            <p className="text-muted-foreground mt-3 text-[13px]">
+              <Trans>
+                If you don't find the confirmation link in your inbox, you can request a new one
+                below.
+              </Trans>
+            </p>
+
+            <SendConfirmationEmailForm />
+          </div>
         </div>
       </div>
     </div>

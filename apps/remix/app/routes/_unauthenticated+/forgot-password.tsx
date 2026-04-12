@@ -10,7 +10,7 @@ export function meta() {
 
 export default function ForgotPasswordPage() {
   return (
-    <div className="w-screen max-w-lg px-4">
+    <div className="w-full px-4">
       <div className="w-full">
         <h1 className="text-3xl font-semibold">
           <Trans>Forgot your password?</Trans>

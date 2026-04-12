@@ -77,7 +77,7 @@ export default function VerifyEmailPage({ loaderData }: Route.ComponentProps) {
 
   return match(state)
     .with(EMAIL_VERIFICATION_STATE.NOT_FOUND, () => (
-      <div className="w-screen max-w-lg px-4">
+      <div className="w-full px-4">
         <div className="flex w-full items-start">
           <div className="mr-4 mt-1 hidden md:block">
             <AlertTriangle className="h-10 w-10 text-yellow-500" strokeWidth={2} />
@@ -105,7 +105,7 @@ export default function VerifyEmailPage({ loaderData }: Route.ComponentProps) {
       </div>
     ))
     .with(EMAIL_VERIFICATION_STATE.EXPIRED, () => (
-      <div className="w-screen max-w-lg px-4">
+      <div className="w-full px-4">
         <div className="flex w-full items-start">
           <div className="mr-4 mt-1 hidden md:block">
             <XCircle className="text-destructive h-10 w-10" strokeWidth={2} />
@@ -133,7 +133,7 @@ export default function VerifyEmailPage({ loaderData }: Route.ComponentProps) {
       </div>
     ))
     .with(EMAIL_VERIFICATION_STATE.VERIFIED, () => (
-      <div className="w-screen max-w-lg px-4">
+      <div className="w-full px-4">
         <div className="flex w-full items-start">
           <div className="mr-4 mt-1 hidden md:block">
             <CheckCircle2 className="h-10 w-10 text-green-500" strokeWidth={2} />
@@ -161,7 +161,7 @@ export default function VerifyEmailPage({ loaderData }: Route.ComponentProps) {
       </div>
     ))
     .with(EMAIL_VERIFICATION_STATE.ALREADY_VERIFIED, () => (
-      <div className="w-screen max-w-lg px-4">
+      <div className="w-full px-4">
         <div className="flex w-full items-start">
           <div className="mr-4 mt-1 hidden md:block">
             <CheckCircle2 className="h-10 w-10 text-green-500" strokeWidth={2} />

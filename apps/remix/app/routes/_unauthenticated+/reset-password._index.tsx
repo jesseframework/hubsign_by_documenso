@@ -11,7 +11,7 @@ export function meta() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="w-screen max-w-lg px-4">
+    <div className="w-full px-4">
       <div className="w-full">
         <h1 className="text-3xl font-semibold">
           <Trans>Unable to reset password</Trans>

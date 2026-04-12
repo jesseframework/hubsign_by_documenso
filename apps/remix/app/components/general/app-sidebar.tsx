@@ -2,14 +2,15 @@ import { Trans } from '@lingui/react/macro';
 import {
   FileTextIcon,
   LayoutGridIcon,
+  LogOutIcon,
   SettingsIcon,
   UsersIcon,
   XIcon,
-  BarChart3Icon,
   ShieldIcon,
 } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router';
 
+import { authClient } from '@documenso/auth/client';
 import type { SessionUser } from '@documenso/auth/server/lib/session/session';
 import type { TGetTeamsResponse } from '@documenso/lib/server-only/team/get-teams';
 
@@ -155,21 +156,31 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
 
         {/* Footer */}
         <div className="mt-auto border-t border-[hsl(var(--sidebar-border))] p-3">
-          <Link
-            to={getRootHref('/settings/profile')}
-            className="flex items-center gap-2.5 rounded-md px-2.5 py-2 hover:bg-[hsl(var(--sidebar-hover))]"
-            onClick={onClose}
-          >
-            <div className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-blue-400 text-[11px] font-semibold text-white">
-              {initials}
-            </div>
-            <div className="flex-1">
-              <div className="text-xs font-medium text-[hsl(var(--sidebar-text-active))]">
-                {user.name || 'User'}
+          <div className="flex items-center gap-2">
+            <Link
+              to={getRootHref('/settings/profile')}
+              className="flex flex-1 items-center gap-2.5 rounded-md px-2.5 py-2 hover:bg-[hsl(var(--sidebar-hover))]"
+              onClick={onClose}
+            >
+              <div className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-blue-400 text-[11px] font-semibold text-white">
+                {initials}
               </div>
-              <div className="text-[10px] text-[hsl(var(--sidebar-text))]">{user.email}</div>
-            </div>
-          </Link>
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-xs font-medium text-[hsl(var(--sidebar-text-active))]">
+                  {user.name || 'User'}
+                </div>
+                <div className="truncate text-[10px] text-[hsl(var(--sidebar-text))]">{user.email}</div>
+              </div>
+            </Link>
+
+            <button
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md text-[hsl(var(--sidebar-text))] transition-colors hover:bg-[hsl(var(--sidebar-hover))] hover:text-[hsl(var(--sidebar-text-active))]"
+              onClick={() => void authClient.signOut()}
+              title="Sign out"
+            >
+              <LogOutIcon className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </aside>
     </>

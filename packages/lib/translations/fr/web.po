@@ -1353,7 +1353,6 @@ msgid "Awaiting email confirmation"
 msgstr "En attente de confirmation par e-mail"
 
 #: apps/remix/app/components/general/direct-template/direct-template-signing-form.tsx
-#: apps/remix/app/components/forms/signup.tsx
 #: apps/remix/app/components/embed/authoring/configure-fields-view.tsx
 #: apps/remix/app/components/embed/authoring/configure-fields-view.tsx
 msgid "Back"
@@ -1381,8 +1380,8 @@ msgid "Banner Updated"
 msgstr "Bannière mise à jour"
 
 #: apps/remix/app/components/forms/signup.tsx
-msgid "Basic details"
-msgstr "Détails de base"
+#~ msgid "Basic details"
+#~ msgstr "Détails de base"
 
 #: packages/email/template-components/template-confirmation-email.tsx
 msgid "Before you get started, please confirm your email address by clicking the button below:"
@@ -1611,8 +1610,8 @@ msgid "Claim account"
 msgstr "Revendiquer le compte"
 
 #: apps/remix/app/components/forms/signup.tsx
-msgid "Claim username"
-msgstr "Revendiquer le nom d'utilisateur"
+#~ msgid "Claim username"
+#~ msgstr "Revendiquer le nom d'utilisateur"
 
 #: apps/remix/app/components/forms/signup.tsx
 msgid "Claim your username now"
@@ -1677,7 +1676,6 @@ msgstr ""
 
 #: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
-#: apps/remix/app/components/forms/signup.tsx
 #: apps/remix/app/components/embed/embed-document-signing-page.tsx
 #: apps/remix/app/components/embed/embed-direct-template-client-page.tsx
 msgid "Complete"
@@ -1959,6 +1957,10 @@ msgstr "Créer une équipe pour collaborer avec vos membres."
 #: packages/email/template-components/template-document-self-signed.tsx
 msgid "Create account"
 msgstr "Créer un compte"
+
+#: apps/remix/app/components/forms/signup.tsx
+msgid "Create Account"
+msgstr ""
 
 #: apps/remix/app/components/dialogs/template-use-dialog.tsx
 msgid "Create and send"
@@ -3861,7 +3863,6 @@ msgstr "Nouveau propriétaire d'équipe"
 msgid "New Template"
 msgstr "Nouveau modèle"
 
-#: apps/remix/app/components/forms/signup.tsx
 #: apps/remix/app/components/embed/embed-document-signing-page.tsx
 #: apps/remix/app/components/embed/embed-direct-template-client-page.tsx
 #: packages/ui/primitives/signature-pad/signature-pad-dialog.tsx
@@ -4264,6 +4265,10 @@ msgstr "Veuillez vérifier votre e-mail pour des mises à jour."
 msgid "Please choose your new password"
 msgstr "Veuillez choisir votre nouveau mot de passe"
 
+#: apps/remix/app/components/forms/signup.tsx
+msgid "Please complete the security verification before signing up."
+msgstr ""
+
 #: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
 #: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
 msgid "Please configure the document first"
@@ -4435,8 +4440,8 @@ msgid "Public profile URL"
 msgstr "URL du profil public"
 
 #: apps/remix/app/components/forms/signup.tsx
-msgid "Public profile username"
-msgstr "Nom d'utilisateur du profil public"
+#~ msgid "Public profile username"
+#~ msgstr "Nom d'utilisateur du profil public"
 
 #: apps/remix/app/components/tables/templates-table.tsx
 msgid "Public templates are connected to your public profile. Any modifications to public templates will also appear in your public profile."
@@ -6732,6 +6737,10 @@ msgstr "Email de vérification envoyé"
 #: apps/remix/app/components/general/verify-email-banner.tsx
 msgid "Verification email sent successfully."
 msgstr "Email de vérification envoyé avec succès."
+
+#: apps/remix/app/components/forms/signup.tsx
+msgid "Verification required"
+msgstr ""
 
 #: apps/remix/app/components/general/verify-email-banner.tsx
 msgid "Verify Now"
