@@ -71,7 +71,7 @@ export default function TemplateEditPage() {
   const { template, isTemplateEnterprise, templateRootPath } = useSuperLoaderData<typeof loader>();
 
   return (
-    <div className="mx-auto -mt-4 max-w-screen-xl px-4 md:px-8">
+    <div className="w-full">
       <div className="flex flex-col justify-between sm:flex-row">
         <div>
           <Link
@@ -80,7 +80,7 @@ export default function TemplateEditPage() {
                 ? `${templateRootPath}/f/${template.folderId}/${template.id}`
                 : `${templateRootPath}/${template.id}`
             }
-            className="flex items-center text-[#7AC455] hover:opacity-80"
+            className="flex items-center text-sm text-muted-foreground hover:text-foreground"
           >
             <ChevronLeft className="mr-2 inline-block h-5 w-5" />
             <Trans>Template</Trans>

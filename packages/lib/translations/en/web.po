@@ -2699,8 +2699,12 @@ msgid "Drag and drop or click to upload"
 msgstr "Drag and drop or click to upload"
 
 #: apps/remix/app/components/general/document/document-drop-zone-wrapper.tsx
-msgid "Drag and drop your PDF file here"
-msgstr "Drag and drop your PDF file here"
+#~ msgid "Drag and drop your PDF file here"
+#~ msgstr "Drag and drop your PDF file here"
+
+#: apps/remix/app/components/general/document/document-drop-zone-wrapper.tsx
+msgid "Drag and drop your PDF files here"
+msgstr "Drag and drop your PDF files here"
 
 #: packages/lib/constants/document.ts
 msgid "Draw"
@@ -3791,6 +3795,10 @@ msgstr "Move to Team"
 msgid "Moving..."
 msgstr "Moving..."
 
+#: apps/remix/app/components/general/document/document-drop-zone-wrapper.tsx
+msgid "Multiple files will be merged into one document"
+msgstr "Multiple files will be merged into one document"
+
 #: apps/remix/app/routes/_authenticated+/settings+/public-profile.tsx
 msgid "My templates"
 msgstr "My templates"
@@ -4397,6 +4405,10 @@ msgstr "Private templates can only be modified and viewed by you."
 msgid "Proceed"
 msgstr "Proceed"
 
+#: apps/remix/app/components/general/document/document-drop-zone-wrapper.tsx
+msgid "Processing document..."
+msgstr "Processing document..."
+
 #: apps/remix/app/routes/_authenticated+/settings+/profile.tsx
 #: apps/remix/app/components/general/settings-nav-mobile.tsx
 #: apps/remix/app/components/general/settings-nav-desktop.tsx
@@ -4541,6 +4553,8 @@ msgid "Recipient updated"
 msgstr "Recipient updated"
 
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/audit-log.tsx
+#: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id.logs.tsx
+#: apps/remix/app/routes/_authenticated+/documents.$id.logs.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 #: apps/remix/app/components/general/template/template-page-view-recipients.tsx
 #: apps/remix/app/components/general/document/document-page-view-recipients.tsx
@@ -5002,8 +5016,8 @@ msgstr "Share Signature Card"
 
 #: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
 #: apps/remix/app/components/general/document/document-page-view-dropdown.tsx
-msgid "Share Signing Card"
-msgstr "Share Signing Card"
+#~ msgid "Share Signing Card"
+#~ msgstr "Share Signing Card"
 
 #: packages/lib/constants/template.ts
 msgid "Share the Link"
@@ -6655,8 +6669,8 @@ msgid "Uploaded file not an allowed file type"
 msgstr "Uploaded file not an allowed file type"
 
 #: apps/remix/app/components/general/document/document-drop-zone-wrapper.tsx
-msgid "Uploading document..."
-msgstr "Uploading document..."
+#~ msgid "Uploading document..."
+#~ msgstr "Uploading document..."
 
 #: apps/remix/app/routes/_authenticated+/templates.f.$folderId.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/templates.$id._index.tsx

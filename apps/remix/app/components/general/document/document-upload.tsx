@@ -13,6 +13,7 @@ import { useSession } from '@documenso/lib/client-only/providers/session';
 import { APP_DOCUMENT_UPLOAD_SIZE_LIMIT } from '@documenso/lib/constants/app';
 import { DEFAULT_DOCUMENT_TIME_ZONE, TIME_ZONES } from '@documenso/lib/constants/time-zones';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
+import { mergePdfFiles } from '@documenso/lib/universal/pdf-merge';
 import { putPdfFile } from '@documenso/lib/universal/upload/put-file';
 import { formatDocumentsPath } from '@documenso/lib/utils/teams';
 import { trpc } from '@documenso/trpc/react';
@@ -66,9 +67,12 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining.documents, user.emailVerified, team]);
 
-  const onFileDrop = async (file: File) => {
+  const onFileDrop = async (files: File[]) => {
     try {
       setIsLoading(true);
+
+      // Merge multiple PDFs into one if needed
+      const file = files.length > 1 ? await mergePdfFiles(files) : files[0];
 
       const response = await putPdfFile(file);
 

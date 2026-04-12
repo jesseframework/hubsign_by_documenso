@@ -139,7 +139,7 @@ export default function DocumentsPage() {
 
   return (
     <DocumentDropZoneWrapper>
-      <div className="mx-auto w-full max-w-screen-xl px-4 md:px-8">
+      <div className="w-full">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-1 items-center">
             <Button
