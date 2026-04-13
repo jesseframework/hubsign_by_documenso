@@ -1,5 +1,5 @@
 import { Trans } from '@lingui/react/macro';
-import { Link, redirect } from 'react-router';
+import { Link, redirect, useSearchParams } from 'react-router';
 
 import { getOptionalSession } from '@documenso/auth/server/lib/utils/get-session';
 import {
@@ -39,6 +39,11 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 export default function SignIn({ loaderData }: Route.ComponentProps) {
   const { isGoogleSSOEnabled, isOIDCSSOEnabled, oidcProviderLabel } = loaderData;
+  const [searchParams] = useSearchParams();
+
+  // Read email from query param (e.g. ?email=user@example.com)
+  // This is safe — it only pre-fills the input field, user still needs to enter password
+  const prefillEmail = searchParams.get('email') ?? undefined;
 
   return (
     <div className="w-full px-4">
@@ -60,6 +65,7 @@ export default function SignIn({ loaderData }: Route.ComponentProps) {
         <hr className="-mx-6 my-4 border-border" />
 
         <SignInForm
+          initialEmail={prefillEmail}
           isGoogleSSOEnabled={isGoogleSSOEnabled}
           isOIDCSSOEnabled={isOIDCSSOEnabled}
           oidcProviderLabel={oidcProviderLabel}
