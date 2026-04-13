@@ -16,6 +16,7 @@ import { authClient } from '@documenso/auth/client';
 import { useAnalytics } from '@documenso/lib/client-only/hooks/use-analytics';
 import { NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
+import { env } from '@documenso/lib/utils/env';
 import { ZPasswordSchema } from '@documenso/trpc/server/auth-router/schema';
 import { cn } from '@documenso/ui/lib/utils';
 import { Button } from '@documenso/ui/primitives/button';
@@ -460,6 +461,7 @@ export const SignUpForm = ({
                 type="button"
                 size="lg"
                 className="w-full"
+                disabled={!!env('NEXT_PUBLIC_TURNSTILE_SITE_KEY') && !turnstileToken}
                 loading={form.formState.isSubmitting}
                 onClick={onNextClick}
               >
