@@ -77,6 +77,24 @@ model User {
   passkeys           Passkey[]
   avatarImage        AvatarImage?           @relation(fields: [avatarImageId], references: [id], onDelete: SetNull)
 
+  // DMS relations
+  dmsLocations          DmsLocation[]
+  dmsDocuments          DmsDocument[]
+  dmsCheckedOutDocs     DmsDocument[] @relation("DmsCheckedOutBy")
+  dmsVersions           DmsVersion[]
+  dmsRetrievalRequests  DmsRetrievalRequest[] @relation("DmsRetrievalRequester")
+  dmsRetrievalApprovals DmsRetrievalRequest[] @relation("DmsRetrievalApprover")
+  dmsFilingRules        DmsFilingRule[]
+  dmsAuditLogs          DmsAuditLog[]
+  dmsComments           DmsComment[]
+  dmsWorkflowsInitiated DmsWorkflow[] @relation("DmsWorkflowInitiator")
+  dmsWorkflowSteps      DmsWorkflowStep[] @relation("DmsWorkflowAssignee")
+  dmsPermissions        DmsPermission[]
+  dmsPermissionsGranted DmsPermission[] @relation("DmsPermissionGranter")
+  dmsDocumentLinks      DmsDocumentLink[]
+  dmsFavorites          DmsFavorite[]
+  dmsShareLinks         DmsShareLink[]
+
   @@index([email])
 }
 
@@ -377,6 +395,9 @@ model Document {
   folder    Folder?            @relation(fields: [folderId], references: [id], onDelete: Cascade)
   folderId  String?
 
+  // DMS auto-filing link
+  dmsDocument DmsDocument?
+
   @@unique([documentDataId])
   @@index([userId])
   @@index([status])
@@ -648,6 +669,15 @@ model Team {
   folders   Folder[]
   apiTokens ApiToken[]
   webhooks  Webhook[]
+
+  // DMS relations
+  dmsLocations       DmsLocation[]
+  dmsDocumentTypes   DmsDocumentType[]
+  dmsClassifications DmsClassification[]
+  dmsTags            DmsTag[]
+  dmsDocuments            DmsDocument[]
+  dmsFilingRules          DmsFilingRule[]
+  dmsComplianceTemplates  DmsComplianceTemplate[]
 }
 
 model TeamPending {
@@ -857,4 +887,506 @@ model AvatarImage {
 
   team Team[]
   user User[]
+}
+
+// ═══════════════════════════════════════════════════════════
+// DOCUMENT MANAGEMENT SYSTEM (DMS) MODULE
+// ═══════════════════════════════════════════════════════════
+
+enum DmsDocumentStatus {
+  DRAFT
+  ACTIVE
+  UNDER_REVIEW
+  ARCHIVED
+  DESTROYED
+}
+
+enum DmsDocumentFormat {
+  DIGITAL
+  PHYSICAL
+  BOTH
+}
+
+enum DmsDisposalStatus {
+  NOT_DUE
+  DUE_FOR_REVIEW
+  APPROVED_FOR_DISPOSAL
+  DISPOSED
+  RETAINED
+}
+
+enum DmsConfidentiality {
+  PUBLIC
+  INTERNAL
+  CONFIDENTIAL
+  RESTRICTED
+}
+
+enum DmsRetrievalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  RETRIEVED
+  RETURNED
+  OVERDUE
+}
+
+// ── Filing Structure ──
+
+model DmsLocation {
+  id          String   @id @default(cuid())
+  name        String
+  address     String?
+  description String?
+
+  teamId Int?
+  team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  cabinets    DmsCabinet[]
+  permissions DmsPermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DmsCabinet {
+  id          String @id @default(cuid())
+  name        String
+  description String?
+
+  locationId String
+  location   DmsLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  shelves DmsShelf[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DmsShelf {
+  id    String  @id @default(cuid())
+  name  String
+  label String?
+
+  cabinetId String
+  cabinet   DmsCabinet @relation(fields: [cabinetId], references: [id], onDelete: Cascade)
+
+  bins DmsBin[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DmsBin {
+  id      String  @id @default(cuid())
+  name    String
+  barcode String? @unique
+  label   String?
+
+  shelfId String
+  shelf   DmsShelf @relation(fields: [shelfId], references: [id], onDelete: Cascade)
+
+  documents DmsDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ── Document Types & Classification ──
+
+model DmsDocumentType {
+  id             String @id @default(cuid())
+  name           String
+  description    String?
+  /// [DmsMetadataSchema]
+  metadataSchema Json?
+
+  teamId Int?
+  team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  documents DmsDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DmsClassification {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  color       String?
+
+  parentId String?
+  parent   DmsClassification?  @relation("ClassificationTree", fields: [parentId], references: [id])
+  children DmsClassification[] @relation("ClassificationTree")
+
+  teamId Int?
+  team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  documents   DmsDocument[]
+  permissions DmsPermission[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DmsTag {
+  id   String @id @default(cuid())
+  name String
+
+  teamId Int?
+  team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  documents DmsDocumentTag[]
+
+  createdAt DateTime @default(now())
+
+  @@unique([name, teamId])
+}
+
+// ── Core Document ──
+
+model DmsDocument {
+  id              String              @id @default(cuid())
+  title           String
+  description     String?
+  referenceNumber String?             @unique
+  fileUrl         String
+  fileName        String
+  fileType        String
+  fileSize        Int
+  ocrText         String?
+  ocrProcessed    Boolean             @default(false)
+  status          DmsDocumentStatus   @default(ACTIVE)
+  format          DmsDocumentFormat   @default(DIGITAL)
+  confidentiality DmsConfidentiality  @default(INTERNAL)
+  disposalStatus  DmsDisposalStatus   @default(NOT_DUE)
+  disposalDate    DateTime?
+  disposalApprovedById Int?
+  disposalNotes   String?
+  physicalLocation String?
+  labelPrinted    Boolean             @default(false)
+  /// [DmsDocumentMetadata]
+  metadata        Json?
+  retentionDate   DateTime?
+  expiryDate      DateTime?
+
+  // Filing location
+  binId String?
+  bin   DmsBin? @relation(fields: [binId], references: [id])
+
+  // Classification
+  documentTypeId   String?
+  documentType     DmsDocumentType? @relation(fields: [documentTypeId], references: [id])
+  classificationId String?
+  classification   DmsClassification? @relation(fields: [classificationId], references: [id])
+
+  // Link to signed document (auto-filing)
+  signedDocumentId Int?      @unique
+  signedDocument   Document? @relation(fields: [signedDocumentId], references: [id])
+
+  // Check-in/Check-out
+  checkedOut     Boolean   @default(false)
+  checkedOutById Int?
+  checkedOutBy   User?     @relation("DmsCheckedOutBy", fields: [checkedOutById], references: [id])
+  checkedOutAt   DateTime?
+  checkoutNotes  String?
+
+  // Ownership
+  uploadedById Int
+  uploadedBy   User @relation(fields: [uploadedById], references: [id])
+
+  teamId Int?
+  team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  // Relations
+  tags             DmsDocumentTag[]
+  versions         DmsVersion[]
+  retrievalRequests DmsRetrievalRequest[]
+  auditLogs        DmsAuditLog[]
+  comments         DmsComment[]
+  workflows        DmsWorkflow[]
+  permissions      DmsPermission[]
+  linksAsSource    DmsDocumentLink[] @relation("DmsLinkSource")
+  linksAsTarget    DmsDocumentLink[] @relation("DmsLinkTarget")
+  favorites        DmsFavorite[]
+  shareLinks       DmsShareLink[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DmsDocumentTag {
+  documentId String
+  document   DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  tagId      String
+  tag        DmsTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([documentId, tagId])
+}
+
+// ── Versioning ──
+
+model DmsVersion {
+  id      String @id @default(cuid())
+  version Int
+  fileUrl String
+  fileSize Int
+  notes   String?
+
+  documentId String
+  document   DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  uploadedById Int
+  uploadedBy   User @relation(fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// ── Retrieval Requests ──
+
+model DmsRetrievalRequest {
+  id     String              @id @default(cuid())
+  status DmsRetrievalStatus  @default(PENDING)
+  notes  String?
+  reason String?
+
+  dueDate    DateTime?
+  returnDate DateTime?
+
+  documentId String
+  document   DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  requestedById Int
+  requestedBy   User @relation("DmsRetrievalRequester", fields: [requestedById], references: [id])
+
+  approvedById Int?
+  approvedBy   User? @relation("DmsRetrievalApprover", fields: [approvedById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ── Filing Rules (Auto-filing) ──
+
+model DmsFilingRule {
+  id     String  @id @default(cuid())
+  name   String
+  active Boolean @default(true)
+
+  /// [DmsFilingCondition]
+  condition Json
+  // Destination
+  binId          String?
+  documentTypeId String?
+  classificationId String?
+
+  teamId Int?
+  team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  createdBy Int
+  creator   User @relation(fields: [createdBy], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ── Audit Log ──
+
+model DmsAuditLog {
+  id     String @id @default(cuid())
+  action String
+  details String?
+  ipAddress String?
+
+  documentId String
+  document   DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// ── Comments ──
+
+model DmsComment {
+  id   String @id @default(cuid())
+  text String
+
+  documentId String
+  document   DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ── Approval Workflows ──
+
+enum DmsWorkflowStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum DmsWorkflowStepStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+}
+
+model DmsWorkflow {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  status      DmsWorkflowStatus @default(PENDING)
+
+  documentId String
+  document   DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  initiatedById Int
+  initiatedBy   User @relation("DmsWorkflowInitiator", fields: [initiatedById], references: [id])
+
+  currentStep Int @default(1)
+
+  steps DmsWorkflowStep[]
+
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model DmsWorkflowStep {
+  id       String                @id @default(cuid())
+  step     Int
+  action   String                @default("APPROVE")
+  status   DmsWorkflowStepStatus @default(PENDING)
+  notes    String?
+  dueDate  DateTime?
+
+  workflowId String
+  workflow   DmsWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+
+  assignedToId Int
+  assignedTo   User @relation("DmsWorkflowAssignee", fields: [assignedToId], references: [id])
+
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ── Access Control ──
+
+enum DmsPermissionLevel {
+  VIEW
+  DOWNLOAD
+  EDIT
+  DELETE
+  ADMIN
+}
+
+model DmsPermission {
+  id    String             @id @default(cuid())
+  level DmsPermissionLevel
+
+  // Can be scoped to location, document, or classification
+  locationId       String?
+  location         DmsLocation? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  documentId       String?
+  document         DmsDocument? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  classificationId String?
+  classification   DmsClassification? @relation(fields: [classificationId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  grantedById Int
+  grantedBy   User @relation("DmsPermissionGranter", fields: [grantedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, locationId, level])
+  @@unique([userId, documentId, level])
+}
+
+// ── Document Links ──
+
+model DmsDocumentLink {
+  id       String @id @default(cuid())
+  linkType String @default("RELATED")
+
+  sourceDocumentId String
+  sourceDocument   DmsDocument @relation("DmsLinkSource", fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+
+  targetDocumentId String
+  targetDocument   DmsDocument @relation("DmsLinkTarget", fields: [targetDocumentId], references: [id], onDelete: Cascade)
+
+  createdById Int
+  createdBy   User @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([sourceDocumentId, targetDocumentId])
+}
+
+// ── Favorites ──
+
+model DmsFavorite {
+  id String @id @default(cuid())
+
+  documentId String
+  document   DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, documentId])
+}
+
+// ── Secure Share Links ──
+
+model DmsShareLink {
+  id        String   @id @default(cuid())
+  token     String   @unique @default(cuid())
+  password  String?
+  expiresAt DateTime?
+  maxViews  Int?
+  viewCount Int      @default(0)
+  active    Boolean  @default(true)
+
+  documentId String
+  document   DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  createdById Int
+  createdBy   User @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// ── Compliance Templates ──
+
+model DmsComplianceTemplate {
+  id              String @id @default(cuid())
+  name            String
+  description     String?
+  industry        String
+  retentionYears  Int
+  disposalAction  String @default("ARCHIVE")
+  legalBasis      String?
+
+  teamId Int?
+  team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }

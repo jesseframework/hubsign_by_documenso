@@ -104,6 +104,50 @@ export const filesRoute = new Hono<HonoEnv>()
       throw new AppError(AppErrorCode.UNKNOWN_ERROR);
     }
   })
+  // DMS document preview — serve DocumentData by ID for authenticated users
+  .get('/dms-preview/:dataId', async (c) => {
+    try {
+      const session = await getOptionalSession(c.req.raw);
+
+      if (!session.isAuthenticated) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+
+      const dataId = c.req.param('dataId');
+
+      const documentData = await prisma.documentData.findUnique({
+        where: { id: dataId },
+      });
+
+      if (!documentData) {
+        return c.json({ error: 'Not found' }, 404);
+      }
+
+      // For database storage: data is base64 encoded
+      if (documentData.type === 'BYTES_64') {
+        const buffer = Buffer.from(documentData.data, 'base64');
+
+        return new Response(buffer, {
+          headers: {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': 'inline',
+            'Cache-Control': 'private, max-age=3600',
+          },
+        });
+      }
+
+      // For S3 storage: get presigned URL and redirect
+      if (documentData.type === 'S3_PATH') {
+        const { url } = await getPresignGetUrl(documentData.data);
+        return c.redirect(url);
+      }
+
+      return c.json({ error: 'Unsupported storage type' }, 400);
+    } catch (err) {
+      console.error('DMS preview error:', err);
+      return c.json({ error: 'Failed to load preview' }, 500);
+    }
+  })
   .get('/download/signed', async (c) => {
     try {
       const searchParams = new URL(c.req.url).searchParams;

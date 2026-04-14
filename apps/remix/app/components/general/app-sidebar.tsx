@@ -1,5 +1,6 @@
 import { Trans } from '@lingui/react/macro';
 import {
+  ArchiveIcon,
   FileTextIcon,
   LayoutGridIcon,
   LogOutIcon,
@@ -113,6 +114,15 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
           >
             <FileTextIcon className="h-4 w-4 flex-shrink-0" />
             <Trans>Templates</Trans>
+          </Link>
+
+          <Link
+            to="/dms"
+            className={`sidebar-nav-item ${location.pathname.startsWith('/dms') ? 'active' : ''}`}
+            onClick={onClose}
+          >
+            <ArchiveIcon className="h-4 w-4 flex-shrink-0" />
+            <Trans>Doc Manager</Trans>
           </Link>
         </div>
 

@@ -1,6 +1,7 @@
 import { adminRouter } from './admin-router/router';
 import { apiTokenRouter } from './api-token-router/router';
 import { authRouter } from './auth-router/router';
+import { dmsRouter } from './dms-router/router';
 import { documentRouter } from './document-router/router';
 import { embeddingPresignRouter } from './embedding-router/_router';
 import { fieldRouter } from './field-router/router';
@@ -17,6 +18,7 @@ export const appRouter = router({
   auth: authRouter,
   profile: profileRouter,
   document: documentRouter,
+  dms: dmsRouter,
   field: fieldRouter,
   folder: folderRouter,
   recipient: recipientRouter,
