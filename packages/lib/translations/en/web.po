@@ -1916,6 +1916,10 @@ msgstr "Consent to Electronic Transactions"
 msgid "Contact Information"
 msgstr "Contact Information"
 
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+msgid "Contact sales for enterprise pricing."
+msgstr "Contact sales for enterprise pricing."
+
 #: apps/remix/app/routes/_authenticated+/admin+/site-settings.tsx
 msgid "Content"
 msgstr "Content"
@@ -2632,6 +2636,7 @@ msgstr "Document is using legacy field insertion"
 msgid "Document Limit Exceeded!"
 msgstr "Document Limit Exceeded!"
 
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
 msgid "Document Manager"
 msgstr "Document Manager"
@@ -6073,6 +6078,10 @@ msgstr "The document is already saved and cannot be changed."
 msgid "The document is now completed, please follow any instructions provided within the parent application."
 msgstr "The document is now completed, please follow any instructions provided within the parent application."
 
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+msgid "The Document Manager module is an enterprise add-on that provides full document lifecycle management — filing, retention, compliance, workflows, and more."
+msgstr "The Document Manager module is an enterprise add-on that provides full document lifecycle management — filing, retention, compliance, workflows, and more."
+
 #: packages/email/template-components/template-document-rejection-confirmed.tsx
 msgid "The document owner has been notified of this rejection. No further action is required from you at this time. The document owner may contact you with any questions regarding this rejection."
 msgstr "The document owner has been notified of this rejection. No further action is required from you at this time. The document owner may contact you with any questions regarding this rejection."
@@ -6919,6 +6928,10 @@ msgstr "Updating Your Information"
 #: packages/ui/primitives/document-dropzone.tsx
 msgid "Upgrade"
 msgstr "Upgrade"
+
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+msgid "Upgrade Your Plan"
+msgstr "Upgrade Your Plan"
 
 #: apps/remix/app/components/general/document/document-drop-zone-wrapper.tsx
 msgid "Upgrade your plan to upload more documents"

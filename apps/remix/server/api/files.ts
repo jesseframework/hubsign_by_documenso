@@ -104,6 +104,37 @@ export const filesRoute = new Hono<HonoEnv>()
       throw new AppError(AppErrorCode.UNKNOWN_ERROR);
     }
   })
+  // DMS generic file upload — accepts any file type (not just PDF)
+  .post('/upload-dms', async (c) => {
+    try {
+      const session = await getOptionalSession(c.req.raw);
+
+      if (!session.isAuthenticated) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+
+      const formData = await c.req.formData();
+      const file = formData.get('file') as File | null;
+
+      if (!file) {
+        return c.json({ error: 'No file provided' }, 400);
+      }
+
+      const MAX_FILE_SIZE = APP_DOCUMENT_UPLOAD_SIZE_LIMIT * 1024 * 1024;
+
+      if (file.size > MAX_FILE_SIZE) {
+        return c.json({ error: 'File too large' }, 400);
+      }
+
+      const { type, data } = await putFileServerSide(file);
+      const result = await createDocumentData({ type, data });
+
+      return c.json(result);
+    } catch (error) {
+      console.error('DMS upload failed:', error);
+      return c.json({ error: 'Upload failed' }, 500);
+    }
+  })
   // DMS document preview — serve DocumentData by ID for authenticated users
   .get('/dms-preview/:dataId', async (c) => {
     try {

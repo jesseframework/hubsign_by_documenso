@@ -68,14 +68,25 @@ const handleUserLimits = async ({ email }: HandleUserLimitsOptions) => {
         continue;
       }
 
-      const currentQuota = ZLimitsSchema.parse(
-        'metadata' in price.product ? price.product.metadata : {},
-      );
+      const productMetadata = 'metadata' in price.product ? price.product.metadata : {};
+      const currentQuota = ZLimitsSchema.parse(productMetadata);
+
+      // If this is a DMS add-on, just merge the dmsEnabled flag
+      if (currentQuota.dmsEnabled) {
+        quota.dmsEnabled = true;
+        remaining.dmsEnabled = true;
+      }
 
       // Use the subscription with the highest quota.
       if (currentQuota.documents > quota.documents && currentQuota.recipients > quota.recipients) {
+        const dmsWasEnabled = quota.dmsEnabled;
         quota = currentQuota;
         remaining = structuredClone(quota);
+        // Preserve DMS flag from other subscriptions
+        if (dmsWasEnabled) {
+          quota.dmsEnabled = true;
+          remaining.dmsEnabled = true;
+        }
       }
     }
 
@@ -150,11 +161,13 @@ const handleTeamLimits = async ({ email, teamId }: HandleTeamLimitsOptions) => {
         documents: 0,
         recipients: 0,
         directTemplates: 0,
+        dmsEnabled: false,
       },
       remaining: {
         documents: 0,
         recipients: 0,
         directTemplates: 0,
+        dmsEnabled: false,
       },
     };
   }

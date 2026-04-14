@@ -13,6 +13,7 @@ import { Link, useLocation, useParams } from 'react-router';
 
 import { authClient } from '@documenso/auth/client';
 import type { SessionUser } from '@documenso/auth/server/lib/session/session';
+import { useLimits } from '@documenso/ee/server-only/limits/provider/client';
 import type { TGetTeamsResponse } from '@documenso/lib/server-only/team/get-teams';
 
 import { BrandingLogo } from './branding-logo';
@@ -30,6 +31,8 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
 
   const teamUrl = params?.teamUrl;
   const isAdmin = user.roles.includes('ADMIN' as never);
+  const { quota } = useLimits();
+  const isDmsEnabled = quota.dmsEnabled;
 
   const getRootHref = (path: string) => {
     if (teamUrl) {
@@ -116,14 +119,16 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
             <Trans>Templates</Trans>
           </Link>
 
-          <Link
-            to="/dms"
-            className={`sidebar-nav-item ${location.pathname.startsWith('/dms') ? 'active' : ''}`}
-            onClick={onClose}
-          >
-            <ArchiveIcon className="h-4 w-4 flex-shrink-0" />
-            <Trans>Doc Manager</Trans>
-          </Link>
+          {isDmsEnabled && (
+            <Link
+              to="/dms"
+              className={`sidebar-nav-item ${location.pathname.startsWith('/dms') ? 'active' : ''}`}
+              onClick={onClose}
+            >
+              <ArchiveIcon className="h-4 w-4 flex-shrink-0" />
+              <Trans>Doc Manager</Trans>
+            </Link>
+          )}
         </div>
 
         <div className="mx-3 my-2 h-px bg-[hsl(var(--sidebar-border))]" />

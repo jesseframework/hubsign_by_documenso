@@ -14,6 +14,10 @@ export const ZLimitsSchema = z.object({
     .preprocess((v) => (v === null ? Infinity : Number(v)), z.number())
     .optional()
     .default(0),
+  dmsEnabled: z
+    .preprocess((v) => v === true || v === 'true' || v === '1', z.boolean())
+    .optional()
+    .default(false),
 });
 
 export type TLimitsSchema = z.infer<typeof ZLimitsSchema>;

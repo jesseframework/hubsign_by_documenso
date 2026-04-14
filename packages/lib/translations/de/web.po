@@ -1921,6 +1921,10 @@ msgstr "Zustimmung zu elektronischen Transaktionen"
 msgid "Contact Information"
 msgstr "Kontaktinformationen"
 
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+msgid "Contact sales for enterprise pricing."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/admin+/site-settings.tsx
 msgid "Content"
 msgstr "Inhalt"
@@ -2637,6 +2641,7 @@ msgstr ""
 msgid "Document Limit Exceeded!"
 msgstr "Dokumentenlimit überschritten!"
 
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
 msgid "Document Manager"
 msgstr ""
@@ -6078,6 +6083,10 @@ msgstr ""
 msgid "The document is now completed, please follow any instructions provided within the parent application."
 msgstr "Das Dokument ist jetzt abgeschlossen. Bitte folgen Sie allen Anweisungen, die in der übergeordneten Anwendung bereitgestellt werden."
 
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+msgid "The Document Manager module is an enterprise add-on that provides full document lifecycle management — filing, retention, compliance, workflows, and more."
+msgstr ""
+
 #: packages/email/template-components/template-document-rejection-confirmed.tsx
 msgid "The document owner has been notified of this rejection. No further action is required from you at this time. The document owner may contact you with any questions regarding this rejection."
 msgstr "Der Dokumenteninhaber wurde über diese Ablehnung informiert. Es sind derzeit keine weiteren Maßnahmen von Ihnen erforderlich. Der Dokumenteninhaber kann Sie bei Fragen zu dieser Ablehnung kontaktieren."
@@ -6922,6 +6931,10 @@ msgstr "Aktualisierung Ihrer Informationen"
 #: packages/ui/primitives/document-dropzone.tsx
 msgid "Upgrade"
 msgstr "Upgrade"
+
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+msgid "Upgrade Your Plan"
+msgstr ""
 
 #: apps/remix/app/components/general/document/document-drop-zone-wrapper.tsx
 msgid "Upgrade your plan to upload more documents"

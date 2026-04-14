@@ -9,4 +9,5 @@ export enum STRIPE_PLAN_TYPE {
   COMMUNITY = 'community',
   PLATFORM = 'platform',
   ENTERPRISE = 'enterprise',
+  DMS = 'dms',
 }
