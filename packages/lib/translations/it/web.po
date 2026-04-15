@@ -947,6 +947,10 @@ msgstr "Tutti i documenti"
 msgid "All documents are within their retention period."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "All documents have been processed"
+msgstr ""
+
 #: apps/remix/app/components/tables/documents-table-empty-state.tsx
 msgid "All documents have been processed. Any new documents that are sent or received will show here."
 msgstr "Tutti i documenti sono stati elaborati. Eventuali nuovi documenti inviati o ricevuti verranno mostrati qui."
@@ -1269,6 +1273,15 @@ msgstr "Token API"
 msgid "App Version"
 msgstr "Versione dell'app"
 
+#. placeholder {0}: files.length
+#: apps/remix/app/routes/_authenticated+/dms+/bulk-upload.tsx
+msgid "Apply to all {0} files"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+msgid "Approval workflow started"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
 msgid "Approvals"
 msgstr ""
@@ -1392,6 +1405,18 @@ msgstr "Livello di Autenticazione"
 msgid "Authentication required"
 msgstr "Autenticazione richiesta"
 
+#: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
+msgid "Auto-File Signed Documents"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
+msgid "Auto-filing settings saved"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
+msgid "Automatically file completed signed documents from HubSign into the Document Manager."
+msgstr ""
+
 #: apps/remix/app/components/forms/avatar-image.tsx
 msgid "Avatar"
 msgstr "Avatar"
@@ -1453,6 +1478,10 @@ msgstr "Fatturazione"
 msgid "Bin created"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
+msgid "Bin updated"
+msgstr ""
+
 #: packages/ui/primitives/signature-pad/signature-pad-color-picker.tsx
 msgid "Black"
 msgstr "Nero"
@@ -1500,6 +1529,11 @@ msgstr "Invio modello in blocco tramite CSV"
 msgid "Bulk Send via CSV"
 msgstr "Invio Massivo via CSV"
 
+#: apps/remix/app/routes/_authenticated+/dms+/bulk-upload.tsx
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+msgid "Bulk Upload"
+msgstr ""
+
 #: packages/email/templates/team-invite.tsx
 msgid "by <0>{senderName}</0>"
 msgstr "da <0>{senderName}</0>"
@@ -1540,12 +1574,18 @@ msgstr "Utilizzando la funzione di firma elettronica, acconsenti a effettuare tr
 msgid "Cabinet created"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
+msgid "Cabinet updated"
+msgstr ""
+
 #: packages/ui/components/recipient/recipient-role-select.tsx
 msgid "Can prepare"
 msgstr "Può preparare"
 
 #: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/documents.tsx
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
@@ -1912,6 +1952,10 @@ msgstr "Conferma email"
 #: apps/remix/app/components/forms/send-confirmation-email.tsx
 msgid "Confirmation email sent"
 msgstr "Email di conferma inviato"
+
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "Connect your AI service to automatically process documents. Set <0>NEXT_PRIVATE_AI_SERVICE_URL</0> in your environment."
+msgstr ""
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Consent to Electronic Transactions"
@@ -2866,6 +2910,10 @@ msgstr "Documenti in bozza"
 msgid "Drafted Documents"
 msgstr "Documenti redatti"
 
+#: apps/remix/app/routes/_authenticated+/dms+/bulk-upload.tsx
+msgid "Drag & drop files here, or click to browse"
+msgstr ""
+
 #: packages/ui/primitives/document-dropzone.tsx
 msgid "Drag & drop your PDF here."
 msgstr "Trascina e rilascia il tuo PDF qui."
@@ -2885,6 +2933,10 @@ msgstr ""
 #: packages/lib/constants/document.ts
 msgid "Draw"
 msgstr "Disegno"
+
+#: apps/remix/app/routes/_authenticated+/dms+/bulk-upload.tsx
+msgid "Drop files here..."
+msgstr ""
 
 #: apps/remix/app/components/embed/authoring/configure-document-upload.tsx
 msgid "Drop your document here"
@@ -3792,7 +3844,6 @@ msgstr "Caricamento Documento..."
 msgid "Loading teams..."
 msgstr "Caricamento dei team..."
 
-#: apps/remix/app/routes/_authenticated+/dms+/retrievals.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/documents.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/_index.tsx
@@ -3806,6 +3857,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
 msgid "Location deleted"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
+msgid "Location updated"
 msgstr ""
 
 #: apps/remix/app/components/general/document-signing/document-signing-auth-page.tsx
@@ -4119,6 +4174,10 @@ msgstr ""
 msgid "No documents match your search."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "No documents processed yet"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/dms+/_index.tsx
 msgid "No documents yet. Upload your first document to get started."
 msgstr ""
@@ -4250,6 +4309,14 @@ msgstr "Numero"
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
 msgid "Number format"
 msgstr "Formato numero"
+
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "OCR Processing Queue"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+msgid "OCR Queue"
+msgstr ""
 
 #. placeholder {0}: document.team?.name
 #: apps/remix/app/components/general/document-signing/document-signing-page-view.tsx
@@ -4475,6 +4542,10 @@ msgstr "Documenti in sospeso"
 #: apps/remix/app/components/general/teams/team-invitations.tsx
 msgid "Pending invitations"
 msgstr "Inviti in sospeso"
+
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "Pending OCR Processing"
+msgstr ""
 
 #: apps/remix/app/components/tables/user-settings-pending-teams-table-actions.tsx
 msgid "Pending team deleted."
@@ -4802,6 +4873,10 @@ msgstr "Documenti recenti"
 msgid "Recent Documents"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "Recently Processed"
+msgstr ""
+
 #: apps/remix/app/components/tables/documents-table.tsx
 msgid "Recip."
 msgstr ""
@@ -4870,6 +4945,10 @@ msgstr "Rosso"
 #: packages/ui/primitives/document-flow/add-settings.tsx
 msgid "Redirect URL"
 msgstr "URL di reindirizzamento"
+
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "Refresh"
+msgstr ""
 
 #: apps/remix/app/components/general/claim-account.tsx
 #: apps/remix/app/components/forms/signup.tsx
@@ -4954,9 +5033,17 @@ msgstr "Rinnova: {formattedDate}"
 msgid "Repeat Password"
 msgstr "Ripeti Password"
 
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+msgid "Request Document Retrieval"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/team-transfer-dialog.tsx
 msgid "Request transfer"
 msgstr "Richiedi trasferimento"
+
+#: apps/remix/app/routes/_authenticated+/dms+/retrievals.tsx
+msgid "Requests are created from the document detail page for physical documents."
+msgstr ""
 
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/radio-field.tsx
@@ -5012,6 +5099,10 @@ msgstr "Risolvi"
 msgid "Resolve payment"
 msgstr "Risolvere il pagamento"
 
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+msgid "Response submitted"
+msgstr ""
+
 #: packages/ui/components/document/document-share-button.tsx
 msgid "Rest assured, your document is strictly confidential and will never be shared. Only your signing experience will be highlighted. Share your personalized signing card to showcase your signature!"
 msgstr "Stai tranquillo, il tuo documento è strettamente confidenziale e non sarà mai condiviso. Solo la tua esperienza di firma sarà evidenziata. Condividi la tua carta di firma personalizzata per mostrare la tua firma!"
@@ -5027,6 +5118,10 @@ msgstr ""
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Retention of Documents"
 msgstr "Conservazione dei documenti"
+
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+msgid "Retrieval request created"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/dms+/retrievals.tsx
 msgid "Retrieval Requests"
@@ -5088,6 +5183,10 @@ msgstr "Ruoli"
 msgid "Root (No Folder)"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+msgid "Route this document through a multi-step approval chain. Each step must be approved before the next person is notified."
+msgstr ""
+
 #: packages/ui/primitives/data-table-pagination.tsx
 msgid "Rows per page"
 msgstr "Righe per pagina"
@@ -5100,6 +5199,10 @@ msgstr "Righe per pagina"
 #: packages/ui/primitives/document-flow/field-item-advanced-settings.tsx
 msgid "Save"
 msgstr "Salva"
+
+#: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
+msgid "Save Settings"
+msgstr ""
 
 #: packages/ui/primitives/template-flow/add-template-fields.tsx
 msgid "Save Template"
@@ -5343,6 +5446,10 @@ msgstr "Condividi la tua esperienza di firma!"
 
 #: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
 msgid "Shelf created"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
+msgid "Shelf updated"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/settings+/public-profile.tsx
@@ -5676,6 +5783,18 @@ msgstr "Siamo spiacenti, non siamo riusciti a scaricare il certificato. Riprova 
 msgid "Source"
 msgstr "Fonte"
 
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+msgid "Start Approval Workflow"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+msgid "Start Workflow"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+msgid "Starting..."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
 msgid "Stats"
 msgstr "Statistiche"
@@ -5698,6 +5817,18 @@ msgstr "Passo <0>{step} di {maxStep}</0>"
 #: packages/ui/primitives/document-flow/add-subject.tsx
 msgid "Subject <0>(Optional)</0>"
 msgstr "Oggetto <0>(Opzionale)</0>"
+
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+msgid "Submit a request to retrieve the physical copy of this document from storage."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+msgid "Submit Request"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
+msgid "Submitting..."
+msgstr ""
 
 #: apps/remix/app/components/general/billing-plans.tsx
 msgid "Subscribe"
@@ -5757,6 +5888,10 @@ msgstr "Creati con successo: {successCount}"
 #: packages/email/templates/bulk-send-complete.tsx
 msgid "Summary:"
 msgstr "Sommario:"
+
+#: apps/remix/app/routes/_authenticated+/dms+/bulk-upload.tsx
+msgid "Supports PDF, JPEG, PNG, TIFF. Upload invoices, receipts, bank statements, or any documents."
+msgstr ""
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "System Requirements"
@@ -6326,6 +6461,10 @@ msgstr "Non ci sono ancora documenti completati. I documenti che hai creato o ri
 msgid "There was an error uploading your file. Please try again."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "These documents are waiting for OCR text extraction. Connect the AI service to process them automatically."
+msgstr ""
+
 #: apps/remix/app/components/general/teams/team-email-usage.tsx
 msgid "They have permission on your behalf to:"
 msgstr "Hanno il permesso per tuo conto di:"
@@ -6680,6 +6819,14 @@ msgstr "Totale firmatari che si sono iscritti"
 msgid "Total Users"
 msgstr "Totale utenti"
 
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "Track OCR processing status for uploaded documents."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/retrievals.tsx
+msgid "Track requests for physical document retrieval from filing locations."
+msgstr ""
+
 #: apps/remix/app/components/dialogs/team-transfer-dialog.tsx
 msgid "transfer {teamName}"
 msgstr "trasferisci {teamName}"
@@ -6989,6 +7136,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/dms+/documents.tsx
 msgid "Upload failed"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/bulk-upload.tsx
+msgid "Upload multiple documents at once. All files will be processed with the same metadata settings."
 msgstr ""
 
 #: packages/ui/primitives/signature-pad/signature-pad-upload.tsx

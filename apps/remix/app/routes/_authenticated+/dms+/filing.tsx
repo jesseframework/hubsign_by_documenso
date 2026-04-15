@@ -6,14 +6,17 @@ import { Trans } from '@lingui/react/macro';
 import {
   ArchiveIcon,
   BoxIcon,
+  CheckIcon,
   ChevronRightIcon,
   FileTextIcon,
   FolderOpenIcon,
   MapPinIcon,
+  PencilIcon,
   PlusIcon,
   ServerIcon,
   Trash2Icon,
   UploadIcon,
+  XIcon,
 } from 'lucide-react';
 import { Link } from 'react-router';
 
@@ -44,6 +47,12 @@ export default function DmsFilingPage() {
   const [addingTo, setAddingTo] = useState<{
     type: 'location' | 'cabinet' | 'shelf' | 'bin';
     parentId?: string;
+  } | null>(null);
+
+  const [editing, setEditing] = useState<{
+    type: 'location' | 'cabinet' | 'shelf' | 'bin';
+    id: string;
+    name: string;
   } | null>(null);
 
   const utils = trpc.useUtils();
@@ -85,12 +94,52 @@ export default function DmsFilingPage() {
     },
   });
 
+  const updateLocation = trpc.dms.updateLocation.useMutation({
+    onSuccess: () => {
+      void utils.dms.getLocations.invalidate();
+      setEditing(null);
+      toast({ title: _(msg`Location updated`) });
+    },
+  });
+
+  const updateCabinet = trpc.dms.updateCabinet.useMutation({
+    onSuccess: () => {
+      void utils.dms.getLocations.invalidate();
+      setEditing(null);
+      toast({ title: _(msg`Cabinet updated`) });
+    },
+  });
+
+  const updateShelf = trpc.dms.updateShelf.useMutation({
+    onSuccess: () => {
+      void utils.dms.getLocations.invalidate();
+      setEditing(null);
+      toast({ title: _(msg`Shelf updated`) });
+    },
+  });
+
+  const updateBin = trpc.dms.updateBin.useMutation({
+    onSuccess: () => {
+      void utils.dms.getLocations.invalidate();
+      setEditing(null);
+      toast({ title: _(msg`Bin updated`) });
+    },
+  });
+
   const deleteLocation = trpc.dms.deleteLocation.useMutation({
     onSuccess: () => {
       void utils.dms.getLocations.invalidate();
       toast({ title: _(msg`Location deleted`) });
     },
   });
+
+  const handleSaveEdit = () => {
+    if (!editing || !editing.name.trim()) return;
+    if (editing.type === 'location') updateLocation.mutate({ id: editing.id, name: editing.name });
+    if (editing.type === 'cabinet') updateCabinet.mutate({ id: editing.id, name: editing.name });
+    if (editing.type === 'shelf') updateShelf.mutate({ id: editing.id, name: editing.name });
+    if (editing.type === 'bin') updateBin.mutate({ id: editing.id, name: editing.name });
+  };
 
   return (
     <div className="space-y-4">
@@ -154,19 +203,48 @@ export default function DmsFilingPage() {
                     }`}
                   />
                   <MapPinIcon className="h-4 w-4 text-primary" />
-                  <span className="flex-1 text-[13px] font-medium">{location.name}</span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {location.cabinets.length} cabinets
-                  </span>
-                  <button
-                    className="ml-2 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteLocation.mutate({ id: location.id });
-                    }}
-                  >
-                    <Trash2Icon className="h-3.5 w-3.5" />
-                  </button>
+                  {editing?.type === 'location' && editing.id === location.id ? (
+                    <div className="flex flex-1 items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      <Input
+                        className="h-7 text-[13px]"
+                        value={editing.name}
+                        onChange={(e) => setEditing({ ...editing, name: e.target.value })}
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditing(null); }}
+                      />
+                      <button className="rounded p-1 text-green-600 hover:bg-green-50" onClick={handleSaveEdit}>
+                        <CheckIcon className="h-3.5 w-3.5" />
+                      </button>
+                      <button className="rounded p-1 text-muted-foreground hover:bg-muted" onClick={() => setEditing(null)}>
+                        <XIcon className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="flex-1 text-[13px] font-medium">{location.name}</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {location.cabinets.length} cabinets
+                      </span>
+                      <button
+                        className="ml-2 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditing({ type: 'location', id: location.id, name: location.name });
+                        }}
+                      >
+                        <PencilIcon className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteLocation.mutate({ id: location.id });
+                        }}
+                      >
+                        <Trash2Icon className="h-3.5 w-3.5" />
+                      </button>
+                    </>
+                  )}
                 </div>
 
                 {/* Cabinets */}
@@ -186,10 +264,19 @@ export default function DmsFilingPage() {
                             }`}
                           />
                           <ServerIcon className="h-3.5 w-3.5 text-amber-600" />
-                          <span className="flex-1 text-[12px] font-medium">{cabinet.name}</span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {cabinet.shelves.length} shelves
-                          </span>
+                          {editing?.type === 'cabinet' && editing.id === cabinet.id ? (
+                            <div className="flex flex-1 items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                              <Input className="h-6 text-[11px]" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditing(null); }} />
+                              <button className="rounded p-0.5 text-green-600 hover:bg-green-50" onClick={handleSaveEdit}><CheckIcon className="h-3 w-3" /></button>
+                              <button className="rounded p-0.5 text-muted-foreground hover:bg-muted" onClick={() => setEditing(null)}><XIcon className="h-3 w-3" /></button>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="flex-1 text-[12px] font-medium">{cabinet.name}</span>
+                              <span className="text-[10px] text-muted-foreground">{cabinet.shelves.length} shelves</span>
+                              <button className="rounded p-0.5 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); setEditing({ type: 'cabinet', id: cabinet.id, name: cabinet.name }); }}><PencilIcon className="h-3 w-3" /></button>
+                            </>
+                          )}
                         </div>
 
                         {/* Shelves */}
@@ -211,10 +298,19 @@ export default function DmsFilingPage() {
                                     }`}
                                   />
                                   <FolderOpenIcon className="h-3.5 w-3.5 text-blue-500" />
-                                  <span className="flex-1 text-[12px]">{shelf.name}</span>
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {shelf.bins.length} bins
-                                  </span>
+                                  {editing?.type === 'shelf' && editing.id === shelf.id ? (
+                                    <div className="flex flex-1 items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                                      <Input className="h-6 text-[11px]" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditing(null); }} />
+                                      <button className="rounded p-0.5 text-green-600 hover:bg-green-50" onClick={handleSaveEdit}><CheckIcon className="h-3 w-3" /></button>
+                                      <button className="rounded p-0.5 text-muted-foreground hover:bg-muted" onClick={() => setEditing(null)}><XIcon className="h-3 w-3" /></button>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <span className="flex-1 text-[12px]">{shelf.name}</span>
+                                      <span className="text-[10px] text-muted-foreground">{shelf.bins.length} bins</span>
+                                      <button className="rounded p-0.5 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); setEditing({ type: 'shelf', id: shelf.id, name: shelf.name }); }}><PencilIcon className="h-3 w-3" /></button>
+                                    </>
+                                  )}
                                 </div>
 
                                 {/* Bins */}
@@ -226,7 +322,18 @@ export default function DmsFilingPage() {
                                         className="group/bin flex items-center gap-2.5 py-2 pl-24 pr-4 transition-colors hover:bg-muted/30"
                                       >
                                         <BoxIcon className="h-3.5 w-3.5 text-green-600" />
-                                        <span className="flex-1 text-[12px]">{bin.name}</span>
+                                        {editing?.type === 'bin' && editing.id === bin.id ? (
+                                          <div className="flex flex-1 items-center gap-1.5">
+                                            <Input className="h-6 text-[11px]" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') handleSaveEdit(); if (e.key === 'Escape') setEditing(null); }} />
+                                            <button className="rounded p-0.5 text-green-600 hover:bg-green-50" onClick={handleSaveEdit}><CheckIcon className="h-3 w-3" /></button>
+                                            <button className="rounded p-0.5 text-muted-foreground hover:bg-muted" onClick={() => setEditing(null)}><XIcon className="h-3 w-3" /></button>
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <span className="flex-1 text-[12px]">{bin.name}</span>
+                                            <button className="rounded p-0.5 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); setEditing({ type: 'bin', id: bin.id, name: bin.name }); }}><PencilIcon className="h-3 w-3" /></button>
+                                          </>
+                                        )}
                                         {bin.barcode && (
                                           <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
                                             {bin.barcode}

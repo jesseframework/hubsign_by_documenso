@@ -38,7 +38,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const [subscriptions, prices, primaryAccountPlanPrices] = await Promise.all([
     getSubscriptionsByUserId({ userId: user.id }),
-    getPricesByInterval({ plans: [STRIPE_PLAN_TYPE.REGULAR, STRIPE_PLAN_TYPE.PLATFORM] }),
+    getPricesByInterval({ plans: [STRIPE_PLAN_TYPE.REGULAR, STRIPE_PLAN_TYPE.PLATFORM, STRIPE_PLAN_TYPE.ENTERPRISE, STRIPE_PLAN_TYPE.DMS] }),
     getPrimaryAccountPlanPrices(),
   ]);
 

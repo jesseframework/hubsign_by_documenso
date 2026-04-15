@@ -11,5 +11,6 @@ export const getDocumentRelatedPrices = async () => {
     STRIPE_PLAN_TYPE.COMMUNITY,
     STRIPE_PLAN_TYPE.PLATFORM,
     STRIPE_PLAN_TYPE.ENTERPRISE,
+    STRIPE_PLAN_TYPE.DMS,
   ]);
 };

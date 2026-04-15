@@ -15,10 +15,64 @@ export const AppTopbar = ({ onHamburgerClick, title }: AppTopbarProps) => {
   const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
   const location = useLocation();
 
-  // Derive page name from path
+  // Derive readable page name from path
   const pathParts = location.pathname.split('/').filter(Boolean);
-  const pageName = title || pathParts[pathParts.length - 1] || 'Documents';
-  const displayName = pageName.charAt(0).toUpperCase() + pageName.slice(1);
+
+  const routeNames: Record<string, string> = {
+    documents: 'Documents',
+    templates: 'Templates',
+    settings: 'Settings',
+    admin: 'Admin',
+    dms: 'Document Manager',
+    'bulk-upload': 'Bulk Upload',
+    'ocr-queue': 'OCR Queue',
+    search: 'Search',
+    filing: 'Filing Structure',
+    favorites: 'Favorites',
+    approvals: 'Approvals',
+    retrievals: 'Retrievals',
+    retention: 'Retention',
+    activity: 'Activity',
+    compliance: 'Compliance',
+    profile: 'Profile',
+    security: 'Security',
+    tokens: 'API Tokens',
+    webhooks: 'Webhooks',
+    billing: 'Billing',
+    teams: 'Teams',
+    stats: 'Stats',
+    users: 'Users',
+    subscriptions: 'Subscriptions',
+    leaderboard: 'Leaderboard',
+    'site-settings': 'Site Settings',
+    'public-profile': 'Public Profile',
+    doc: 'Details',
+    edit: 'Edit',
+    logs: 'Logs',
+    label: 'Print Label',
+    folders: 'Folders',
+    signin: 'Sign In',
+    signup: 'Sign Up',
+  };
+
+  // Find the best display name — skip IDs (long strings with mixed chars)
+  const getDisplayName = () => {
+    if (title) return title;
+    for (let i = pathParts.length - 1; i >= 0; i--) {
+      const part = pathParts[i];
+      if (routeNames[part]) return routeNames[part];
+    }
+    // Fallback: use last part if it looks like a word
+    const last = pathParts[pathParts.length - 1] || 'Documents';
+    if (last.length < 20 && /^[a-zA-Z-]+$/.test(last)) {
+      return last.charAt(0).toUpperCase() + last.slice(1);
+    }
+    // It's an ID — use the route before it
+    const secondLast = pathParts[pathParts.length - 2];
+    return routeNames[secondLast] || 'Documents';
+  };
+
+  const displayName = getDisplayName();
 
   return (
     <>

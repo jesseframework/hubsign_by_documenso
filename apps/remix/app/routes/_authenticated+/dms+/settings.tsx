@@ -25,6 +25,47 @@ export default function DmsSettingsPage() {
   const [newClassName, setNewClassName] = useState('');
   const [newTagName, setNewTagName] = useState('');
 
+  // Auto-filing settings
+  const { data: autoFilingSettings } = trpc.dms.getAutoFilingSettings.useQuery();
+  const { data: locations } = trpc.dms.getLocations.useQuery();
+  const [afEnabled, setAfEnabled] = useState(false);
+  const [afBinId, setAfBinId] = useState('');
+  const [afTypeId, setAfTypeId] = useState('');
+  const [afClassId, setAfClassId] = useState('');
+  const [afConfidentiality, setAfConfidentiality] = useState('INTERNAL');
+  const [afAutoOcr, setAfAutoOcr] = useState(true);
+  const [afLoaded, setAfLoaded] = useState(false);
+
+  // Load settings when data arrives
+  if (autoFilingSettings && !afLoaded) {
+    setAfEnabled(autoFilingSettings.enabled);
+    setAfBinId(autoFilingSettings.binId || '');
+    setAfTypeId(autoFilingSettings.documentTypeId || '');
+    setAfClassId(autoFilingSettings.classificationId || '');
+    setAfConfidentiality(autoFilingSettings.confidentiality);
+    setAfAutoOcr(autoFilingSettings.autoOcr);
+    setAfLoaded(true);
+  }
+
+  // Flatten bins
+  const allBins: { id: string; path: string }[] = [];
+  locations?.forEach((loc) =>
+    loc.cabinets.forEach((cab) =>
+      cab.shelves.forEach((shelf) =>
+        shelf.bins.forEach((bin) =>
+          allBins.push({ id: bin.id, path: `${loc.name} › ${cab.name} › ${shelf.name} › ${bin.name}` }),
+        ),
+      ),
+    ),
+  );
+
+  const saveAutoFiling = trpc.dms.saveAutoFilingSettings.useMutation({
+    onSuccess: () => {
+      void utils.dms.getAutoFilingSettings.invalidate();
+      toast({ title: _(msg`Auto-filing settings saved`) });
+    },
+  });
+
   const { data: types } = trpc.dms.getDocumentTypes.useQuery();
   const { data: classifications } = trpc.dms.getClassifications.useQuery();
   const { data: tags } = trpc.dms.getTags.useQuery();
@@ -58,6 +99,110 @@ export default function DmsSettingsPage() {
       <h2 className="text-lg font-semibold">
         <Trans>DMS Settings</Trans>
       </h2>
+
+      {/* Auto-Filing Settings */}
+      <div className="rounded-[var(--r)] border border-border bg-card p-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-[15px] font-semibold">
+              <Trans>Auto-File Signed Documents</Trans>
+            </h3>
+            <p className="mt-1 text-[13px] text-muted-foreground">
+              <Trans>Automatically file completed signed documents from HubSign into the Document Manager.</Trans>
+            </p>
+          </div>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-border"
+              checked={afEnabled}
+              onChange={(e) => setAfEnabled(e.target.checked)}
+            />
+            <span className="text-[13px] font-medium">{afEnabled ? 'Enabled' : 'Disabled'}</span>
+          </label>
+        </div>
+
+        {afEnabled && (
+          <div className="mt-4 grid grid-cols-2 gap-3 border-t border-border pt-4">
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Filing Location</label>
+              <select
+                className="mt-1 h-8 w-full rounded-md border border-border bg-background px-2 text-[13px]"
+                value={afBinId}
+                onChange={(e) => setAfBinId(e.target.value)}
+              >
+                <option value="">Unfiled (no location)</option>
+                {allBins.map((b) => <option key={b.id} value={b.id}>{b.path}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Document Type</label>
+              <select
+                className="mt-1 h-8 w-full rounded-md border border-border bg-background px-2 text-[13px]"
+                value={afTypeId}
+                onChange={(e) => setAfTypeId(e.target.value)}
+              >
+                <option value="">No type</option>
+                {types?.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Classification</label>
+              <select
+                className="mt-1 h-8 w-full rounded-md border border-border bg-background px-2 text-[13px]"
+                value={afClassId}
+                onChange={(e) => setAfClassId(e.target.value)}
+              >
+                <option value="">No classification</option>
+                {classifications?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Confidentiality</label>
+              <select
+                className="mt-1 h-8 w-full rounded-md border border-border bg-background px-2 text-[13px]"
+                value={afConfidentiality}
+                onChange={(e) => setAfConfidentiality(e.target.value)}
+              >
+                <option value="PUBLIC">Public</option>
+                <option value="INTERNAL">Internal</option>
+                <option value="CONFIDENTIAL">Confidential</option>
+                <option value="RESTRICTED">Restricted</option>
+              </select>
+            </div>
+
+            <div className="col-span-2 flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 rounded border-border"
+                checked={afAutoOcr}
+                onChange={(e) => setAfAutoOcr(e.target.checked)}
+              />
+              <span className="text-[13px]">Auto-OCR signed documents after filing</span>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-4 flex justify-end">
+          <Button
+            size="sm"
+            onClick={() => void saveAutoFiling.mutateAsync({
+              enabled: afEnabled,
+              binId: afBinId || null,
+              documentTypeId: afTypeId || null,
+              classificationId: afClassId || null,
+              confidentiality: afConfidentiality as 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'RESTRICTED',
+              autoOcr: afAutoOcr,
+            })}
+            loading={saveAutoFiling.isPending}
+          >
+            <Trans>Save Settings</Trans>
+          </Button>
+        </div>
+      </div>
 
       {/* Document Types */}
       <div className="rounded-[var(--r)] border border-border bg-card p-4">

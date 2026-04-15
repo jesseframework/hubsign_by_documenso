@@ -818,6 +818,20 @@ export const dmsRouter = router({
     }),
 
   // ═══════════════════════════════════════════
+  // USER LOOKUP (for workflows)
+  // ═══════════════════════════════════════════
+
+  lookupUserByEmail: authenticatedProcedure
+    .input(z.object({ email: z.string().email() }))
+    .query(async ({ input }) => {
+      const user = await prisma.user.findUnique({
+        where: { email: input.email },
+        select: { id: true, name: true, email: true },
+      });
+      return user;
+    }),
+
+  // ═══════════════════════════════════════════
   // APPROVAL WORKFLOWS
   // ═══════════════════════════════════════════
 
@@ -1119,6 +1133,104 @@ export const dmsRouter = router({
         orderBy: { createdAt: 'desc' },
         take: input.limit,
       });
+    }),
+
+  // ═══════════════════════════════════════════
+  // AUTO-FILING SETTINGS
+  // ═══════════════════════════════════════════
+
+  getAutoFilingSettings: authenticatedProcedure.query(async ({ ctx }) => {
+    return prisma.dmsAutoFilingSettings.findUnique({
+      where: { userId: ctx.user.id },
+    });
+  }),
+
+  saveAutoFilingSettings: authenticatedProcedure
+    .input(z.object({
+      enabled: z.boolean(),
+      binId: z.string().nullable().optional(),
+      documentTypeId: z.string().nullable().optional(),
+      classificationId: z.string().nullable().optional(),
+      confidentiality: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']).optional(),
+      autoOcr: z.boolean().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      return prisma.dmsAutoFilingSettings.upsert({
+        where: { userId: ctx.user.id },
+        create: {
+          userId: ctx.user.id,
+          ...input,
+          binId: input.binId ?? undefined,
+          documentTypeId: input.documentTypeId ?? undefined,
+          classificationId: input.classificationId ?? undefined,
+        },
+        update: input,
+      });
+    }),
+
+  // Auto-file a completed signed document into DMS
+  autoFileSignedDocument: authenticatedProcedure
+    .input(z.object({ signedDocumentId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      // Get settings
+      const settings = await prisma.dmsAutoFilingSettings.findUnique({
+        where: { userId: ctx.user.id },
+      });
+
+      if (!settings?.enabled) {
+        return { filed: false, reason: 'Auto-filing disabled' };
+      }
+
+      // Get the signed document
+      const signedDoc = await prisma.document.findUnique({
+        where: { id: input.signedDocumentId },
+        include: { documentData: true },
+      });
+
+      if (!signedDoc || !signedDoc.documentData) {
+        return { filed: false, reason: 'Document not found' };
+      }
+
+      // Check if already filed
+      const existing = await prisma.dmsDocument.findUnique({
+        where: { signedDocumentId: input.signedDocumentId },
+      });
+
+      if (existing) {
+        return { filed: false, reason: 'Already filed', documentId: existing.id };
+      }
+
+      // Create DMS document
+      const dmsDoc = await prisma.dmsDocument.create({
+        data: {
+          title: signedDoc.title,
+          referenceNumber: `DMS-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+          fileUrl: signedDoc.documentData.id,
+          fileName: `${signedDoc.title}.pdf`,
+          fileType: 'application/pdf',
+          fileSize: 0,
+          status: 'ACTIVE',
+          format: 'DIGITAL',
+          confidentiality: settings.confidentiality,
+          binId: settings.binId,
+          documentTypeId: settings.documentTypeId,
+          classificationId: settings.classificationId,
+          signedDocumentId: input.signedDocumentId,
+          uploadedById: ctx.user.id,
+        },
+      });
+
+      // Audit log
+      await prisma.dmsAuditLog.create({
+        data: {
+          action: 'AUTO_FILED_FROM_SIGNING',
+          documentId: dmsDoc.id,
+          userId: ctx.user.id,
+          details: `Auto-filed from signed document: ${signedDoc.title}`,
+        },
+      });
+
+      return { filed: true, documentId: dmsDoc.id };
     }),
 
   // ═══════════════════════════════════════════

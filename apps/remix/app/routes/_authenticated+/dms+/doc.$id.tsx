@@ -9,7 +9,13 @@ import {
   DownloadIcon,
   EditIcon,
   FileTextIcon,
+  CheckCircleIcon,
+  ClipboardListIcon,
   FolderInputIcon,
+  GitBranchIcon,
+  PlusIcon,
+  Trash2Icon,
+  XCircleIcon,
   FolderXIcon,
   HeartIcon,
   LockIcon,
@@ -48,9 +54,14 @@ export default function DmsDocumentDetailPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const [commentText, setCommentText] = useState('');
-  const [activeTab, setActiveTab] = useState<'preview' | 'details' | 'audit' | 'comments' | 'versions'>('preview');
+  const [activeTab, setActiveTab] = useState<'preview' | 'details' | 'workflows' | 'audit' | 'comments' | 'versions'>('preview');
   const [isFilingOpen, setIsFilingOpen] = useState(false);
   const [selectedBinId, setSelectedBinId] = useState('');
+  const [isRetrievalOpen, setIsRetrievalOpen] = useState(false);
+  const [retrievalReason, setRetrievalReason] = useState('');
+  const [isWorkflowOpen, setIsWorkflowOpen] = useState(false);
+  const [workflowName, setWorkflowName] = useState('');
+  const [workflowSteps, setWorkflowSteps] = useState<{ email: string; action: string }[]>([{ email: '', action: 'APPROVE' }]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const utils = trpc.useUtils();
@@ -128,6 +139,31 @@ export default function DmsDocumentDetailPage() {
     },
   });
 
+  const createWorkflow = trpc.dms.createWorkflow.useMutation({
+    onSuccess: () => {
+      void utils.dms.getDocument.invalidate({ id: id! });
+      setIsWorkflowOpen(false);
+      setWorkflowName('');
+      setWorkflowSteps([{ email: '', action: 'APPROVE' }]);
+      toast({ title: _(msg`Approval workflow started`) });
+    },
+  });
+
+  const respondToStep = trpc.dms.respondToWorkflowStep.useMutation({
+    onSuccess: () => {
+      void utils.dms.getDocument.invalidate({ id: id! });
+      toast({ title: _(msg`Response submitted`) });
+    },
+  });
+
+  const createRetrieval = trpc.dms.createRetrievalRequest.useMutation({
+    onSuccess: () => {
+      setIsRetrievalOpen(false);
+      setRetrievalReason('');
+      toast({ title: _(msg`Retrieval request created`) });
+    },
+  });
+
   const toggleFavorite = trpc.dms.toggleFavorite.useMutation({
     onSuccess: () => void utils.dms.getDocument.invalidate({ id: id! }),
   });
@@ -154,6 +190,7 @@ export default function DmsDocumentDetailPage() {
   const tabs = [
     { id: 'preview' as const, label: 'Preview' },
     { id: 'details' as const, label: 'Details' },
+    { id: 'workflows' as const, label: `Workflows (${doc.workflows.length})` },
     { id: 'audit' as const, label: 'Audit Trail' },
     { id: 'comments' as const, label: `Comments (${doc.comments.length})` },
     { id: 'versions' as const, label: `Versions (${doc.versions.length})` },
@@ -275,6 +312,30 @@ export default function DmsDocumentDetailPage() {
                 </Button>
               )}
             </div>
+
+            {/* Start Approval Workflow */}
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 gap-1 text-[11px]"
+              onClick={() => setIsWorkflowOpen(true)}
+            >
+              <GitBranchIcon className="h-3 w-3" />
+              Start Approval
+            </Button>
+
+            {/* Request Retrieval (physical docs) */}
+            {(doc.format === 'PHYSICAL' || doc.format === 'BOTH') && (
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-7 gap-1 text-[11px]"
+                onClick={() => setIsRetrievalOpen(true)}
+              >
+                <ClipboardListIcon className="h-3 w-3" />
+                Request Retrieval
+              </Button>
+            )}
 
             {/* Checkout status + actions */}
             {doc.checkedOut ? (
@@ -473,16 +534,130 @@ export default function DmsDocumentDetailPage() {
               </div>
 
               {/* OCR Preview */}
+              {/* Extracted metadata (from OCR/AI) */}
+              {doc.metadata && typeof doc.metadata === 'object' && Object.keys(doc.metadata as Record<string, unknown>).length > 0 && (
+                <div>
+                  <span className="text-[12px] font-medium text-muted-foreground">Extracted Data</span>
+                  <div className="mt-1.5 space-y-1.5">
+                    {Object.entries(doc.metadata as Record<string, unknown>).map(([key, value]) => (
+                      <div key={key} className="flex items-center justify-between rounded border border-border bg-muted/20 px-2.5 py-1.5">
+                        <span className="text-[11px] font-medium text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</span>
+                        <span className="text-[12px] font-medium">{String(value)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* OCR text preview */}
               {doc.ocrText && (
                 <div>
-                  <span className="text-[12px] text-muted-foreground">OCR Content Preview</span>
-                  <p className="mt-1 max-h-32 overflow-y-auto rounded border border-border bg-muted/30 p-2 text-[11px] text-muted-foreground">
-                    {doc.ocrText.substring(0, 500)}
-                    {doc.ocrText.length > 500 && '...'}
+                  <span className="text-[12px] text-muted-foreground">OCR Content</span>
+                  <p className="mt-1 max-h-48 overflow-y-auto rounded border border-border bg-muted/30 p-2 text-[11px] text-muted-foreground leading-relaxed">
+                    {doc.ocrText.substring(0, 1000)}
+                    {doc.ocrText.length > 1000 && '...'}
                   </p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">{doc.ocrText.length} characters extracted</p>
+                </div>
+              )}
+
+              {/* OCR status */}
+              {!doc.ocrProcessed && (
+                <div className="flex items-center gap-2 rounded border border-amber-200 bg-amber-50 p-2 dark:border-amber-800 dark:bg-amber-950">
+                  <ClockIcon className="h-3.5 w-3.5 text-amber-600" />
+                  <span className="text-[11px] text-amber-700 dark:text-amber-300">OCR pending — text will be extracted when the AI service processes this document</span>
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'workflows' && (
+          <div className="space-y-4">
+            <h3 className="text-[13px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">Approval Workflows</h3>
+
+            {doc.workflows.length > 0 ? (
+              <div className="space-y-4">
+                {doc.workflows.map((workflow) => (
+                  <div key={workflow.id} className="rounded-md border border-border p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-[14px] font-medium">{workflow.name}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Started by {workflow.initiatedBy.name || workflow.initiatedBy.email} · {new Date(workflow.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+                        workflow.status === 'APPROVED' ? 'bg-status-complete-bg text-status-complete-text'
+                        : workflow.status === 'REJECTED' ? 'bg-red-50 text-red-600'
+                        : workflow.status === 'IN_PROGRESS' ? 'bg-status-pending-bg text-status-pending-text'
+                        : 'bg-muted text-muted-foreground'
+                      }`}>
+                        <span className="h-[5px] w-[5px] rounded-full bg-current opacity-80" />
+                        {workflow.status.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+
+                    {/* Steps */}
+                    <div className="mt-3 space-y-2">
+                      {workflow.steps.map((step) => (
+                        <div key={step.id} className="flex items-center gap-3 rounded border border-border bg-muted/20 p-2.5">
+                          <div className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                            step.status === 'APPROVED' ? 'bg-green-100 text-green-700'
+                            : step.status === 'REJECTED' ? 'bg-red-100 text-red-700'
+                            : step.step === workflow.currentStep ? 'bg-primary/20 text-primary'
+                            : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {step.status === 'APPROVED' ? '✓' : step.status === 'REJECTED' ? '✗' : step.step}
+                          </div>
+
+                          <div className="flex-1">
+                            <p className="text-[12px] font-medium">
+                              Step {step.step}: {step.action} — {step.assignedTo.name || step.assignedTo.email}
+                            </p>
+                            {step.notes && <p className="text-[11px] text-muted-foreground">{step.notes}</p>}
+                            {step.completedAt && (
+                              <p className="text-[10px] text-muted-foreground">
+                                {step.status} on {new Date(step.completedAt).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+
+                          {step.status === 'PENDING' && step.step === workflow.currentStep && (
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 gap-1 text-[10px] text-green-600 hover:bg-green-50"
+                                onClick={() => void respondToStep.mutateAsync({ stepId: step.id, status: 'APPROVED' })}
+                              >
+                                <CheckCircleIcon className="h-3 w-3" />
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 gap-1 text-[10px] text-red-600 hover:bg-red-50"
+                                onClick={() => void respondToStep.mutateAsync({ stepId: step.id, status: 'REJECTED' })}
+                              >
+                                <XCircleIcon className="h-3 w-3" />
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-[13px] text-muted-foreground">
+                <GitBranchIcon className="mx-auto mb-3 h-8 w-8 opacity-30" />
+                <p>No approval workflows yet</p>
+                <p className="mt-1 text-[11px]">Click "Start Approval" to create one.</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -639,6 +814,171 @@ export default function DmsDocumentDetailPage() {
               ) : (
                 <><FolderInputIcon className="mr-2 h-3.5 w-3.5" /><Trans>{doc.binId ? 'Move Here' : 'File Here'}</Trans></>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approval Workflow Dialog */}
+      <Dialog open={isWorkflowOpen} onOpenChange={setIsWorkflowOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              <Trans>Start Approval Workflow</Trans>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="max-h-[60vh] space-y-4 overflow-y-auto py-2">
+            <p className="text-[13px] text-muted-foreground">
+              <Trans>Route this document through a multi-step approval chain. Each step must be approved before the next person is notified.</Trans>
+            </p>
+
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Workflow Name</label>
+              <Input
+                className="mt-1 h-8 text-[13px]"
+                placeholder="e.g. Invoice Approval, Contract Review..."
+                value={workflowName}
+                onChange={(e) => setWorkflowName(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Approval Steps</label>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">Add approvers in order. Each must approve before the next is asked.</p>
+
+              <div className="mt-2 space-y-2">
+                {workflowSteps.map((step, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                      {i + 1}
+                    </span>
+                    <Input
+                      className="h-8 flex-1 text-[13px]"
+                      placeholder="Approver email address"
+                      type="email"
+                      value={step.email}
+                      onChange={(e) => {
+                        const updated = [...workflowSteps];
+                        updated[i] = { ...updated[i], email: e.target.value };
+                        setWorkflowSteps(updated);
+                      }}
+                    />
+                    <select
+                      className="h-8 rounded-md border border-border bg-background px-2 text-[12px]"
+                      value={step.action}
+                      onChange={(e) => {
+                        const updated = [...workflowSteps];
+                        updated[i] = { ...updated[i], action: e.target.value };
+                        setWorkflowSteps(updated);
+                      }}
+                    >
+                      <option value="APPROVE">Approve</option>
+                      <option value="REVIEW">Review</option>
+                      <option value="SIGN_OFF">Sign Off</option>
+                    </select>
+                    {workflowSteps.length > 1 && (
+                      <button
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => setWorkflowSteps(workflowSteps.filter((_, idx) => idx !== i))}
+                      >
+                        <Trash2Icon className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                className="mt-2 flex items-center gap-1.5 text-[12px] font-medium text-primary hover:underline"
+                onClick={() => setWorkflowSteps([...workflowSteps, { email: '', action: 'APPROVE' }])}
+              >
+                <PlusIcon className="h-3 w-3" />
+                Add Step
+              </button>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setIsWorkflowOpen(false)}>
+              <Trans>Cancel</Trans>
+            </Button>
+            <Button
+              onClick={async () => {
+                const validSteps = workflowSteps.filter((s) => s.email.trim());
+                if (!workflowName || validSteps.length === 0) return;
+
+                // Look up user IDs by email
+                const resolvedSteps: { assignedToId: number; action: string }[] = [];
+                for (const step of validSteps) {
+                  const user = await utils.dms.lookupUserByEmail.fetch({ email: step.email });
+                  if (!user) {
+                    toast({ title: `User not found: ${step.email}`, variant: 'destructive' });
+                    return;
+                  }
+                  resolvedSteps.push({ assignedToId: user.id, action: step.action });
+                }
+
+                await createWorkflow.mutateAsync({
+                  documentId: doc.id,
+                  name: workflowName,
+                  steps: resolvedSteps,
+                });
+              }}
+              disabled={!workflowName || workflowSteps.every((s) => !s.email.trim()) || createWorkflow.isPending}
+            >
+              {createWorkflow.isPending ? <Trans>Starting...</Trans> : <Trans>Start Workflow</Trans>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Retrieval Request Dialog */}
+      <Dialog open={isRetrievalOpen} onOpenChange={setIsRetrievalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              <Trans>Request Document Retrieval</Trans>
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            <p className="text-[13px] text-muted-foreground">
+              <Trans>Submit a request to retrieve the physical copy of this document from storage.</Trans>
+            </p>
+
+            {doc.bin && (
+              <div className="rounded-md border border-border bg-muted/30 p-2.5">
+                <p className="text-[11px] font-medium text-muted-foreground">Current Location</p>
+                <p className="mt-0.5 text-[13px] font-medium">
+                  {doc.bin.shelf.cabinet.location.name} › {doc.bin.shelf.cabinet.name} › {doc.bin.shelf.name} › {doc.bin.name}
+                </p>
+              </div>
+            )}
+
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Reason for retrieval</label>
+              <Input
+                className="mt-1"
+                placeholder="e.g. Client audit, legal review, copy needed..."
+                value={retrievalReason}
+                onChange={(e) => setRetrievalReason(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setIsRetrievalOpen(false)}>
+              <Trans>Cancel</Trans>
+            </Button>
+            <Button
+              onClick={() => void createRetrieval.mutateAsync({
+                documentId: doc.id,
+                reason: retrievalReason || undefined,
+              })}
+              disabled={createRetrieval.isPending}
+            >
+              {createRetrieval.isPending ? <Trans>Submitting...</Trans> : <Trans>Submit Request</Trans>}
             </Button>
           </DialogFooter>
         </DialogContent>

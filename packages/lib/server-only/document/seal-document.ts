@@ -241,4 +241,44 @@ export const sealDocument = async ({
     userId: document.userId,
     teamId: document.teamId ?? undefined,
   });
+
+  // Auto-file completed documents into DMS (if enabled)
+  if (!isRejected && !isResealing) {
+    try {
+      const autoFilingSettings = await prisma.dmsAutoFilingSettings.findUnique({
+        where: { userId: document.userId },
+      });
+
+      if (autoFilingSettings?.enabled) {
+        const existing = await prisma.dmsDocument.findUnique({
+          where: { signedDocumentId: document.id },
+        });
+
+        if (!existing) {
+          await prisma.dmsDocument.create({
+            data: {
+              title: document.title,
+              referenceNumber: `DMS-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+              fileUrl: documentData.id,
+              fileName: `${document.title}.pdf`,
+              fileType: 'application/pdf',
+              fileSize: 0,
+              status: 'ACTIVE',
+              format: 'DIGITAL',
+              confidentiality: autoFilingSettings.confidentiality,
+              binId: autoFilingSettings.binId,
+              documentTypeId: autoFilingSettings.documentTypeId,
+              classificationId: autoFilingSettings.classificationId,
+              signedDocumentId: document.id,
+              uploadedById: document.userId,
+              teamId: document.teamId,
+            },
+          });
+        }
+      }
+    } catch (err) {
+      // Don't fail the seal if auto-filing fails
+      console.error('[DMS Auto-Filing Error]', err);
+    }
+  }
 };

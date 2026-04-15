@@ -4,6 +4,7 @@ import {
   ArchiveIcon,
   CheckSquareIcon,
   ClockIcon,
+  CpuIcon,
   FileSearchIcon,
   FolderTreeIcon,
   HeartIcon,
@@ -12,6 +13,7 @@ import {
   LockIcon,
   SettingsIcon,
   ShieldCheckIcon,
+  UploadCloudIcon,
 } from 'lucide-react';
 import { Link, Outlet, useLocation } from 'react-router';
 
@@ -23,6 +25,8 @@ import { Button } from '@documenso/ui/primitives/button';
 const navItems = [
   { to: '/dms', icon: LayoutDashboardIcon, label: <Trans>Dashboard</Trans>, exact: true },
   { to: '/dms/documents', icon: ArchiveIcon, label: <Trans>Documents</Trans> },
+  { to: '/dms/bulk-upload', icon: UploadCloudIcon, label: <Trans>Bulk Upload</Trans> },
+  { to: '/dms/ocr-queue', icon: CpuIcon, label: <Trans>OCR Queue</Trans> },
   { to: '/dms/search', icon: FileSearchIcon, label: <Trans>Search</Trans> },
   { to: '/dms/filing', icon: FolderTreeIcon, label: <Trans>Filing Structure</Trans> },
   { to: '/dms/favorites', icon: HeartIcon, label: <Trans>Favorites</Trans> },

@@ -94,6 +94,7 @@ model User {
   dmsDocumentLinks      DmsDocumentLink[]
   dmsFavorites          DmsFavorite[]
   dmsShareLinks         DmsShareLink[]
+  dmsAutoFilingSettings DmsAutoFilingSettings?
 
   @@index([email])
 }
@@ -678,6 +679,7 @@ model Team {
   dmsDocuments            DmsDocument[]
   dmsFilingRules          DmsFilingRule[]
   dmsComplianceTemplates  DmsComplianceTemplate[]
+  dmsAutoFilingSettings   DmsAutoFilingSettings[]
 }
 
 model TeamPending {
@@ -1389,4 +1391,27 @@ model DmsComplianceTemplate {
   team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+}
+
+// ── Auto-Filing Settings ──
+
+model DmsAutoFilingSettings {
+  id      String  @id @default(cuid())
+  enabled Boolean @default(true)
+
+  // Where to file signed documents
+  binId            String?
+  documentTypeId   String?
+  classificationId String?
+  confidentiality  DmsConfidentiality @default(INTERNAL)
+  autoOcr          Boolean            @default(true)
+
+  userId Int    @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  teamId Int?
+  team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
