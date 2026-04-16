@@ -1347,6 +1347,10 @@ msgstr "Czy na pewno chcesz usunąć ten zespół?"
 msgid "Are you sure?"
 msgstr "Czy na pewno?"
 
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Assign a plan tier to each member. Members without a seat have no access."
+msgstr ""
+
 #: packages/lib/constants/recipient-roles.ts
 msgid "Assist"
 msgstr "Asysta"
@@ -2250,8 +2254,8 @@ msgid "Current password is incorrect."
 msgstr "Aktualne hasło jest niepoprawne."
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
-msgid "Current Plan"
-msgstr ""
+#~ msgid "Current Plan"
+#~ msgstr ""
 
 #: apps/remix/app/components/dialogs/template-bulk-send-dialog.tsx
 msgid "Current recipients:"
@@ -3006,8 +3010,8 @@ msgid "Duplicate on all pages"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
-msgid "Each member in your organization uses one seat. Add or remove members from the Members page."
-msgstr ""
+#~ msgid "Each member in your organization uses one seat. Add or remove members from the Members page."
+#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks._index.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks._index.tsx
@@ -3202,6 +3206,7 @@ msgstr "Wprowadź swój tekst tutaj"
 #: apps/remix/app/routes/_authenticated+/org+/recycle-bin.tsx
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 #: apps/remix/app/components/general/verify-email-banner.tsx
@@ -3942,10 +3947,9 @@ msgstr "Zarządzaj i przeglądaj szablon"
 msgid "Manage billing"
 msgstr "Zarządzaj fakturowaniem"
 
-#. placeholder {0}: org.name
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
-msgid "Manage billing for {0}. Per-seat pricing with DMS add-on."
-msgstr ""
+#~ msgid "Manage billing for {0}. Per-seat pricing with DMS add-on."
+#~ msgstr ""
 
 #: apps/remix/app/components/dialogs/public-profile-template-manage-dialog.tsx
 msgid "Manage details for this public template"
@@ -3971,7 +3975,6 @@ msgstr "Zarządzaj kluczami dostępu"
 msgid "Manage subscription"
 msgstr "Zarządzaj subskrypcją"
 
-#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 #: apps/remix/app/components/general/billing-portal-button.tsx
 msgid "Manage Subscription"
 msgstr "Zarządzaj subskrypcją"
@@ -4051,6 +4054,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
 msgid "Member removed"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Member Seat Assignment"
 msgstr ""
 
 #: apps/remix/app/components/tables/user-settings-current-teams-table.tsx
@@ -4847,8 +4854,8 @@ msgid "Preview and configure template."
 msgstr "Podgląd i konfiguracja szablonu."
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
-msgid "Pricing Details"
-msgstr ""
+#~ msgid "Pricing Details"
+#~ msgstr ""
 
 #: apps/remix/app/components/tables/templates-table.tsx
 #: apps/remix/app/components/general/template/template-type.tsx
@@ -4911,6 +4918,10 @@ msgstr "Adres URL profilu publicznego"
 #: apps/remix/app/components/tables/templates-table.tsx
 msgid "Public templates are connected to your public profile. Any modifications to public templates will also appear in your public profile."
 msgstr "Szablony publiczne są powiązane z Twoim publicznym profilem. Wszelkie modyfikacje szablonów publicznych również pojawią się w Twoim publicznym profilu."
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Purchase seats and assign plans to members."
+msgstr ""
 
 #: packages/ui/primitives/document-flow/types.ts
 msgid "Radio"
@@ -5368,7 +5379,19 @@ msgid "Searching..."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
-msgid "Seat Allocation"
+#~ msgid "Seat Allocation"
+#~ msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Seat assigned"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Seat Plans"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Seats purchased"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks.$id.tsx
@@ -5525,6 +5548,10 @@ msgstr "Wysłano"
 #: apps/remix/app/components/general/claim-account.tsx
 msgid "Set a password"
 msgstr "Ustaw hasło"
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+#~ msgid "Set Up Billing ({memberCount} seats × ${seatPrice} + ${dmsPrice} DMS)"
+#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
 msgid "Set up filing structure"

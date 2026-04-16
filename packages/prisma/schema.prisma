@@ -1480,6 +1480,14 @@ model Organization {
   domain String? @unique
   logoUrl String?
 
+  // Stripe billing
+  stripeCustomerId     String? @unique
+  stripeSubscriptionId String? @unique
+  stripeSeatPriceId    String?
+  stripeDmsPriceId     String?
+  seatCount            Int     @default(0)
+  billingStatus        String  @default("inactive") // inactive, active, past_due
+
   defaultConfidentiality DmsConfidentiality @default(INTERNAL)
 
   createdAt DateTime @default(now())
@@ -1496,11 +1504,47 @@ model Organization {
   dmsComplianceTemplates DmsComplianceTemplate[] @relation("OrgDmsCompliance")
   recycleBin         DmsRecycleBinItem[]
   savedSearches      DmsSavedSearch[]
+  seatPlans          OrgSeatPlan[]
+}
+
+enum OrgSeatTier {
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+model OrgSeatPlan {
+  id   String      @id @default(cuid())
+  tier OrgSeatTier
+
+  // Limits for this seat
+  documentsPerMonth Int     @default(20)
+  recipientsPerMonth Int    @default(50)
+  directTemplates   Int     @default(5)
+  dmsEnabled        Boolean @default(false)
+
+  // How many seats purchased at this tier
+  quantity  Int @default(1)
+  // How many are currently assigned
+  assigned  Int @default(0)
+
+  // Stripe
+  stripePriceId String?
+
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model OrganizationMember {
   id   String           @id @default(cuid())
   role OrganizationRole @default(MEMBER)
+
+  // Assigned seat tier
+  seatTier OrgSeatTier?
+  dmsAddon Boolean      @default(false)
 
   organizationId Int
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
