@@ -3,6 +3,7 @@ import { apiTokenRouter } from './api-token-router/router';
 import { authRouter } from './auth-router/router';
 import { dmsRouter } from './dms-router/router';
 import { documentRouter } from './document-router/router';
+import { orgRouter } from './org-router/router';
 import { embeddingPresignRouter } from './embedding-router/_router';
 import { fieldRouter } from './field-router/router';
 import { folderRouter } from './folder-router/router';
@@ -19,6 +20,7 @@ export const appRouter = router({
   profile: profileRouter,
   document: documentRouter,
   dms: dmsRouter,
+  org: orgRouter,
   field: fieldRouter,
   folder: folderRouter,
   recipient: recipientRouter,

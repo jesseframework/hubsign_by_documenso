@@ -1,6 +1,7 @@
 import { Trans } from '@lingui/react/macro';
 import {
   ArchiveIcon,
+  BuildingIcon,
   FileTextIcon,
   LayoutGridIcon,
   LogOutIcon,
@@ -138,6 +139,15 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
           <div className="sidebar-section-label">
             <Trans>Workspace</Trans>
           </div>
+
+          <Link
+            to="/org/settings"
+            className={`sidebar-nav-item ${location.pathname.startsWith('/org') ? 'active' : ''}`}
+            onClick={onClose}
+          >
+            <BuildingIcon className="h-4 w-4 flex-shrink-0" />
+            <Trans>Organization</Trans>
+          </Link>
 
           <Link
             to={getRootHref('/settings/teams')}

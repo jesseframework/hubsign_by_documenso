@@ -1462,6 +1462,7 @@ msgstr "Before you get started, please confirm your email address by clicking th
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.billing.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/billing.tsx
+#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
 #: apps/remix/app/components/general/settings-nav-mobile.tsx
 #: apps/remix/app/components/general/settings-nav-desktop.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-mobile.tsx
@@ -2102,6 +2103,16 @@ msgstr "Create account"
 msgid "Create Account"
 msgstr "Create Account"
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Create an Organization"
+msgstr "Create an Organization"
+
+#: apps/remix/app/routes/_authenticated+/org+/permissions.tsx
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Create an organization first."
+msgstr "Create an organization first."
+
 #: apps/remix/app/components/dialogs/template-use-dialog.tsx
 msgid "Create and send"
 msgstr "Create and send"
@@ -2133,6 +2144,10 @@ msgstr "Create now"
 #: apps/remix/app/components/dialogs/template-direct-link-dialog.tsx
 msgid "Create one automatically"
 msgstr "Create one automatically"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Create Organization"
+msgstr "Create Organization"
 
 #: apps/remix/app/components/dialogs/template-use-dialog.tsx
 msgid "Create signing links"
@@ -2228,6 +2243,10 @@ msgstr "Current Password"
 #: apps/remix/app/components/forms/password.tsx
 msgid "Current password is incorrect."
 msgstr "Current password is incorrect."
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Current Plan"
+msgstr "Current Plan"
 
 #: apps/remix/app/components/dialogs/template-bulk-send-dialog.tsx
 msgid "Current recipients:"
@@ -2380,6 +2399,10 @@ msgstr "Delete your account and all its contents, including completed documents.
 msgid "Deleted"
 msgstr "Deleted"
 
+#: apps/remix/app/routes/_authenticated+/org+/recycle-bin.tsx
+msgid "Deleted documents are kept for 30 days before permanent removal."
+msgstr "Deleted documents are kept for 30 days before permanent removal."
+
 #: apps/remix/app/components/dialogs/account-delete-dialog.tsx
 msgid "Deleting account..."
 msgstr "Deleting account..."
@@ -2493,6 +2516,11 @@ msgstr "Distribute Document"
 #: apps/remix/app/components/embed/authoring/configure-document-advanced-settings.tsx
 msgid "Distribution Method"
 msgstr "Distribution Method"
+
+#: apps/remix/app/routes/_authenticated+/org+/permissions.tsx
+#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+msgid "DMS Permissions"
+msgstr "DMS Permissions"
 
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "DMS Settings"
@@ -2714,6 +2742,10 @@ msgstr "Document pending"
 msgid "Document pending email"
 msgstr "Document pending email"
 
+#: apps/remix/app/routes/_authenticated+/org+/recycle-bin.tsx
+msgid "Document permanently deleted"
+msgstr "Document permanently deleted"
+
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Document preferences updated"
 msgstr "Document preferences updated"
@@ -2735,6 +2767,10 @@ msgstr "Document Rejected"
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 msgid "Document resealed"
 msgstr "Document resealed"
+
+#: apps/remix/app/routes/_authenticated+/org+/recycle-bin.tsx
+msgid "Document restored"
+msgstr "Document restored"
 
 #: apps/remix/app/components/general/document/document-edit-form.tsx
 #: packages/lib/utils/document-audit-logs.ts
@@ -2964,6 +3000,10 @@ msgstr "Duplicate"
 msgid "Duplicate on all pages"
 msgstr "Duplicate on all pages"
 
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Each member in your organization uses one seat. Add or remove members from the Members page."
+msgstr "Each member in your organization uses one seat. Add or remove members from the Members page."
+
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks._index.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks._index.tsx
 #: apps/remix/app/components/tables/templates-table-action-dropdown.tsx
@@ -3154,6 +3194,9 @@ msgstr "Enter your text here"
 #: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
 #: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
 #: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
+#: apps/remix/app/routes/_authenticated+/org+/recycle-bin.tsx
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 #: apps/remix/app/components/general/verify-email-banner.tsx
@@ -3676,6 +3719,10 @@ msgstr "Invite"
 msgid "Invite member"
 msgstr "Invite member"
 
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Invite Member"
+msgstr "Invite Member"
+
 #: apps/remix/app/components/dialogs/team-member-invite-dialog.tsx
 msgid "Invite Members"
 msgstr "Invite Members"
@@ -3890,6 +3937,11 @@ msgstr "Manage and view template"
 msgid "Manage billing"
 msgstr "Manage billing"
 
+#. placeholder {0}: org.name
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Manage billing for {0}. Per-seat pricing with DMS add-on."
+msgstr "Manage billing for {0}. Per-seat pricing with DMS add-on."
+
 #: apps/remix/app/components/dialogs/public-profile-template-manage-dialog.tsx
 msgid "Manage details for this public template"
 msgstr "Manage details for this public template"
@@ -3897,6 +3949,10 @@ msgstr "Manage details for this public template"
 #: apps/remix/app/components/dialogs/template-direct-link-dialog-wrapper.tsx
 msgid "Manage Direct Link"
 msgstr "Manage Direct Link"
+
+#: apps/remix/app/routes/_authenticated+/org+/permissions.tsx
+msgid "Manage Document Manager permissions for each member. Select a member to configure their access."
+msgstr "Manage Document Manager permissions for each member. Select a member to configure their access."
 
 #: apps/remix/app/routes/_authenticated+/admin+/documents._index.tsx
 msgid "Manage documents"
@@ -3910,6 +3966,7 @@ msgstr "Manage passkeys"
 msgid "Manage subscription"
 msgstr "Manage subscription"
 
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 #: apps/remix/app/components/general/billing-portal-button.tsx
 msgid "Manage Subscription"
 msgstr "Manage Subscription"
@@ -3937,6 +3994,10 @@ msgstr "Manage the members or invite new members."
 #: apps/remix/app/routes/_authenticated+/admin+/users._index.tsx
 msgid "Manage users"
 msgstr "Manage users"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Manage your organization settings."
+msgstr "Manage your organization settings."
 
 #: apps/remix/app/routes/_authenticated+/settings+/security.passkeys.tsx
 msgid "Manage your passkeys."
@@ -3979,12 +4040,22 @@ msgstr "Maximum file size: 4MB. Maximum 100 rows per upload. Blank values will u
 msgid "Member"
 msgstr "Member"
 
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Member invited"
+msgstr "Member invited"
+
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Member removed"
+msgstr "Member removed"
+
 #: apps/remix/app/components/tables/user-settings-current-teams-table.tsx
 #: apps/remix/app/components/tables/team-settings-members-table.tsx
 msgid "Member Since"
 msgstr "Member Since"
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.members.tsx
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-mobile.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-desktop.tsx
 msgid "Members"
@@ -4398,6 +4469,31 @@ msgstr "Or"
 msgid "Or continue with"
 msgstr "Or continue with"
 
+#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
+msgid "Organization"
+msgstr "Organization"
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Organization Billing"
+msgstr "Organization Billing"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Organization created"
+msgstr "Organization created"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Organization Details"
+msgstr "Organization Details"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Organization updated"
+msgstr "Organization updated"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Organizations let you share the Document Manager across your team with role-based permissions."
+msgstr "Organizations let you share the Document Manager across your team with role-based permissions."
+
 #: apps/remix/app/components/dialogs/template-use-dialog.tsx
 msgid "Otherwise, the document will be created as a draft."
 msgstr "Otherwise, the document will be created as a draft."
@@ -4545,6 +4641,14 @@ msgstr "Pending OCR Processing"
 #: apps/remix/app/components/tables/user-settings-pending-teams-table-actions.tsx
 msgid "Pending team deleted."
 msgstr "Pending team deleted."
+
+#: apps/remix/app/routes/_authenticated+/org+/permissions.tsx
+msgid "Permission granted"
+msgstr "Permission granted"
+
+#: apps/remix/app/routes/_authenticated+/org+/permissions.tsx
+msgid "Permission revoked"
+msgstr "Permission revoked"
 
 #: apps/remix/app/components/general/menu-switcher.tsx
 msgid "Personal"
@@ -4736,6 +4840,10 @@ msgstr "Preview"
 #: apps/remix/app/components/general/direct-template/direct-template-page.tsx
 msgid "Preview and configure template."
 msgstr "Preview and configure template."
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Pricing Details"
+msgstr "Pricing Details"
 
 #: apps/remix/app/components/tables/templates-table.tsx
 #: apps/remix/app/components/general/template/template-type.tsx
@@ -4930,6 +5038,15 @@ msgstr "Recovery code copied"
 #: apps/remix/app/routes/_authenticated+/settings+/security._index.tsx
 msgid "Recovery codes"
 msgstr "Recovery codes"
+
+#: apps/remix/app/routes/_authenticated+/org+/recycle-bin.tsx
+#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+msgid "Recycle Bin"
+msgstr "Recycle Bin"
+
+#: apps/remix/app/routes/_authenticated+/org+/recycle-bin.tsx
+msgid "Recycle bin is empty"
+msgstr "Recycle bin is empty"
 
 #: packages/ui/primitives/signature-pad/signature-pad-color-picker.tsx
 msgid "Red"
@@ -5168,6 +5285,10 @@ msgstr "Revoke access"
 msgid "Role"
 msgstr "Role"
 
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Role updated"
+msgstr "Role updated"
+
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
 #: apps/remix/app/components/tables/admin-dashboard-users-table.tsx
 msgid "Roles"
@@ -5241,6 +5362,10 @@ msgstr "Search..."
 msgid "Searching..."
 msgstr "Searching..."
 
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Seat Allocation"
+msgstr "Seat Allocation"
+
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks.$id.tsx
 #: apps/remix/app/components/dialogs/webhook-create-dialog.tsx
 msgid "Secret"
@@ -5265,6 +5390,10 @@ msgstr "Select"
 #: apps/remix/app/components/dialogs/document-move-to-folder-dialog.tsx
 msgid "Select a folder to move this document to."
 msgstr "Select a folder to move this document to."
+
+#: apps/remix/app/routes/_authenticated+/org+/permissions.tsx
+msgid "Select a member to manage their DMS permissions"
+msgstr "Select a member to manage their DMS permissions"
 
 #: apps/remix/app/components/dialogs/template-move-dialog.tsx
 #: apps/remix/app/components/dialogs/document-move-dialog.tsx
@@ -5405,6 +5534,7 @@ msgid "Set up your template properties and recipient information"
 msgstr "Set up your template properties and recipient information"
 
 #: apps/remix/app/routes/_authenticated+/settings+/_layout.tsx
+#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
 #: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/app-nav-mobile.tsx

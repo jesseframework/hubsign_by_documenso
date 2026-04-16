@@ -95,6 +95,10 @@ model User {
   dmsFavorites          DmsFavorite[]
   dmsShareLinks         DmsShareLink[]
   dmsAutoFilingSettings DmsAutoFilingSettings?
+  organizationMemberships OrganizationMember[]
+  dmsOrgPermissionsGranted DmsOrgPermission[] @relation("DmsOrgPermissionGranter")
+  dmsRecycleBinItems    DmsRecycleBinItem[] @relation("DmsRecycleBinDeleter")
+  dmsSavedSearches      DmsSavedSearch[]
 
   @@index([email])
 }
@@ -671,6 +675,10 @@ model Team {
   apiTokens ApiToken[]
   webhooks  Webhook[]
 
+  // Organization
+  organizationId Int?
+  organization   Organization? @relation("OrgTeams", fields: [organizationId], references: [id])
+
   // DMS relations
   dmsLocations       DmsLocation[]
   dmsDocumentTypes   DmsDocumentType[]
@@ -947,6 +955,9 @@ model DmsLocation {
   userId Int
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  organizationId Int?
+  organization   Organization? @relation("OrgDmsLocations", fields: [organizationId], references: [id])
+
   cabinets    DmsCabinet[]
   permissions DmsPermission[]
 
@@ -1009,6 +1020,9 @@ model DmsDocumentType {
   teamId Int?
   team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
+  organizationId Int?
+  organization   Organization? @relation("OrgDmsDocTypes", fields: [organizationId], references: [id])
+
   documents DmsDocument[]
 
   createdAt DateTime @default(now())
@@ -1028,6 +1042,9 @@ model DmsClassification {
   teamId Int?
   team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
+  organizationId Int?
+  organization   Organization? @relation("OrgDmsClassifications", fields: [organizationId], references: [id])
+
   documents   DmsDocument[]
   permissions DmsPermission[]
 
@@ -1041,6 +1058,9 @@ model DmsTag {
 
   teamId Int?
   team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  organizationId Int?
+  organization   Organization? @relation("OrgDmsTags", fields: [organizationId], references: [id])
 
   documents DmsDocumentTag[]
 
@@ -1104,8 +1124,12 @@ model DmsDocument {
   teamId Int?
   team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
+  organizationId Int?
+  organization   Organization? @relation("OrgDmsDocuments", fields: [organizationId], references: [id])
+
   // Relations
   tags             DmsDocumentTag[]
+  recycleBinItem   DmsRecycleBinItem?
   versions         DmsVersion[]
   retrievalRequests DmsRetrievalRequest[]
   auditLogs        DmsAuditLog[]
@@ -1188,6 +1212,9 @@ model DmsFilingRule {
 
   teamId Int?
   team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  organizationId Int?
+  organization   Organization? @relation("OrgDmsFilingRules", fields: [organizationId], references: [id])
 
   createdBy Int
   creator   User @relation(fields: [createdBy], references: [id])
@@ -1390,6 +1417,9 @@ model DmsComplianceTemplate {
   teamId Int?
   team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
+  organizationId Int?
+  organization   Organization? @relation("OrgDmsCompliance", fields: [organizationId], references: [id])
+
   createdAt DateTime @default(now())
 }
 
@@ -1411,6 +1441,124 @@ model DmsAutoFilingSettings {
 
   teamId Int?
   team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ═══════════════════════════════════════════════════════════
+// ORGANIZATION (MULTI-TENANCY)
+// ═══════════════════════════════════════════════════════════
+
+enum OrganizationRole {
+  ORG_ADMIN
+  DMS_ADMIN
+  TEAM_ADMIN
+  MANAGER
+  MEMBER
+}
+
+enum DmsPermissionAction {
+  DMS_VIEW
+  DMS_UPLOAD
+  DMS_DOWNLOAD
+  DMS_EDIT
+  DMS_DELETE
+  DMS_MANAGE_FILING
+  DMS_MANAGE_TYPES
+  DMS_APPROVE_WORKFLOWS
+  DMS_APPROVE_RETRIEVALS
+  DMS_MANAGE_RETENTION
+  DMS_EXPORT
+  DMS_VIEW_AUDIT_TRAIL
+}
+
+model Organization {
+  id     Int    @id @default(autoincrement())
+  name   String
+  slug   String @unique
+  domain String? @unique
+  logoUrl String?
+
+  defaultConfidentiality DmsConfidentiality @default(INTERNAL)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members            OrganizationMember[]
+  teams              Team[]               @relation("OrgTeams")
+  dmsLocations       DmsLocation[]        @relation("OrgDmsLocations")
+  dmsDocumentTypes   DmsDocumentType[]    @relation("OrgDmsDocTypes")
+  dmsClassifications DmsClassification[]  @relation("OrgDmsClassifications")
+  dmsTags            DmsTag[]             @relation("OrgDmsTags")
+  dmsDocuments       DmsDocument[]        @relation("OrgDmsDocuments")
+  dmsFilingRules     DmsFilingRule[]      @relation("OrgDmsFilingRules")
+  dmsComplianceTemplates DmsComplianceTemplate[] @relation("OrgDmsCompliance")
+  recycleBin         DmsRecycleBinItem[]
+  savedSearches      DmsSavedSearch[]
+}
+
+model OrganizationMember {
+  id   String           @id @default(cuid())
+  role OrganizationRole @default(MEMBER)
+
+  organizationId Int
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  dmsPermissions DmsOrgPermission[]
+
+  joinedAt DateTime @default(now())
+
+  @@unique([organizationId, userId])
+}
+
+model DmsOrgPermission {
+  id     String              @id @default(cuid())
+  action DmsPermissionAction
+
+  memberId String
+  member   OrganizationMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  locationId       String?
+  classificationId String?
+
+  grantedById Int
+  grantedBy   User @relation("DmsOrgPermissionGranter", fields: [grantedById], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model DmsRecycleBinItem {
+  id String @id @default(cuid())
+
+  documentId String   @unique
+  document   DmsDocument @relation(fields: [documentId], references: [id])
+
+  deletedById Int
+  deletedBy   User @relation("DmsRecycleBinDeleter", fields: [deletedById], references: [id])
+
+  organizationId Int?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model DmsSavedSearch {
+  id       String  @id @default(cuid())
+  name     String
+  /// [DmsSavedSearchCriteria]
+  criteria Json
+  isShared Boolean @default(false)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId Int?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
