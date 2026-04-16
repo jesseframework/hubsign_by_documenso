@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useDropzone } from 'react-dropzone';
 
-import { putPdfFile } from '@documenso/lib/universal/upload/put-file';
+import { putDmsFile } from '@documenso/lib/universal/upload/put-dms-file';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import { useToast } from '@documenso/ui/primitives/use-toast';
@@ -109,7 +109,7 @@ export default function DmsBulkUploadPage() {
 
       try {
         // Upload file
-        const response = await putPdfFile(item.file);
+        const response = await putDmsFile(item.file);
 
         setFiles((prev) =>
           prev.map((f, idx) => (idx === i ? { ...f, progress: 60 } : f)),

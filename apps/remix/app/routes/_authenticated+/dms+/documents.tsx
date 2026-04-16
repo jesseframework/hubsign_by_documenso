@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 
-import { putPdfFile } from '@documenso/lib/universal/upload/put-file';
+import { putDmsFile } from '@documenso/lib/universal/upload/put-dms-file';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import {
@@ -165,7 +165,7 @@ export default function DmsDocumentsPage() {
       setIsUploading(true);
 
       for (const file of uploadFiles) {
-        const response = await putPdfFile(file);
+        const response = await putDmsFile(file);
 
         await createDmsDocument.mutateAsync({
           title: uploadFiles.length === 1 ? (uploadTitle || file.name) : file.name.replace(/\.[^.]+$/, ''),

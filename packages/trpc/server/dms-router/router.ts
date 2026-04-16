@@ -4,6 +4,34 @@ import { z } from 'zod';
 import { prisma } from '@documenso/prisma';
 
 import { authenticatedProcedure, router } from '../trpc';
+
+// Helper: get document ownership filter based on org membership
+const getDocOwnerFilter = async (userId: number) => {
+  const membership = await prisma.organizationMember.findFirst({
+    where: { userId },
+  });
+
+  if (membership) {
+    // User is in an org — show all org documents
+    return { organizationId: membership.organizationId };
+  }
+
+  // No org — show only personal documents
+  return { uploadedById: userId };
+};
+
+// Helper: get location ownership filter
+const getLocationOwnerFilter = async (userId: number) => {
+  const membership = await prisma.organizationMember.findFirst({
+    where: { userId },
+  });
+
+  if (membership) {
+    return { organizationId: membership.organizationId };
+  }
+
+  return { userId };
+};
 import {
   ZCreateBinSchema,
   ZCreateCabinetSchema,
@@ -40,8 +68,9 @@ export const dmsRouter = router({
   // ═══════════════════════════════════════════
 
   getLocations: authenticatedProcedure.query(async ({ ctx }) => {
+    const ownerFilter = await getLocationOwnerFilter(ctx.user.id);
     return prisma.dmsLocation.findMany({
-      where: { userId: ctx.user.id },
+      where: ownerFilter,
       include: {
         cabinets: {
           include: {
@@ -62,8 +91,16 @@ export const dmsRouter = router({
   createLocation: authenticatedProcedure
     .input(ZCreateLocationSchema)
     .mutation(async ({ ctx, input }) => {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id },
+      });
+
       return prisma.dmsLocation.create({
-        data: { ...input, userId: ctx.user.id },
+        data: {
+          ...input,
+          userId: ctx.user.id,
+          organizationId: membership?.organizationId,
+        },
       });
     }),
 
@@ -220,11 +257,17 @@ export const dmsRouter = router({
     .mutation(async ({ ctx, input }) => {
       const { tagIds, ...data } = input;
 
+      // Auto-set organizationId if user is in an org
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id },
+      });
+
       const document = await prisma.dmsDocument.create({
         data: {
           ...data,
           referenceNumber: generateRefNumber(),
           uploadedById: ctx.user.id,
+          organizationId: membership?.organizationId,
           retentionDate: data.retentionDate ? new Date(data.retentionDate) : undefined,
           expiryDate: data.expiryDate ? new Date(data.expiryDate) : undefined,
           tags: tagIds
@@ -352,8 +395,9 @@ export const dmsRouter = router({
         teamId,
       } = input;
 
+      const docFilter = await getDocOwnerFilter(ctx.user.id);
       const where: Record<string, unknown> = {
-        uploadedById: ctx.user.id,
+        ...docFilter,
       };
 
       if (teamId) where.teamId = teamId;
@@ -414,9 +458,10 @@ export const dmsRouter = router({
   // ═══════════════════════════════════════════
 
   getRetrievalRequests: authenticatedProcedure.query(async ({ ctx }) => {
+    const docFilter = await getDocOwnerFilter(ctx.user.id);
     return prisma.dmsRetrievalRequest.findMany({
       where: {
-        OR: [{ requestedById: ctx.user.id }, { approvedById: ctx.user.id }],
+        document: docFilter,
       },
       include: {
         document: true,
@@ -481,8 +526,9 @@ export const dmsRouter = router({
   // ═══════════════════════════════════════════
 
   getFilingRules: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await prisma.organizationMember.findFirst({ where: { userId: ctx.user.id } });
     return prisma.dmsFilingRule.findMany({
-      where: { createdBy: ctx.user.id },
+      where: membership ? { organizationId: membership.organizationId } : { createdBy: ctx.user.id },
       orderBy: { createdAt: 'desc' },
     });
   }),
@@ -638,9 +684,10 @@ export const dmsRouter = router({
 
   getRetentionDue: authenticatedProcedure.query(async ({ ctx }) => {
     const now = new Date();
+    const docFilter = await getDocOwnerFilter(ctx.user.id);
     return prisma.dmsDocument.findMany({
       where: {
-        uploadedById: ctx.user.id,
+        ...docFilter,
         retentionDate: { lte: now },
         disposalStatus: { in: ['NOT_DUE', 'DUE_FOR_REVIEW'] },
         status: { not: 'DESTROYED' },
@@ -735,7 +782,7 @@ export const dmsRouter = router({
   // ═══════════════════════════════════════════
 
   getDashboardStats: authenticatedProcedure.query(async ({ ctx }) => {
-    const where = { uploadedById: ctx.user.id };
+    const where = await getDocOwnerFilter(ctx.user.id);
 
     const [
       totalDocuments,
@@ -1122,9 +1169,10 @@ export const dmsRouter = router({
   getActivityFeed: authenticatedProcedure
     .input(z.object({ limit: z.number().default(50) }))
     .query(async ({ ctx, input }) => {
+      const docFilter = await getDocOwnerFilter(ctx.user.id);
       return prisma.dmsAuditLog.findMany({
         where: {
-          document: { uploadedById: ctx.user.id },
+          document: docFilter,
         },
         include: {
           user: { select: { id: true, name: true, email: true } },
@@ -1240,8 +1288,9 @@ export const dmsRouter = router({
   exportDocuments: authenticatedProcedure
     .input(z.object({ format: z.enum(['json']).default('json') }))
     .query(async ({ ctx }) => {
+      const docFilter = await getDocOwnerFilter(ctx.user.id);
       const documents = await prisma.dmsDocument.findMany({
-        where: { uploadedById: ctx.user.id },
+        where: docFilter,
         include: {
           documentType: true,
           classification: true,
