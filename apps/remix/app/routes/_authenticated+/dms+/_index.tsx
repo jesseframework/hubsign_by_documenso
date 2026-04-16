@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 
 import { trpc } from '@documenso/trpc/react';
+import { Link } from 'react-router';
 
 import { CardMetric } from '~/components/general/metric-card';
 import { appMetaTags } from '~/utils/meta';
@@ -71,16 +72,17 @@ export default function DmsDashboard() {
             </div>
           ) : stats?.recentDocuments && stats.recentDocuments.length > 0 ? (
             stats.recentDocuments.map((doc) => (
-              <div
+              <Link
                 key={doc.id}
-                className="flex items-center justify-between px-4 py-3 hover:bg-muted/30"
+                to={`/dms/doc/${doc.id}`}
+                className="flex cursor-pointer items-center justify-between px-4 py-3 hover:bg-muted/30"
               >
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
                     <FileTextIcon className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <p className="text-[13px] font-medium text-foreground">{doc.title}</p>
+                    <p className="text-[13px] font-medium text-foreground hover:underline">{doc.title}</p>
                     <p className="text-[11px] text-muted-foreground">
                       {doc.referenceNumber} · {doc.documentType?.name || 'Uncategorized'}
                     </p>
@@ -100,7 +102,7 @@ export default function DmsDashboard() {
                     {doc.status}
                   </span>
                 </div>
-              </div>
+              </Link>
             ))
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">

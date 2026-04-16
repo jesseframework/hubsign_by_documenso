@@ -132,6 +132,14 @@ export const orgRouter = router({
       name: z.string().optional(),
       domain: z.string().nullable().optional(),
       logoUrl: z.string().nullable().optional(),
+      brandingLogo: z.string().nullable().optional(),
+      brandingPrimaryColor: z.string().nullable().optional(),
+      brandingAccentColor: z.string().nullable().optional(),
+      brandingSidebarBg: z.string().nullable().optional(),
+      brandingSidebarTextColor: z.string().nullable().optional(),
+      brandingButtonColor: z.string().nullable().optional(),
+      brandingButtonHoverColor: z.string().nullable().optional(),
+      brandingButtonTextColor: z.string().nullable().optional(),
       defaultConfidentiality: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
