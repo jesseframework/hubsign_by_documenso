@@ -60,6 +60,8 @@ export default function DmsDocumentsPage() {
   const [uploadFormat, setUploadFormat] = useState('DIGITAL');
   const [uploadRetentionDate, setUploadRetentionDate] = useState('');
   const [uploadBinId, setUploadBinId] = useState('');
+  const [uploadOcrTemplateId, setUploadOcrTemplateId] = useState('');
+  const [uploadAutoOcr, setUploadAutoOcr] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -95,6 +97,7 @@ export default function DmsDocumentsPage() {
   });
 
   const { data: docTypes } = trpc.dms.getDocumentTypes.useQuery();
+  const { data: ocrTemplates } = trpc.dms.getOcrTemplates.useQuery();
   const { data: classifications } = trpc.dms.getClassifications.useQuery();
   const { data: locations } = trpc.dms.getLocations.useQuery();
 
@@ -180,6 +183,8 @@ export default function DmsDocumentsPage() {
           format: uploadFormat as 'DIGITAL' | 'PHYSICAL' | 'BOTH',
           binId: uploadBinId || undefined,
           retentionDate: uploadRetentionDate || undefined,
+          ocrTemplateId: uploadOcrTemplateId ? Number(uploadOcrTemplateId) : undefined,
+          autoOcr: uploadAutoOcr,
         });
       }
 
@@ -212,6 +217,8 @@ export default function DmsDocumentsPage() {
     setUploadFormat('DIGITAL');
     setUploadRetentionDate('');
     setUploadBinId('');
+    setUploadOcrTemplateId('');
+    setUploadAutoOcr(true);
   };
 
   const toggleSelect = (id: string) => {
@@ -389,6 +396,30 @@ export default function DmsDocumentsPage() {
                   value={uploadRetentionDate}
                   onChange={(e) => setUploadRetentionDate(e.target.value ? new Date(e.target.value).toISOString() : '')}
                 />
+              </div>
+
+              {/* OCR Template */}
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">OCR Template</label>
+                <select className={`mt-1 w-full ${selectClass}`} value={uploadOcrTemplateId} onChange={(e) => setUploadOcrTemplateId(e.target.value)}>
+                  <option value="">Auto-detect (default)</option>
+                  {ocrTemplates?.map((t) => (
+                    <option key={t.id} value={t.id}>{t.name}{t.is_default ? ' (default)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Auto-OCR */}
+              <div className="flex items-end pb-1">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={uploadAutoOcr}
+                    onChange={(e) => setUploadAutoOcr(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-border"
+                  />
+                  <span className="text-[12px] font-medium">Process OCR on upload</span>
+                </label>
               </div>
 
               {/* Filing Location */}

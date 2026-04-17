@@ -533,33 +533,132 @@ export default function DmsDocumentDetailPage() {
                 </div>
               </div>
 
-              {/* OCR Preview */}
-              {/* Extracted metadata (from OCR/AI) */}
-              {doc.metadata && typeof doc.metadata === 'object' && Object.keys(doc.metadata as Record<string, unknown>).length > 0 && (
-                <div>
-                  <span className="text-[12px] font-medium text-muted-foreground">Extracted Data</span>
-                  <div className="mt-1.5 space-y-1.5">
-                    {Object.entries(doc.metadata as Record<string, unknown>).map(([key, value]) => (
-                      <div key={key} className="flex items-center justify-between rounded border border-border bg-muted/20 px-2.5 py-1.5">
-                        <span className="text-[11px] font-medium text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</span>
-                        <span className="text-[12px] font-medium">{String(value)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* OCR Results with confidence and manual edit */}
+              {doc.metadata && typeof doc.metadata === 'object' && (() => {
+                const meta = doc.metadata as Record<string, unknown>;
+                const ocrData = meta._ocr as { fieldExtractions?: Array<{ field_name: string; extracted_value: unknown; confidence_score: number; extraction_method: string; requires_review?: boolean; template_name?: string }>; ocrConfidence?: number; documentType?: string; completeness?: { score: number } } | undefined;
+                const fieldExtractions = ocrData?.fieldExtractions || [];
+                const plainFields = Object.entries(meta).filter(([k]) => k !== '_ocr');
 
-              {/* OCR text preview */}
-              {doc.ocrText && (
-                <div>
-                  <span className="text-[12px] text-muted-foreground">OCR Content</span>
-                  <p className="mt-1 max-h-48 overflow-y-auto rounded border border-border bg-muted/30 p-2 text-[11px] text-muted-foreground leading-relaxed">
-                    {doc.ocrText.substring(0, 1000)}
-                    {doc.ocrText.length > 1000 && '...'}
-                  </p>
-                  <p className="mt-1 text-[10px] text-muted-foreground">{doc.ocrText.length} characters extracted</p>
-                </div>
-              )}
+                return (
+                  <div className="space-y-3">
+                    {/* OCR Summary */}
+                    {ocrData && (
+                      <div className="rounded border border-border bg-muted/20 p-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-semibold uppercase text-muted-foreground">OCR Results</span>
+                          <div className="flex items-center gap-2">
+                            {ocrData.documentType && (
+                              <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">{ocrData.documentType}</span>
+                            )}
+                            {ocrData.ocrConfidence && (
+                              <span className={`rounded px-2 py-0.5 text-[10px] font-medium ${
+                                ocrData.ocrConfidence >= 0.8 ? 'bg-green-50 text-green-700' :
+                                ocrData.ocrConfidence >= 0.5 ? 'bg-amber-50 text-amber-700' :
+                                'bg-red-50 text-red-700'
+                              }`}>
+                                {Math.round(ocrData.ocrConfidence * 100)}% confidence
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        {ocrData.completeness && (
+                          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                            <div
+                              className={`h-full rounded-full ${ocrData.completeness.score >= 0.7 ? 'bg-green-500' : 'bg-amber-500'}`}
+                              style={{ width: `${ocrData.completeness.score * 100}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Field Extractions with confidence */}
+                    {fieldExtractions.length > 0 ? (
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[12px] font-medium text-muted-foreground">Extracted Fields</span>
+                          {fieldExtractions[0]?.template_name && (
+                            <span className="text-[10px] text-muted-foreground">Template: {fieldExtractions[0].template_name}</span>
+                          )}
+                        </div>
+                        <div className="mt-1.5 space-y-1">
+                          {fieldExtractions.map((field, i) => {
+                            const isLow = field.confidence_score < 0.5;
+                            const needsReview = field.requires_review || isLow || !field.extracted_value;
+
+                            return (
+                              <div key={i} className={`flex items-center gap-2 rounded border px-2.5 py-1.5 ${
+                                needsReview ? 'border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/30' : 'border-border bg-muted/20'
+                              }`}>
+                                {/* Confidence indicator */}
+                                <div className={`h-2 w-2 flex-shrink-0 rounded-full ${
+                                  field.confidence_score >= 0.7 ? 'bg-green-500' :
+                                  field.confidence_score >= 0.4 ? 'bg-amber-500' :
+                                  'bg-red-500'
+                                }`} title={`${Math.round(field.confidence_score * 100)}% confidence`} />
+
+                                {/* Field name */}
+                                <span className="min-w-[100px] text-[11px] font-medium text-muted-foreground capitalize">
+                                  {field.field_name.replace(/_/g, ' ')}
+                                </span>
+
+                                {/* Value — editable if low confidence */}
+                                <span className="flex-1 text-[12px] font-medium">
+                                  {field.extracted_value != null ? String(field.extracted_value) : '—'}
+                                </span>
+
+                                {/* Confidence + method */}
+                                <span className="text-[9px] text-muted-foreground">
+                                  {Math.round(field.confidence_score * 100)}%
+                                  {field.extraction_method === 'ml+ai' && ' · AI'}
+                                </span>
+
+                                {needsReview && (
+                                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                                    Review
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Manual correction note */}
+                        {fieldExtractions.some((f) => f.requires_review || f.confidence_score < 0.5) && (
+                          <p className="mt-2 text-[11px] text-amber-600">
+                            Fields marked "Review" have low confidence. Edit the document metadata to correct them.
+                          </p>
+                        )}
+                      </div>
+                    ) : plainFields.length > 0 ? (
+                      <div>
+                        <span className="text-[12px] font-medium text-muted-foreground">Document Data</span>
+                        <div className="mt-1.5 space-y-1.5">
+                          {plainFields.map(([key, value]) => (
+                            <div key={key} className="flex items-center justify-between rounded border border-border bg-muted/20 px-2.5 py-1.5">
+                              <span className="text-[11px] font-medium text-muted-foreground capitalize">{key.replace(/_/g, ' ')}</span>
+                              <span className="text-[12px] font-medium">{String(value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* OCR text preview */}
+                    {doc.ocrText && (
+                      <div>
+                        <span className="text-[12px] text-muted-foreground">OCR Content</span>
+                        <p className="mt-1 max-h-48 overflow-y-auto rounded border border-border bg-muted/30 p-2 text-[11px] text-muted-foreground leading-relaxed">
+                          {doc.ocrText.substring(0, 1000)}
+                          {doc.ocrText.length > 1000 && '...'}
+                        </p>
+                        <p className="mt-1 text-[10px] text-muted-foreground">{doc.ocrText.length} characters extracted</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* OCR status */}
               {!doc.ocrProcessed && (

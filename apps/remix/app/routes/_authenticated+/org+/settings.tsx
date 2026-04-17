@@ -35,6 +35,15 @@ export default function OrgSettingsPage() {
   const [brandButtonText, setBrandButtonText] = useState('');
   const [brandLoaded, setBrandLoaded] = useState(false);
 
+  // OCR settings
+  const [ocrApiUrl, setOcrApiUrl] = useState('');
+  const [ocrApiKey, setOcrApiKey] = useState('');
+  const [ocrUsername, setOcrUsername] = useState('');
+  const [ocrPassword, setOcrPassword] = useState('');
+  const [ocrEngine, setOcrEngine] = useState('');
+  const [ocrAutoProcess, setOcrAutoProcess] = useState(false);
+  const [ocrLoaded, setOcrLoaded] = useState(false);
+
   const createOrg = trpc.org.create.useMutation({
     onSuccess: () => {
       void utils.org.getMyOrganization.invalidate();
@@ -398,6 +407,111 @@ export default function OrgSettingsPage() {
             >
               <Trans>Save Branding</Trans>
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* OCR / BMS ML Settings */}
+      {isAdmin && (
+        <div className="rounded-[var(--r)] border border-border bg-card p-5">
+          <h2 className="text-[15px] font-semibold"><Trans>OCR & Document Processing</Trans></h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            <Trans>Connect your BMS ML service for automatic OCR, field extraction, and document classification.</Trans>
+          </p>
+
+          <div className="mt-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">BMS ML API URL</label>
+                <Input
+                  className="mt-1.5 h-9 font-mono text-[13px]"
+                  value={ocrLoaded ? ocrApiUrl : (org.ocrApiUrl || '')}
+                  onChange={(e) => { setOcrApiUrl(e.target.value); setOcrLoaded(true); }}
+                  placeholder="http://bms-ml-server:8080/api/v1"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">The base URL of your BMS ML service</p>
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">API Key</label>
+                <Input
+                  className="mt-1.5 h-9 font-mono text-[13px]"
+                  type="password"
+                  value={ocrLoaded ? ocrApiKey : (org.ocrApiKey || '')}
+                  onChange={(e) => { setOcrApiKey(e.target.value); setOcrLoaded(true); }}
+                  placeholder="sk-your-api-key"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">Authentication key for the BMS ML API</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">Username (JWT auth)</label>
+                <Input
+                  className="mt-1.5 h-9 text-[13px]"
+                  value={ocrLoaded ? ocrUsername : (org.ocrApiUsername || '')}
+                  onChange={(e) => { setOcrUsername(e.target.value); setOcrLoaded(true); }}
+                  placeholder="admin"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">Leave empty if using API key</p>
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">Password (JWT auth)</label>
+                <Input
+                  className="mt-1.5 h-9 text-[13px]"
+                  type="password"
+                  value={ocrLoaded ? ocrPassword : (org.ocrApiPassword || '')}
+                  onChange={(e) => { setOcrPassword(e.target.value); setOcrLoaded(true); }}
+                  placeholder="••••••"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">Leave empty if using API key</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">Default OCR Engine</label>
+                <select
+                  className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-2 text-[13px]"
+                  value={ocrLoaded ? ocrEngine : (org.ocrDefaultEngine || 'auto')}
+                  onChange={(e) => { setOcrEngine(e.target.value); setOcrLoaded(true); }}
+                >
+                  <option value="auto">Auto-detect (recommended)</option>
+                  <option value="doctr">DocTR (deep learning)</option>
+                  <option value="easyocr">EasyOCR (multi-language)</option>
+                  <option value="tesseract">Tesseract (fast)</option>
+                  <option value="pymupdf">PyMuPDF (text PDFs)</option>
+                </select>
+              </div>
+              <div className="flex items-end pb-1">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 rounded border-border"
+                    checked={ocrLoaded ? ocrAutoProcess : (org.ocrAutoProcess || false)}
+                    onChange={(e) => { setOcrAutoProcess(e.target.checked); setOcrLoaded(true); }}
+                  />
+                  <span className="text-[13px] font-medium">Auto-process on upload</span>
+                </label>
+                <p className="ml-6 text-[11px] text-muted-foreground">Automatically run OCR when documents are uploaded</p>
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                onClick={() => void updateOrg.mutateAsync({
+                  ocrApiUrl: ocrApiUrl || null,
+                  ocrApiKey: ocrApiKey || null,
+                  ocrApiUsername: ocrUsername || null,
+                  ocrApiPassword: ocrPassword || null,
+                  ocrDefaultEngine: ocrEngine || null,
+                  ocrAutoProcess,
+                })}
+                loading={updateOrg.isPending}
+              >
+                <Trans>Save OCR Settings</Trans>
+              </Button>
+            </div>
           </div>
         </div>
       )}

@@ -1490,6 +1490,15 @@ model Organization {
   brandingButtonHoverColor  String?  // hex e.g. #6a4af0
   brandingButtonTextColor   String?  // hex e.g. #ffffff
 
+  // OCR / BMS ML Settings
+  ocrApiUrl            String?  // e.g. http://bms-ml:8080/api/v1
+  ocrApiKey            String?  // API key or JWT token
+  ocrApiUsername       String?  // For JWT auth: username
+  ocrApiPassword       String?  // For JWT auth: password
+  ocrDefaultTemplateId Int?     // Default extraction template ID
+  ocrAutoProcess       Boolean  @default(false) // Auto-OCR on upload
+  ocrDefaultEngine     String?  // auto, doctr, easyocr, tesseract, pymupdf
+
   // Stripe billing
   stripeCustomerId     String? @unique
   stripeSubscriptionId String? @unique

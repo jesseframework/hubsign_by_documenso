@@ -140,6 +140,13 @@ export const orgRouter = router({
       brandingButtonColor: z.string().nullable().optional(),
       brandingButtonHoverColor: z.string().nullable().optional(),
       brandingButtonTextColor: z.string().nullable().optional(),
+      ocrApiUrl: z.string().nullable().optional(),
+      ocrApiKey: z.string().nullable().optional(),
+      ocrApiUsername: z.string().nullable().optional(),
+      ocrApiPassword: z.string().nullable().optional(),
+      ocrDefaultTemplateId: z.number().nullable().optional(),
+      ocrAutoProcess: z.boolean().optional(),
+      ocrDefaultEngine: z.string().nullable().optional(),
       defaultConfidentiality: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']).optional(),
     }))
     .mutation(async ({ ctx, input }) => {

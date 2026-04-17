@@ -1,15 +1,19 @@
+import { msg } from '@lingui/core/macro';
+import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import {
   CheckCircleIcon,
   ClockIcon,
   CpuIcon,
-  FileTextIcon,
+  Loader,
   RefreshCwIcon,
+  SettingsIcon,
 } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
+import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { appMetaTags } from '~/utils/meta';
 
@@ -18,20 +22,42 @@ export function meta() {
 }
 
 export default function DmsOcrQueuePage() {
+  const { _ } = useLingui();
+  const { toast } = useToast();
   const utils = trpc.useUtils();
 
-  // Get all documents, split by OCR status
   const { data: allDocs, isLoading } = trpc.dms.searchDocuments.useQuery({
     page: 1,
     perPage: 100,
   });
 
+  const { data: ocrStatus } = trpc.dms.getOcrStatus.useQuery();
+  const { data: orgMembership } = trpc.org.getMyOrganization.useQuery();
+
+  const triggerOcr = trpc.dms.triggerOcr.useMutation({
+    onSuccess: (result) => {
+      void utils.dms.searchDocuments.invalidate();
+      if (result.status === 'completed' || result.status === 'needs_review') {
+        toast({ title: `OCR complete — ${result.fieldsExtracted} fields extracted` });
+      } else if (result.status === 'not_configured') {
+        toast({ title: 'OCR not configured', description: result.message, variant: 'destructive' });
+      } else if (result.status === 'error') {
+        toast({ title: 'OCR failed', description: result.message, variant: 'destructive' });
+      }
+    },
+  });
+
   const pendingOcr = allDocs?.data?.filter((d) => !d.ocrProcessed) ?? [];
   const completedOcr = allDocs?.data?.filter((d) => d.ocrProcessed) ?? [];
 
-  const triggerOcr = trpc.dms.triggerOcr.useMutation({
-    onSuccess: () => void utils.dms.searchDocuments.invalidate(),
-  });
+  const orgOcrConfigured = !!orgMembership?.organization?.ocrApiUrl;
+  const isConnected = ocrStatus?.available || orgOcrConfigured;
+
+  const processAll = async () => {
+    for (const doc of pendingOcr) {
+      await triggerOcr.mutateAsync({ id: doc.id });
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -42,15 +68,28 @@ export default function DmsOcrQueuePage() {
             <Trans>Track OCR processing status for uploaded documents.</Trans>
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="secondary"
-          className="gap-1.5"
-          onClick={() => void utils.dms.searchDocuments.invalidate()}
-        >
-          <RefreshCwIcon className="h-3.5 w-3.5" />
-          <Trans>Refresh</Trans>
-        </Button>
+        <div className="flex gap-2">
+          {pendingOcr.length > 0 && isConnected && (
+            <Button
+              size="sm"
+              className="gap-1.5"
+              onClick={() => void processAll()}
+              disabled={triggerOcr.isPending}
+            >
+              {triggerOcr.isPending ? <Loader className="h-3.5 w-3.5 animate-spin" /> : <CpuIcon className="h-3.5 w-3.5" />}
+              Process All ({pendingOcr.length})
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="secondary"
+            className="gap-1.5"
+            onClick={() => void utils.dms.searchDocuments.invalidate()}
+          >
+            <RefreshCwIcon className="h-3.5 w-3.5" />
+            <Trans>Refresh</Trans>
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -78,15 +117,43 @@ export default function DmsOcrQueuePage() {
         </div>
       </div>
 
+      {/* AI Service Status */}
+      <div className={`rounded-[var(--r)] border p-4 ${isConnected ? 'border-green-200 bg-green-50/50 dark:border-green-800 dark:bg-green-950/30' : 'border-dashed border-border bg-card'}`}>
+        <div className="flex items-center gap-3">
+          <CpuIcon className={`h-6 w-6 ${isConnected ? 'text-green-600' : 'text-muted-foreground/40'}`} />
+          <div className="flex-1">
+            <p className="text-[13px] font-medium">BMS ML — OCR & AI Service</p>
+            {orgOcrConfigured ? (
+              <p className="text-[11px] text-muted-foreground">
+                Connected to: <code className="rounded bg-muted px-1">{orgMembership?.organization?.ocrApiUrl}</code>
+                {orgMembership?.organization?.ocrDefaultEngine && ` · Engine: ${orgMembership.organization.ocrDefaultEngine}`}
+                {orgMembership?.organization?.ocrAutoProcess && ' · Auto-process enabled'}
+              </p>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">
+                <Trans>Configure your BMS ML service in</Trans>{' '}
+                <Link to="/org/settings" className="text-primary hover:underline">Organization Settings</Link>
+                {' '}<Trans>to enable automatic OCR processing.</Trans>
+              </p>
+            )}
+          </div>
+          {isConnected ? (
+            <span className="rounded-full bg-green-100 px-3 py-1 text-[11px] font-medium text-green-700 dark:bg-green-900 dark:text-green-300">
+              Connected
+            </span>
+          ) : (
+            <Link to="/org/settings" className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground">
+              <SettingsIcon className="h-3 w-3" />
+              Configure
+            </Link>
+          )}
+        </div>
+      </div>
+
       {/* Pending OCR */}
       <div className="rounded-[var(--r)] border border-border bg-card">
         <div className="border-b border-border px-4 py-3">
-          <h3 className="text-[14px] font-semibold">
-            <Trans>Pending OCR Processing</Trans>
-          </h3>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            <Trans>These documents are waiting for OCR text extraction. Connect the AI service to process them automatically.</Trans>
-          </p>
+          <h3 className="text-[14px] font-semibold"><Trans>Pending OCR Processing</Trans></h3>
         </div>
 
         {isLoading ? (
@@ -114,10 +181,11 @@ export default function DmsOcrQueuePage() {
                   size="sm"
                   variant="ghost"
                   className="h-7 gap-1 text-[11px]"
+                  disabled={!isConnected || triggerOcr.isPending}
                   onClick={() => void triggerOcr.mutateAsync({ id: doc.id })}
                 >
-                  <CpuIcon className="h-3 w-3" />
-                  Queue OCR
+                  {triggerOcr.isPending ? <Loader className="h-3 w-3 animate-spin" /> : <CpuIcon className="h-3 w-3" />}
+                  Process
                 </Button>
               </div>
             ))}
@@ -133,9 +201,7 @@ export default function DmsOcrQueuePage() {
       {/* Recently Completed */}
       <div className="rounded-[var(--r)] border border-border bg-card">
         <div className="border-b border-border px-4 py-3">
-          <h3 className="text-[14px] font-semibold">
-            <Trans>Recently Processed</Trans>
-          </h3>
+          <h3 className="text-[14px] font-semibold"><Trans>Recently Processed</Trans></h3>
         </div>
 
         {completedOcr.length > 0 ? (
@@ -165,24 +231,6 @@ export default function DmsOcrQueuePage() {
             <Trans>No documents processed yet</Trans>
           </div>
         )}
-      </div>
-
-      {/* AI Service Status */}
-      <div className="rounded-[var(--r)] border border-dashed border-border bg-card p-4">
-        <div className="flex items-center gap-3">
-          <CpuIcon className="h-6 w-6 text-muted-foreground/40" />
-          <div>
-            <p className="text-[13px] font-medium">AI/OCR Service</p>
-            <p className="text-[11px] text-muted-foreground">
-              <Trans>
-                Connect your AI service to automatically process documents. Set <code className="rounded bg-muted px-1">NEXT_PRIVATE_AI_SERVICE_URL</code> in your environment.
-              </Trans>
-            </p>
-          </div>
-          <span className="ml-auto rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground">
-            Not Connected
-          </span>
-        </div>
       </div>
     </div>
   );

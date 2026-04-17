@@ -86,6 +86,8 @@ export const ZCreateDmsDocumentSchema = z.object({
   expiryDate: z.string().datetime().optional(),
   tagIds: z.array(z.string()).optional(),
   teamId: z.number().optional(),
+  ocrTemplateId: z.number().optional(),
+  autoOcr: z.boolean().optional(),
 });
 
 export const ZUpdateDmsDocumentSchema = z.object({
