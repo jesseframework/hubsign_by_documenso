@@ -99,6 +99,8 @@ model User {
   dmsOrgPermissionsGranted DmsOrgPermission[] @relation("DmsOrgPermissionGranter")
   dmsRecycleBinItems    DmsRecycleBinItem[] @relation("DmsRecycleBinDeleter")
   dmsSavedSearches      DmsSavedSearch[]
+  dmsAiConversations    DmsAiConversation[]
+  dmsAiUsage            DmsAiUsage[]
 
   @@index([email])
 }
@@ -1523,6 +1525,8 @@ model Organization {
   dmsComplianceTemplates DmsComplianceTemplate[] @relation("OrgDmsCompliance")
   recycleBin         DmsRecycleBinItem[]
   savedSearches      DmsSavedSearch[]
+  aiConversations    DmsAiConversation[]
+  aiUsage            DmsAiUsage[]
   seatPlans          OrgSeatPlan[]
 }
 
@@ -1625,4 +1629,59 @@ model DmsSavedSearch {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ═══════════════════════════════════════════════════════════
+// DMS AI AGENT
+// ═══════════════════════════════════════════════════════════
+
+model DmsAiConversation {
+  id    String @id @default(cuid())
+  title String?
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId Int?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  messages DmsAiMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DmsAiMessage {
+  id   String @id @default(cuid())
+  role String // user, assistant, system
+  content String @db.Text
+  
+  // Token usage
+  promptTokens    Int @default(0)
+  completionTokens Int @default(0)
+
+  conversationId String
+  conversation   DmsAiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model DmsAiUsage {
+  id    String @id @default(cuid())
+  month String // YYYY-MM format
+
+  totalQueries      Int @default(0)
+  totalPromptTokens Int @default(0)
+  totalCompletionTokens Int @default(0)
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  organizationId Int?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, month])
 }

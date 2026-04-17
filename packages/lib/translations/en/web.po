@@ -930,6 +930,11 @@ msgstr "After signing a document electronically, you will be provided the opport
 msgid "After submission, a document will be automatically generated and added to your documents page. You will also receive a notification via email."
 msgstr "After submission, a document will be automatically generated and added to your documents page. You will also receive a notification via email."
 
+#: apps/remix/app/routes/_authenticated+/dms+/ai.tsx
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+msgid "AI Agent"
+msgstr "AI Agent"
+
 #: apps/remix/app/components/general/document/document-status.tsx
 msgid "All"
 msgstr "All"
@@ -1341,6 +1346,10 @@ msgstr "Are you sure you wish to delete this team?"
 #: apps/remix/app/components/dialogs/document-delete-dialog.tsx
 msgid "Are you sure?"
 msgstr "Are you sure?"
+
+#: apps/remix/app/routes/_authenticated+/dms+/ai.tsx
+msgid "Ask questions about your documents, generate reports, and get insights."
+msgstr "Ask questions about your documents, generate reports, and get insights."
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 msgid "Assign a plan tier to each member. Members without a seat have no access."
@@ -1920,6 +1929,10 @@ msgstr "Configure the {0} field"
 msgid "Configure the fields you want to place on the document."
 msgstr "Configure the fields you want to place on the document."
 
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "Configure your BMS ML service in"
+msgstr "Configure your BMS ML service in"
+
 #: apps/remix/app/components/dialogs/template-direct-link-dialog.tsx
 #: apps/remix/app/components/dialogs/public-profile-template-manage-dialog.tsx
 msgid "Confirm"
@@ -1954,8 +1967,12 @@ msgid "Confirmation email sent"
 msgstr "Confirmation email sent"
 
 #: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
-msgid "Connect your AI service to automatically process documents. Set <0>NEXT_PRIVATE_AI_SERVICE_URL</0> in your environment."
-msgstr "Connect your AI service to automatically process documents. Set <0>NEXT_PRIVATE_AI_SERVICE_URL</0> in your environment."
+#~ msgid "Connect your AI service to automatically process documents. Set <0>NEXT_PRIVATE_AI_SERVICE_URL</0> in your environment."
+#~ msgstr "Connect your AI service to automatically process documents. Set <0>NEXT_PRIVATE_AI_SERVICE_URL</0> in your environment."
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Connect your BMS ML service for automatic OCR, field extraction, and document classification."
+msgstr "Connect your BMS ML service for automatic OCR, field extraction, and document classification."
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Consent to Electronic Transactions"
@@ -2255,6 +2272,10 @@ msgstr "Current password is incorrect."
 #: apps/remix/app/components/dialogs/template-bulk-send-dialog.tsx
 msgid "Current recipients:"
 msgstr "Current recipients:"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Customize your organization's appearance with your brand colors and logo."
+msgstr "Customize your organization's appearance with your brand colors and logo."
 
 #: apps/remix/app/components/general/billing-plans.tsx
 msgid "Daily"
@@ -4383,6 +4404,10 @@ msgstr "Number"
 msgid "Number format"
 msgstr "Number format"
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "OCR & Document Processing"
+msgstr "OCR & Document Processing"
+
 #: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
 msgid "OCR Processing Queue"
 msgstr "OCR Processing Queue"
@@ -4484,6 +4509,10 @@ msgstr "Organization"
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 msgid "Organization Billing"
 msgstr "Organization Billing"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Organization Branding"
+msgstr "Organization Branding"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Organization created"
@@ -5326,6 +5355,14 @@ msgstr "Rows per page"
 #: packages/ui/primitives/document-flow/field-item-advanced-settings.tsx
 msgid "Save"
 msgstr "Save"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Save Branding"
+msgstr "Save Branding"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Save OCR Settings"
+msgstr "Save OCR Settings"
 
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "Save Settings"
@@ -6614,8 +6651,8 @@ msgid "There was an error uploading your file. Please try again."
 msgstr "There was an error uploading your file. Please try again."
 
 #: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
-msgid "These documents are waiting for OCR text extraction. Connect the AI service to process them automatically."
-msgstr "These documents are waiting for OCR text extraction. Connect the AI service to process them automatically."
+#~ msgid "These documents are waiting for OCR text extraction. Connect the AI service to process them automatically."
+#~ msgstr "These documents are waiting for OCR text extraction. Connect the AI service to process them automatically."
 
 #: apps/remix/app/components/general/teams/team-email-usage.tsx
 msgid "They have permission on your behalf to:"
@@ -6882,6 +6919,10 @@ msgstr "To confirm, please enter the reason"
 #: apps/remix/app/routes/_unauthenticated+/team.decline.$token.tsx
 msgid "To decline this invitation you must create an account."
 msgstr "To decline this invitation you must create an account."
+
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "to enable automatic OCR processing."
+msgstr "to enable automatic OCR processing."
 
 #: apps/remix/app/components/forms/2fa/enable-authenticator-app-dialog.tsx
 msgid "To enable two-factor authentication, scan the following QR code using your authenticator app."

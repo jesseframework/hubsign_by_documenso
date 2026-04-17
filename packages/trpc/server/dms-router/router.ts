@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { dmsAiChat, getAiConversations, getAiConversationMessages } from '@documenso/lib/server-only/dms-ai/agent';
 import { bmsMlGetStatus, bmsMlGetTemplates, bmsMlUploadDocument, isBmsMlConfigured } from '@documenso/lib/server-only/bms-ml/client';
 import { prisma } from '@documenso/prisma';
 
@@ -1512,4 +1513,54 @@ export const dmsRouter = router({
         updatedAt: doc.updatedAt,
       }));
     }),
+
+
+
+  // ═══════════════════════════════════════════
+  // AI AGENT
+  // ═══════════════════════════════════════════
+
+  aiChat: authenticatedProcedure
+    .input(z.object({
+      message: z.string().min(1),
+      conversationId: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id },
+      });
+
+      return dmsAiChat({
+        userId: ctx.user.id,
+        organizationId: membership?.organizationId,
+        message: input.message,
+        conversationId: input.conversationId,
+      });
+    }),
+
+  aiGetConversations: authenticatedProcedure.query(async ({ ctx }) => {
+    return getAiConversations(ctx.user.id);
+  }),
+
+  aiGetMessages: authenticatedProcedure
+    .input(z.object({ conversationId: z.string() }))
+    .query(async ({ input }) => {
+      return getAiConversationMessages(input.conversationId);
+    }),
+
+  aiGetUsage: authenticatedProcedure.query(async ({ ctx }) => {
+    const month = new Date().toISOString().substring(0, 7);
+    const usage = await prisma.dmsAiUsage.findUnique({
+      where: { userId_month: { userId: ctx.user.id, month } },
+    });
+
+    const freeLimit = Number(process.env.NEXT_PRIVATE_DMS_AI_FREE_QUERIES_PER_MONTH || '20');
+
+    return {
+      queriesThisMonth: usage?.totalQueries || 0,
+      tokensUsed: (usage?.totalPromptTokens || 0) + (usage?.totalCompletionTokens || 0),
+      limit: freeLimit,
+      remaining: Math.max(freeLimit - (usage?.totalQueries || 0), 0),
+    };
+  }),
 });

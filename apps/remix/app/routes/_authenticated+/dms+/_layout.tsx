@@ -11,6 +11,7 @@ import {
   LayoutDashboardIcon,
   ClipboardListIcon,
   LockIcon,
+  BotIcon,
   SettingsIcon,
   ShieldCheckIcon,
   UploadCloudIcon,
@@ -35,7 +36,9 @@ const navItems = [
   { to: '/dms/retention', icon: ClockIcon, label: <Trans>Retention</Trans> },
   { to: '/dms/activity', icon: ActivityIcon, label: <Trans>Activity</Trans> },
   { to: '/dms/compliance', icon: ShieldCheckIcon, label: <Trans>Compliance</Trans> },
-  { to: '/dms/settings', icon: SettingsIcon, label: <Trans>Settings</Trans> },
+  { to: '/dms/ai', icon: BotIcon, label: <Trans>AI Agent</Trans> },
+  { to: '/dms/settings', icon:
+SettingsIcon, label: <Trans>Settings</Trans> },
 ];
 
 export default function DmsLayout() {

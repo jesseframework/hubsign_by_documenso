@@ -935,6 +935,11 @@ msgstr "Dopo aver firmato un documento elettronicamente, avrai la possibilità d
 msgid "After submission, a document will be automatically generated and added to your documents page. You will also receive a notification via email."
 msgstr "Dopo l'invio, un documento verrà generato automaticamente e aggiunto alla tua pagina dei documenti. Riceverai anche una notifica via email."
 
+#: apps/remix/app/routes/_authenticated+/dms+/ai.tsx
+#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+msgid "AI Agent"
+msgstr ""
+
 #: apps/remix/app/components/general/document/document-status.tsx
 msgid "All"
 msgstr "Tutto"
@@ -1346,6 +1351,10 @@ msgstr "Sei sicuro di voler eliminare questo team?"
 #: apps/remix/app/components/dialogs/document-delete-dialog.tsx
 msgid "Are you sure?"
 msgstr "Sei sicuro?"
+
+#: apps/remix/app/routes/_authenticated+/dms+/ai.tsx
+msgid "Ask questions about your documents, generate reports, and get insights."
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 msgid "Assign a plan tier to each member. Members without a seat have no access."
@@ -1925,6 +1934,10 @@ msgstr "Configura il campo {0}"
 msgid "Configure the fields you want to place on the document."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "Configure your BMS ML service in"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/template-direct-link-dialog.tsx
 #: apps/remix/app/components/dialogs/public-profile-template-manage-dialog.tsx
 msgid "Confirm"
@@ -1959,7 +1972,11 @@ msgid "Confirmation email sent"
 msgstr "Email di conferma inviato"
 
 #: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
-msgid "Connect your AI service to automatically process documents. Set <0>NEXT_PRIVATE_AI_SERVICE_URL</0> in your environment."
+#~ msgid "Connect your AI service to automatically process documents. Set <0>NEXT_PRIVATE_AI_SERVICE_URL</0> in your environment."
+#~ msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Connect your BMS ML service for automatic OCR, field extraction, and document classification."
 msgstr ""
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
@@ -2260,6 +2277,10 @@ msgstr "La password corrente è errata."
 #: apps/remix/app/components/dialogs/template-bulk-send-dialog.tsx
 msgid "Current recipients:"
 msgstr "Destinatari attuali:"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Customize your organization's appearance with your brand colors and logo."
+msgstr ""
 
 #: apps/remix/app/components/general/billing-plans.tsx
 msgid "Daily"
@@ -4388,6 +4409,10 @@ msgstr "Numero"
 msgid "Number format"
 msgstr "Formato numero"
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "OCR & Document Processing"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
 msgid "OCR Processing Queue"
 msgstr ""
@@ -4488,6 +4513,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 msgid "Organization Billing"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Organization Branding"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
@@ -5331,6 +5360,14 @@ msgstr "Righe per pagina"
 #: packages/ui/primitives/document-flow/field-item-advanced-settings.tsx
 msgid "Save"
 msgstr "Salva"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Save Branding"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Save OCR Settings"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "Save Settings"
@@ -6619,8 +6656,8 @@ msgid "There was an error uploading your file. Please try again."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
-msgid "These documents are waiting for OCR text extraction. Connect the AI service to process them automatically."
-msgstr ""
+#~ msgid "These documents are waiting for OCR text extraction. Connect the AI service to process them automatically."
+#~ msgstr ""
 
 #: apps/remix/app/components/general/teams/team-email-usage.tsx
 msgid "They have permission on your behalf to:"
@@ -6887,6 +6924,10 @@ msgstr "Per confermare, per favore inserisci il motivo"
 #: apps/remix/app/routes/_unauthenticated+/team.decline.$token.tsx
 msgid "To decline this invitation you must create an account."
 msgstr "Per rifiutare questo invito devi creare un account."
+
+#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+msgid "to enable automatic OCR processing."
+msgstr ""
 
 #: apps/remix/app/components/forms/2fa/enable-authenticator-app-dialog.tsx
 msgid "To enable two-factor authentication, scan the following QR code using your authenticator app."
