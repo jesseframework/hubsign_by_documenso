@@ -25,15 +25,16 @@ export default function OrgSettingsPage() {
 
   const [createName, setCreateName] = useState('');
   const [createSlug, setCreateSlug] = useState('');
-  const [brandPrimary, setBrandPrimary] = useState('');
-  const [brandAccent, setBrandAccent] = useState('');
-  const [brandSidebarBg, setBrandSidebarBg] = useState('');
-  const [brandSidebarText, setBrandSidebarText] = useState('');
+  const [brandInitialized, setBrandInitialized] = useState(false);
+  const [brandPrimary, setBrandPrimary] = useState('#7c5cfc');
+  const [brandAccent, setBrandAccent] = useState('#f59e0b');
+  const [brandSidebarBg, setBrandSidebarBg] = useState('#0d0d10');
+  const [brandSidebarText, setBrandSidebarText] = useState('#f4f2ff');
+  const [brandNavActive, setBrandNavActive] = useState('#7c5cfc');
   const [brandLogoUrl, setBrandLogoUrl] = useState('');
-  const [brandButtonColor, setBrandButtonColor] = useState('');
-  const [brandButtonHover, setBrandButtonHover] = useState('');
-  const [brandButtonText, setBrandButtonText] = useState('');
-  const [brandLoaded, setBrandLoaded] = useState(false);
+  const [brandButtonColor, setBrandButtonColor] = useState('#7c5cfc');
+  const [brandButtonHover, setBrandButtonHover] = useState('#6a4af0');
+  const [brandButtonText, setBrandButtonText] = useState('#ffffff');
 
   // OCR settings
   const [ocrApiUrl, setOcrApiUrl] = useState('');
@@ -115,6 +116,20 @@ export default function OrgSettingsPage() {
 
   const org = membership.organization;
   const isAdmin = membership.role === 'ORG_ADMIN';
+
+  // Initialize branding state from org data (once)
+  if (!brandInitialized && org) {
+    setBrandPrimary(org.brandingPrimaryColor || '#7c5cfc');
+    setBrandAccent(org.brandingAccentColor || '#f59e0b');
+    setBrandSidebarBg(org.brandingSidebarBg || '#0d0d10');
+    setBrandSidebarText(org.brandingSidebarTextColor || '#f4f2ff');
+    setBrandNavActive((org as Record<string, unknown>).brandingNavActiveColor as string || org.brandingPrimaryColor || '#7c5cfc');
+    setBrandLogoUrl(org.brandingLogo || '');
+    setBrandButtonColor(org.brandingButtonColor || '#7c5cfc');
+    setBrandButtonHover(org.brandingButtonHoverColor || '#6a4af0');
+    setBrandButtonText(org.brandingButtonTextColor || '#ffffff');
+    setBrandInitialized(true);
+  }
 
   return (
     <div className="space-y-4">

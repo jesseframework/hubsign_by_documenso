@@ -20,7 +20,7 @@ export const AppBottomNav = () => {
     {
       href: getRootHref('/documents'),
       icon: LayoutGridIcon,
-      label: <Trans>Docs</Trans>,
+      label: <Trans>E-Sign</Trans>,
       active: isActive('/documents'),
     },
     {

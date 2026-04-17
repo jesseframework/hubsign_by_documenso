@@ -1487,7 +1487,8 @@ model Organization {
   brandingPrimaryColor      String?  // hex e.g. #7c5cfc
   brandingAccentColor       String?  // hex e.g. #f59e0b
   brandingSidebarBg         String?  // hex e.g. #0d0d10
-  brandingSidebarTextColor  String?  // hex e.g. #f4f2ff
+  brandingSidebarTextColor  String?
+  brandingNavActiveColor   String?  // hex for active nav item  // hex e.g. #f4f2ff
   brandingButtonColor       String?  // hex e.g. #7c5cfc
   brandingButtonHoverColor  String?  // hex e.g. #6a4af0
   brandingButtonTextColor   String?  // hex e.g. #ffffff

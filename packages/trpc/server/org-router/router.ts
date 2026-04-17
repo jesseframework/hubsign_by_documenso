@@ -137,6 +137,7 @@ export const orgRouter = router({
       brandingAccentColor: z.string().nullable().optional(),
       brandingSidebarBg: z.string().nullable().optional(),
       brandingSidebarTextColor: z.string().nullable().optional(),
+      brandingNavActiveColor: z.string().nullable().optional(),
       brandingButtonColor: z.string().nullable().optional(),
       brandingButtonHoverColor: z.string().nullable().optional(),
       brandingButtonTextColor: z.string().nullable().optional(),

@@ -1,10 +1,13 @@
+// @ts-expect-error — importing version from package.json
+import { version as APP_VERSION } from '../../../../../package.json';
+
 import { Trans } from '@lingui/react/macro';
 import {
-  ArchiveIcon,
   BuildingIcon,
   FileTextIcon,
-  LayoutGridIcon,
+  FolderArchiveIcon,
   LogOutIcon,
+  PenLineIcon,
   SettingsIcon,
   UsersIcon,
   XIcon,
@@ -162,8 +165,8 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
             style={navStyle(isActive('/documents'))}
             onClick={onClose}
           >
-            <LayoutGridIcon className="h-4 w-4 flex-shrink-0" />
-            <Trans>Documents</Trans>
+            <PenLineIcon className="h-4 w-4 flex-shrink-0" />
+            <Trans>E-Sign</Trans>
           </Link>
 
           <Link
@@ -173,7 +176,7 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
             onClick={onClose}
           >
             <FileTextIcon className="h-4 w-4 flex-shrink-0" />
-            <Trans>Templates</Trans>
+            <Trans>Sign Templates</Trans>
           </Link>
 
           {isDmsEnabled && (
@@ -183,7 +186,7 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
               style={navStyle(location.pathname.startsWith('/dms'))}
               onClick={onClose}
             >
-              <ArchiveIcon className="h-4 w-4 flex-shrink-0" />
+              <FolderArchiveIcon className="h-4 w-4 flex-shrink-0" />
               <Trans>Doc Manager</Trans>
             </Link>
           )}
@@ -275,7 +278,7 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
           </div>
           <div className="mt-1 px-2.5 text-center">
             <span className="text-[9px]" style={{ color: sidebarTextColor ? `${sidebarTextColor}40` : 'hsl(var(--sidebar-text))' }}>
-              v2.0.0
+              v{APP_VERSION}
             </span>
           </div>
         </div>
