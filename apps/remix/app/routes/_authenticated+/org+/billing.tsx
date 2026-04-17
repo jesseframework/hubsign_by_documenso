@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
@@ -10,6 +10,7 @@ import {
   PlusIcon,
   UsersIcon,
 } from 'lucide-react';
+import { useSearchParams } from 'react-router';
 
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
@@ -32,6 +33,20 @@ export default function OrgBillingPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const utils = trpc.useUtils();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Handle Stripe redirect results
+  useEffect(() => {
+    if (searchParams.get('success') === 'true') {
+      toast({ title: _(msg`Payment successful! Your seats have been activated.`) });
+      void utils.org.getSeatPlans.invalidate();
+      void utils.org.getMyOrganization.invalidate();
+      setSearchParams({}, { replace: true });
+    } else if (searchParams.get('canceled') === 'true') {
+      toast({ title: _(msg`Payment canceled`), variant: 'destructive' });
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
 
   const { data: membership, isLoading } = trpc.org.getMyOrganization.useQuery();
   const { data: seatPlans } = trpc.org.getSeatPlans.useQuery();
@@ -40,14 +55,23 @@ export default function OrgBillingPage() {
 
   const [buyTier, setBuyTier] = useState<string>('PRO');
   const [buyQty, setBuyQty] = useState(1);
+  const [buyDms, setBuyDms] = useState(false);
   const [showBuy, setShowBuy] = useState(false);
 
   const purchaseSeats = trpc.org.purchaseSeats.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
       void utils.org.getSeatPlans.invalidate();
       void utils.org.getMyOrganization.invalidate();
+
+      // If Stripe returned a checkout URL, redirect to it
+      if (result && typeof result === 'object' && 'url' in result && result.url) {
+        window.location.href = result.url as string;
+        return;
+      }
+
       setShowBuy(false);
       setBuyQty(1);
+      setBuyDms(false);
       toast({ title: _(msg`Seats purchased`) });
     },
   });
@@ -126,13 +150,17 @@ export default function OrgBillingPage() {
         {/* Purchase form */}
         {showBuy && (
           <div className="border-b border-border bg-muted/30 p-4">
-            <div className="flex items-end gap-3">
+            <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground">Plan Tier</label>
                 <select
                   className="mt-1 block h-8 rounded-md border border-border bg-background px-2 text-[13px]"
                   value={buyTier}
-                  onChange={(e) => setBuyTier(e.target.value)}
+                  onChange={(e) => {
+                    setBuyTier(e.target.value);
+                    // Enterprise always includes DMS
+                    if (e.target.value === 'ENTERPRISE') setBuyDms(true);
+                  }}
                 >
                   <option value="STARTER">Starter — $15/seat/mo (20 docs)</option>
                   <option value="PRO">Pro — $25/seat/mo (100 docs)</option>
@@ -150,12 +178,27 @@ export default function OrgBillingPage() {
                   onChange={(e) => setBuyQty(Number(e.target.value))}
                 />
               </div>
+              {buyTier !== 'ENTERPRISE' && (
+                <label className="flex items-center gap-1.5 text-[12px]">
+                  <input
+                    type="checkbox"
+                    checked={buyDms}
+                    onChange={(e) => setBuyDms(e.target.checked)}
+                    className="rounded"
+                  />
+                  <span className="font-medium text-muted-foreground">+ DMS Add-On ($15/seat/mo)</span>
+                </label>
+              )}
               <div className="text-[13px] font-medium text-muted-foreground">
-                = ${buyQty * (TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.price ?? 0)}/month
+                = ${buyQty * ((TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.price ?? 0) + (buyDms && buyTier !== 'ENTERPRISE' ? 15 : 0))}/month
               </div>
               <Button
                 size="sm"
-                onClick={() => void purchaseSeats.mutateAsync({ tier: buyTier as 'STARTER' | 'PRO' | 'ENTERPRISE', quantity: buyQty })}
+                onClick={() => void purchaseSeats.mutateAsync({
+                  tier: buyTier as 'STARTER' | 'PRO' | 'ENTERPRISE',
+                  quantity: buyQty,
+                  dmsEnabled: buyTier === 'ENTERPRISE' ? true : buyDms,
+                })}
                 loading={purchaseSeats.isPending}
               >
                 Purchase
@@ -240,25 +283,46 @@ export default function OrgBillingPage() {
                 )}
 
                 {isAdmin && (
-                  <select
-                    className="h-7 rounded-md border border-border bg-background px-2 text-[11px]"
-                    value={member.seatTier || ''}
-                    onChange={(e) => {
-                      const tier = e.target.value;
-                      if (tier) {
-                        void assignSeat.mutateAsync({
-                          memberId: member.id,
-                          tier: tier as 'STARTER' | 'PRO' | 'ENTERPRISE',
-                          dmsAddon: tier === 'ENTERPRISE',
-                        });
-                      }
-                    }}
-                  >
-                    <option value="">No seat</option>
-                    <option value="STARTER">Starter</option>
-                    <option value="PRO">Pro</option>
-                    <option value="ENTERPRISE">Enterprise</option>
-                  </select>
+                  <>
+                    <select
+                      className="h-7 rounded-md border border-border bg-background px-2 text-[11px]"
+                      value={member.seatTier || ''}
+                      onChange={(e) => {
+                        const tier = e.target.value;
+                        if (tier) {
+                          void assignSeat.mutateAsync({
+                            memberId: member.id,
+                            tier: tier as 'STARTER' | 'PRO' | 'ENTERPRISE',
+                            dmsAddon: tier === 'ENTERPRISE' ? true : member.dmsAddon,
+                          });
+                        }
+                      }}
+                    >
+                      <option value="">No seat</option>
+                      <option value="STARTER">Starter</option>
+                      <option value="PRO">Pro</option>
+                      <option value="PRO" disabled style={{ display: 'none' }}>Pro + DMS</option>
+                      <option value="ENTERPRISE">Enterprise (+ DMS)</option>
+                    </select>
+
+                    {member.seatTier && member.seatTier !== 'ENTERPRISE' && (
+                      <label className="flex items-center gap-1 text-[10px]">
+                        <input
+                          type="checkbox"
+                          checked={member.dmsAddon}
+                          onChange={(e) => {
+                            void assignSeat.mutateAsync({
+                              memberId: member.id,
+                              tier: member.seatTier as 'STARTER' | 'PRO' | 'ENTERPRISE',
+                              dmsAddon: e.target.checked,
+                            });
+                          }}
+                          className="rounded"
+                        />
+                        <span className="font-medium text-muted-foreground">DMS</span>
+                      </label>
+                    )}
+                  </>
                 )}
               </div>
             </div>

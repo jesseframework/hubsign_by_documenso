@@ -191,14 +191,14 @@ export default function OrgSettingsPage() {
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
-                  value={brandLoaded ? brandPrimary : (org.brandingPrimaryColor || '#7c5cfc')}
-                  onChange={(e) => { setBrandPrimary(e.target.value); setBrandLoaded(true); }}
+                  value={brandPrimary}
+                  onChange={(e) => { setBrandPrimary(e.target.value);}}
                   className="h-9 w-12 cursor-pointer rounded border border-border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
-                  value={brandLoaded ? brandPrimary : (org.brandingPrimaryColor || '#7c5cfc')}
-                  onChange={(e) => { setBrandPrimary(e.target.value); setBrandLoaded(true); }}
+                  value={brandPrimary}
+                  onChange={(e) => { setBrandPrimary(e.target.value);}}
                   placeholder="#7c5cfc"
                 />
               </div>
@@ -211,14 +211,14 @@ export default function OrgSettingsPage() {
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
-                  value={brandLoaded ? brandAccent : (org.brandingAccentColor || '#f59e0b')}
-                  onChange={(e) => { setBrandAccent(e.target.value); setBrandLoaded(true); }}
+                  value={brandAccent}
+                  onChange={(e) => { setBrandAccent(e.target.value);}}
                   className="h-9 w-12 cursor-pointer rounded border border-border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
-                  value={brandLoaded ? brandAccent : (org.brandingAccentColor || '#f59e0b')}
-                  onChange={(e) => { setBrandAccent(e.target.value); setBrandLoaded(true); }}
+                  value={brandAccent}
+                  onChange={(e) => { setBrandAccent(e.target.value);}}
                   placeholder="#f59e0b"
                 />
               </div>
@@ -233,14 +233,14 @@ export default function OrgSettingsPage() {
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
-                  value={brandLoaded ? brandSidebarBg : (org.brandingSidebarBg || '#0d0d10')}
-                  onChange={(e) => { setBrandSidebarBg(e.target.value); setBrandLoaded(true); }}
+                  value={brandSidebarBg}
+                  onChange={(e) => { setBrandSidebarBg(e.target.value);}}
                   className="h-9 w-12 cursor-pointer rounded border border-border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
-                  value={brandLoaded ? brandSidebarBg : (org.brandingSidebarBg || '#0d0d10')}
-                  onChange={(e) => { setBrandSidebarBg(e.target.value); setBrandLoaded(true); }}
+                  value={brandSidebarBg}
+                  onChange={(e) => { setBrandSidebarBg(e.target.value);}}
                   placeholder="#0d0d10"
                 />
               </div>
@@ -250,17 +250,39 @@ export default function OrgSettingsPage() {
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
-                  value={brandLoaded ? brandSidebarText : (org.brandingSidebarTextColor || '#f4f2ff')}
-                  onChange={(e) => { setBrandSidebarText(e.target.value); setBrandLoaded(true); }}
+                  value={brandSidebarText}
+                  onChange={(e) => { setBrandSidebarText(e.target.value);}}
                   className="h-9 w-12 cursor-pointer rounded border border-border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
-                  value={brandLoaded ? brandSidebarText : (org.brandingSidebarTextColor || '#f4f2ff')}
-                  onChange={(e) => { setBrandSidebarText(e.target.value); setBrandLoaded(true); }}
+                  value={brandSidebarText}
+                  onChange={(e) => { setBrandSidebarText(e.target.value);}}
                   placeholder="#f4f2ff"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Nav Active Color */}
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Nav Selected/Active Color</label>
+              <div className="mt-1.5 flex items-center gap-2">
+                <input
+                  type="color"
+                  value={brandNavActive}
+                  onChange={(e) => setBrandNavActive(e.target.value)}
+                  className="h-9 w-12 cursor-pointer rounded border border-border"
+                />
+                <Input
+                  className="h-9 flex-1 font-mono text-[13px]"
+                  value={brandNavActive}
+                  onChange={(e) => setBrandNavActive(e.target.value)}
+                  placeholder="#7c5cfc"
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">Color for the active/selected menu item in the sidebar</p>
             </div>
           </div>
 
@@ -271,14 +293,14 @@ export default function OrgSettingsPage() {
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
-                  value={brandLoaded ? brandButtonColor : (org.brandingButtonColor || '#7c5cfc')}
-                  onChange={(e) => { setBrandButtonColor(e.target.value); setBrandLoaded(true); }}
+                  value={brandButtonColor}
+                  onChange={(e) => { setBrandButtonColor(e.target.value);}}
                   className="h-9 w-12 cursor-pointer rounded border border-border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
-                  value={brandLoaded ? brandButtonColor : (org.brandingButtonColor || '#7c5cfc')}
-                  onChange={(e) => { setBrandButtonColor(e.target.value); setBrandLoaded(true); }}
+                  value={brandButtonColor}
+                  onChange={(e) => { setBrandButtonColor(e.target.value);}}
                   placeholder="#7c5cfc"
                 />
               </div>
@@ -288,14 +310,14 @@ export default function OrgSettingsPage() {
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
-                  value={brandLoaded ? brandButtonHover : (org.brandingButtonHoverColor || '#6a4af0')}
-                  onChange={(e) => { setBrandButtonHover(e.target.value); setBrandLoaded(true); }}
+                  value={brandButtonHover}
+                  onChange={(e) => { setBrandButtonHover(e.target.value);}}
                   className="h-9 w-12 cursor-pointer rounded border border-border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
-                  value={brandLoaded ? brandButtonHover : (org.brandingButtonHoverColor || '#6a4af0')}
-                  onChange={(e) => { setBrandButtonHover(e.target.value); setBrandLoaded(true); }}
+                  value={brandButtonHover}
+                  onChange={(e) => { setBrandButtonHover(e.target.value);}}
                   placeholder="#6a4af0"
                 />
               </div>
@@ -305,14 +327,14 @@ export default function OrgSettingsPage() {
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
-                  value={brandLoaded ? brandButtonText : (org.brandingButtonTextColor || '#ffffff')}
-                  onChange={(e) => { setBrandButtonText(e.target.value); setBrandLoaded(true); }}
+                  value={brandButtonText}
+                  onChange={(e) => { setBrandButtonText(e.target.value);}}
                   className="h-9 w-12 cursor-pointer rounded border border-border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
-                  value={brandLoaded ? brandButtonText : (org.brandingButtonTextColor || '#ffffff')}
-                  onChange={(e) => { setBrandButtonText(e.target.value); setBrandLoaded(true); }}
+                  value={brandButtonText}
+                  onChange={(e) => { setBrandButtonText(e.target.value);}}
                   placeholder="#ffffff"
                 />
               </div>
@@ -324,8 +346,8 @@ export default function OrgSettingsPage() {
             <label className="text-[12px] font-medium text-muted-foreground">Organization Logo URL</label>
             <Input
               className="mt-1.5 h-9 text-[13px]"
-              value={brandLoaded ? brandLogoUrl : (org.brandingLogo || '')}
-              onChange={(e) => { setBrandLogoUrl(e.target.value); setBrandLoaded(true); }}
+              value={brandLogoUrl}
+              onChange={(e) => { setBrandLogoUrl(e.target.value);}}
               placeholder="https://example.com/logo.png (or leave empty for default)"
             />
             <p className="mt-1 text-[11px] text-muted-foreground">PNG or SVG recommended. Will replace the HubSign logo in the sidebar.</p>
@@ -339,13 +361,13 @@ export default function OrgSettingsPage() {
               <div
                 className="flex w-[180px] flex-shrink-0 flex-col p-3"
                 style={{
-                  background: brandLoaded ? brandSidebarBg : (org.brandingSidebarBg || '#0d0d10'),
-                  color: brandLoaded ? brandSidebarText : (org.brandingSidebarTextColor || '#f4f2ff'),
+                  background: brandSidebarBg,
+                  color: brandSidebarText,
                 }}
               >
-                {(brandLoaded ? brandLogoUrl : org.brandingLogo) ? (
+                {brandLogoUrl ? (
                   <img
-                    src={brandLoaded ? brandLogoUrl : (org.brandingLogo || '')}
+                    src={brandLogoUrl}
                     alt="Logo"
                     className="mb-3 h-6 w-auto object-contain"
                     style={{ filter: 'brightness(0) invert(1)' }}
@@ -356,7 +378,7 @@ export default function OrgSettingsPage() {
                 <div className="space-y-1">
                   <div
                     className="rounded px-2 py-1 text-[11px] font-medium"
-                    style={{ background: `${brandLoaded ? brandPrimary : (org.brandingPrimaryColor || '#7c5cfc')}22`, color: brandLoaded ? brandPrimary : (org.brandingPrimaryColor || '#7c5cfc') }}
+                    style={{ background: `${brandPrimary}22`, color: brandPrimary }}
                   >
                     Documents
                   </div>
@@ -370,7 +392,7 @@ export default function OrgSettingsPage() {
                 <div className="flex items-center gap-3">
                   <div
                     className="flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-bold text-white"
-                    style={{ background: brandLoaded ? brandPrimary : (org.brandingPrimaryColor || '#7c5cfc') }}
+                    style={{ background: brandPrimary }}
                   >
                     {org.name[0]}
                   </div>
@@ -380,14 +402,14 @@ export default function OrgSettingsPage() {
                   <button
                     className="rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors"
                     style={{
-                      background: brandLoaded ? brandButtonColor : (org.brandingButtonColor || '#7c5cfc'),
-                      color: brandLoaded ? brandButtonText : (org.brandingButtonTextColor || '#ffffff'),
+                      background: brandButtonColor,
+                      color: brandButtonText,
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = brandLoaded ? brandButtonHover : (org.brandingButtonHoverColor || '#6a4af0');
+                      e.currentTarget.style.background = brandButtonHover;
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = brandLoaded ? brandButtonColor : (org.brandingButtonColor || '#7c5cfc');
+                      e.currentTarget.style.background = brandButtonColor;
                     }}
                   >
                     Button
@@ -395,8 +417,8 @@ export default function OrgSettingsPage() {
                   <button
                     className="rounded-md px-3 py-1.5 text-[11px] font-medium transition-colors"
                     style={{
-                      background: brandLoaded ? brandButtonHover : (org.brandingButtonHoverColor || '#6a4af0'),
-                      color: brandLoaded ? brandButtonText : (org.brandingButtonTextColor || '#ffffff'),
+                      background: brandButtonHover,
+                      color: brandButtonText,
                     }}
                   >
                     Hover State
@@ -413,6 +435,7 @@ export default function OrgSettingsPage() {
                 brandingAccentColor: brandAccent || null,
                 brandingSidebarBg: brandSidebarBg || null,
                 brandingSidebarTextColor: brandSidebarText || null,
+                brandingNavActiveColor: brandNavActive || null,
                 brandingButtonColor: brandButtonColor || null,
                 brandingButtonHoverColor: brandButtonHover || null,
                 brandingButtonTextColor: brandButtonText || null,
@@ -440,8 +463,8 @@ export default function OrgSettingsPage() {
                 <label className="text-[12px] font-medium text-muted-foreground">BMS ML API URL</label>
                 <Input
                   className="mt-1.5 h-9 font-mono text-[13px]"
-                  value={ocrLoaded ? ocrApiUrl : (org.ocrApiUrl || '')}
-                  onChange={(e) => { setOcrApiUrl(e.target.value); setOcrLoaded(true); }}
+                  value={ocrApiUrl}
+                  onChange={(e) => { setOcrApiUrl(e.target.value); }}
                   placeholder="http://bms-ml-server:8080/api/v1"
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground">The base URL of your BMS ML service</p>
@@ -451,8 +474,8 @@ export default function OrgSettingsPage() {
                 <Input
                   className="mt-1.5 h-9 font-mono text-[13px]"
                   type="password"
-                  value={ocrLoaded ? ocrApiKey : (org.ocrApiKey || '')}
-                  onChange={(e) => { setOcrApiKey(e.target.value); setOcrLoaded(true); }}
+                  value={ocrApiKey}
+                  onChange={(e) => { setOcrApiKey(e.target.value); }}
                   placeholder="sk-your-api-key"
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground">Authentication key for the BMS ML API</p>
@@ -464,8 +487,8 @@ export default function OrgSettingsPage() {
                 <label className="text-[12px] font-medium text-muted-foreground">Username (JWT auth)</label>
                 <Input
                   className="mt-1.5 h-9 text-[13px]"
-                  value={ocrLoaded ? ocrUsername : (org.ocrApiUsername || '')}
-                  onChange={(e) => { setOcrUsername(e.target.value); setOcrLoaded(true); }}
+                  value={ocrUsername}
+                  onChange={(e) => { setOcrUsername(e.target.value); }}
                   placeholder="admin"
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground">Leave empty if using API key</p>
@@ -475,8 +498,8 @@ export default function OrgSettingsPage() {
                 <Input
                   className="mt-1.5 h-9 text-[13px]"
                   type="password"
-                  value={ocrLoaded ? ocrPassword : (org.ocrApiPassword || '')}
-                  onChange={(e) => { setOcrPassword(e.target.value); setOcrLoaded(true); }}
+                  value={ocrPassword}
+                  onChange={(e) => { setOcrPassword(e.target.value); }}
                   placeholder="••••••"
                 />
                 <p className="mt-1 text-[11px] text-muted-foreground">Leave empty if using API key</p>
@@ -488,8 +511,8 @@ export default function OrgSettingsPage() {
                 <label className="text-[12px] font-medium text-muted-foreground">Default OCR Engine</label>
                 <select
                   className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-2 text-[13px]"
-                  value={ocrLoaded ? ocrEngine : (org.ocrDefaultEngine || 'auto')}
-                  onChange={(e) => { setOcrEngine(e.target.value); setOcrLoaded(true); }}
+                  value={ocrEngine}
+                  onChange={(e) => { setOcrEngine(e.target.value); }}
                 >
                   <option value="auto">Auto-detect (recommended)</option>
                   <option value="doctr">DocTR (deep learning)</option>
@@ -503,8 +526,8 @@ export default function OrgSettingsPage() {
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-border"
-                    checked={ocrLoaded ? ocrAutoProcess : (org.ocrAutoProcess || false)}
-                    onChange={(e) => { setOcrAutoProcess(e.target.checked); setOcrLoaded(true); }}
+                    checked={ocrAutoProcess}
+                    onChange={(e) => { setOcrAutoProcess(e.target.checked); }}
                   />
                   <span className="text-[13px] font-medium">Auto-process on upload</span>
                 </label>

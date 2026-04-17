@@ -1,7 +1,15 @@
+import { createElement } from 'react';
+
+import { msg } from '@lingui/core/macro';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
-import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
+import { IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
+import { getI18nInstance } from '@documenso/lib/client-only/providers/i18n-server';
+import { env } from '@documenso/lib/utils/env';
+import { renderEmailWithI18N } from '@documenso/lib/utils/render-email-with-i18n';
+import { mailer } from '@documenso/email/mailer';
+import { OrgMemberInviteEmailTemplate } from '@documenso/email/templates/org-member-invite';
 import { stripe } from '@documenso/lib/server-only/stripe';
 import { prisma } from '@documenso/prisma';
 
@@ -210,6 +218,50 @@ export const orgRouter = router({
         },
       });
 
+      // Send invite confirmation email to the new member
+      const org = await prisma.organization.findUniqueOrThrow({
+        where: { id: membership.organizationId },
+      });
+
+      const inviter = await prisma.user.findUniqueOrThrow({
+        where: { id: ctx.user.id },
+        select: { name: true, email: true },
+      });
+
+      const assetBaseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
+      const roleLabel = input.role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+      const emailTemplate = createElement(OrgMemberInviteEmailTemplate, {
+        assetBaseUrl,
+        baseUrl: assetBaseUrl,
+        inviterName: inviter.name || inviter.email,
+        orgName: org.name,
+        role: roleLabel,
+      });
+
+      const [html, text] = await Promise.all([
+        renderEmailWithI18N(emailTemplate),
+        renderEmailWithI18N(emailTemplate, { plainText: true }),
+      ]);
+
+      const i18n = await getI18nInstance();
+
+      await mailer.sendMail({
+        to: {
+          address: user.email,
+          name: user.name || '',
+        },
+        from: {
+          name: env('NEXT_PRIVATE_SMTP_FROM_NAME') || 'HubSign',
+          address: env('NEXT_PRIVATE_SMTP_FROM_ADDRESS') || 'noreply@hubsign.io',
+        },
+        subject: i18n._(msg`You've been added to ${org.name} on HubSign`),
+        html,
+        text,
+      }).catch((err) => {
+        console.error('[Org Invite] Failed to send invite email:', err);
+      });
+
       // Update org billing — add seat
       await createOrUpdateOrgSubscription(membership.organizationId).catch((err) => {
         console.error('[Org Billing] Failed to update seats after invite:', err);
@@ -393,6 +445,7 @@ export const orgRouter = router({
     .mutation(async ({ ctx, input }) => {
       const membership = await prisma.organizationMember.findFirst({
         where: { userId: ctx.user.id, role: 'ORG_ADMIN' },
+        include: { organization: { include: { members: true } } },
       });
 
       if (!membership) {
@@ -400,25 +453,117 @@ export const orgRouter = router({
       }
 
       const tierConfig = {
-        STARTER: { documentsPerMonth: 20, recipientsPerMonth: 50, directTemplates: 5, dmsEnabled: false },
-        PRO: { documentsPerMonth: 100, recipientsPerMonth: 500, directTemplates: 20, dmsEnabled: false },
-        ENTERPRISE: { documentsPerMonth: 999999, recipientsPerMonth: 999999, directTemplates: 999999, dmsEnabled: true },
+        STARTER: { documentsPerMonth: 20, recipientsPerMonth: 50, directTemplates: 5, dmsEnabled: false, price: 1500 },
+        PRO: { documentsPerMonth: 100, recipientsPerMonth: 500, directTemplates: 20, dmsEnabled: false, price: 2500 },
+        ENTERPRISE: { documentsPerMonth: 999999, recipientsPerMonth: 999999, directTemplates: 999999, dmsEnabled: true, price: 4500 },
       };
 
       const config = tierConfig[input.tier];
+      const dmsEnabled = input.dmsEnabled ?? config.dmsEnabled;
 
-      // Check if a plan of this tier already exists
+      // If billing is enabled, create a Stripe checkout session
+      if (IS_BILLING_ENABLED()) {
+        const org = membership.organization;
+        const customerId = await getOrCreateStripeCustomer(org, ctx.user.email);
+        const baseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
+
+        const lineItems: Array<{
+          price_data: {
+            currency: string;
+            product_data: { name: string; metadata: Record<string, string> };
+            unit_amount: number;
+            recurring: { interval: 'month' };
+          };
+          quantity: number;
+        }> = [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: `HubSign ${input.tier.charAt(0) + input.tier.slice(1).toLowerCase()} Seat`,
+                metadata: { type: 'org_seat', tier: input.tier },
+              },
+              unit_amount: config.price,
+              recurring: { interval: 'month' },
+            },
+            quantity: input.quantity,
+          },
+        ];
+
+        // Add DMS add-on line item if enabled
+        if (dmsEnabled && input.tier !== 'ENTERPRISE') {
+          lineItems.push({
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: 'Document Manager (DMS) Add-On',
+                metadata: { type: 'org_dms', tier: input.tier },
+              },
+              unit_amount: 1500, // $15/seat/mo
+              recurring: { interval: 'month' },
+            },
+            quantity: input.quantity,
+          });
+        }
+
+        const session = await stripe.checkout.sessions.create({
+          customer: customerId,
+          mode: 'subscription',
+          line_items: lineItems,
+          subscription_data: {
+            metadata: {
+              organizationId: org.id.toString(),
+              type: 'organization',
+              tier: input.tier,
+              quantity: input.quantity.toString(),
+              dmsEnabled: dmsEnabled.toString(),
+            },
+          },
+          success_url: `${baseUrl}/org/billing?success=true&tier=${input.tier}&qty=${input.quantity}`,
+          cancel_url: `${baseUrl}/org/billing?canceled=true`,
+        });
+
+        // Also create/update the seat plan record so it's tracked locally
+        const existing = await prisma.orgSeatPlan.findFirst({
+          where: { organizationId: membership.organizationId, tier: input.tier },
+        });
+
+        if (existing) {
+          await prisma.orgSeatPlan.update({
+            where: { id: existing.id },
+            data: {
+              quantity: existing.quantity + input.quantity,
+              dmsEnabled,
+            },
+          });
+        } else {
+          await prisma.orgSeatPlan.create({
+            data: {
+              tier: input.tier,
+              quantity: input.quantity,
+              organizationId: membership.organizationId,
+              documentsPerMonth: config.documentsPerMonth,
+              recipientsPerMonth: config.recipientsPerMonth,
+              directTemplates: config.directTemplates,
+              dmsEnabled,
+            },
+          });
+        }
+
+        return { url: session.url };
+      }
+
+      // Billing not enabled — just create the seat plan locally
       const existing = await prisma.orgSeatPlan.findFirst({
         where: { organizationId: membership.organizationId, tier: input.tier },
       });
 
       if (existing) {
-        // Add to existing quantity
         return prisma.orgSeatPlan.update({
           where: { id: existing.id },
           data: {
             quantity: existing.quantity + input.quantity,
-            dmsEnabled: input.dmsEnabled ?? config.dmsEnabled,
+            dmsEnabled,
           },
         });
       }
@@ -428,8 +573,10 @@ export const orgRouter = router({
           tier: input.tier,
           quantity: input.quantity,
           organizationId: membership.organizationId,
-          ...config,
-          dmsEnabled: input.dmsEnabled ?? config.dmsEnabled,
+          documentsPerMonth: config.documentsPerMonth,
+          recipientsPerMonth: config.recipientsPerMonth,
+          directTemplates: config.directTemplates,
+          dmsEnabled,
         },
       });
     }),

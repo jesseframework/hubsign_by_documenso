@@ -58,13 +58,14 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
   const sidebarTextColor = orgBrand?.brandingSidebarTextColor || undefined;
   const sidebarBg = orgBrand?.brandingSidebarBg || undefined;
   const primaryColor = orgBrand?.brandingPrimaryColor || undefined;
+  const navActiveColor = (orgBrand as Record<string, unknown> | undefined)?.brandingNavActiveColor as string || primaryColor || undefined;
 
   // Nav item style helper for org branding
   const navStyle = (active: boolean): React.CSSProperties | undefined => {
     if (!sidebarTextColor) return undefined;
     return {
-      color: active ? primaryColor || sidebarTextColor : `${sidebarTextColor}90`,
-      background: active ? `${primaryColor || sidebarTextColor}18` : 'transparent',
+      color: active ? navActiveColor || sidebarTextColor : `${sidebarTextColor}90`,
+      background: active ? `${navActiveColor || sidebarTextColor}18` : 'transparent',
     };
   };
 
