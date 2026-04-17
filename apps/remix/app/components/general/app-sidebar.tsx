@@ -273,6 +273,11 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
               <LogOutIcon className="h-4 w-4" />
             </button>
           </div>
+          <div className="mt-1 px-2.5 text-center">
+            <span className="text-[9px]" style={{ color: sidebarTextColor ? `${sidebarTextColor}40` : 'hsl(var(--sidebar-text))' }}>
+              v2.0.0
+            </span>
+          </div>
         </div>
       </aside>
     </>
