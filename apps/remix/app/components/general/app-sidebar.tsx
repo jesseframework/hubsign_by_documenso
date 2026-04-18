@@ -1,4 +1,3 @@
-// @ts-expect-error — importing version from package.json
 import { version as APP_VERSION } from '../../../../../package.json';
 
 import { Trans } from '@lingui/react/macro';
