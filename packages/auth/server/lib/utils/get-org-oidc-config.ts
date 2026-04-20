@@ -38,7 +38,10 @@ export const getOidcConfigForOrgSlug = async (
     clientSecret: org.oidcClientSecret,
     wellKnownUrl: org.oidcWellKnownUrl,
     redirectUrl: `${NEXT_PUBLIC_WEBAPP_URL()}/api/auth/callback/oidc?org=${encodeURIComponent(slug)}`,
-    bypassEmailVerification: false,
+    // Microsoft Entra ID, Google Workspace, and most enterprise IdPs don't
+    // include `email_verified` in the ID token. Since the org admin vouched
+    // for the IdP itself, treat its emails as verified.
+    bypassEmailVerification: true,
     organizationId: org.id,
   };
 };

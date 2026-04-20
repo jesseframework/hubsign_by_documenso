@@ -214,7 +214,14 @@ export const orgRouter = router({
       oidcEnabled: z.boolean().optional(),
       oidcClientId: z.string().nullable().optional(),
       oidcClientSecret: z.string().nullable().optional(),
-      oidcWellKnownUrl: z.string().url().nullable().optional(),
+      oidcWellKnownUrl: z
+        .string()
+        .url()
+        .refine((u) => u.startsWith('http://') || u.startsWith('https://'), {
+          message: 'Must be an http(s) URL.',
+        })
+        .nullable()
+        .optional(),
       oidcProviderLabel: z.string().max(80).nullable().optional(),
       disableSelfSignup: z.boolean().optional(),
       // Email-to-sign

@@ -54,6 +54,7 @@ export const auth = new Hono<HonoAuthContext>()
  */
 auth.onError((err, c) => {
   if (err instanceof HTTPException) {
+    console.error('[auth] HTTPException:', c.req.method, c.req.path, err.status, err.message);
     return c.json(
       {
         code: AppErrorCode.UNKNOWN_ERROR,
@@ -65,6 +66,7 @@ auth.onError((err, c) => {
   }
 
   if (err instanceof AppError) {
+    console.error('[auth] AppError:', c.req.method, c.req.path, err.code, err.message);
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
     const statusCode = (err.statusCode || 500) as ContentfulStatusCode;
 
@@ -78,7 +80,8 @@ auth.onError((err, c) => {
     );
   }
 
-  // Handle other errors
+  // Handle other errors — log fully so we can diagnose what blew up.
+  console.error('[auth] Unhandled error:', c.req.method, c.req.path, err);
   return c.json(
     {
       code: AppErrorCode.UNKNOWN_ERROR,

@@ -30,6 +30,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   let oidcProviderLabel = OIDC_PROVIDER_LABEL;
   let orgSsoSlug: string | null = null;
   let orgName: string | null = null;
+  // When true, hide email/password + signup link — SSO is the only way in.
+  let ssoOnly = false;
 
   // If `?org=<slug>` is present and that org has SSO configured, override
   // the global OIDC button with the org's button + label.
@@ -43,6 +45,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         oidcProviderLabel: true,
         oidcClientId: true,
         oidcWellKnownUrl: true,
+        disableSelfSignup: true,
       },
     });
     if (org?.oidcEnabled && org.oidcClientId && org.oidcWellKnownUrl) {
@@ -50,6 +53,9 @@ export async function loader({ request }: Route.LoaderArgs) {
       oidcProviderLabel = org.oidcProviderLabel || `Sign in with ${org.name}`;
       orgSsoSlug = org.slug;
       orgName = org.name;
+      // When the org has self-signup disabled, the org expects SSO to be the
+      // only way in — hide the email/password form and signup link.
+      ssoOnly = org.disableSelfSignup;
     }
   }
 
@@ -63,12 +69,19 @@ export async function loader({ request }: Route.LoaderArgs) {
     oidcProviderLabel,
     orgSsoSlug,
     orgName,
+    ssoOnly,
   };
 }
 
 export default function SignIn({ loaderData }: Route.ComponentProps) {
-  const { isGoogleSSOEnabled, isOIDCSSOEnabled, oidcProviderLabel, orgSsoSlug, orgName } =
-    loaderData;
+  const {
+    isGoogleSSOEnabled,
+    isOIDCSSOEnabled,
+    oidcProviderLabel,
+    orgSsoSlug,
+    orgName,
+    ssoOnly,
+  } = loaderData;
   const [searchParams] = useSearchParams();
 
   // Read email from query param (e.g. ?email=user@example.com)
@@ -122,9 +135,10 @@ export default function SignIn({ loaderData }: Route.ComponentProps) {
           isOIDCSSOEnabled={isOIDCSSOEnabled}
           oidcProviderLabel={oidcProviderLabel}
           orgSsoSlug={orgSsoSlug ?? undefined}
+          ssoOnly={ssoOnly}
         />
 
-        {env('NEXT_PUBLIC_DISABLE_SIGNUP') !== 'true' && (
+        {!ssoOnly && env('NEXT_PUBLIC_DISABLE_SIGNUP') !== 'true' && (
           <p className="text-muted-foreground mt-6 text-center text-[13px]">
             <Trans>
               Don't have an account?{' '}

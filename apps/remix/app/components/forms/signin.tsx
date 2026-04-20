@@ -74,6 +74,8 @@ export type SignInFormProps = {
   oidcProviderLabel?: string;
   /** When set, the OIDC button signs in via that org's per-org OIDC config. */
   orgSsoSlug?: string;
+  /** When true, hide the email/password form. SSO is the only way in. */
+  ssoOnly?: boolean;
   returnTo?: string;
 };
 
@@ -84,6 +86,7 @@ export const SignInForm = ({
   isOIDCSSOEnabled,
   oidcProviderLabel,
   orgSsoSlug,
+  ssoOnly,
   returnTo,
 }: SignInFormProps) => {
   const { _ } = useLingui();
@@ -313,61 +316,65 @@ export const SignInForm = ({
           className="flex w-full flex-col gap-y-4"
           disabled={isSubmitting || isPasskeyLoading}
         >
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  <Trans>Email</Trans>
-                </FormLabel>
+          {!ssoOnly && (
+            <>
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      <Trans>Email</Trans>
+                    </FormLabel>
 
-                <FormControl>
-                  <Input type="email" {...field} />
-                </FormControl>
+                    <FormControl>
+                      <Input type="email" {...field} />
+                    </FormControl>
 
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>
-                  <Trans>Password</Trans>
-                </FormLabel>
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      <Trans>Password</Trans>
+                    </FormLabel>
 
-                <FormControl>
-                  <PasswordInput {...field} />
-                </FormControl>
+                    <FormControl>
+                      <PasswordInput {...field} />
+                    </FormControl>
 
-                <FormMessage />
+                    <FormMessage />
 
-                <p className="mt-2 text-right">
-                  <Link
-                    to="/forgot-password"
-                    className="text-muted-foreground text-sm duration-200 hover:opacity-70"
-                  >
-                    <Trans>Forgot your password?</Trans>
-                  </Link>
-                </p>
-              </FormItem>
-            )}
-          />
+                    <p className="mt-2 text-right">
+                      <Link
+                        to="/forgot-password"
+                        className="text-muted-foreground text-sm duration-200 hover:opacity-70"
+                      >
+                        <Trans>Forgot your password?</Trans>
+                      </Link>
+                    </p>
+                  </FormItem>
+                )}
+              />
 
-          <Button
-            type="submit"
-            size="lg"
-            loading={isSubmitting}
-            className=""
-          >
-            {isSubmitting ? <Trans>Signing in...</Trans> : <Trans>Sign In</Trans>}
-          </Button>
+              <Button
+                type="submit"
+                size="lg"
+                loading={isSubmitting}
+                className=""
+              >
+                {isSubmitting ? <Trans>Signing in...</Trans> : <Trans>Sign In</Trans>}
+              </Button>
+            </>
+          )}
 
-          {(isGoogleSSOEnabled || isOIDCSSOEnabled) && (
+          {!ssoOnly && (isGoogleSSOEnabled || isOIDCSSOEnabled) && (
             <div className="relative flex items-center justify-center gap-x-4 py-2 text-xs uppercase">
               <div className="bg-border h-px flex-1" />
               <span className="text-muted-foreground bg-transparent">
