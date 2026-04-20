@@ -1,4 +1,5 @@
 ﻿#!/bin/bash
+set -e
 
 echo "🚀 Starting HubSign application..."
 
@@ -26,7 +27,10 @@ fi
 cd /app
 
 echo "🔄 Running Prisma migrations..."
-npx prisma migrate deploy --schema ./packages/prisma/schema.prisma
+if ! npx prisma migrate deploy --schema ./packages/prisma/schema.prisma; then
+    echo "❌ Prisma migrations FAILED — aborting startup so the bad state is visible." >&2
+    exit 1
+fi
 echo "✅ Prisma migrations completed"
 
 # Change to remix app directory
