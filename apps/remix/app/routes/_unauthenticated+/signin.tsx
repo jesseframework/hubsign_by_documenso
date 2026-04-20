@@ -44,6 +44,7 @@ export default function SignIn({ loaderData }: Route.ComponentProps) {
   // Read email from query param (e.g. ?email=user@example.com)
   // This is safe — it only pre-fills the input field, user still needs to enter password
   const prefillEmail = searchParams.get('email') ?? undefined;
+  const reason = searchParams.get('reason');
 
   return (
     <div className="w-full px-4">
@@ -51,6 +52,21 @@ export default function SignIn({ loaderData }: Route.ComponentProps) {
       <div className="mb-8 flex justify-center">
         <BrandingLogo className="h-10 w-auto" />
       </div>
+
+      {/* Session ended banner */}
+      {reason === 'session-ended' && (
+        <div className="mb-4 rounded-[var(--r)] border border-amber-300 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
+          <p className="font-medium">
+            <Trans>You've been signed out</Trans>
+          </p>
+          <p className="mt-0.5 text-[12px] text-amber-700">
+            <Trans>
+              Your session has ended. This can happen if your session expired or you signed in
+              from another device. Please sign in again to continue.
+            </Trans>
+          </p>
+        </div>
+      )}
 
       {/* Card */}
       <div className="rounded-[var(--r)] border border-border bg-card p-6 shadow-sm">

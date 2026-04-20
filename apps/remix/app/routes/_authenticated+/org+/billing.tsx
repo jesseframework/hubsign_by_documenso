@@ -24,9 +24,9 @@ export function meta() {
 }
 
 const TIER_CONFIG = {
-  STARTER: { name: 'Starter', price: 15, docs: 20, color: 'text-blue-600' },
-  PRO: { name: 'Pro', price: 25, docs: 100, color: 'text-purple-600' },
-  ENTERPRISE: { name: 'Enterprise', price: 45, docs: '∞', color: 'text-amber-600' },
+  STARTER: { name: 'Starter', price: 15, docs: 20, color: 'text-blue-600', minSeats: 2 },
+  PRO: { name: 'Pro', price: 25, docs: 100, color: 'text-purple-600', minSeats: 1 },
+  ENTERPRISE: { name: 'Enterprise', price: 45, docs: '∞', color: 'text-amber-600', minSeats: 5 },
 };
 
 export default function OrgBillingPage() {
@@ -157,22 +157,28 @@ export default function OrgBillingPage() {
                   className="mt-1 block h-8 rounded-md border border-border bg-background px-2 text-[13px]"
                   value={buyTier}
                   onChange={(e) => {
-                    setBuyTier(e.target.value);
+                    const newTier = e.target.value as keyof typeof TIER_CONFIG;
+                    setBuyTier(newTier);
                     // Enterprise always includes DMS
-                    if (e.target.value === 'ENTERPRISE') setBuyDms(true);
+                    if (newTier === 'ENTERPRISE') setBuyDms(true);
+                    // Enforce minimum seats for the selected tier
+                    const minSeats = TIER_CONFIG[newTier]?.minSeats ?? 1;
+                    if (buyQty < minSeats) setBuyQty(minSeats);
                   }}
                 >
-                  <option value="STARTER">Starter — $15/seat/mo (20 docs)</option>
-                  <option value="PRO">Pro — $25/seat/mo (100 docs)</option>
-                  <option value="ENTERPRISE">Enterprise — $45/seat/mo (unlimited + DMS)</option>
+                  <option value="STARTER">Starter — $15/seat/mo (20 docs, min 2 seats)</option>
+                  <option value="PRO">Pro — $25/seat/mo (100 docs, min 1 seat)</option>
+                  <option value="ENTERPRISE">Enterprise — $45/seat/mo (unlimited + DMS, min 5 seats)</option>
                 </select>
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">Quantity</label>
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  Quantity (min {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1})
+                </label>
                 <Input
                   className="mt-1 h-8 w-20 text-[13px]"
                   type="number"
-                  min={1}
+                  min={TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1}
                   max={100}
                   value={buyQty}
                   onChange={(e) => setBuyQty(Number(e.target.value))}
@@ -194,12 +200,17 @@ export default function OrgBillingPage() {
               </div>
               <Button
                 size="sm"
-                onClick={() => void purchaseSeats.mutateAsync({
-                  tier: buyTier as 'STARTER' | 'PRO' | 'ENTERPRISE',
-                  quantity: buyQty,
-                  dmsEnabled: buyTier === 'ENTERPRISE' ? true : buyDms,
-                })}
+                onClick={() => {
+                  const minSeats = TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1;
+                  const finalQty = Math.max(buyQty, minSeats);
+                  void purchaseSeats.mutateAsync({
+                    tier: buyTier as 'STARTER' | 'PRO' | 'ENTERPRISE',
+                    quantity: finalQty,
+                    dmsEnabled: buyTier === 'ENTERPRISE' ? true : buyDms,
+                  });
+                }}
                 loading={purchaseSeats.isPending}
+                disabled={buyQty < (TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1)}
               >
                 Purchase
               </Button>

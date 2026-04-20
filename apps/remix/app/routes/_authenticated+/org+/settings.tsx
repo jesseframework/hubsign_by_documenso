@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import { BuildingIcon, PlusIcon } from 'lucide-react';
+import { BuildingIcon, PencilIcon, PlusIcon } from 'lucide-react';
 
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
@@ -25,6 +25,9 @@ export default function OrgSettingsPage() {
 
   const [createName, setCreateName] = useState('');
   const [createSlug, setCreateSlug] = useState('');
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDomain, setEditDomain] = useState('');
   const [brandInitialized, setBrandInitialized] = useState(false);
   const [brandPrimary, setBrandPrimary] = useState('#7c5cfc');
   const [brandAccent, setBrandAccent] = useState('#f59e0b');
@@ -134,29 +137,102 @@ export default function OrgSettingsPage() {
   return (
     <div className="space-y-4">
       <div className="rounded-[var(--r)] border border-border bg-card p-5">
-        <h2 className="text-[15px] font-semibold"><Trans>Organization Details</Trans></h2>
-        <p className="mt-1 text-[13px] text-muted-foreground">
-          <Trans>Manage your organization settings.</Trans>
-        </p>
-
-        <div className="mt-4 grid grid-cols-2 gap-4">
+        <div className="flex items-center justify-between">
           <div>
-            <label className="text-[12px] font-medium text-muted-foreground">Name</label>
-            <p className="mt-0.5 text-[14px] font-medium">{org.name}</p>
+            <h2 className="text-[15px] font-semibold"><Trans>Organization Details</Trans></h2>
+            <p className="mt-1 text-[13px] text-muted-foreground">
+              <Trans>Manage your organization settings.</Trans>
+            </p>
           </div>
-          <div>
-            <label className="text-[12px] font-medium text-muted-foreground">Slug</label>
-            <p className="mt-0.5 font-mono text-[13px]">{org.slug}</p>
-          </div>
-          <div>
-            <label className="text-[12px] font-medium text-muted-foreground">Your Role</label>
-            <p className="mt-0.5 text-[13px] font-medium text-primary">{membership.role.replace(/_/g, ' ')}</p>
-          </div>
-          <div>
-            <label className="text-[12px] font-medium text-muted-foreground">Domain</label>
-            <p className="mt-0.5 text-[13px]">{org.domain || 'Not set'}</p>
-          </div>
+          {isAdmin && !editingDetails && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => {
+                setEditName(org.name);
+                setEditDomain(org.domain || '');
+                setEditingDetails(true);
+              }}
+            >
+              <PencilIcon className="h-3.5 w-3.5" />
+              Edit
+            </Button>
+          )}
         </div>
+
+        {editingDetails ? (
+          <div className="mt-4 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">Name</label>
+                <Input
+                  className="mt-1 h-9 text-[13px]"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Organization name"
+                />
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">Domain</label>
+                <Input
+                  className="mt-1 h-9 text-[13px]"
+                  value={editDomain}
+                  onChange={(e) => setEditDomain(e.target.value)}
+                  placeholder="e.g. acme.com"
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">Used for SSO and email domain matching</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">Slug</label>
+                <p className="mt-0.5 font-mono text-[13px] text-muted-foreground">{org.slug}</p>
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">Your Role</label>
+                <p className="mt-0.5 text-[13px] font-medium text-primary">{membership.role.replace(/_/g, ' ')}</p>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setEditingDetails(false)}>
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  void updateOrg.mutateAsync({
+                    name: editName || undefined,
+                    domain: editDomain || null,
+                  }).then(() => setEditingDetails(false));
+                }}
+                loading={updateOrg.isPending}
+                disabled={!editName.trim()}
+              >
+                Save Changes
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Name</label>
+              <p className="mt-0.5 text-[14px] font-medium">{org.name}</p>
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Slug</label>
+              <p className="mt-0.5 font-mono text-[13px]">{org.slug}</p>
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Your Role</label>
+              <p className="mt-0.5 text-[13px] font-medium text-primary">{membership.role.replace(/_/g, ' ')}</p>
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">Domain</label>
+              <p className="mt-0.5 text-[13px]">{org.domain || 'Not set'}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Stats */}

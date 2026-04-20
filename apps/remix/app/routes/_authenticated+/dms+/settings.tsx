@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import { PlusIcon, Trash2Icon } from 'lucide-react';
+import { CheckIcon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
 
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
@@ -11,6 +11,92 @@ import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { appMetaTags } from '~/utils/meta';
+
+type EditableChipProps = {
+  id: string;
+  label: string;
+  onSave: (id: string, name: string) => void;
+  onDelete: (id: string) => void;
+  variant?: 'default' | 'tag';
+  prefix?: string;
+};
+
+const EditableChip = ({ id, label, onSave, onDelete, variant = 'default', prefix = '' }: EditableChipProps) => {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(label);
+
+  const baseClass =
+    variant === 'tag'
+      ? 'inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[12px] font-medium text-primary'
+      : 'inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-[12px] font-medium';
+
+  if (editing) {
+    return (
+      <span className={`${baseClass} h-7`}>
+        <input
+          autoFocus
+          className="h-5 w-32 rounded border border-border bg-background px-1.5 text-[12px] outline-none focus:border-primary"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && value.trim()) {
+              onSave(id, value.trim());
+              setEditing(false);
+            }
+            if (e.key === 'Escape') {
+              setValue(label);
+              setEditing(false);
+            }
+          }}
+        />
+        <button
+          className="rounded p-0.5 hover:bg-primary/20"
+          onClick={() => {
+            if (value.trim()) {
+              onSave(id, value.trim());
+              setEditing(false);
+            }
+          }}
+          title="Save"
+        >
+          <CheckIcon className="h-3 w-3" />
+        </button>
+        <button
+          className="rounded p-0.5 hover:bg-muted-foreground/20"
+          onClick={() => {
+            setValue(label);
+            setEditing(false);
+          }}
+          title="Cancel"
+        >
+          <XIcon className="h-3 w-3" />
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <span className={`${baseClass} group`}>
+      {prefix}{label}
+      <button
+        className="ml-0.5 rounded p-0.5 opacity-0 transition-opacity hover:bg-primary/20 group-hover:opacity-100"
+        onClick={() => setEditing(true)}
+        title="Edit"
+      >
+        <PencilIcon className="h-3 w-3" />
+      </button>
+      <button
+        className="rounded p-0.5 opacity-0 transition-opacity hover:bg-red-500/20 hover:text-red-600 group-hover:opacity-100"
+        onClick={() => {
+          if (confirm(`Delete "${label}"?`)) onDelete(id);
+        }}
+        title="Delete"
+      >
+        <Trash2Icon className="h-3 w-3" />
+      </button>
+    </span>
+  );
+};
 
 export function meta() {
   return appMetaTags('DMS Settings');
@@ -92,6 +178,54 @@ export default function DmsSettingsPage() {
       setNewTagName('');
       toast({ title: _(msg`Tag created`) });
     },
+  });
+
+  const updateType = trpc.dms.updateDocumentType.useMutation({
+    onSuccess: () => {
+      void utils.dms.getDocumentTypes.invalidate();
+      toast({ title: _(msg`Document type updated`) });
+    },
+    onError: (err) => toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' }),
+  });
+
+  const deleteType = trpc.dms.deleteDocumentTypeById.useMutation({
+    onSuccess: () => {
+      void utils.dms.getDocumentTypes.invalidate();
+      toast({ title: _(msg`Document type deleted`) });
+    },
+    onError: (err) => toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' }),
+  });
+
+  const updateClassification = trpc.dms.updateClassification.useMutation({
+    onSuccess: () => {
+      void utils.dms.getClassifications.invalidate();
+      toast({ title: _(msg`Classification updated`) });
+    },
+    onError: (err) => toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' }),
+  });
+
+  const deleteClassification = trpc.dms.deleteClassification.useMutation({
+    onSuccess: () => {
+      void utils.dms.getClassifications.invalidate();
+      toast({ title: _(msg`Classification deleted`) });
+    },
+    onError: (err) => toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' }),
+  });
+
+  const updateTag = trpc.dms.updateTag.useMutation({
+    onSuccess: () => {
+      void utils.dms.getTags.invalidate();
+      toast({ title: _(msg`Tag updated`) });
+    },
+    onError: (err) => toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' }),
+  });
+
+  const deleteTag = trpc.dms.deleteTag.useMutation({
+    onSuccess: () => {
+      void utils.dms.getTags.invalidate();
+      toast({ title: _(msg`Tag deleted`) });
+    },
+    onError: (err) => toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' }),
   });
 
   return (
@@ -232,12 +366,13 @@ export default function DmsSettingsPage() {
 
         <div className="mt-3 flex flex-wrap gap-2">
           {types?.map((type) => (
-            <span
+            <EditableChip
               key={type.id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-[12px] font-medium"
-            >
-              {type.name}
-            </span>
+              id={type.id}
+              label={type.name}
+              onSave={(id, name) => updateType.mutate({ id, name })}
+              onDelete={(id) => deleteType.mutate({ id })}
+            />
           ))}
           {(!types || types.length === 0) && (
             <p className="text-[12px] text-muted-foreground">
@@ -275,17 +410,13 @@ export default function DmsSettingsPage() {
 
         <div className="mt-3 flex flex-wrap gap-2">
           {classifications?.map((cls) => (
-            <span
+            <EditableChip
               key={cls.id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-3 py-1 text-[12px] font-medium"
-            >
-              {cls.name}
-              {cls.children.length > 0 && (
-                <span className="text-[10px] text-muted-foreground">
-                  ({cls.children.length} sub)
-                </span>
-              )}
-            </span>
+              id={cls.id}
+              label={cls.name}
+              onSave={(id, name) => updateClassification.mutate({ id, name })}
+              onDelete={(id) => deleteClassification.mutate({ id })}
+            />
           ))}
           {(!classifications || classifications.length === 0) && (
             <p className="text-[12px] text-muted-foreground">
@@ -323,12 +454,15 @@ export default function DmsSettingsPage() {
 
         <div className="mt-3 flex flex-wrap gap-2">
           {tags?.map((tag) => (
-            <span
+            <EditableChip
               key={tag.id}
-              className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-[12px] font-medium text-primary"
-            >
-              #{tag.name}
-            </span>
+              id={tag.id}
+              label={tag.name}
+              prefix="#"
+              variant="tag"
+              onSave={(id, name) => updateTag.mutate({ id, name })}
+              onDelete={(id) => deleteTag.mutate({ id })}
+            />
           ))}
           {(!tags || tags.length === 0) && (
             <p className="text-[12px] text-muted-foreground">

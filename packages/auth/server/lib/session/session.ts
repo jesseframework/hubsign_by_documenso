@@ -51,6 +51,18 @@ export const createSession = async (
 ): Promise<Session> => {
   const hashedSessionId = encodeHexLowerCase(sha256(new TextEncoder().encode(token)));
 
+  // Single-session enforcement: organization members are limited to one active
+  // session at a time to ensure 1 license per user. Any prior sessions are
+  // invalidated so the new login takes over.
+  const orgMembership = await prisma.organizationMember.findFirst({
+    where: { userId },
+    select: { id: true },
+  });
+
+  if (orgMembership) {
+    await prisma.session.deleteMany({ where: { userId } });
+  }
+
   const session: Session = {
     id: hashedSessionId,
     sessionToken: hashedSessionId,

@@ -63,6 +63,23 @@ export const SessionProvider = ({ children, initialSession }: SessionProviderPro
     const newSession = await authClient.getSession();
 
     if (!newSession.isAuthenticated) {
+      // Session was lost mid-app (expired, signed out, or kicked out by single-session
+      // enforcement). Redirect to signin with a friendly reason instead of letting
+      // useSession() throw "Session not found" which crashes the React tree.
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        const isOnAuthPage =
+          path.startsWith('/signin') ||
+          path.startsWith('/signup') ||
+          path.startsWith('/forgot-password') ||
+          path.startsWith('/reset-password') ||
+          path.startsWith('/verify-email');
+
+        if (!isOnAuthPage) {
+          window.location.href = '/signin?reason=session-ended';
+          return;
+        }
+      }
       setSession(null);
       return;
     }

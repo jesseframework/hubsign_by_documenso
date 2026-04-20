@@ -97,7 +97,7 @@ export const BillingPlans = ({ prices }: BillingPlansProps) => {
 
                 <div className="text-muted-foreground mt-2 text-lg font-medium">
                   ${toHumanPrice(price.unit_amount ?? 0)} {price.currency.toUpperCase()}{' '}
-                  <span className="text-xs">per {interval}</span>
+                  <span className="text-xs">per user / {interval}</span>
                 </div>
 
                 <div className="text-muted-foreground mt-1.5 text-sm">

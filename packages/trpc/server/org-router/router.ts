@@ -453,13 +453,21 @@ export const orgRouter = router({
       }
 
       const tierConfig = {
-        STARTER: { documentsPerMonth: 20, recipientsPerMonth: 50, directTemplates: 5, dmsEnabled: false, price: 1500 },
-        PRO: { documentsPerMonth: 100, recipientsPerMonth: 500, directTemplates: 20, dmsEnabled: false, price: 2500 },
-        ENTERPRISE: { documentsPerMonth: 999999, recipientsPerMonth: 999999, directTemplates: 999999, dmsEnabled: true, price: 4500 },
+        STARTER: { documentsPerMonth: 20, recipientsPerMonth: 50, directTemplates: 5, dmsEnabled: false, price: 1500, minSeats: 2 },
+        PRO: { documentsPerMonth: 100, recipientsPerMonth: 500, directTemplates: 20, dmsEnabled: false, price: 2500, minSeats: 1 },
+        ENTERPRISE: { documentsPerMonth: 999999, recipientsPerMonth: 999999, directTemplates: 999999, dmsEnabled: true, price: 4500, minSeats: 5 },
       };
 
       const config = tierConfig[input.tier];
       const dmsEnabled = input.dmsEnabled ?? config.dmsEnabled;
+
+      // Enforce minimum seat count per tier (org-mode only)
+      if (input.quantity < config.minSeats) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `${input.tier} plan requires a minimum of ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}.`,
+        });
+      }
 
       // If billing is enabled, create a Stripe checkout session
       if (IS_BILLING_ENABLED()) {

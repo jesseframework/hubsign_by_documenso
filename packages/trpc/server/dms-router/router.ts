@@ -216,6 +216,21 @@ export const dmsRouter = router({
       return prisma.dmsDocumentType.delete({ where: { id: docType.id } });
     }),
 
+  updateDocumentType: authenticatedProcedure
+    .input(z.object({ id: z.string(), name: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      return prisma.dmsDocumentType.update({
+        where: { id: input.id },
+        data: { name: input.name },
+      });
+    }),
+
+  deleteDocumentTypeById: authenticatedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      return prisma.dmsDocumentType.delete({ where: { id: input.id } });
+    }),
+
   // ═══════════════════════════════════════════
   // CLASSIFICATIONS
   // ═══════════════════════════════════════════
@@ -234,6 +249,21 @@ export const dmsRouter = router({
       return prisma.dmsClassification.create({ data: input });
     }),
 
+  updateClassification: authenticatedProcedure
+    .input(z.object({ id: z.string(), name: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      return prisma.dmsClassification.update({
+        where: { id: input.id },
+        data: { name: input.name },
+      });
+    }),
+
+  deleteClassification: authenticatedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      return prisma.dmsClassification.delete({ where: { id: input.id } });
+    }),
+
   // ═══════════════════════════════════════════
   // TAGS
   // ═══════════════════════════════════════════
@@ -248,6 +278,21 @@ export const dmsRouter = router({
       return prisma.dmsTag.create({
         data: input,
       });
+    }),
+
+  updateTag: authenticatedProcedure
+    .input(z.object({ id: z.string(), name: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      return prisma.dmsTag.update({
+        where: { id: input.id },
+        data: { name: input.name },
+      });
+    }),
+
+  deleteTag: authenticatedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input }) => {
+      return prisma.dmsTag.delete({ where: { id: input.id } });
     }),
 
   // ═══════════════════════════════════════════
