@@ -8,8 +8,12 @@ import { IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/const
 import { getI18nInstance } from '@documenso/lib/client-only/providers/i18n-server';
 import { env } from '@documenso/lib/utils/env';
 import { renderEmailWithI18N } from '@documenso/lib/utils/render-email-with-i18n';
+import crypto from 'crypto';
+
 import { mailer } from '@documenso/email/mailer';
 import { OrgMemberInviteEmailTemplate } from '@documenso/email/templates/org-member-invite';
+import { OrgMemberWelcomeEmailTemplate } from '@documenso/email/templates/org-member-welcome';
+import { ONE_DAY } from '@documenso/lib/constants/time';
 import { stripe } from '@documenso/lib/server-only/stripe';
 import { prisma } from '@documenso/prisma';
 
@@ -115,6 +119,51 @@ export const orgRouter = router({
       return org;
     }),
 
+  /**
+   * Search members of the current user's organization by name or email.
+   * Used by the recipient autocomplete in the signer-add flow.
+   * Returns empty array if the user isn't in any organization.
+   */
+  searchMembers: authenticatedProcedure
+    .input(z.object({ query: z.string().max(200).optional() }))
+    .query(async ({ ctx, input }) => {
+      const myMembership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id },
+      });
+
+      if (!myMembership) return [];
+
+      const q = (input.query ?? '').trim();
+
+      const members = await prisma.organizationMember.findMany({
+        where: {
+          organizationId: myMembership.organizationId,
+          ...(q.length > 0
+            ? {
+                user: {
+                  OR: [
+                    { email: { contains: q, mode: 'insensitive' } },
+                    { name: { contains: q, mode: 'insensitive' } },
+                  ],
+                  disabled: false,
+                },
+              }
+            : { user: { disabled: false } }),
+        },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+        },
+        orderBy: { joinedAt: 'asc' },
+        take: 20,
+      });
+
+      return members.map((m) => ({
+        id: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+      }));
+    }),
+
   getMyOrganization: authenticatedProcedure.query(async ({ ctx }) => {
     const membership = await prisma.organizationMember.findFirst({
       where: { userId: ctx.user.id },
@@ -157,6 +206,19 @@ export const orgRouter = router({
       ocrAutoProcess: z.boolean().optional(),
       ocrDefaultEngine: z.string().nullable().optional(),
       defaultConfidentiality: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']).optional(),
+      allowedEmailDomains: z.array(z.string().min(1).max(253)).optional(),
+      signReminderEnabled: z.boolean().optional(),
+      signReminderDays: z.number().int().min(1).max(60).optional(),
+      signReminderMaxCount: z.number().int().min(1).max(10).optional(),
+      // SSO / OIDC
+      oidcEnabled: z.boolean().optional(),
+      oidcClientId: z.string().nullable().optional(),
+      oidcClientSecret: z.string().nullable().optional(),
+      oidcWellKnownUrl: z.string().url().nullable().optional(),
+      oidcProviderLabel: z.string().max(80).nullable().optional(),
+      disableSelfSignup: z.boolean().optional(),
+      // Email-to-sign
+      emailToSignEnabled: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const membership = await prisma.organizationMember.findFirst({
@@ -181,6 +243,10 @@ export const orgRouter = router({
     .input(z.object({
       email: z.string().email(),
       role: z.enum(['ORG_ADMIN', 'DMS_ADMIN', 'TEAM_ADMIN', 'MANAGER', 'MEMBER']),
+      // Optional — only used when the email doesn't match an existing user
+      // and we're auto-creating the account.
+      name: z.string().min(1).max(200).optional(),
+      welcomeMessage: z.string().max(2000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const membership = await prisma.organizationMember.findFirst({
@@ -191,11 +257,55 @@ export const orgRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Insufficient permissions to invite members' });
       }
 
-      // Find user by email
-      const user = await prisma.user.findUnique({ where: { email: input.email } });
+      // Load org early so we can validate the email domain BEFORE creating any user.
+      const org = await prisma.organization.findUniqueOrThrow({
+        where: { id: membership.organizationId },
+      });
 
+      const allowedDomains = org.allowedEmailDomains ?? [];
+      if (allowedDomains.length > 0) {
+        const emailDomain = input.email.split('@')[1]?.toLowerCase();
+        const ok = allowedDomains.some((d) => d.toLowerCase() === emailDomain);
+        if (!ok) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `This organization only accepts members with email domains: ${allowedDomains.join(', ')}`,
+          });
+        }
+      }
+
+      // Find user by email
+      let user = await prisma.user.findUnique({ where: { email: input.email } });
+      const isNewUser = !user;
+
+      // Auto-create the user if they don't exist. The admin never sets a
+      // password — we flag the user with `mustChangePassword=true` and send
+      // them a single-use set-password link via the password reset flow.
+      let setPasswordLink: string | null = null;
       if (!user) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found. They must have a HubSign account first.' });
+        user = await prisma.user.create({
+          data: {
+            email: input.email,
+            name: input.name || input.email.split('@')[0],
+            // Mark for forced password change on first login.
+            mustChangePassword: true,
+            // Pre-verify the email since the admin has vouched for it.
+            emailVerified: new Date(),
+          },
+        });
+
+        // Generate a single-use set-password token (24-hour expiry).
+        const token = crypto.randomBytes(18).toString('hex');
+        await prisma.passwordResetToken.create({
+          data: {
+            token,
+            expiry: new Date(Date.now() + ONE_DAY),
+            userId: user.id,
+          },
+        });
+
+        const base = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
+        setPasswordLink = `${base}/reset-password/${token}`;
       }
 
       // Check if already a member
@@ -218,11 +328,6 @@ export const orgRouter = router({
         },
       });
 
-      // Send invite confirmation email to the new member
-      const org = await prisma.organization.findUniqueOrThrow({
-        where: { id: membership.organizationId },
-      });
-
       const inviter = await prisma.user.findUniqueOrThrow({
         where: { id: ctx.user.id },
         select: { name: true, email: true },
@@ -231,13 +336,26 @@ export const orgRouter = router({
       const assetBaseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
       const roleLabel = input.role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
-      const emailTemplate = createElement(OrgMemberInviteEmailTemplate, {
-        assetBaseUrl,
-        baseUrl: assetBaseUrl,
-        inviterName: inviter.name || inviter.email,
-        orgName: org.name,
-        role: roleLabel,
-      });
+      // Choose template: welcome (with set-password link) for new users,
+      // or existing-user invite for users who already had an account.
+      const emailTemplate =
+        isNewUser && setPasswordLink
+          ? createElement(OrgMemberWelcomeEmailTemplate, {
+              assetBaseUrl,
+              baseUrl: assetBaseUrl,
+              inviterName: inviter.name || inviter.email,
+              orgName: org.name,
+              role: roleLabel,
+              welcomeMessage: input.welcomeMessage || '',
+              setPasswordLink,
+            })
+          : createElement(OrgMemberInviteEmailTemplate, {
+              assetBaseUrl,
+              baseUrl: assetBaseUrl,
+              inviterName: inviter.name || inviter.email,
+              orgName: org.name,
+              role: roleLabel,
+            });
 
       const [html, text] = await Promise.all([
         renderEmailWithI18N(emailTemplate),
@@ -255,7 +373,11 @@ export const orgRouter = router({
           name: env('NEXT_PRIVATE_SMTP_FROM_NAME') || 'HubSign',
           address: env('NEXT_PRIVATE_SMTP_FROM_ADDRESS') || 'noreply@hubsign.io',
         },
-        subject: i18n._(msg`You've been added to ${org.name} on HubSign`),
+        subject: i18n._(
+          isNewUser
+            ? msg`Welcome to ${org.name} on HubSign`
+            : msg`You've been added to ${org.name} on HubSign`,
+        ),
         html,
         text,
       }).catch((err) => {

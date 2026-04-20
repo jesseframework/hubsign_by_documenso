@@ -150,6 +150,26 @@ export const emailPasswordRoute = new Hono<HonoAuthContext>()
 
     const { name, email, password, signature, url, turnstileToken } = c.req.valid('json');
 
+    // Block self-signup if the email belongs to an org that has it disabled.
+    // We match against the org's allowedEmailDomains so we don't accidentally
+    // block unrelated emails when an org sets disableSelfSignup=true but
+    // hasn't restricted any domains.
+    const emailDomain = email.split('@')[1]?.toLowerCase();
+    if (emailDomain) {
+      const blockingOrg = await prisma.organization.findFirst({
+        where: {
+          disableSelfSignup: true,
+          allowedEmailDomains: { has: emailDomain },
+        },
+        select: { name: true },
+      });
+      if (blockingOrg) {
+        throw new AppError('SIGNUP_DISABLED', {
+          message: `Self-signup is disabled for ${blockingOrg.name}. Please ask an administrator to invite you, or sign in via SSO.`,
+        });
+      }
+    }
+
     // Verify Cloudflare Turnstile token if configured
     const turnstileSecret = env('NEXT_PRIVATE_TURNSTILE_SECRET_KEY');
     if (turnstileSecret) {

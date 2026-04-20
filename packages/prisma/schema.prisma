@@ -53,6 +53,13 @@ model User {
   avatarImageId    String?
   disabled         Boolean          @default(false)
 
+  // When an admin creates a user directly, this is true so the user is forced
+  // to set a password on first login.
+  mustChangePassword Boolean @default(false)
+
+  pushTokens         PushDeviceToken[]
+  pushNotifPrefs     PushNotificationPreference?
+
   accounts             Account[]
   sessions             Session[]
   documents            Document[]
@@ -529,6 +536,10 @@ model Recipient {
   fields               Field[]
   signatures           Signature[]
   fieldSignedPositions FieldSignedPosition[]
+
+  // Sign reminder tracking
+  remindersSent  Int       @default(0)
+  lastReminderAt DateTime?
 
   @@unique([documentId, email])
   @@unique([templateId, email])
@@ -1521,6 +1532,36 @@ model Organization {
   // Security: enforce single concurrent session per user (license/security)
   enforceSingleSession Boolean @default(false)
 
+  // Restrict membership to specific email domains (e.g. ["acme.com"]).
+  // Empty array = no restriction. Lowercase, no leading '@'.
+  allowedEmailDomains String[] @default([])
+
+  // Sign reminders — when enabled, periodically email recipients who haven't
+  // signed yet after `signReminderDays` days, up to `signReminderMaxCount` times.
+  signReminderEnabled  Boolean @default(false)
+  signReminderDays     Int     @default(3)
+  signReminderMaxCount Int     @default(3)
+
+  // Per-org OIDC / SSO configuration. When `oidcEnabled` is true and the
+  // signin page is accessed with `?org=<slug>`, the OIDC initiate flow uses
+  // these credentials instead of the global env-based config. Office 365
+  // and Google Workspace both speak OIDC so this works for any provider with
+  // a valid well-known discovery URL.
+  oidcEnabled         Boolean @default(false)
+  oidcClientId        String?
+  oidcClientSecret    String?
+  oidcWellKnownUrl    String?
+  oidcProviderLabel   String? // display name on the SSO button (e.g. "Sign in with Acme SSO")
+
+  // When true, users matching the org's allowedEmailDomains cannot self-signup
+  // via the public signup page; they must be invited or use SSO.
+  disableSelfSignup Boolean @default(false)
+
+  // Email-to-sign: when enabled, the org has a unique inbox alias that
+  // accepts inbound emails with PDF attachments and creates DRAFT documents.
+  // The inbox alias is `{slug}@inbox.<your-domain>` (configured externally).
+  emailToSignEnabled Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1695,3 +1736,36 @@ model DmsAiUsage {
 
   @@unique([userId, month])
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Firebase Cloud Messaging (FCM) push notifications
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PushDeviceToken {
+  id        String   @id @default(cuid())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // The FCM registration token issued to this device by the Firebase SDK.
+  token     String   @unique
+  // Optional context: "web", "ios", "android"
+  platform  String?
+  // Optional human-readable identifier (browser name, device model)
+  label     String?
+  createdAt DateTime @default(now())
+  lastUsedAt DateTime @default(now())
+  @@index([userId])
+}
+
+model PushNotificationPreference {
+  id     String @id @default(cuid())
+  userId Int    @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  documentSentToYou      Boolean @default(true)
+  documentSigned         Boolean @default(true)
+  documentCompleted      Boolean @default(true)
+  documentRejected       Boolean @default(true)
+  reminderReceived       Boolean @default(true)
+}
+

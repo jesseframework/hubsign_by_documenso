@@ -72,6 +72,8 @@ export type SignInFormProps = {
   isGoogleSSOEnabled?: boolean;
   isOIDCSSOEnabled?: boolean;
   oidcProviderLabel?: string;
+  /** When set, the OIDC button signs in via that org's per-org OIDC config. */
+  orgSsoSlug?: string;
   returnTo?: string;
 };
 
@@ -81,6 +83,7 @@ export const SignInForm = ({
   isGoogleSSOEnabled,
   isOIDCSSOEnabled,
   oidcProviderLabel,
+  orgSsoSlug,
   returnTo,
 }: SignInFormProps) => {
   const { _ } = useLingui();
@@ -275,6 +278,7 @@ export const SignInForm = ({
     try {
       await authClient.oidc.signIn({
         redirectPath,
+        orgSlug: orgSsoSlug,
       });
     } catch (err) {
       toast({

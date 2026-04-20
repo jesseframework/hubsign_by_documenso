@@ -39,6 +39,30 @@ export default function OrgSettingsPage() {
   const [brandButtonHover, setBrandButtonHover] = useState('#6a4af0');
   const [brandButtonText, setBrandButtonText] = useState('#ffffff');
 
+  // Email domain restriction
+  const [allowedDomains, setAllowedDomains] = useState<string[]>([]);
+  const [domainsInitialized, setDomainsInitialized] = useState(false);
+  const [newDomain, setNewDomain] = useState('');
+
+  // Sign reminders
+  const [reminderEnabled, setReminderEnabled] = useState(false);
+  const [reminderDays, setReminderDays] = useState(3);
+  const [reminderMaxCount, setReminderMaxCount] = useState(3);
+  const [remindersInitialized, setRemindersInitialized] = useState(false);
+
+  // SSO / OIDC
+  const [oidcEnabled, setOidcEnabled] = useState(false);
+  const [oidcClientId, setOidcClientId] = useState('');
+  const [oidcClientSecret, setOidcClientSecret] = useState('');
+  const [oidcWellKnownUrl, setOidcWellKnownUrl] = useState('');
+  const [oidcProviderLabel, setOidcProviderLabel] = useState('');
+  const [disableSelfSignup, setDisableSelfSignup] = useState(false);
+  const [ssoInitialized, setSsoInitialized] = useState(false);
+
+  // Email-to-sign
+  const [emailToSignEnabled, setEmailToSignEnabled] = useState(false);
+  const [emailToSignInitialized, setEmailToSignInitialized] = useState(false);
+
   // OCR settings
   const [ocrApiUrl, setOcrApiUrl] = useState('');
   const [ocrApiKey, setOcrApiKey] = useState('');
@@ -133,6 +157,55 @@ export default function OrgSettingsPage() {
     setBrandButtonText(org.brandingButtonTextColor || '#ffffff');
     setBrandInitialized(true);
   }
+
+  if (!domainsInitialized && org) {
+    setAllowedDomains(((org as Record<string, unknown>).allowedEmailDomains as string[]) ?? []);
+    setDomainsInitialized(true);
+  }
+
+  if (!remindersInitialized && org) {
+    const orgRec = org as Record<string, unknown>;
+    setReminderEnabled(Boolean(orgRec.signReminderEnabled));
+    setReminderDays(typeof orgRec.signReminderDays === 'number' ? orgRec.signReminderDays : 3);
+    setReminderMaxCount(typeof orgRec.signReminderMaxCount === 'number' ? orgRec.signReminderMaxCount : 3);
+    setRemindersInitialized(true);
+  }
+
+  if (!ssoInitialized && org) {
+    const orgRec = org as Record<string, unknown>;
+    setOidcEnabled(Boolean(orgRec.oidcEnabled));
+    setOidcClientId((orgRec.oidcClientId as string) ?? '');
+    setOidcClientSecret((orgRec.oidcClientSecret as string) ?? '');
+    setOidcWellKnownUrl((orgRec.oidcWellKnownUrl as string) ?? '');
+    setOidcProviderLabel((orgRec.oidcProviderLabel as string) ?? '');
+    setDisableSelfSignup(Boolean(orgRec.disableSelfSignup));
+    setSsoInitialized(true);
+  }
+
+  if (!emailToSignInitialized && org) {
+    setEmailToSignEnabled(Boolean((org as Record<string, unknown>).emailToSignEnabled));
+    setEmailToSignInitialized(true);
+  }
+
+  const addDomain = () => {
+    const cleaned = newDomain.trim().toLowerCase().replace(/^@/, '');
+    if (!cleaned) return;
+    if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i.test(cleaned)) {
+      toast({
+        title: _(msg`Invalid domain`),
+        description: _(msg`Use a valid format like "example.com"`),
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (allowedDomains.includes(cleaned)) return;
+    setAllowedDomains([...allowedDomains, cleaned]);
+    setNewDomain('');
+  };
+
+  const removeDomain = (d: string) => {
+    setAllowedDomains(allowedDomains.filter((x) => x !== d));
+  };
 
   return (
     <div className="space-y-4">
@@ -520,6 +593,347 @@ export default function OrgSettingsPage() {
               loading={updateOrg.isPending}
             >
               <Trans>Save Branding</Trans>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Email Domain Restriction */}
+      {isAdmin && (
+        <div className="rounded-[var(--r)] border border-border bg-card p-5">
+          <h2 className="text-[15px] font-semibold"><Trans>Email Domain Restriction</Trans></h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            <Trans>
+              Only users whose email matches one of these domains can be invited or self-join
+              this organization. Leave empty to allow any email.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex gap-2">
+            <Input
+              className="h-8 flex-1 text-[13px]"
+              placeholder="e.g. acme.com"
+              value={newDomain}
+              onChange={(e) => setNewDomain(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addDomain();
+                }
+              }}
+            />
+            <Button size="sm" onClick={addDomain} disabled={!newDomain.trim()}>
+              <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add
+            </Button>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {allowedDomains.length === 0 ? (
+              <p className="text-[12px] italic text-muted-foreground">
+                <Trans>No restriction — any email domain can be invited.</Trans>
+              </p>
+            ) : (
+              allowedDomains.map((d) => (
+                <span
+                  key={d}
+                  className="group inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-0.5 text-[12px] font-medium"
+                >
+                  @{d}
+                  <button
+                    type="button"
+                    className="ml-1 rounded p-0.5 opacity-0 transition-opacity hover:bg-red-500/20 hover:text-red-600 group-hover:opacity-100"
+                    onClick={() => removeDomain(d)}
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))
+            )}
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() => void updateOrg.mutateAsync({ allowedEmailDomains: allowedDomains })}
+              loading={updateOrg.isPending}
+            >
+              <Trans>Save Domain Restrictions</Trans>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Sign Reminders */}
+      {isAdmin && (
+        <div className="rounded-[var(--r)] border border-border bg-card p-5">
+          <h2 className="text-[15px] font-semibold"><Trans>Sign Reminders</Trans></h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            <Trans>
+              Automatically email recipients who haven't signed yet after the chosen number of
+              days. Reminders stop after the maximum count is reached.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+            <div className="flex-1 pr-4">
+              <label className="text-[13px] font-medium">
+                <Trans>Enable sign reminders</Trans>
+              </label>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                <Trans>
+                  Requires a scheduled cron to call <code>POST /api/cron/send-reminders</code>.
+                </Trans>
+              </p>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={reminderEnabled}
+                onChange={(e) => setReminderEnabled(e.target.checked)}
+              />
+              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+            </label>
+          </div>
+
+          {reminderEnabled && (
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>Reminder interval (days)</Trans>
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={60}
+                  className="mt-1 h-8 text-[13px]"
+                  value={reminderDays}
+                  onChange={(e) => setReminderDays(Math.max(1, Math.min(60, Number(e.target.value))))}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Send a reminder if the recipient still hasn't signed after this many days.
+                </p>
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>Max reminders per recipient</Trans>
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={10}
+                  className="mt-1 h-8 text-[13px]"
+                  value={reminderMaxCount}
+                  onChange={(e) => setReminderMaxCount(Math.max(1, Math.min(10, Number(e.target.value))))}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Stops sending reminders after this many.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() => void updateOrg.mutateAsync({
+                signReminderEnabled: reminderEnabled,
+                signReminderDays: reminderDays,
+                signReminderMaxCount: reminderMaxCount,
+              })}
+              loading={updateOrg.isPending}
+            >
+              <Trans>Save Reminder Settings</Trans>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* SSO / OIDC Configuration */}
+      {isAdmin && (
+        <div className="rounded-[var(--r)] border border-border bg-card p-5">
+          <h2 className="text-[15px] font-semibold"><Trans>Single Sign-On (SSO)</Trans></h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            <Trans>
+              Configure your own OpenID Connect provider — works with Office 365 / Azure AD,
+              Google Workspace, Okta, Auth0, or any OIDC-compliant identity provider. When
+              enabled, members sign in via{' '}
+              <code className="rounded bg-muted px-1">/signin?org={org.slug}</code>.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+            <div className="flex-1 pr-4">
+              <label className="text-[13px] font-medium">
+                <Trans>Enable SSO for this organization</Trans>
+              </label>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                <Trans>
+                  When on, the SSO button appears on{' '}
+                  <code className="rounded bg-muted px-1">/signin?org={org.slug}</code>. New
+                  members are auto-added to this org on first SSO sign-in.
+                </Trans>
+              </p>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={oidcEnabled}
+                onChange={(e) => setOidcEnabled(e.target.checked)}
+              />
+              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+            </label>
+          </div>
+
+          {oidcEnabled && (
+            <div className="mt-4 grid grid-cols-1 gap-3">
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>Provider Label</Trans>
+                </label>
+                <Input
+                  className="mt-1 h-9 text-[13px]"
+                  placeholder='Shown on the SSO button (e.g. "Sign in with Acme")'
+                  value={oidcProviderLabel}
+                  onChange={(e) => setOidcProviderLabel(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>Discovery / Well-Known URL</Trans>
+                </label>
+                <Input
+                  className="mt-1 h-9 font-mono text-[13px]"
+                  placeholder="https://login.microsoftonline.com/{tenant}/v2.0/.well-known/openid-configuration"
+                  value={oidcWellKnownUrl}
+                  onChange={(e) => setOidcWellKnownUrl(e.target.value)}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Office 365: <code>https://login.microsoftonline.com/{'{tenant-id}'}/v2.0/.well-known/openid-configuration</code>
+                  <br />
+                  Google Workspace: <code>https://accounts.google.com/.well-known/openid-configuration</code>
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Client ID</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 font-mono text-[13px]"
+                    value={oidcClientId}
+                    onChange={(e) => setOidcClientId(e.target.value)}
+                    autoComplete="off"
+                  />
+                </div>
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Client Secret</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 font-mono text-[13px]"
+                    type="password"
+                    value={oidcClientSecret}
+                    onChange={(e) => setOidcClientSecret(e.target.value)}
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                <Trans>
+                  Set the redirect URL on your provider to:{' '}
+                  <code className="rounded bg-muted px-1">
+                    {typeof window !== 'undefined' ? window.location.origin : 'https://app.hubsign.io'}
+                    /api/auth/callback/oidc?org={org.slug}
+                  </code>
+                </Trans>
+              </p>
+            </div>
+          )}
+
+          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+            <div className="flex-1 pr-4">
+              <label className="text-[13px] font-medium">
+                <Trans>Disable self-signup for this organization's domains</Trans>
+              </label>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                <Trans>
+                  Users with an email matching one of this org's allowed domains can't sign up
+                  themselves — they must be invited or use SSO. Set allowed domains above first.
+                </Trans>
+              </p>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={disableSelfSignup}
+                onChange={(e) => setDisableSelfSignup(e.target.checked)}
+              />
+              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+            </label>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() => void updateOrg.mutateAsync({
+                oidcEnabled,
+                oidcClientId: oidcClientId || null,
+                oidcClientSecret: oidcClientSecret || null,
+                oidcWellKnownUrl: oidcWellKnownUrl || null,
+                oidcProviderLabel: oidcProviderLabel || null,
+                disableSelfSignup,
+              })}
+              loading={updateOrg.isPending}
+            >
+              <Trans>Save SSO Settings</Trans>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Email-to-Sign Inbox */}
+      {isAdmin && (
+        <div className="rounded-[var(--r)] border border-border bg-card p-5">
+          <h2 className="text-[15px] font-semibold"><Trans>Email-to-Sign Inbox</Trans></h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            <Trans>
+              Forward a PDF to your org's inbox alias and HubSign creates a DRAFT signing
+              request automatically. The sender (you or any org member) then opens HubSign to
+              add recipients and send it out.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+            <div className="flex-1 pr-4">
+              <label className="text-[13px] font-medium">
+                <Trans>Enable email-to-sign for this org</Trans>
+              </label>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                <Trans>
+                  Inbox alias: <code className="rounded bg-muted px-1">{org.slug}@inbox.hubsign.io</code>
+                  &nbsp;(requires DNS + inbound provider config — see README).
+                </Trans>
+              </p>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={emailToSignEnabled}
+                onChange={(e) => setEmailToSignEnabled(e.target.checked)}
+              />
+              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+            </label>
+          </div>
+
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() => void updateOrg.mutateAsync({ emailToSignEnabled })}
+              loading={updateOrg.isPending}
+            >
+              <Trans>Save Inbox Settings</Trans>
             </Button>
           </div>
         </div>

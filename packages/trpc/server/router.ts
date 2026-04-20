@@ -8,6 +8,7 @@ import { embeddingPresignRouter } from './embedding-router/_router';
 import { fieldRouter } from './field-router/router';
 import { folderRouter } from './folder-router/router';
 import { profileRouter } from './profile-router/router';
+import { pushRouter } from './push-router/router';
 import { recipientRouter } from './recipient-router/router';
 import { shareLinkRouter } from './share-link-router/router';
 import { teamRouter } from './team-router/router';
@@ -31,6 +32,7 @@ export const appRouter = router({
   template: templateRouter,
   webhook: webhookRouter,
   embeddingPresign: embeddingPresignRouter,
+  push: pushRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -38,10 +38,14 @@ export const resetPassword = async ({ token, password, requestMetadata }: ResetP
     throw new AppError(AppErrorCode.EXPIRED_CODE);
   }
 
-  const isSamePassword = await compare(password, foundToken.user.password || '');
+  // Skip the "same password" check for users who have never set one (e.g.
+  // admin-created accounts where `password` is null until first set).
+  if (foundToken.user.password) {
+    const isSamePassword = await compare(password, foundToken.user.password);
 
-  if (isSamePassword) {
-    throw new AppError('SAME_PASSWORD');
+    if (isSamePassword) {
+      throw new AppError('SAME_PASSWORD');
+    }
   }
 
   const hashedPassword = await hash(password, SALT_ROUNDS);
@@ -53,6 +57,8 @@ export const resetPassword = async ({ token, password, requestMetadata }: ResetP
       },
       data: {
         password: hashedPassword,
+        // Clear the "must change password" flag now that they've set one.
+        mustChangePassword: false,
       },
     });
 

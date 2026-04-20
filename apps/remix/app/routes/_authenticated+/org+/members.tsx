@@ -32,13 +32,26 @@ export default function OrgMembersPage() {
   const { data: membership, isLoading } = trpc.org.getMyOrganization.useQuery();
 
   const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState<string>('MEMBER');
+  const [welcomeMessage, setWelcomeMessage] = useState('');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const invite = trpc.org.inviteMember.useMutation({
-    onSuccess: () => {
+    onSuccess: (result) => {
       void utils.org.getMyOrganization.invalidate();
       setInviteEmail('');
-      toast({ title: _(msg`Member invited`) });
+      setInviteName('');
+      setWelcomeMessage('');
+      setShowAdvanced(false);
+      // Result includes the new member — the backend decides whether to send
+      // a welcome (new user) or invite (existing user) email.
+      toast({
+        title: _(msg`Member invited`),
+        description: result?.user
+          ? _(msg`An email has been sent to ${result.user.email}.`)
+          : undefined,
+      });
     },
     onError: (err) => {
       toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' });
@@ -85,17 +98,29 @@ export default function OrgMembersPage() {
         </div>
       </div>
 
-      {/* Invite form */}
+      {/* Invite / Add member form */}
       {isAdmin && (
         <div className="rounded-[var(--r)] border border-border bg-card p-4">
-          <h3 className="text-[14px] font-semibold mb-3"><Trans>Invite Member</Trans></h3>
-          <div className="flex gap-2">
+          <h3 className="text-[14px] font-semibold mb-3"><Trans>Invite or Create Member</Trans></h3>
+          <p className="-mt-2 mb-3 text-[11px] text-muted-foreground">
+            <Trans>
+              If the email matches an existing HubSign user they'll just be added. Otherwise we'll
+              create the account and email them a secure link to set their password.
+            </Trans>
+          </p>
+          <div className="flex flex-wrap gap-2">
             <Input
-              className="h-8 flex-1 text-[13px]"
+              className="h-8 flex-1 min-w-[200px] text-[13px]"
               placeholder="Email address"
               type="email"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
+            />
+            <Input
+              className="h-8 flex-1 min-w-[160px] text-[13px]"
+              placeholder="Name (for new users)"
+              value={inviteName}
+              onChange={(e) => setInviteName(e.target.value)}
             />
             <select
               className="h-8 rounded-md border border-border bg-background px-2 text-[13px]"
@@ -110,13 +135,45 @@ export default function OrgMembersPage() {
             </select>
             <Button
               size="sm"
-              onClick={() => void invite.mutateAsync({ email: inviteEmail, role: inviteRole as never })}
+              onClick={() => void invite.mutateAsync({
+                email: inviteEmail,
+                role: inviteRole as never,
+                name: inviteName || undefined,
+                welcomeMessage: welcomeMessage || undefined,
+              })}
               disabled={!inviteEmail || invite.isPending}
             >
               <PlusIcon className="mr-1 h-3.5 w-3.5" />
               Invite
             </Button>
           </div>
+
+          <button
+            type="button"
+            className="mt-2 text-[11px] text-primary hover:underline"
+            onClick={() => setShowAdvanced((v) => !v)}
+          >
+            {showAdvanced ? '− Hide welcome message' : '+ Add welcome message (optional)'}
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-2">
+              <label className="text-[11px] font-medium text-muted-foreground">
+                <Trans>Welcome Message</Trans>
+              </label>
+              <textarea
+                className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                rows={3}
+                placeholder="Shown in the welcome email to newly created users."
+                value={welcomeMessage}
+                onChange={(e) => setWelcomeMessage(e.target.value)}
+                maxLength={2000}
+              />
+              <p className="mt-0.5 text-[10px] text-muted-foreground">
+                {welcomeMessage.length}/2000 · Only sent to users we're creating (not existing users)
+              </p>
+            </div>
+          )}
         </div>
       )}
 

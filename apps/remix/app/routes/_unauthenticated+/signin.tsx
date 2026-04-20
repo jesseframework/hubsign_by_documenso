@@ -8,6 +8,7 @@ import {
   OIDC_PROVIDER_LABEL,
 } from '@documenso/lib/constants/auth';
 import { env } from '@documenso/lib/utils/env';
+import { prisma } from '@documenso/prisma';
 
 import { BrandingLogo } from '~/components/general/branding-logo';
 import { SignInForm } from '~/components/forms/signin';
@@ -22,23 +23,52 @@ export function meta() {
 export async function loader({ request }: Route.LoaderArgs) {
   const { isAuthenticated } = await getOptionalSession(request);
 
-  const isGoogleSSOEnabled = IS_GOOGLE_SSO_ENABLED;
-  const isOIDCSSOEnabled = IS_OIDC_SSO_ENABLED;
-  const oidcProviderLabel = OIDC_PROVIDER_LABEL;
+  const url = new URL(request.url);
+  const orgSlug = url.searchParams.get('org');
+
+  let isOIDCSSOEnabled = IS_OIDC_SSO_ENABLED;
+  let oidcProviderLabel = OIDC_PROVIDER_LABEL;
+  let orgSsoSlug: string | null = null;
+  let orgName: string | null = null;
+
+  // If `?org=<slug>` is present and that org has SSO configured, override
+  // the global OIDC button with the org's button + label.
+  if (orgSlug) {
+    const org = await prisma.organization.findUnique({
+      where: { slug: orgSlug.toLowerCase() },
+      select: {
+        slug: true,
+        name: true,
+        oidcEnabled: true,
+        oidcProviderLabel: true,
+        oidcClientId: true,
+        oidcWellKnownUrl: true,
+      },
+    });
+    if (org?.oidcEnabled && org.oidcClientId && org.oidcWellKnownUrl) {
+      isOIDCSSOEnabled = true;
+      oidcProviderLabel = org.oidcProviderLabel || `Sign in with ${org.name}`;
+      orgSsoSlug = org.slug;
+      orgName = org.name;
+    }
+  }
 
   if (isAuthenticated) {
     throw redirect('/documents');
   }
 
   return {
-    isGoogleSSOEnabled,
+    isGoogleSSOEnabled: IS_GOOGLE_SSO_ENABLED,
     isOIDCSSOEnabled,
     oidcProviderLabel,
+    orgSsoSlug,
+    orgName,
   };
 }
 
 export default function SignIn({ loaderData }: Route.ComponentProps) {
-  const { isGoogleSSOEnabled, isOIDCSSOEnabled, oidcProviderLabel } = loaderData;
+  const { isGoogleSSOEnabled, isOIDCSSOEnabled, oidcProviderLabel, orgSsoSlug, orgName } =
+    loaderData;
   const [searchParams] = useSearchParams();
 
   // Read email from query param (e.g. ?email=user@example.com)
@@ -80,11 +110,18 @@ export default function SignIn({ loaderData }: Route.ComponentProps) {
 
         <hr className="-mx-6 my-4 border-border" />
 
+        {orgSsoSlug && orgName && (
+          <div className="mb-3 rounded-[var(--r)] border border-primary/30 bg-primary/5 px-3 py-2 text-[12px] text-primary">
+            <Trans>Signing in to <span className="font-semibold">{orgName}</span></Trans>
+          </div>
+        )}
+
         <SignInForm
           initialEmail={prefillEmail}
           isGoogleSSOEnabled={isGoogleSSOEnabled}
           isOIDCSSOEnabled={isOIDCSSOEnabled}
           oidcProviderLabel={oidcProviderLabel}
+          orgSsoSlug={orgSsoSlug ?? undefined}
         />
 
         {env('NEXT_PUBLIC_DISABLE_SIGNUP') !== 'true' && (

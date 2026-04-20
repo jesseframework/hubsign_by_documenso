@@ -24,6 +24,7 @@ export type SessionUser = Pick<
   | 'signature'
   | 'url'
   | 'customerId'
+  | 'mustChangePassword'
 >;
 
 export type SessionValidationResult =
@@ -113,6 +114,7 @@ export const validateSessionToken = async (token: string): Promise<SessionValida
           signature: true,
           url: true,
           customerId: true,
+          mustChangePassword: true,
         },
       },
     },
