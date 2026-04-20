@@ -232,11 +232,12 @@ export const PDFViewer = ({
           <PDFLoader />
         </div>
       ) : (
-        <div className={cn('overflow-x-auto', zoom > 1 && 'overflow-x-scroll')}>
+        <div className="h-[80vh] max-h-[60rem] overflow-auto">
           <PDFDocument
             file={documentBytes.buffer}
-            className={cn('w-full overflow-hidden rounded', {
-              'h-[80vh] max-h-[60rem]': numPages === 0,
+            className={cn('rounded', {
+              'h-full': numPages === 0,
+              'inline-block': numPages > 0,
             })}
             onLoadSuccess={(d) => onDocumentLoaded(d)}
             onSourceError={() => {
