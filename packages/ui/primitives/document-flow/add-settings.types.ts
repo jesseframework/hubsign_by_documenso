@@ -27,20 +27,25 @@ export const ZMapNegativeOneToUndefinedSchema = z
     return val;
   });
 
-export const ZAddSettingsFormSchema = z.object({
-  title: z
-    .string()
-    .trim()
-    .min(1, { message: msg`Title cannot be empty`.id }),
-  externalId: z.string().optional(),
-  visibility: z.nativeEnum(DocumentVisibility).optional(),
-  globalAccessAuth: ZMapNegativeOneToUndefinedSchema.pipe(
-    ZDocumentAccessAuthTypesSchema.optional(),
-  ),
-  globalActionAuth: ZMapNegativeOneToUndefinedSchema.pipe(
-    ZDocumentActionAuthTypesSchema.optional(),
-  ),
-  meta: z.object({
+export const ZAddSettingsFormSchema = z
+  .object({
+    title: z
+      .string()
+      .trim()
+      .min(1, { message: msg`Title cannot be empty`.id }),
+    externalId: z.string().optional(),
+    visibility: z.nativeEnum(DocumentVisibility).optional(),
+    globalAccessAuth: ZMapNegativeOneToUndefinedSchema.pipe(
+      ZDocumentAccessAuthTypesSchema.optional(),
+    ),
+    globalActionAuth: ZMapNegativeOneToUndefinedSchema.pipe(
+      ZDocumentActionAuthTypesSchema.optional(),
+    ),
+    // PDF lock
+    pdfLockEnabled: z.boolean().optional(),
+    pdfPassword: z.string().optional(),
+    pdfPasswordConfirm: z.string().optional(),
+    meta: z.object({
     timezone: ZDocumentMetaTimezoneSchema.optional().default(DEFAULT_DOCUMENT_TIME_ZONE),
     dateFormat: ZDocumentMetaDateFormatSchema.optional().default(DEFAULT_DOCUMENT_DATE_FORMAT),
     redirectUrl: z
@@ -57,7 +62,26 @@ export const ZAddSettingsFormSchema = z.object({
     signatureTypes: z.array(z.nativeEnum(DocumentSignatureType)).min(1, {
       message: msg`At least one signature type must be enabled`.id,
     }),
-  }),
-});
+    }),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.pdfLockEnabled) return;
+    const pwd = data.pdfPassword ?? '';
+    if (pwd.length < 4) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Password must be at least 4 characters.',
+        path: ['pdfPassword'],
+      });
+      return;
+    }
+    if (pwd !== (data.pdfPasswordConfirm ?? '')) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Passwords do not match.',
+        path: ['pdfPasswordConfirm'],
+      });
+    }
+  });
 
 export type TAddSettingsFormSchema = z.infer<typeof ZAddSettingsFormSchema>;

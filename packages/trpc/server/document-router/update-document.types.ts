@@ -45,6 +45,11 @@ export const ZUpdateDocumentRequestSchema = z.object({
       globalAccessAuth: ZDocumentAccessAuthTypesSchema.nullish(),
       globalActionAuth: ZDocumentActionAuthTypesSchema.nullish(),
       useLegacyFieldInsertion: z.boolean().optional(),
+      // PDF lock password. Tri-state:
+      //   undefined = leave unchanged
+      //   null      = clear the lock (no password)
+      //   string    = set/replace the password (held encrypted-at-rest until seal)
+      pdfPassword: z.string().min(4).max(128).nullish(),
     })
     .optional(),
   meta: z

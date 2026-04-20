@@ -326,7 +326,7 @@ export const documentRouter = router({
     .input(ZCreateDocumentRequestSchema)
     .mutation(async ({ input, ctx }) => {
       const { teamId } = ctx;
-      const { title, documentDataId, timezone, folderId } = input;
+      const { title, documentDataId, timezone, folderId, pdfPassword } = input;
 
       const { remaining } = await getServerLimits({ email: ctx.user.email, teamId });
 
@@ -346,6 +346,7 @@ export const documentRouter = router({
         timezone,
         requestMetadata: ctx.metadata,
         folderId,
+        pdfPassword,
       });
     }),
 

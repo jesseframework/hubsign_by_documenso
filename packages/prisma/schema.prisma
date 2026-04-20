@@ -394,6 +394,12 @@ model Document {
 
   useLegacyFieldInsertion Boolean @default(false)
 
+  // PDF lock: when set, the password (encrypted at rest with the app's secondary key)
+  // is applied to the final PDF on seal, then this field is cleared so the system
+  // no longer holds the password.
+  pdfPassword String?
+  pdfLocked   Boolean @default(false)
+
   documentData DocumentData @relation(fields: [documentDataId], references: [id], onDelete: Cascade)
   team         Team?        @relation(fields: [teamId], references: [id])
   template     Template?    @relation(fields: [templateId], references: [id], onDelete: SetNull)

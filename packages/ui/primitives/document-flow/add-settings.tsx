@@ -92,6 +92,8 @@ export const AddSettingsFormPartial = ({
     documentAuth: document.authOptions,
   });
 
+  const documentHasPdfPassword = Boolean((document as { pdfPassword?: string | null }).pdfPassword);
+
   const form = useForm<TAddSettingsFormSchema>({
     resolver: zodResolver(ZAddSettingsFormSchema),
     defaultValues: {
@@ -100,6 +102,10 @@ export const AddSettingsFormPartial = ({
       visibility: document.visibility || '',
       globalAccessAuth: documentAuthOption?.globalAccessAuth || undefined,
       globalActionAuth: documentAuthOption?.globalActionAuth || undefined,
+
+      pdfLockEnabled: documentHasPdfPassword,
+      pdfPassword: '',
+      pdfPasswordConfirm: '',
 
       meta: {
         timezone:
@@ -445,6 +451,103 @@ export const AddSettingsFormPartial = ({
                         </FormItem>
                       )}
                     />
+
+                    {/* PDF Lock */}
+                    <div className="rounded-md border border-border p-3">
+                      <FormField
+                        control={form.control}
+                        name="pdfLockEnabled"
+                        render={({ field }) => (
+                          <FormItem className="space-y-0">
+                            <FormLabel className="flex cursor-pointer items-center gap-2">
+                              <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-border"
+                                checked={!!field.value}
+                                onChange={(e) => {
+                                  field.onChange(e.target.checked);
+                                  if (!e.target.checked) {
+                                    form.setValue('pdfPassword', '');
+                                    form.setValue('pdfPasswordConfirm', '');
+                                  }
+                                }}
+                                disabled={documentHasBeenSent}
+                              />
+                              <Trans>Lock PDF with password</Trans>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <InfoIcon className="ml-1 h-4 w-4" />
+                                </TooltipTrigger>
+                                <TooltipContent className="text-muted-foreground max-w-xs">
+                                  <Trans>
+                                    Password is held briefly during signing and used to encrypt
+                                    the final signed PDF. The system discards it after sealing —
+                                    you must share it with recipients yourself.
+                                  </Trans>
+                                </TooltipContent>
+                              </Tooltip>
+                            </FormLabel>
+                          </FormItem>
+                        )}
+                      />
+
+                      {form.watch('pdfLockEnabled') && (
+                        <div className="mt-3 grid grid-cols-2 gap-3 border-t border-border pt-3">
+                          <FormField
+                            control={form.control}
+                            name="pdfPassword"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  <Trans>Password</Trans>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="password"
+                                    placeholder="At least 4 characters"
+                                    autoComplete="new-password"
+                                    className="bg-background"
+                                    disabled={documentHasBeenSent}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="pdfPasswordConfirm"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>
+                                  <Trans>Confirm</Trans>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="password"
+                                    placeholder="Re-enter password"
+                                    autoComplete="new-password"
+                                    className="bg-background"
+                                    disabled={documentHasBeenSent}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          {documentHasPdfPassword && (
+                            <p className="col-span-2 text-[11px] text-muted-foreground">
+                              <Trans>
+                                A password is already set. Enter a new one to replace it, or
+                                uncheck to remove the lock.
+                              </Trans>
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>

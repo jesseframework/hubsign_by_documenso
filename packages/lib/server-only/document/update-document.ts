@@ -3,6 +3,7 @@ import { DocumentStatus, TeamMemberRole } from '@prisma/client';
 import { match } from 'ts-pattern';
 
 import { isUserEnterprise } from '@documenso/ee/server-only/util/is-document-enterprise';
+import { encryptSecondaryData } from '@documenso/lib/server-only/crypto/encrypt';
 import { DOCUMENT_AUDIT_LOG_TYPE } from '@documenso/lib/types/document-audit-logs';
 import type { ApiRequestMetadata } from '@documenso/lib/universal/extract-request-metadata';
 import type { CreateDocumentAuditLogDataResponse } from '@documenso/lib/utils/document-audit-logs';
@@ -24,6 +25,7 @@ export type UpdateDocumentOptions = {
     globalAccessAuth?: TDocumentAccessAuthTypes | null;
     globalActionAuth?: TDocumentActionAuthTypes | null;
     useLegacyFieldInsertion?: boolean;
+    pdfPassword?: string | null;
   };
   requestMetadata: ApiRequestMetadata;
 };
@@ -238,8 +240,21 @@ export const updateDocument = async ({
   }
 
   // Early return if nothing is required.
-  if (auditLogs.length === 0 && data.useLegacyFieldInsertion === undefined) {
+  if (
+    auditLogs.length === 0 &&
+    data.useLegacyFieldInsertion === undefined &&
+    data.pdfPassword === undefined
+  ) {
     return document;
+  }
+
+  // PDF lock: changing the password is only allowed before the document is sealed.
+  // Once sealed and locked, the password is baked into the PDF and the system has
+  // no way to know it.
+  if (data.pdfPassword !== undefined && document.status !== DocumentStatus.DRAFT) {
+    throw new AppError(AppErrorCode.INVALID_BODY, {
+      message: 'PDF lock can only be changed while the document is in DRAFT status.',
+    });
   }
 
   return await prisma.$transaction(async (tx) => {
@@ -247,6 +262,14 @@ export const updateDocument = async ({
       globalAccessAuth: newGlobalAccessAuth,
       globalActionAuth: newGlobalActionAuth,
     });
+
+    // Encrypt the new password if one was provided. `null` clears the lock.
+    let pdfPasswordValue: string | null | undefined;
+    if (data.pdfPassword === null) {
+      pdfPasswordValue = null;
+    } else if (typeof data.pdfPassword === 'string' && data.pdfPassword.length > 0) {
+      pdfPasswordValue = encryptSecondaryData({ data: data.pdfPassword });
+    }
 
     const updatedDocument = await tx.document.update({
       where: {
@@ -258,6 +281,7 @@ export const updateDocument = async ({
         visibility: data.visibility as DocumentVisibility,
         useLegacyFieldInsertion: data.useLegacyFieldInsertion,
         authOptions,
+        ...(pdfPasswordValue !== undefined ? { pdfPassword: pdfPasswordValue } : {}),
       },
     });
 

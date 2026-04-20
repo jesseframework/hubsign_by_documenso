@@ -1,6 +1,7 @@
 FROM node:20-slim AS base
 
 # Update packages and install build tools
+# qpdf is required at runtime to lock signed PDFs with a user-set password.
 RUN apt-get update && apt-get install -y \
   build-essential \
   python3 \
@@ -8,7 +9,8 @@ RUN apt-get update && apt-get install -y \
   git \
   bash \
   ca-certificates \
-  curl && \
+  curl \
+  qpdf && \
   rm -rf /var/lib/apt/lists/*
 
 # Set environment for sharp

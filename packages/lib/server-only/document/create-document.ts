@@ -2,6 +2,7 @@ import { DocumentSource, WebhookTriggerEvents } from '@prisma/client';
 import type { DocumentVisibility, Team, TeamGlobalSettings } from '@prisma/client';
 import { TeamMemberRole } from '@prisma/client';
 
+import { encryptSecondaryData } from '@documenso/lib/server-only/crypto/encrypt';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import { normalizePdf as makeNormalizedPdf } from '@documenso/lib/server-only/pdf/normalize-pdf';
 import { DOCUMENT_AUDIT_LOG_TYPE } from '@documenso/lib/types/document-audit-logs';
@@ -30,6 +31,12 @@ export type CreateDocumentOptions = {
   timezone?: string;
   requestMetadata: ApiRequestMetadata;
   folderId?: string;
+  /**
+   * Password to apply as a PDF user-password lock when the document is sealed.
+   * Held encrypted-at-rest with the app's secondary key during signing, then
+   * cleared on seal so the system no longer holds it.
+   */
+  pdfPassword?: string;
 };
 
 export const createDocument = async ({
@@ -43,6 +50,7 @@ export const createDocument = async ({
   requestMetadata,
   timezone,
   folderId,
+  pdfPassword,
 }: CreateDocumentOptions) => {
   const user = await prisma.user.findFirstOrThrow({
     where: {
@@ -138,6 +146,11 @@ export const createDocument = async ({
   }
 
   return await prisma.$transaction(async (tx) => {
+    const encryptedPdfPassword =
+      pdfPassword && pdfPassword.length > 0
+        ? encryptSecondaryData({ data: pdfPassword })
+        : null;
+
     const document = await tx.document.create({
       data: {
         title,
@@ -155,6 +168,7 @@ export const createDocument = async ({
           ),
         formValues,
         source: DocumentSource.DOCUMENT,
+        pdfPassword: encryptedPdfPassword,
         documentMeta: {
           create: {
             language: team?.teamGlobalSettings?.documentLanguage,

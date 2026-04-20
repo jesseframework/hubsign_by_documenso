@@ -177,6 +177,14 @@ export const DocumentEditForm = ({
     try {
       const { timezone, dateFormat, redirectUrl, language, signatureTypes } = data.meta;
 
+      // PDF lock tri-state: undefined = unchanged, null = clear, string = set new password.
+      let pdfPassword: string | null | undefined = undefined;
+      if (data.pdfLockEnabled && data.pdfPassword && data.pdfPassword.length > 0) {
+        pdfPassword = data.pdfPassword;
+      } else if (data.pdfLockEnabled === false) {
+        pdfPassword = null;
+      }
+
       await updateDocument({
         documentId: document.id,
         data: {
@@ -185,6 +193,7 @@ export const DocumentEditForm = ({
           visibility: data.visibility,
           globalAccessAuth: data.globalAccessAuth ?? null,
           globalActionAuth: data.globalActionAuth ?? null,
+          ...(pdfPassword !== undefined ? { pdfPassword } : {}),
         },
         meta: {
           timezone,
