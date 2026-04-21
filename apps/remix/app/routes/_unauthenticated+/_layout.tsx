@@ -1,26 +1,19 @@
 import { Outlet } from 'react-router';
 
-import backgroundPattern from '@documenso/assets/images/background-pattern.png';
-
 export default function Layout() {
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 py-12 md:p-12 lg:p-24">
-      <div>
-        <div className="absolute -inset-[min(600px,max(400px,60vw))] -z-[1] flex items-center justify-center opacity-70">
-          <img
-            src={backgroundPattern}
-            alt="background pattern"
-            className="dark:brightness-95 dark:contrast-[70%] dark:invert dark:sepia"
-            style={{
-              mask: 'radial-gradient(rgba(255, 255, 255, 1) 0%, transparent 80%)',
-              WebkitMask: 'radial-gradient(rgba(255, 255, 255, 1) 0%, transparent 80%)',
-            }}
-          />
-        </div>
+    <main className="relative flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
+      {/* Subtle gradient background */}
+      <div
+        className="absolute inset-0 -z-10 opacity-40"
+        style={{
+          background:
+            'radial-gradient(ellipse at 50% 0%, hsla(254, 97%, 67%, 0.12) 0%, transparent 60%), radial-gradient(ellipse at 80% 100%, hsla(43, 96%, 52%, 0.08) 0%, transparent 50%)',
+        }}
+      />
 
-        <div className="relative w-full">
-          <Outlet />
-        </div>
+      <div className="relative w-full max-w-lg">
+        <Outlet />
       </div>
     </main>
   );

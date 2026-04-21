@@ -16,10 +16,26 @@ import { getOpenIdConfiguration } from './open-id';
 type HandleOAuthCallbackUrlOptions = {
   c: Context;
   clientOptions: OAuthClientOptions;
+  /**
+   * Optional hook called once we know which user just signed in successfully,
+   * before the redirect is returned. Use this for per-org auto-membership
+   * provisioning, audit logging tied to the SSO flow, etc.
+   * Errors from this hook are caught and logged — they do not fail the auth.
+   */
+  onAfterSignIn?: (userId: number) => Promise<void>;
 };
 
 export const handleOAuthCallbackUrl = async (options: HandleOAuthCallbackUrlOptions) => {
-  const { c, clientOptions } = options;
+  const { c, clientOptions, onAfterSignIn } = options;
+
+  const runHook = async (userId: number) => {
+    if (!onAfterSignIn) return;
+    try {
+      await onAfterSignIn(userId);
+    } catch (err) {
+      console.error('[oauth-callback] onAfterSignIn hook failed:', err);
+    }
+  };
 
   if (!clientOptions.clientId || !clientOptions.clientSecret) {
     throw new AppError(AppErrorCode.NOT_SETUP);
@@ -100,6 +116,7 @@ export const handleOAuthCallbackUrl = async (options: HandleOAuthCallbackUrlOpti
   // Directly log in user if account already exists.
   if (existingAccount) {
     await onAuthorize({ userId: existingAccount.user.id }, c);
+    await runHook(existingAccount.user.id);
 
     return c.redirect(redirectPath, 302);
   }
@@ -153,6 +170,7 @@ export const handleOAuthCallbackUrl = async (options: HandleOAuthCallbackUrlOpti
     });
 
     await onAuthorize({ userId: userWithSameEmail.id }, c);
+    await runHook(userWithSameEmail.id);
 
     return c.redirect(redirectPath, 302);
   }
@@ -190,6 +208,7 @@ export const handleOAuthCallbackUrl = async (options: HandleOAuthCallbackUrlOpti
   });
 
   await onAuthorize({ userId: createdUser.id }, c);
+  await runHook(createdUser.id);
 
   return c.redirect(redirectPath, 302);
 };

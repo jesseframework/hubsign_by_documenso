@@ -21,7 +21,6 @@ import { isDocumentCompleted } from '@documenso/lib/utils/document';
 import { env } from '@documenso/lib/utils/env';
 import DocumentDialog from '@documenso/ui/components/document/document-dialog';
 import { DocumentDownloadButton } from '@documenso/ui/components/document/document-download-button';
-import { DocumentShareButton } from '@documenso/ui/components/document/document-share-button';
 import { SigningCard3D } from '@documenso/ui/components/signing-card';
 import { cn } from '@documenso/ui/lib/utils';
 import { Badge } from '@documenso/ui/primitives/badge';
@@ -155,7 +154,7 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
 
           {match({ status: document.status, deletedAt: document.deletedAt })
             .with({ status: DocumentStatus.COMPLETED }, () => (
-              <div className="text-documenso-700 mt-4 flex items-center text-center">
+              <div className="text-primary mt-4 flex items-center text-center">
                 <CheckCircle2 className="mr-2 h-5 w-5" />
                 <span className="text-sm">
                   <Trans>Everyone has signed</Trans>
@@ -204,8 +203,6 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
             ))}
 
           <div className="mt-8 flex w-full max-w-sm items-center justify-center gap-4">
-            <DocumentShareButton documentId={document.id} token={recipient.token} />
-
             {isDocumentCompleted(document.status) ? (
               <DocumentDownloadButton
                 className="flex-1"
@@ -249,7 +246,7 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
           )}
 
           {user && (
-            <Link to="/documents" className="text-documenso-700 hover:text-documenso-600 mt-2">
+            <Link to="/documents" className="text-primary hover:text-primary/80 mt-2">
               <Trans>Go Back Home</Trans>
             </Link>
           )}

@@ -172,8 +172,13 @@ export class AuthClient {
   };
 
   public oidc = {
-    signIn: async ({ redirectPath }: { redirectPath?: string } = {}) => {
-      const response = await this.client['oauth'].authorize.oidc.$post({ json: { redirectPath } });
+    signIn: async ({
+      redirectPath,
+      orgSlug,
+    }: { redirectPath?: string; orgSlug?: string } = {}) => {
+      const response = await this.client['oauth'].authorize.oidc.$post({
+        json: { redirectPath, orgSlug },
+      });
       await this.handleError(response);
 
       const data = await response.json();

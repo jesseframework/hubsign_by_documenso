@@ -7,10 +7,12 @@ import { prisma } from '@documenso/prisma';
 import { signPdf } from '@documenso/signing';
 
 import { AppError, AppErrorCode } from '../../../errors/app-error';
+import { decryptSecondaryData } from '../../../server-only/crypto/decrypt';
 import { sendCompletedEmail } from '../../../server-only/document/send-completed-email';
 import PostHogServerClient from '../../../server-only/feature-flags/get-post-hog-server-client';
 import { getCertificatePdf } from '../../../server-only/htmltopdf/get-certificate-pdf';
 import { addRejectionStampToPdf } from '../../../server-only/pdf/add-rejection-stamp-to-pdf';
+import { encryptPdfWithPassword } from '../../../server-only/pdf/encrypt-pdf';
 import { flattenAnnotations } from '../../../server-only/pdf/flatten-annotations';
 import { flattenForm } from '../../../server-only/pdf/flatten-form';
 import { insertFieldInPDF } from '../../../server-only/pdf/insert-field-in-pdf';
@@ -192,18 +194,44 @@ export const run = async ({
     flattenForm(pdfDoc);
 
     const pdfBytes = await pdfDoc.save();
-    const pdfBuffer = await signPdf({ pdf: Buffer.from(pdfBytes) });
+    let pdfBuffer = await signPdf({ pdf: Buffer.from(pdfBytes) });
+
+    // Apply PDF user-password lock if the owner opted in. The password was
+    // held encrypted-at-rest on the document row during signing; decrypt it
+    // just for this operation. The cleanup transaction below clears the
+    // password from the row so the system no longer holds it.
+    let pdfWasLocked = false;
+    if (!isRejected && document.pdfPassword) {
+      try {
+        const decrypted = decryptSecondaryData(document.pdfPassword);
+        if (decrypted) {
+          pdfBuffer = await encryptPdfWithPassword(pdfBuffer, decrypted);
+          pdfWasLocked = true;
+        }
+      } catch (err) {
+        console.error('[seal-document.handler] Failed to apply PDF password lock:', err);
+        throw new Error(
+          'Failed to apply PDF password lock. The document was not sealed. ' +
+            (err instanceof Error ? err.message : String(err)),
+        );
+      }
+    }
 
     const { name } = path.parse(document.title);
 
     // Add suffix based on document status
     const suffix = isRejected ? '_rejected.pdf' : '_signed.pdf';
 
-    const documentData = await putPdfFileServerSide({
-      name: `${name}${suffix}`,
-      type: 'application/pdf',
-      arrayBuffer: async () => Promise.resolve(pdfBuffer),
-    });
+    const documentData = await putPdfFileServerSide(
+      {
+        name: `${name}${suffix}`,
+        type: 'application/pdf',
+        arrayBuffer: async () => Promise.resolve(pdfBuffer),
+      },
+      // Bypass the "no encrypted PDFs" validation since we just intentionally
+      // encrypted this one with the owner's chosen password.
+      { allowEncrypted: pdfWasLocked },
+    );
 
     return documentData.id;
   });
@@ -236,6 +264,11 @@ export const run = async ({
         data: {
           status: isRejected ? DocumentStatus.REJECTED : DocumentStatus.COMPLETED,
           completedAt: new Date(),
+          // If a PDF lock password was held during signing, clear it now so the
+          // system no longer holds it, and mark the PDF as locked.
+          ...(document.pdfPassword && !isRejected
+            ? { pdfPassword: null, pdfLocked: true }
+            : {}),
         },
       });
 

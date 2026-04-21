@@ -32,6 +32,7 @@ import { Checkbox } from '../checkbox';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../form/form';
 import { FormErrorMessage } from '../form/form-error-message';
 import { Input } from '../input';
+import { RecipientEmailAutocomplete } from '../recipient-email-autocomplete';
 import { useStep } from '../stepper';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../tooltip';
 import { useToast } from '../use-toast';
@@ -574,10 +575,16 @@ export const AddSignersFormPartial = ({
                                     )}
 
                                     <FormControl>
-                                      <Input
-                                        type="email"
+                                      <RecipientEmailAutocomplete
+                                        value={field.value ?? ''}
+                                        onChange={(v) => field.onChange(v)}
+                                        onSelectMember={(m) => {
+                                          // Auto-fill the matching name field on this row.
+                                          if (m.name) {
+                                            form.setValue(`signers.${index}.name`, m.name);
+                                          }
+                                        }}
                                         placeholder={_(msg`Email`)}
-                                        {...field}
                                         disabled={
                                           snapshot.isDragging ||
                                           isSubmitting ||

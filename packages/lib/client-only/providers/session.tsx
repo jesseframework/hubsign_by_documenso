@@ -63,6 +63,32 @@ export const SessionProvider = ({ children, initialSession }: SessionProviderPro
     const newSession = await authClient.getSession();
 
     if (!newSession.isAuthenticated) {
+      // Session was lost mid-app (expired, signed out, or kicked out by single-session
+      // enforcement). Redirect to signin with a friendly reason instead of letting
+      // useSession() throw "Session not found" which crashes the React tree.
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname;
+        // Pages where this redirect should NOT fire:
+        // - Auth pages (signin/signup/forgot/reset/verify) — already public
+        // - Recipient signing routes (/sign/...) — recipients aren't logged in
+        // - Public share routes (/share/...) — public access
+        // - Internal htmltopdf routes (/__htmltopdf/*) — server-side rendered
+        //   for cert/audit-log generation by Playwright with no session
+        const isPublicRoute =
+          path.startsWith('/signin') ||
+          path.startsWith('/signup') ||
+          path.startsWith('/forgot-password') ||
+          path.startsWith('/reset-password') ||
+          path.startsWith('/verify-email') ||
+          path.startsWith('/sign/') ||
+          path.startsWith('/share/') ||
+          path.startsWith('/__htmltopdf');
+
+        if (!isPublicRoute) {
+          window.location.href = '/signin?reason=session-ended';
+          return;
+        }
+      }
       setSession(null);
       return;
     }

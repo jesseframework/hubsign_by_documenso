@@ -30,59 +30,57 @@ export const FolderCard = ({
   onSettings,
   onDelete,
 }: FolderCardProps) => {
+  const docCount =
+    folder.type === FolderType.TEMPLATE ? folder._count.templates : folder._count.documents;
+  const docLabel = folder.type === FolderType.TEMPLATE ? 'templates' : 'docs';
+
   return (
     <div
       key={folder.id}
-      className="border-border hover:border-muted-foreground/40 group relative flex flex-col rounded-lg border p-4 transition-all hover:shadow-sm"
+      className="group flex min-w-[168px] cursor-pointer items-center gap-2.5 rounded-[var(--r)] border border-border bg-card p-3 transition-colors hover:border-primary/30"
     >
-      <div className="flex items-start justify-between">
-        <button
-          className="flex items-center space-x-2 text-left"
-          onClick={() => onNavigate(folder.id)}
-        >
-          <FolderIcon className="text-documenso h-6 w-6" />
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="font-medium">{folder.name}</h3>
-              {folder.pinned && <PinIcon className="text-documenso h-3 w-3" />}
-            </div>
-            <div className="mt-1 flex space-x-2 text-xs text-gray-500">
-              <span>
-                {formatFolderCount(
-                  folder.type === FolderType.TEMPLATE
-                    ? folder._count.templates
-                    : folder._count.documents,
-                  folder.type === FolderType.TEMPLATE ? 'template' : 'document',
-                  folder.type === FolderType.TEMPLATE ? 'templates' : 'documents',
-                )}
-              </span>
-              <span>•</span>
-              <span>{formatFolderCount(folder._count.subfolders, 'folder', 'folders')}</span>
-            </div>
+      <button
+        className="flex flex-1 items-center gap-2.5 text-left"
+        onClick={() => onNavigate(folder.id)}
+      >
+        <div className="flex h-[34px] w-[34px] flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <FolderIcon className="h-[18px] w-[18px] text-primary" />
+        </div>
+        <div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[13px] font-medium text-foreground">{folder.name}</span>
+            {folder.pinned && <PinIcon className="h-3 w-3 text-primary" />}
           </div>
-        </button>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">
+            {docCount} {docLabel}
+          </div>
+        </div>
+      </button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="opacity-0 group-hover:opacity-100">
-              •••
-            </Button>
-          </DropdownMenuTrigger>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-[22px] w-[22px] p-0 text-[13px] text-muted-foreground opacity-0 group-hover:opacity-100"
+          >
+            ···
+          </Button>
+        </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onMove(folder)}>Move</DropdownMenuItem>
-            {folder.pinned ? (
-              <DropdownMenuItem onClick={() => onUnpin(folder.id)}>Unpin</DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem onClick={() => onPin(folder.id)}>Pin</DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={() => onSettings(folder)}>Settings</DropdownMenuItem>
-            <DropdownMenuItem className="text-red-500" onClick={() => onDelete(folder)}>
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => onMove(folder)}>Move</DropdownMenuItem>
+          {folder.pinned ? (
+            <DropdownMenuItem onClick={() => onUnpin(folder.id)}>Unpin</DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={() => onPin(folder.id)}>Pin</DropdownMenuItem>
+          )}
+          <DropdownMenuItem onClick={() => onSettings(folder)}>Settings</DropdownMenuItem>
+          <DropdownMenuItem className="text-red-500" onClick={() => onDelete(folder)}>
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 };

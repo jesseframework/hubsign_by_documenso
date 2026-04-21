@@ -37,11 +37,13 @@ export default function Layout({ params }: Route.ComponentProps) {
           documents: 0,
           recipients: 0,
           directTemplates: 0,
+          dmsEnabled: false,
         },
         remaining: {
           documents: 0,
           recipients: 0,
           directTemplates: 0,
+          dmsEnabled: false,
         },
       };
     }

@@ -114,4 +114,27 @@ export const run = async ({
       text,
     });
   });
+
+  // Best-effort push to the document owner.
+  await io.runTask('send-push-notification', async () => {
+    try {
+      const { sendFcmNotificationToUser } = await import(
+        '../../../server-only/push-notifications/fcm-client'
+      );
+      const prefs = await prisma.pushNotificationPreference.findUnique({
+        where: { userId: owner.id },
+        select: { documentSigned: true },
+      });
+      if (prefs?.documentSigned === false) return;
+
+      await sendFcmNotificationToUser(owner.id, {
+        title: `${recipientReference} signed "${document.title}"`,
+        body: i18n._(msg`A recipient has signed your document.`),
+        link: `${NEXT_PUBLIC_WEBAPP_URL()}/documents/${document.id}`,
+        data: { documentId: String(document.id), recipientId: String(recipient.id) },
+      });
+    } catch (err) {
+      console.error('[send-recipient-signed-email] push failed (non-fatal):', err);
+    }
+  });
 };

@@ -31,7 +31,7 @@ export type TeamInviteEmailProps = {
 
 export const TeamInviteEmailTemplate = ({
   assetBaseUrl = 'http://localhost:3002',
-  baseUrl = 'https://documenso.com',
+  baseUrl = 'https://app.hubsign.io',
   senderName = 'John Doe',
   teamName = 'Team Name',
   teamUrl = 'demo',

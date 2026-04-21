@@ -15,6 +15,7 @@ import { APP_DOCUMENT_UPLOAD_SIZE_LIMIT, IS_BILLING_ENABLED } from '@documenso/l
 import { DEFAULT_DOCUMENT_TIME_ZONE, TIME_ZONES } from '@documenso/lib/constants/time-zones';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import { megabytesToBytes } from '@documenso/lib/universal/unit-convertions';
+import { mergePdfFiles } from '@documenso/lib/universal/pdf-merge';
 import { putPdfFile } from '@documenso/lib/universal/upload/put-file';
 import { formatDocumentsPath } from '@documenso/lib/utils/teams';
 import { trpc } from '@documenso/trpc/react';
@@ -51,7 +52,7 @@ export const DocumentDropZoneWrapper = ({ children, className }: DocumentDropZon
 
   const isUploadDisabled = remaining.documents === 0 || !user.emailVerified;
 
-  const onFileDrop = async (file: File) => {
+  const onFileDrop = async (files: File[]) => {
     if (isUploadDisabled && IS_BILLING_ENABLED()) {
       await navigate('/settings/billing');
       return;
@@ -59,6 +60,9 @@ export const DocumentDropZoneWrapper = ({ children, className }: DocumentDropZon
 
     try {
       setIsLoading(true);
+
+      // Merge multiple PDFs into one if needed
+      const file = files.length > 1 ? await mergePdfFiles(files) : files[0];
 
       const response = await putPdfFile(file);
 
@@ -124,11 +128,11 @@ export const DocumentDropZoneWrapper = ({ children, className }: DocumentDropZon
       'application/pdf': ['.pdf'],
     },
     //disabled: isUploadDisabled,
-    multiple: false,
+    multiple: true,
     maxSize: megabytesToBytes(APP_DOCUMENT_UPLOAD_SIZE_LIMIT),
-    onDrop: ([acceptedFile]) => {
-      if (acceptedFile) {
-        void onFileDrop(acceptedFile);
+    onDrop: (acceptedFiles) => {
+      if (acceptedFiles.length > 0) {
+        void onFileDrop(acceptedFiles);
       }
     },
     onDropRejected: () => {
@@ -151,7 +155,10 @@ export const DocumentDropZoneWrapper = ({ children, className }: DocumentDropZon
             </h2>
 
             <p className="text-muted-foreground text-md mt-4">
-              <Trans>Drag and drop your PDF file here</Trans>
+              <Trans>Drag and drop your PDF files here</Trans>
+            </p>
+            <p className="text-muted-foreground/60 mt-1 text-sm">
+              <Trans>Multiple files will be merged into one document</Trans>
             </p>
 
             {isUploadDisabled && IS_BILLING_ENABLED() && (
@@ -182,7 +189,7 @@ export const DocumentDropZoneWrapper = ({ children, className }: DocumentDropZon
           <div className="pointer-events-none flex h-1/2 w-full flex-col items-center justify-center">
             <Loader className="text-primary h-12 w-12 animate-spin" />
             <p className="text-foreground mt-8 font-medium">
-              <Trans>Uploading document...</Trans>
+              <Trans>Processing document...</Trans>
             </p>
           </div>
         </div>

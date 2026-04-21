@@ -16,6 +16,7 @@ import { authClient } from '@documenso/auth/client';
 import { useAnalytics } from '@documenso/lib/client-only/hooks/use-analytics';
 import { NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
+import { env } from '@documenso/lib/utils/env';
 import { ZPasswordSchema } from '@documenso/trpc/server/auth-router/schema';
 import { cn } from '@documenso/ui/lib/utils';
 import { Button } from '@documenso/ui/primitives/button';
@@ -31,6 +32,8 @@ import { Input } from '@documenso/ui/primitives/input';
 import { PasswordInput } from '@documenso/ui/primitives/password-input';
 import { SignaturePadDialog } from '@documenso/ui/primitives/signature-pad/signature-pad-dialog';
 import { useToast } from '@documenso/ui/primitives/use-toast';
+
+import { Turnstile } from '~/components/general/turnstile';
 
 type SignUpStep = 'BASIC_DETAILS' | 'CLAIM_USERNAME';
 
@@ -94,6 +97,7 @@ export const SignUpForm = ({
   const [searchParams] = useSearchParams();
 
   const [step, setStep] = useState<SignUpStep>('BASIC_DETAILS');
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const utmSrc = searchParams.get('utm_source') ?? null;
 
@@ -124,6 +128,7 @@ export const SignUpForm = ({
         password,
         signature,
         url,
+        turnstileToken: turnstileToken ?? undefined,
       });
 
       await navigate(`/unverified-account`);
@@ -165,7 +170,29 @@ export const SignUpForm = ({
     const valid = await form.trigger(['name', 'email', 'password', 'signature']);
 
     if (valid) {
-      setStep('CLAIM_USERNAME');
+      // Check Turnstile verification
+      const siteKey = typeof window !== 'undefined' ? window.__ENV__?.NEXT_PUBLIC_TURNSTILE_SITE_KEY : undefined;
+      if (siteKey && !turnstileToken) {
+        toast({
+          title: _(msg`Verification required`),
+          description: _(msg`Please complete the security verification before signing up.`),
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Auto-generate username from name and submit directly
+      const nameValue = form.getValues('name');
+      const autoUrl = nameValue
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        || `user-${Date.now().toString(36)}`;
+
+      form.setValue('url', autoUrl);
+
+      // Submit the form directly, skipping the claim username step
+      await form.handleSubmit(onFormSubmit)();
     }
   };
 
@@ -250,7 +277,7 @@ export const SignUpForm = ({
         </div>
       </div> */}
 
-      <div className="border-border dark:bg-background relative z-10 flex min-h-[min(850px,80vh)] w-full max-w-lg flex-col rounded-xl border bg-neutral-100 p-6">
+      <div className="relative z-10 flex w-full max-w-lg flex-col rounded-[var(--r)] border border-border bg-card p-6 shadow-sm">
         {step === 'BASIC_DETAILS' && (
           <div className="h-20">
             <h1 className="text-xl font-semibold md:text-2xl">
@@ -414,7 +441,7 @@ export const SignUpForm = ({
                 <p className="text-muted-foreground mt-4 text-sm">
                   <Trans>
                     Already have an account?{' '}
-                    <Link to="/signin" className="text-documenso-700 duration-200 hover:opacity-70">
+                    <Link to="/signin" className="text-primary duration-200 hover:opacity-70">
                       Sign in instead
                     </Link>
                   </Trans>
@@ -422,107 +449,24 @@ export const SignUpForm = ({
               </fieldset>
             )}
 
-            {step === 'CLAIM_USERNAME' && (
-              <fieldset
-                className={cn(
-                  'flex h-[550px] w-full flex-col gap-y-4',
-                  isGoogleSSOEnabled && 'h-[650px]',
-                )}
-                disabled={isSubmitting}
-              >
-                <FormField
-                  control={form.control}
-                  name="url"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>
-                        <Trans>Public profile username</Trans>
-                      </FormLabel>
+            {/* Turnstile verification */}
+            <Turnstile
+              onVerify={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
+            />
 
-                      <FormControl>
-                        <Input type="text" className="mb-2 mt-2 lowercase" {...field} />
-                      </FormControl>
-
-                      <FormMessage />
-
-                      <div className="bg-muted/50 border-border text-muted-foreground mt-2 inline-block max-w-[16rem] truncate rounded-md border px-2 py-1 text-sm lowercase">
-                        {baseUrl.host}/u/{field.value || '<username>'}
-                      </div>
-                    </FormItem>
-                  )}
-                />
-              </fieldset>
-            )}
-
-            <div className="mt-6">
-              {step === 'BASIC_DETAILS' && (
-                <p className="text-muted-foreground text-sm">
-                  <span className="font-medium">
-                    <Trans>Basic details</Trans>
-                  </span>{' '}
-                  1/2
-                </p>
-              )}
-
-              {step === 'CLAIM_USERNAME' && (
-                <p className="text-muted-foreground text-sm">
-                  <span className="font-medium">
-                    <Trans>Claim username</Trans>
-                  </span>{' '}
-                  2/2
-                </p>
-              )}
-
-              <div className="bg-foreground/40 relative mt-4 h-1.5 rounded-full">
-                <motion.div
-                  layout="size"
-                  layoutId="document-flow-container-step"
-                  className="bg-documenso absolute inset-y-0 left-0 rounded-full"
-                  style={{
-                    width: step === 'BASIC_DETAILS' ? '50%' : '100%',
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-x-4">
-              {/* Go back button, disabled if step is basic details */}
+            <div className="mt-4">
               <Button
                 type="button"
                 size="lg"
-                variant="secondary"
-                className="flex-1"
-                disabled={step === 'BASIC_DETAILS' || form.formState.isSubmitting}
-                onClick={() => setStep('BASIC_DETAILS')}
+                className="w-full"
+                disabled={!!env('NEXT_PUBLIC_TURNSTILE_SITE_KEY') && !turnstileToken}
+                loading={form.formState.isSubmitting}
+                onClick={onNextClick}
               >
-                <Trans>Back</Trans>
+                <Trans>Create Account</Trans>
               </Button>
-
-              {/* Continue button */}
-              {step === 'BASIC_DETAILS' && (
-                <Button
-                  type="button"
-                  size="lg"
-                  className="flex-1 disabled:cursor-not-allowed"
-                  loading={form.formState.isSubmitting}
-                  onClick={onNextClick}
-                >
-                  <Trans>Next</Trans>
-                </Button>
-              )}
-
-              {/* Sign up button */}
-              {step === 'CLAIM_USERNAME' && (
-                <Button
-                  loading={form.formState.isSubmitting}
-                  disabled={!form.formState.isValid}
-                  type="submit"
-                  size="lg"
-                  className="flex-1"
-                >
-                  <Trans>Complete</Trans>
-                </Button>
-              )}
             </div>
           </form>
         </Form>
@@ -530,17 +474,17 @@ export const SignUpForm = ({
           <Trans>
             By proceeding, you agree to our{' '}
             <Link
-              to="https://documen.so/terms"
+              to="https://fepro.io/hubsign/tos"
               target="_blank"
-              className="text-documenso-700 duration-200 hover:opacity-70"
+              className="text-primary duration-200 hover:opacity-70"
             >
               Terms of Service
             </Link>{' '}
             and{' '}
             <Link
-              to="https://documen.so/privacy"
+              to="https://fepro.io/hubsign/pp"
               target="_blank"
-              className="text-documenso-700 duration-200 hover:opacity-70"
+              className="text-primary duration-200 hover:opacity-70"
             >
               Privacy Policy
             </Link>

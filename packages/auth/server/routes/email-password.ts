@@ -148,7 +148,54 @@ export const emailPasswordRoute = new Hono<HonoAuthContext>()
       });
     }
 
-    const { name, email, password, signature, url } = c.req.valid('json');
+    const { name, email, password, signature, url, turnstileToken } = c.req.valid('json');
+
+    // Block self-signup if the email belongs to an org that has it disabled.
+    // We match against the org's allowedEmailDomains so we don't accidentally
+    // block unrelated emails when an org sets disableSelfSignup=true but
+    // hasn't restricted any domains.
+    const emailDomain = email.split('@')[1]?.toLowerCase();
+    if (emailDomain) {
+      const blockingOrg = await prisma.organization.findFirst({
+        where: {
+          disableSelfSignup: true,
+          allowedEmailDomains: { has: emailDomain },
+        },
+        select: { name: true },
+      });
+      if (blockingOrg) {
+        throw new AppError('SIGNUP_DISABLED', {
+          message: `Self-signup is disabled for ${blockingOrg.name}. Please ask an administrator to invite you, or sign in via SSO.`,
+        });
+      }
+    }
+
+    // Verify Cloudflare Turnstile token if configured
+    const turnstileSecret = env('NEXT_PRIVATE_TURNSTILE_SECRET_KEY');
+    if (turnstileSecret) {
+      if (!turnstileToken) {
+        throw new AppError('TURNSTILE_REQUIRED', {
+          message: 'Security verification is required.',
+        });
+      }
+
+      const verifyResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          secret: turnstileSecret,
+          response: turnstileToken,
+        }),
+      });
+
+      const verifyResult = await verifyResponse.json() as { success: boolean };
+
+      if (!verifyResult.success) {
+        throw new AppError('TURNSTILE_FAILED', {
+          message: 'Security verification failed. Please try again.',
+        });
+      }
+    }
 
     if (IS_BILLING_ENABLED() && url && url.length < 6) {
       throw new AppError('PREMIUM_PROFILE_URL', {

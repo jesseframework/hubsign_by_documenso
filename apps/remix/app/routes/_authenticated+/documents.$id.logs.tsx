@@ -12,7 +12,6 @@ import { getDocumentById } from '@documenso/lib/server-only/document/get-documen
 import { getRecipientsForDocument } from '@documenso/lib/server-only/recipient/get-recipients-for-document';
 import { type TGetTeamByUrlResponse, getTeamByUrl } from '@documenso/lib/server-only/team/get-team';
 import { formatDocumentsPath } from '@documenso/lib/utils/teams';
-import { Card } from '@documenso/ui/primitives/card';
 
 import { DocumentAuditLogDownloadButton } from '~/components/general/document/document-audit-log-download-button';
 import { DocumentCertificateDownloadButton } from '~/components/general/document/document-certificate-download-button';
@@ -121,69 +120,72 @@ export default function DocumentsLogsPage({ loaderData }: Route.ComponentProps) 
 
     return `[${recipient.role}] ${text}`;
   };
+
   return (
-    <div className="mx-auto -mt-4 w-full max-w-screen-xl px-4 md:px-8">
+    <div className="w-full">
       <Link
         to={`${documentRootPath}/${document.id}`}
-        className="flex items-center text-[#7AC455] hover:opacity-80"
+        className="flex items-center text-sm text-muted-foreground hover:text-foreground"
       >
-        <ChevronLeft className="mr-2 inline-block h-5 w-5" />
+        <ChevronLeft className="mr-1 inline-block h-4 w-4" />
         <Trans>Document</Trans>
       </Link>
 
-      <div className="flex flex-col">
-        <div>
-          <h1
-            className="mt-4 block max-w-[20rem] truncate text-2xl font-semibold md:max-w-[30rem] md:text-3xl"
-            title={document.title}
-          >
-            {document.title}
-          </h1>
-        </div>
-        <div className="mt-1 flex flex-col justify-between sm:flex-row">
-          <div className="mt-2.5 flex items-center gap-x-6">
-            <DocumentStatusComponent
-              inheritColor
-              status={document.status}
-              className="text-muted-foreground"
-            />
-          </div>
-          <div className="mt-4 flex w-full flex-row sm:mt-0 sm:w-auto sm:self-end">
+      <div className="mt-3 flex flex-col">
+        <h1
+          className="block max-w-[20rem] truncate text-xl font-semibold tracking-tight md:max-w-[30rem] md:text-2xl"
+          title={document.title}
+        >
+          {document.title}
+        </h1>
+
+        <div className="mt-2 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+          <DocumentStatusComponent asBadge status={document.status} />
+
+          <div className="flex gap-2">
             <DocumentCertificateDownloadButton
-              className="mr-2"
               documentId={document.id}
               documentStatus={document.status}
             />
-
             <DocumentAuditLogDownloadButton documentId={document.id} />
           </div>
         </div>
       </div>
 
-      <section className="mt-6">
-        <Card className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2" degrees={45} gradient>
-          {documentInformation.map((info, i) => (
-            <div className="text-foreground text-sm" key={i}>
-              <h3 className="font-semibold">{_(info.description)}</h3>
-              <p className="text-muted-foreground truncate">{info.value}</p>
-            </div>
-          ))}
+      {/* Document info card */}
+      <section className="mt-5">
+        <div className="rounded-[var(--r)] border border-border bg-card p-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {documentInformation.map((info, i) => (
+              <div key={i}>
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                  {_(info.description)}
+                </h3>
+                <p className="mt-0.5 truncate text-[13px] text-foreground">{info.value}</p>
+              </div>
+            ))}
 
-          <div className="text-foreground text-sm">
-            <h3 className="font-semibold">Recipients</h3>
-            <ul className="text-muted-foreground list-inside list-disc">
-              {recipients.map((recipient) => (
-                <li key={`recipient-${recipient.id}`}>
-                  <span className="-ml-2">{formatRecipientText(recipient)}</span>
-                </li>
-              ))}
-            </ul>
+            <div>
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <Trans>Recipients</Trans>
+              </h3>
+              <ul className="mt-0.5 space-y-0.5">
+                {recipients.map((recipient) => (
+                  <li key={`recipient-${recipient.id}`} className="truncate text-[13px] text-foreground">
+                    {formatRecipientText(recipient)}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
-        </Card>
+        </div>
       </section>
 
-      <section className="mt-6">
-        <DocumentLogsTable documentId={document.id} />
+      {/* Audit logs table */}
+      <section className="mt-4">
+        <div className="overflow-hidden rounded-[var(--r)] border border-border bg-card">
+          <DocumentLogsTable documentId={document.id} />
+        </div>
       </section>
     </div>
   );

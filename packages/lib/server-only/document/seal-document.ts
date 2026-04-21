@@ -17,8 +17,10 @@ import type { RequestMetadata } from '../../universal/extract-request-metadata';
 import { getFileServerSide } from '../../universal/upload/get-file.server';
 import { putPdfFileServerSide } from '../../universal/upload/put-file.server';
 import { fieldsContainUnsignedRequiredField } from '../../utils/advanced-fields-helpers';
+import { decryptSecondaryData } from '../crypto/decrypt';
 import { getCertificatePdf } from '../htmltopdf/get-certificate-pdf';
 import { addRejectionStampToPdf } from '../pdf/add-rejection-stamp-to-pdf';
+import { encryptPdfWithPassword } from '../pdf/encrypt-pdf';
 import { flattenAnnotations } from '../pdf/flatten-annotations';
 import { flattenForm } from '../pdf/flatten-form';
 import { insertFieldInPDF } from '../pdf/insert-field-in-pdf';
@@ -158,18 +160,42 @@ export const sealDocument = async ({
 
   const pdfBytes = await doc.save();
 
-  const pdfBuffer = await signPdf({ pdf: Buffer.from(pdfBytes) });
+  let pdfBuffer = await signPdf({ pdf: Buffer.from(pdfBytes) });
+
+  // Apply PDF user-password lock if the owner opted in at upload time. The
+  // password was held encrypted-at-rest on the document row during signing;
+  // we decrypt it just for this operation, encrypt the PDF with it, then
+  // clear the field below so the system no longer holds the password.
+  let pdfWasLocked = false;
+  if (!isRejected && document.pdfPassword) {
+    try {
+      const decrypted = decryptSecondaryData(document.pdfPassword);
+      if (decrypted) {
+        pdfBuffer = await encryptPdfWithPassword(pdfBuffer, decrypted);
+        pdfWasLocked = true;
+      }
+    } catch (err) {
+      console.error('[seal-document] Failed to apply PDF password lock:', err);
+      throw new Error(
+        'Failed to apply PDF password lock. The document was not sealed. ' +
+          (err instanceof Error ? err.message : String(err)),
+      );
+    }
+  }
 
   const { name } = path.parse(document.title);
 
   // Add suffix based on document status
   const suffix = isRejected ? '_rejected.pdf' : '_signed.pdf';
 
-  const { data: newData } = await putPdfFileServerSide({
-    name: `${name}${suffix}`,
-    type: 'application/pdf',
-    arrayBuffer: async () => Promise.resolve(pdfBuffer),
-  });
+  const { data: newData } = await putPdfFileServerSide(
+    {
+      name: `${name}${suffix}`,
+      type: 'application/pdf',
+      arrayBuffer: async () => Promise.resolve(pdfBuffer),
+    },
+    { allowEncrypted: pdfWasLocked },
+  );
 
   const postHog = PostHogServerClient();
 
@@ -192,6 +218,14 @@ export const sealDocument = async ({
       data: {
         status: isRejected ? DocumentStatus.REJECTED : DocumentStatus.COMPLETED,
         completedAt: new Date(),
+        // Clear the held password and mark the PDF as locked. After this point
+        // the system has no way to recover the password.
+        ...(document.pdfPassword
+          ? {
+              pdfPassword: null,
+              pdfLocked: pdfWasLocked,
+            }
+          : {}),
       },
     });
 
@@ -241,4 +275,44 @@ export const sealDocument = async ({
     userId: document.userId,
     teamId: document.teamId ?? undefined,
   });
+
+  // Auto-file completed documents into DMS (if enabled)
+  if (!isRejected && !isResealing) {
+    try {
+      const autoFilingSettings = await prisma.dmsAutoFilingSettings.findUnique({
+        where: { userId: document.userId },
+      });
+
+      if (autoFilingSettings?.enabled) {
+        const existing = await prisma.dmsDocument.findUnique({
+          where: { signedDocumentId: document.id },
+        });
+
+        if (!existing) {
+          await prisma.dmsDocument.create({
+            data: {
+              title: document.title,
+              referenceNumber: `DMS-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+              fileUrl: documentData.id,
+              fileName: `${document.title}.pdf`,
+              fileType: 'application/pdf',
+              fileSize: 0,
+              status: 'ACTIVE',
+              format: 'DIGITAL',
+              confidentiality: autoFilingSettings.confidentiality,
+              binId: autoFilingSettings.binId,
+              documentTypeId: autoFilingSettings.documentTypeId,
+              classificationId: autoFilingSettings.classificationId,
+              signedDocumentId: document.id,
+              uploadedById: document.userId,
+              teamId: document.teamId,
+            },
+          });
+        }
+      }
+    } catch (err) {
+      // Don't fail the seal if auto-filing fails
+      console.error('[DMS Auto-Filing Error]', err);
+    }
+  }
 };

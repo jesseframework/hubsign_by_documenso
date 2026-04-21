@@ -27,7 +27,6 @@ import type { TDocumentMany as TDocumentRow } from '@documenso/lib/types/documen
 import { isDocumentCompleted } from '@documenso/lib/utils/document';
 import { formatDocumentsPath } from '@documenso/lib/utils/teams';
 import { trpc as trpcClient } from '@documenso/trpc/client';
-import { DocumentShareButton } from '@documenso/ui/components/document/document-share-button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -135,8 +134,11 @@ export const DocumentsTableActionDropdown = ({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger data-testid="document-table-action-btn">
-        <MoreHorizontal className="text-muted-foreground h-5 w-5" />
+      <DropdownMenuTrigger
+        data-testid="document-table-action-btn"
+        className="flex h-[26px] w-[26px] items-center justify-center rounded-[5px] border border-border bg-transparent text-[12px] text-muted-foreground transition-colors hover:bg-muted"
+      >
+        ···
       </DropdownMenuTrigger>
 
       <DropdownMenuContent className="w-52" align="start" forceMount>
@@ -239,18 +241,6 @@ export const DocumentsTableActionDropdown = ({
 
         <DocumentResendDialog document={row} recipients={nonSignedRecipients} />
 
-        <DocumentShareButton
-          documentId={row.id}
-          token={isOwner ? undefined : recipient?.token}
-          trigger={({ loading, disabled }) => (
-            <DropdownMenuItem disabled={disabled || isDraft} onSelect={(e) => e.preventDefault()}>
-              <div className="flex items-center">
-                {loading ? <Loader className="mr-2 h-4 w-4" /> : <Share className="mr-2 h-4 w-4" />}
-                <Trans>Share Signing Card</Trans>
-              </div>
-            </DropdownMenuItem>
-          )}
-        />
       </DropdownMenuContent>
 
       <DocumentDeleteDialog

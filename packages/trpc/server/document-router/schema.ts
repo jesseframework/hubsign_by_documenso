@@ -200,6 +200,12 @@ export const ZCreateDocumentRequestSchema = z.object({
   documentDataId: z.string().min(1),
   timezone: ZDocumentMetaTimezoneSchema.optional(),
   folderId: z.string().describe('The ID of the folder to create the document in').optional(),
+  pdfPassword: z
+    .string()
+    .min(4)
+    .max(128)
+    .optional()
+    .describe('Password to lock the final signed PDF with. Held briefly during signing, then deleted.'),
 });
 
 export const ZCreateDocumentV2RequestSchema = z.object({

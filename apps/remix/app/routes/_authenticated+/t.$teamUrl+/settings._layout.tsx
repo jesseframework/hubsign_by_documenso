@@ -34,7 +34,7 @@ export async function clientLoader() {
 
 export default function TeamsSettingsLayout() {
   return (
-    <div className="mx-auto w-full max-w-screen-xl px-4 md:px-8">
+    <div className="w-full">
       <h1 className="text-4xl font-semibold">
         <Trans>Team Settings</Trans>
       </h1>

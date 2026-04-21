@@ -18,20 +18,27 @@ type File = {
 /**
  * Uploads a document file to the appropriate storage location and creates
  * a document data record.
+ *
+ * Set `allowEncrypted` to skip the encryption validation — used when uploading
+ * a deliberately password-locked PDF (e.g. the final sealed PDF after applying
+ * a user-set password lock).
  */
-export const putPdfFileServerSide = async (file: File) => {
-  const isEncryptedDocumentsAllowed = false; // Was feature flag.
-
+export const putPdfFileServerSide = async (
+  file: File,
+  options: { allowEncrypted?: boolean } = {},
+) => {
   const arrayBuffer = await file.arrayBuffer();
 
-  const pdf = await PDFDocument.load(arrayBuffer).catch((e) => {
-    console.error(`PDF upload parse error: ${e.message}`);
+  if (!options.allowEncrypted) {
+    const pdf = await PDFDocument.load(arrayBuffer).catch((e) => {
+      console.error(`PDF upload parse error: ${e.message}`);
 
-    throw new AppError('INVALID_DOCUMENT_FILE');
-  });
+      throw new AppError('INVALID_DOCUMENT_FILE');
+    });
 
-  if (!isEncryptedDocumentsAllowed && pdf.isEncrypted) {
-    throw new AppError('INVALID_DOCUMENT_FILE');
+    if (pdf.isEncrypted) {
+      throw new AppError('INVALID_DOCUMENT_FILE');
+    }
   }
 
   if (!file.name.endsWith('.pdf')) {

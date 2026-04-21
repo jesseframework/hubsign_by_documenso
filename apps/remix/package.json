@@ -8,11 +8,12 @@
     "build:server": "cross-env NODE_ENV=production rollup -c rollup.config.mjs",
     "dev": "npm run with:env -- react-router dev",
     "dev:billing": "bash .bin/stripe-dev.sh",
-    "start": "npm run with:env -- cross-env NODE_ENV=production node build/server/main.js",
+    "db:migrate:deploy": "npx prisma migrate deploy --schema ../../packages/prisma/schema.prisma",
+    "start": "npm run db:migrate:deploy && npm run with:env -- cross-env NODE_ENV=production node build/server/main.js",
     "clean": "rimraf .react-router && rimraf node_modules",
     "typecheck": "react-router typegen && tsc",
     "with:env": "dotenv -e ../../.env -e ../../.env.local --",
-     "translate": "lingui extract && lingui compile"
+    "translate": "lingui extract && lingui compile"
   },
   "dependencies": {
     "@documenso/api": "*",
@@ -40,6 +41,7 @@
     "@simplewebauthn/server": "^9.0.3",
     "autoprefixer": "^10.4.13",
     "colord": "^2.9.3",
+    "firebase": "^12.12.1",
     "framer-motion": "^10.12.8",
     "hono": "4.7.0",
     "hono-react-router-adapter": "^0.6.2",
@@ -101,5 +103,5 @@
     "vite-plugin-babel-macros": "^1.0.6",
     "vite-tsconfig-paths": "^5.1.4"
   },
-  "version": "1.10.3"
+  "version": "2.0.0"
 }

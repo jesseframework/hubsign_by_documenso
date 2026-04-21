@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import { Loader } from 'lucide-react';
+import { LockIcon, Loader } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router';
 import { match } from 'ts-pattern';
 
@@ -13,11 +13,14 @@ import { useSession } from '@documenso/lib/client-only/providers/session';
 import { APP_DOCUMENT_UPLOAD_SIZE_LIMIT } from '@documenso/lib/constants/app';
 import { DEFAULT_DOCUMENT_TIME_ZONE, TIME_ZONES } from '@documenso/lib/constants/time-zones';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
+import { mergePdfFiles } from '@documenso/lib/universal/pdf-merge';
 import { putPdfFile } from '@documenso/lib/universal/upload/put-file';
 import { formatDocumentsPath } from '@documenso/lib/utils/teams';
 import { trpc } from '@documenso/trpc/react';
 import { cn } from '@documenso/ui/lib/utils';
 import { DocumentDropzone } from '@documenso/ui/primitives/document-upload';
+import { Input } from '@documenso/ui/primitives/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@documenso/ui/primitives/popover';
 import {
   Tooltip,
   TooltipContent,
@@ -50,6 +53,9 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
   const { quota, remaining, refreshLimits } = useLimits();
 
   const [isLoading, setIsLoading] = useState(false);
+  const [lockPdf, setLockPdf] = useState(false);
+  const [lockPassword, setLockPassword] = useState('');
+  const [lockPasswordConfirm, setLockPasswordConfirm] = useState('');
 
   const { mutateAsync: createDocument } = trpc.document.createDocument.useMutation();
 
@@ -66,9 +72,32 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remaining.documents, user.emailVerified, team]);
 
-  const onFileDrop = async (file: File) => {
+  const onFileDrop = async (files: File[]) => {
     try {
+      // Validate password fields if Lock PDF is enabled
+      if (lockPdf) {
+        if (lockPassword.length < 4) {
+          toast({
+            title: _(msg`Password too short`),
+            description: _(msg`Lock password must be at least 4 characters.`),
+            variant: 'destructive',
+          });
+          return;
+        }
+        if (lockPassword !== lockPasswordConfirm) {
+          toast({
+            title: _(msg`Passwords do not match`),
+            description: _(msg`Please confirm the same password in both fields.`),
+            variant: 'destructive',
+          });
+          return;
+        }
+      }
+
       setIsLoading(true);
+
+      // Merge multiple PDFs into one if needed
+      const file = files.length > 1 ? await mergePdfFiles(files) : files[0];
 
       const response = await putPdfFile(file);
 
@@ -77,6 +106,7 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
         documentDataId: response.id,
         timezone: userTimezone,
         folderId: folderId ?? undefined,
+        pdfPassword: lockPdf ? lockPassword : undefined,
       });
 
       void refreshLimits();
@@ -132,7 +162,7 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
   };
 
   return (
-    <div className={cn('relative', className)}>
+    <div className={cn('group/upload relative inline-flex items-center gap-1.5', className)}>
       <TooltipProvider>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -158,6 +188,79 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
             )}
         </Tooltip>
       </TooltipProvider>
+
+      {/* Lock toggle — slides in on hover next to the upload button.
+          Always visible on touch devices (no hover state) and when lock is on. */}
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              'flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition-all hover:bg-muted hover:text-foreground',
+              // Hidden by default on hover-capable devices, revealed on hover
+              'w-0 overflow-hidden border-0 opacity-0 group-hover/upload:w-9 group-hover/upload:border group-hover/upload:opacity-100',
+              // Always visible on touch devices and when lock is enabled
+              '[@media(hover:none)]:w-9 [@media(hover:none)]:border [@media(hover:none)]:opacity-100',
+              lockPdf &&
+                '!w-9 !border-primary !bg-primary/10 !text-primary !opacity-100',
+            )}
+            title={lockPdf ? 'PDF lock enabled' : 'Lock PDF with password'}
+          >
+            <LockIcon className="h-3.5 w-3.5" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="end" className="w-72 p-3">
+          <label className="flex cursor-pointer items-center gap-2 text-[13px] font-medium">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-border"
+              checked={lockPdf}
+              onChange={(e) => setLockPdf(e.target.checked)}
+            />
+            <Trans>Lock PDF with password</Trans>
+          </label>
+          <p className="mt-1 pl-6 text-[11px] text-muted-foreground">
+            <Trans>Applied to the final signed PDF.</Trans>
+          </p>
+
+          {lockPdf && (
+            <div className="mt-3 space-y-2 border-t border-border pt-3">
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground">
+                  <Trans>Password</Trans>
+                </label>
+                <Input
+                  type="password"
+                  className="mt-1 h-8 text-[13px]"
+                  placeholder="At least 4 characters"
+                  value={lockPassword}
+                  onChange={(e) => setLockPassword(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium text-muted-foreground">
+                  <Trans>Confirm</Trans>
+                </label>
+                <Input
+                  type="password"
+                  className="mt-1 h-8 text-[13px]"
+                  placeholder="Re-enter password"
+                  value={lockPasswordConfirm}
+                  onChange={(e) => setLockPasswordConfirm(e.target.value)}
+                  autoComplete="new-password"
+                />
+              </div>
+              <p className="text-[11px] text-amber-700">
+                <Trans>
+                  Save this password — once signed, the system discards it and you must share
+                  it with recipients yourself.
+                </Trans>
+              </p>
+            </div>
+          )}
+        </PopoverContent>
+      </Popover>
 
       {isLoading && (
         <div className="bg-background/50 absolute inset-0 flex items-center justify-center rounded-lg">

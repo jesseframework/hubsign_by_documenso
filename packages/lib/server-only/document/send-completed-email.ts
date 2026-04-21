@@ -226,4 +226,40 @@ export const sendCompletedEmail = async ({ documentId, requestMetadata }: SendDo
       });
     }),
   );
+
+  // Best-effort push notifications to the owner + any recipient who is a
+  // HubSign user with the preference enabled.
+  try {
+    const { sendFcmNotificationToUser } = await import(
+      '../push-notifications/fcm-client'
+    );
+
+    const recipientEmails = document.recipients.map((r) => r.email);
+    const pushTargets = await prisma.user.findMany({
+      where: { email: { in: [owner.email, ...recipientEmails] } },
+      select: {
+        id: true,
+        email: true,
+        pushNotifPrefs: { select: { documentCompleted: true } },
+      },
+    });
+
+    await Promise.all(
+      pushTargets
+        .filter((u) => u.pushNotifPrefs?.documentCompleted !== false)
+        .map((u) =>
+          sendFcmNotificationToUser(u.id, {
+            title: `"${document.title}" is complete`,
+            body: 'All recipients have signed the document.',
+            link:
+              u.email === owner.email
+                ? documentOwnerDownloadLink
+                : `${NEXT_PUBLIC_WEBAPP_URL()}/documents/${document.id}`,
+            data: { documentId: String(document.id) },
+          }),
+        ),
+    );
+  } catch (err) {
+    console.error('[send-completed-email] push failed (non-fatal):', err);
+  }
 };

@@ -16,7 +16,7 @@ export type DocumentDropzoneProps = {
   className?: string;
   disabled?: boolean;
   disabledMessage?: MessageDescriptor;
-  onDrop?: (_file: File) => void | Promise<void>;
+  onDrop?: (_files: File[]) => void | Promise<void>;
   onDropRejected?: () => void | Promise<void>;
   type?: 'document' | 'template';
   [key: string]: unknown;
@@ -37,11 +37,11 @@ export const DocumentDropzone = ({
     accept: {
       'application/pdf': ['.pdf'],
     },
-    multiple: false,
+    multiple: true,
     disabled,
-    onDrop: ([acceptedFile]) => {
-      if (acceptedFile && onDrop) {
-        void onDrop(acceptedFile);
+    onDrop: (acceptedFiles) => {
+      if (acceptedFiles.length > 0 && onDrop) {
+        void onDrop(acceptedFiles);
       }
     },
     onDropRejected: () => {

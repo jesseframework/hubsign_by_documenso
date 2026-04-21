@@ -6,34 +6,62 @@ export type CardMetricProps = {
   icon?: LucideIcon;
   title: string;
   value: string | number;
+  subtitle?: string;
+  accentColor?: string;
+  iconBg?: string;
   className?: string;
 };
 
-export const CardMetric = ({ icon: Icon, title, value, className }: CardMetricProps) => {
+export const CardMetric = ({
+  icon: Icon,
+  title,
+  value,
+  subtitle,
+  accentColor,
+  iconBg,
+  className,
+}: CardMetricProps) => {
   return (
     <div
       className={cn(
-        'border-border bg-background hover:shadow-border/80 h-32 max-h-32 max-w-full overflow-hidden rounded-lg border shadow shadow-transparent duration-200',
+        'relative overflow-hidden rounded-[var(--r)] border border-border bg-card p-3 sm:p-4',
         className,
       )}
     >
-      <div className="flex h-full max-h-full flex-col px-4 pb-6 pt-4 sm:px-4 sm:pb-8 sm:pt-4">
-        <div className="flex items-start">
-          {Icon && (
-            <div className="mr-2 h-4 w-4">
-              <Icon className="text-muted-foreground h-4 w-4" />
-            </div>
+      {/* Bottom accent bar */}
+      {accentColor && (
+        <div
+          className="absolute bottom-0 left-0 right-0 h-[3px] opacity-[0.18]"
+          style={{ background: accentColor }}
+        />
+      )}
+
+      {/* Icon - hidden on small screens */}
+      {Icon && (
+        <div
+          className={cn(
+            'absolute right-3 top-3 hidden h-7 w-7 items-center justify-center rounded-[7px] sm:flex',
+            iconBg || 'bg-primary/10',
           )}
-
-          <h3 className="text-primary-forground mb-2 flex items-end text-sm font-medium leading-tight">
-            {title}
-          </h3>
+        >
+          <Icon className="h-3.5 w-3.5" style={{ color: accentColor }} />
         </div>
+      )}
 
-        <p className="text-foreground mt-auto text-4xl font-semibold leading-8">
-          {typeof value === 'number' ? value.toLocaleString('en-US') : value}
-        </p>
+      {/* Label */}
+      <div className="text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground sm:text-[11px]">
+        {title}
       </div>
+
+      {/* Value */}
+      <p className="mt-1 text-xl font-semibold leading-none tracking-tight text-foreground sm:mt-1.5 sm:text-2xl">
+        {typeof value === 'number' ? value.toLocaleString('en-US') : value}
+      </p>
+
+      {/* Subtitle - hidden on small screens */}
+      {subtitle && (
+        <div className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">{subtitle}</div>
+      )}
     </div>
   );
 };

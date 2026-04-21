@@ -191,6 +191,35 @@ export const run = async ({
     });
   });
 
+  // Best-effort push notification to the recipient if they're a HubSign user
+  // with a registered device + push enabled. No-op if FCM isn't configured or
+  // the recipient has no devices / has the preference disabled.
+  await io.runTask('send-push-notification', async () => {
+    try {
+      const { sendFcmNotificationToUser } = await import(
+        '../../../server-only/push-notifications/fcm-client'
+      );
+      const recipientUser = await prisma.user.findUnique({
+        where: { email: recipient.email },
+        select: {
+          id: true,
+          pushNotifPrefs: { select: { documentSentToYou: true } },
+        },
+      });
+      if (!recipientUser) return;
+      if (recipientUser.pushNotifPrefs?.documentSentToYou === false) return;
+
+      await sendFcmNotificationToUser(recipientUser.id, {
+        title: `Please sign "${document.title}"`,
+        body: `${user.name || user.email} sent you a document for signing.`,
+        link: `${NEXT_PUBLIC_WEBAPP_URL()}/sign/${recipient.token}`,
+        data: { documentId: String(document.id), recipientId: String(recipient.id) },
+      });
+    } catch (err) {
+      console.error('[send-signing-email] push failed (non-fatal):', err);
+    }
+  });
+
   await io.runTask('store-audit-log', async () => {
     await prisma.documentAuditLog.create({
       data: createDocumentAuditLogData({

@@ -4,7 +4,7 @@ import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import type { DocumentData } from '@prisma/client';
-import { Loader } from 'lucide-react';
+import { Loader, Minus, Plus, RotateCcw } from 'lucide-react';
 import { type PDFDocumentProxy } from 'pdfjs-dist';
 import { Document as PDFDocument, Page as PDFPage, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -36,9 +36,14 @@ export type OnPDFViewerPageClick = (_event: {
   pageY: number;
 }) => void | Promise<void>;
 
+const ZOOM_STEP = 0.25;
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3;
+const ZOOM_DEFAULT = 1;
+
 const PDFLoader = () => (
   <>
-    <Loader className="text-documenso h-12 w-12 animate-spin" />
+    <Loader className="text-primary h-12 w-12 animate-spin" />
 
     <p className="text-muted-foreground mt-4">
       <Trans>Loading document...</Trans>
@@ -51,6 +56,7 @@ export type PDFViewerProps = {
   documentData: DocumentData;
   onDocumentLoad?: (_doc: LoadedPDFDocument) => void;
   onPageClick?: OnPDFViewerPageClick;
+  showZoomControls?: boolean;
   [key: string]: unknown;
 } & Omit<React.HTMLAttributes<HTMLDivElement>, 'onPageClick'>;
 
@@ -59,6 +65,7 @@ export const PDFViewer = ({
   documentData,
   onDocumentLoad,
   onPageClick,
+  showZoomControls = true,
   ...props
 }: PDFViewerProps) => {
   const { _ } = useLingui();
@@ -69,9 +76,12 @@ export const PDFViewer = ({
   const [isDocumentBytesLoading, setIsDocumentBytesLoading] = useState(false);
   const [documentBytes, setDocumentBytes] = useState<Uint8Array | null>(null);
 
-  const [width, setWidth] = useState(0);
+  const [containerWidth, setContainerWidth] = useState(0);
   const [numPages, setNumPages] = useState(0);
   const [pdfError, setPdfError] = useState(false);
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+
+  const width = containerWidth * zoom;
 
   const memoizedData = useMemo(
     () => ({ type: documentData.type, data: documentData.data }),
@@ -79,6 +89,12 @@ export const PDFViewer = ({
   );
 
   const isLoading = isDocumentBytesLoading || !documentBytes;
+
+  const onZoomIn = () => setZoom((z) => Math.min(z + ZOOM_STEP, ZOOM_MAX));
+  const onZoomOut = () => setZoom((z) => Math.max(z - ZOOM_STEP, ZOOM_MIN));
+  const onZoomReset = () => setZoom(ZOOM_DEFAULT);
+
+  const zoomPercent = Math.round(zoom * 100);
 
   const onDocumentLoaded = (doc: LoadedPDFDocument) => {
     setNumPages(doc.numPages);
@@ -125,12 +141,12 @@ export const PDFViewer = ({
 
       const { width } = $current.getBoundingClientRect();
 
-      setWidth(width);
+      setContainerWidth(width);
 
       const onResize = () => {
         const { width } = $current.getBoundingClientRect();
 
-        setWidth(width);
+        setContainerWidth(width);
       };
 
       window.addEventListener('resize', onResize);
@@ -166,7 +182,47 @@ export const PDFViewer = ({
   }, [memoizedData, toast]);
 
   return (
-    <div ref={$el} className={cn('overflow-hidden', className)} {...props}>
+    <div ref={$el} className={cn('relative flex flex-col overflow-hidden', className)} {...props}>
+      {/* Zoom controls — top bar */}
+      {showZoomControls && !isLoading && numPages > 0 && (
+        <div className="flex items-center justify-between border-b border-border bg-muted/50 px-3 py-1.5">
+          <span className="text-[11px] text-muted-foreground">
+            {numPages} {numPages === 1 ? 'page' : 'pages'}
+          </span>
+
+          <div className="inline-flex items-center gap-0.5 rounded-md border border-border bg-card px-1 py-0.5">
+            <button
+              type="button"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
+              onClick={onZoomOut}
+              disabled={zoom <= ZOOM_MIN}
+              title="Zoom out"
+            >
+              <Minus className="h-3 w-3" />
+            </button>
+
+            <button
+              type="button"
+              className="flex h-6 min-w-[2.5rem] items-center justify-center px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+              onClick={onZoomReset}
+              title="Reset zoom"
+            >
+              {zoomPercent}%
+            </button>
+
+            <button
+              type="button"
+              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
+              onClick={onZoomIn}
+              disabled={zoom >= ZOOM_MAX}
+              title="Zoom in"
+            >
+              <Plus className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {isLoading ? (
         <div
           className={cn(
@@ -176,15 +232,13 @@ export const PDFViewer = ({
           <PDFLoader />
         </div>
       ) : (
-        <>
+        <div className={cn('overflow-x-auto', zoom > 1 && 'overflow-x-scroll')}>
           <PDFDocument
             file={documentBytes.buffer}
             className={cn('w-full overflow-hidden rounded', {
               'h-[80vh] max-h-[60rem]': numPages === 0,
             })}
             onLoadSuccess={(d) => onDocumentLoaded(d)}
-            // Uploading a invalid document causes an error which doesn't appear to be handled by the `error` prop.
-            // Therefore we add some additional custom error handling.
             onSourceError={() => {
               setPdfError(true);
             }}
@@ -240,8 +294,9 @@ export const PDFViewer = ({
                 </div>
               ))}
           </PDFDocument>
-        </>
+        </div>
       )}
+
     </div>
   );
 };

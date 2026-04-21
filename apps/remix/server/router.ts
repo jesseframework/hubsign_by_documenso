@@ -7,6 +7,7 @@ import { API_V2_BETA_URL } from '@documenso/lib/constants/app';
 import { jobsClient } from '@documenso/lib/jobs/client';
 import { openApiDocument } from '@documenso/trpc/server/open-api';
 
+import { externalSignupRoute } from './api/external-signup';
 import { filesRoute } from './api/files';
 import { type AppContext, appContext } from './context';
 import { appMiddleware } from './middleware';
@@ -37,6 +38,9 @@ app.route('/api/auth', auth);
 
 // Files route.
 app.route('/api/files', filesRoute);
+
+// External signup API (secured).
+app.route('/api/external', externalSignupRoute);
 
 // API servers.
 app.route('/api/v1', tsRestHonoApp);

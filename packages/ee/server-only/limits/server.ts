@@ -7,8 +7,73 @@ import { prisma } from '@documenso/prisma';
 import { getDocumentRelatedPrices } from '../stripe/get-document-related-prices.ts';
 import { FREE_PLAN_LIMITS, SELFHOSTED_PLAN_LIMITS, TEAM_PLAN_LIMITS } from './constants';
 import { ERROR_CODES } from './errors';
-import type { TLimitsResponseSchema } from './schema';
+import type { TLimitsResponseSchema, TLimitsSchema } from './schema';
 import { ZLimitsSchema } from './schema';
+
+/**
+ * Check if user is in an organization with an assigned seat.
+ * If so, use the seat's plan limits instead of personal subscription.
+ */
+const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | null> => {
+  const user = await prisma.user.findFirst({
+    where: { email },
+    include: {
+      organizationMemberships: true,
+    },
+  });
+
+  if (!user || user.organizationMemberships.length === 0) return null;
+
+  const membership = user.organizationMemberships[0];
+
+  // If no seat assigned, user is in org but has no plan → treat as free
+  if (!membership.seatTier) {
+    return {
+      quota: { ...FREE_PLAN_LIMITS, dmsEnabled: false },
+      remaining: { ...FREE_PLAN_LIMITS, dmsEnabled: false },
+    };
+  }
+
+  // Map seat tier to limits
+  const tierLimits: Record<string, TLimitsSchema> = {
+    STARTER: { documents: 20, recipients: 50, directTemplates: 5, dmsEnabled: false },
+    PRO: { documents: 100, recipients: 500, directTemplates: 20, dmsEnabled: false },
+    ENTERPRISE: { documents: Infinity, recipients: Infinity, directTemplates: Infinity, dmsEnabled: true },
+  };
+
+  const seatLimits = tierLimits[membership.seatTier] || FREE_PLAN_LIMITS;
+
+  // DMS addon overrides dmsEnabled
+  if (membership.dmsAddon) {
+    seatLimits.dmsEnabled = true;
+  }
+
+  // Count usage this month
+  const [documents, directTemplates] = await Promise.all([
+    prisma.document.count({
+      where: {
+        userId: user.id,
+        createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+        source: { not: 'TEMPLATE_DIRECT_LINK' },
+      },
+    }),
+    prisma.template.count({
+      where: {
+        userId: user.id,
+        directLink: { isNot: null },
+      },
+    }),
+  ]);
+
+  const remaining = structuredClone(seatLimits);
+  remaining.documents = Math.max(remaining.documents - documents, 0);
+  remaining.directTemplates = Math.max(remaining.directTemplates - directTemplates, 0);
+
+  return {
+    quota: seatLimits,
+    remaining,
+  };
+};
 
 export type GetServerLimitsOptions = {
   email: string;
@@ -28,6 +93,12 @@ export const getServerLimits = async ({
 
   if (!email) {
     throw new Error(ERROR_CODES.UNAUTHORIZED);
+  }
+
+  // Check if user is in an org with an assigned seat — use org seat limits
+  const orgSeatLimits = await getOrgSeatLimits(email);
+  if (orgSeatLimits) {
+    return orgSeatLimits;
   }
 
   return teamId ? handleTeamLimits({ email, teamId }) : handleUserLimits({ email });
@@ -68,14 +139,25 @@ const handleUserLimits = async ({ email }: HandleUserLimitsOptions) => {
         continue;
       }
 
-      const currentQuota = ZLimitsSchema.parse(
-        'metadata' in price.product ? price.product.metadata : {},
-      );
+      const productMetadata = 'metadata' in price.product ? price.product.metadata : {};
+      const currentQuota = ZLimitsSchema.parse(productMetadata);
+
+      // If this is a DMS add-on, just merge the dmsEnabled flag
+      if (currentQuota.dmsEnabled) {
+        quota.dmsEnabled = true;
+        remaining.dmsEnabled = true;
+      }
 
       // Use the subscription with the highest quota.
       if (currentQuota.documents > quota.documents && currentQuota.recipients > quota.recipients) {
+        const dmsWasEnabled = quota.dmsEnabled;
         quota = currentQuota;
         remaining = structuredClone(quota);
+        // Preserve DMS flag from other subscriptions
+        if (dmsWasEnabled) {
+          quota.dmsEnabled = true;
+          remaining.dmsEnabled = true;
+        }
       }
     }
 
@@ -150,11 +232,13 @@ const handleTeamLimits = async ({ email, teamId }: HandleTeamLimitsOptions) => {
         documents: 0,
         recipients: 0,
         directTemplates: 0,
+        dmsEnabled: false,
       },
       remaining: {
         documents: 0,
         recipients: 0,
         directTemplates: 0,
+        dmsEnabled: false,
       },
     };
   }

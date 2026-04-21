@@ -153,4 +153,29 @@ export const run = async ({
       },
     });
   });
+
+  // Best-effort push to the document owner that the recipient rejected.
+  await io.runTask('send-push-notification', async () => {
+    try {
+      const { sendFcmNotificationToUser } = await import(
+        '../../../server-only/push-notifications/fcm-client'
+      );
+      const prefs = await prisma.pushNotificationPreference.findUnique({
+        where: { userId: documentOwner.id },
+        select: { documentRejected: true },
+      });
+      if (prefs?.documentRejected === false) return;
+
+      await sendFcmNotificationToUser(documentOwner.id, {
+        title: i18n._(msg`${recipient.name} rejected "${document.title}"`),
+        body: recipient.rejectionReason
+          ? recipient.rejectionReason
+          : i18n._(msg`The recipient declined to sign the document.`),
+        link: `${NEXT_PUBLIC_WEBAPP_URL()}${formatDocumentsPath(document.team?.url)}/${document.id}`,
+        data: { documentId: String(document.id), recipientId: String(recipient.id) },
+      });
+    } catch (err) {
+      console.error('[send-rejection-emails] push failed (non-fatal):', err);
+    }
+  });
 };

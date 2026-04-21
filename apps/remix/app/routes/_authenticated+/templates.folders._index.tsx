@@ -49,7 +49,7 @@ export default function TemplatesFoldersPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-screen-xl px-4 md:px-8">
+    <div className="w-full">
       <div className="flex w-full items-center justify-between">
         <div className="flex flex-1 items-center">
           <Button
