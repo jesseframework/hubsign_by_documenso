@@ -26,6 +26,8 @@ export const ZRecipientSchema = RecipientSchema.pick({
   authOptions: true,
   signingOrder: true,
   rejectionReason: true,
+  remindersSent: true,
+  lastReminderAt: true,
 }).extend({
   fields: ZFieldSchema.array(),
 });
@@ -50,6 +52,8 @@ export const ZRecipientLiteSchema = RecipientSchema.pick({
   authOptions: true,
   signingOrder: true,
   rejectionReason: true,
+  remindersSent: true,
+  lastReminderAt: true,
 });
 
 /**
@@ -72,6 +76,8 @@ export const ZRecipientManySchema = RecipientSchema.pick({
   authOptions: true,
   signingOrder: true,
   rejectionReason: true,
+  remindersSent: true,
+  lastReminderAt: true,
 }).extend({
   user: UserSchema.pick({
     id: true,
