@@ -13,6 +13,7 @@ import { AppBanner } from '~/components/general/app-banner';
 import { AppBottomNav } from '~/components/general/app-bottom-nav';
 import { AppSidebar } from '~/components/general/app-sidebar';
 import { AppTopbar } from '~/components/general/app-topbar';
+import { PushAutoSync } from '~/components/general/push-auto-sync';
 import { VerifyEmailBanner } from '~/components/general/verify-email-banner';
 
 import type { Route } from './+types/_layout';
@@ -76,6 +77,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
       </div>
 
       <AppBottomNav />
+      <PushAutoSync />
     </LimitsProvider>
   );
 }

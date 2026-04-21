@@ -21,13 +21,18 @@ That's it server-side. `isFcmConfigured()` returns true and `sendFcmNotification
 
 ## Wired event triggers
 
-- ✅ `send-signing-email` — pushes "Please sign X" when the recipient is a HubSign user with the preference on
-- ⏳ TODO — wire `send-recipient-signed-email`, `send-completed-email`, rejection, reminder
+- ✅ `send-signing-email` — pushes "Please sign X" to the recipient
+- ✅ `send-recipient-signed-email` — pushes to the document owner when a recipient signs
+- ✅ `send-completed-email` — pushes to owner + all HubSign-user recipients when the document finalizes
+- ✅ `send-rejection-emails` — pushes to the owner when a recipient rejects
+- ⏳ `reminderReceived` preference exists but the reminder feature itself isn't built yet (backlog #4)
 
 To wire more events, import and call inside the relevant job handler:
 ```ts
 import { sendFcmNotificationToUser } from '@documenso/lib/server-only/push-notifications/fcm-client';
 
+// Respect user prefs — read PushNotificationPreference by userId first, skip
+// the send if the relevant flag is explicitly false.
 await sendFcmNotificationToUser(userId, {
   title: '…',
   body: '…',
@@ -35,15 +40,17 @@ await sendFcmNotificationToUser(userId, {
 });
 ```
 
+All event wiring is no-op when `isFcmConfigured()` returns false, so pushing to
+a deployment without env vars set is safe.
+
 ## Client side (web)
 
-Not yet built — needs:
+Wired in `apps/remix`:
 
-1. `npm install firebase` in `apps/remix`
-2. Service worker at `apps/remix/public/firebase-messaging-sw.js`
-3. Init code in the app shell that:
-   - Calls `getToken()` from the firebase-messaging SDK
-   - Sends the token to `trpc.push.registerDevice.mutate({ token, platform: 'web' })`
-4. UI on the user settings page calling `trpc.push.getPreferences/updatePreferences`
+- `firebase` web SDK installed
+- Service worker: `apps/remix/public/firebase-messaging-sw.js` (reads config from URL query params)
+- Hook: `apps/remix/app/utils/firebase-push.ts` — `useFirebasePush()` returns `{ status, enablePush }`
+- `<PushAutoSync />` mounted in the authenticated layout keeps tokens fresh on every page load
+- Settings page: `/settings/notifications` with opt-in button + per-event toggles
 
-The server-side routes (`trpc.push.*`) are ready and waiting.
+Required client env vars (all `NEXT_PUBLIC_*` — see `.env.example` for the list).

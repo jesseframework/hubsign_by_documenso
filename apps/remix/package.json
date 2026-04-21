@@ -13,7 +13,7 @@
     "clean": "rimraf .react-router && rimraf node_modules",
     "typecheck": "react-router typegen && tsc",
     "with:env": "dotenv -e ../../.env -e ../../.env.local --",
-     "translate": "lingui extract && lingui compile"
+    "translate": "lingui extract && lingui compile"
   },
   "dependencies": {
     "@documenso/api": "*",
@@ -41,6 +41,7 @@
     "@simplewebauthn/server": "^9.0.3",
     "autoprefixer": "^10.4.13",
     "colord": "^2.9.3",
+    "firebase": "^12.12.1",
     "framer-motion": "^10.12.8",
     "hono": "4.7.0",
     "hono-react-router-adapter": "^0.6.2",

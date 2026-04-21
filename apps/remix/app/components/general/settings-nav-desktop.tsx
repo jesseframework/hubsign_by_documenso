@@ -1,5 +1,5 @@
 import { Trans } from '@lingui/react/macro';
-import { Braces, CreditCard, Globe2Icon, Lock, User, Users, Webhook } from 'lucide-react';
+import { Bell, Braces, CreditCard, Globe2Icon, Lock, User, Users, Webhook } from 'lucide-react';
 import { useLocation, Link } from 'react-router';
 
 import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
@@ -10,6 +10,7 @@ const navItems = [
   { to: '/settings/public-profile', icon: Globe2Icon, label: <Trans>Public Profile</Trans> },
   { to: '/settings/teams', icon: Users, label: <Trans>Teams</Trans> },
   { to: '/settings/security', icon: Lock, label: <Trans>Security</Trans> },
+  { to: '/settings/notifications', icon: Bell, label: <Trans>Notifications</Trans> },
   { to: '/settings/tokens', icon: Braces, label: <Trans>API Tokens</Trans> },
   { to: '/settings/webhooks', icon: Webhook, label: <Trans>Webhooks</Trans> },
 ];
