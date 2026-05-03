@@ -11,6 +11,7 @@ import { profileRouter } from './profile-router/router';
 import { pushRouter } from './push-router/router';
 import { recipientRouter } from './recipient-router/router';
 import { shareLinkRouter } from './share-link-router/router';
+import { stampRouter } from './stamp-router/router';
 import { teamRouter } from './team-router/router';
 import { templateRouter } from './template-router/router';
 import { router } from './trpc';
@@ -33,6 +34,7 @@ export const appRouter = router({
   webhook: webhookRouter,
   embeddingPresign: embeddingPresignRouter,
   push: pushRouter,
+  stamp: stampRouter,
 });
 
 export type AppRouter = typeof appRouter;

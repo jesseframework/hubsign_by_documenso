@@ -13,6 +13,7 @@ import { isDocumentCompleted } from '@documenso/lib/utils/document';
 import { formatDocumentsPath } from '@documenso/lib/utils/teams';
 
 import { DocumentEditForm } from '~/components/general/document/document-edit-form';
+import { DocumentStampsButton } from '~/components/general/document/document-stamps-button';
 import { DocumentStatus } from '~/components/general/document/document-status';
 import { LegacyFieldWarningPopover } from '~/components/general/legacy-field-warning-popover';
 import { StackAvatarsWithTooltip } from '~/components/general/stack-avatars-with-tooltip';
@@ -142,11 +143,16 @@ export default function DocumentEditPage() {
           </div>
         </div>
 
-        {document.useLegacyFieldInsertion && (
-          <div>
+        <div className="flex items-center gap-2">
+          <DocumentStampsButton
+            documentId={document.id}
+            disabled={isDocumentCompleted(document.status)}
+          />
+
+          {document.useLegacyFieldInsertion && (
             <LegacyFieldWarningPopover type="document" documentId={document.id} />
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <DocumentEditForm

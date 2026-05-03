@@ -4,6 +4,7 @@ import {
   CreditCardIcon,
   SettingsIcon,
   ShieldIcon,
+  StampIcon,
   Trash2Icon,
   UsersIcon,
 } from 'lucide-react';
@@ -15,6 +16,7 @@ const navItems = [
   { to: '/org/settings', icon: BuildingIcon, label: <Trans>Settings</Trans> },
   { to: '/org/members', icon: UsersIcon, label: <Trans>Members</Trans> },
   { to: '/org/permissions', icon: ShieldIcon, label: <Trans>DMS Permissions</Trans> },
+  { to: '/org/stamps', icon: StampIcon, label: <Trans>Stamps</Trans> },
   { to: '/org/billing', icon: CreditCardIcon, label: <Trans>Billing</Trans> },
   { to: '/org/recycle-bin', icon: Trash2Icon, label: <Trans>Recycle Bin</Trans> },
 ];

@@ -3,6 +3,7 @@ import { version as APP_VERSION } from '../../../../../package.json';
 import { Trans } from '@lingui/react/macro';
 import {
   BuildingIcon,
+  CombineIcon,
   FileTextIcon,
   FolderArchiveIcon,
   LogOutIcon,
@@ -177,6 +178,16 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
           >
             <FileTextIcon className="h-4 w-4 flex-shrink-0" />
             <Trans>Sign Templates</Trans>
+          </Link>
+
+          <Link
+            to="/doc-merge"
+            className={`sidebar-nav-item ${!sidebarTextColor && location.pathname.startsWith('/doc-merge') ? 'active' : ''}`}
+            style={navStyle(location.pathname.startsWith('/doc-merge'))}
+            onClick={onClose}
+          >
+            <CombineIcon className="h-4 w-4 flex-shrink-0" />
+            <Trans>Doc Merging</Trans>
           </Link>
 
           {isDmsEnabled && (

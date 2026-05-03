@@ -1,5 +1,6 @@
 import { DocumentStatus, RecipientRole, SigningStatus, WebhookTriggerEvents } from '@prisma/client';
 import { nanoid } from 'nanoid';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { PDFDocument } from 'pdf-lib';
 
@@ -26,6 +27,7 @@ import { flattenForm } from '../pdf/flatten-form';
 import { insertFieldInPDF } from '../pdf/insert-field-in-pdf';
 import { legacy_insertFieldInPDF } from '../pdf/legacy-insert-field-in-pdf';
 import { normalizeSignatureAppearances } from '../pdf/normalize-signature-appearances';
+import { embedStampsOnPdf } from '../stamps/embed-stamp-on-pdf';
 import { triggerWebhook } from '../webhooks/trigger/trigger-webhook';
 import { sendCompletedEmail } from './send-completed-email';
 
@@ -124,6 +126,9 @@ export const sealDocument = async ({
       ? await getCertificatePdf({
           documentId,
           language: document.documentMeta?.language,
+          // Tell the renderer the seal's terminal state so the audit page
+          // shows "Completed" / "Rejected" instead of the live "Pending".
+          completionStatus: isRejected ? 'REJECTED' : 'COMPLETED',
         }).catch(() => null)
       : null;
 
@@ -155,6 +160,12 @@ export const sealDocument = async ({
       : await insertFieldInPDF(doc, field);
   }
 
+  // Draw any custom stamps the owner placed on the document. Best-effort —
+  // a broken placement logs and is skipped rather than aborting the seal.
+  if (!isRejected) {
+    await embedStampsOnPdf(doc, document.id);
+  }
+
   // Re-flatten post-insertion to handle fields that create arcoFields
   flattenForm(doc);
 
@@ -182,6 +193,12 @@ export const sealDocument = async ({
       );
     }
   }
+
+  // SHA-256 of the final sealed bytes — exposed on /verify/:token so anyone
+  // can recompute the same hash from a downloaded copy and confirm the file
+  // hasn't been modified since signing. We hash the canonical form (post-sign,
+  // post-encryption if locked) since that's what end users receive.
+  const signatureHash = createHash('sha256').update(pdfBuffer).digest('hex');
 
   const { name } = path.parse(document.title);
 
@@ -218,6 +235,7 @@ export const sealDocument = async ({
       data: {
         status: isRejected ? DocumentStatus.REJECTED : DocumentStatus.COMPLETED,
         completedAt: new Date(),
+        signatureHash,
         // Clear the held password and mark the PDF as locked. After this point
         // the system has no way to recover the password.
         ...(document.pdfPassword

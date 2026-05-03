@@ -17,6 +17,7 @@ import { getNextPendingRecipient } from '@documenso/lib/server-only/recipient/ge
 import { getRecipientByToken } from '@documenso/lib/server-only/recipient/get-recipient-by-token';
 import { getRecipientSignatures } from '@documenso/lib/server-only/recipient/get-recipient-signatures';
 import { getRecipientsForAssistant } from '@documenso/lib/server-only/recipient/get-recipients-for-assistant';
+import { getStampPlacementsForToken } from '@documenso/lib/server-only/stamps/get-stamp-placements-for-token';
 import { getUserByEmail } from '@documenso/lib/server-only/user/get-user-by-email';
 import { extractDocumentAuthMethods } from '@documenso/lib/utils/document-auth';
 import { SigningCard3D } from '@documenso/ui/components/signing-card';
@@ -139,6 +140,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const [recipientSignature] = await getRecipientSignatures({ recipientId: recipient.id });
 
+  const stampPlacements = await getStampPlacementsForToken({ token });
+
   return superLoaderJson({
     isDocumentAccessValid: true,
     document,
@@ -149,6 +152,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     completedFields,
     recipientSignature,
     isRecipientsTurn,
+    stampPlacements,
   } as const);
 }
 
@@ -176,6 +180,7 @@ export default function SigningPage() {
     isRecipientsTurn,
     allRecipients,
     recipientWithFields,
+    stampPlacements,
   } = data;
 
   if (document.deletedAt || document.status === DocumentStatus.REJECTED) {
@@ -249,6 +254,7 @@ export default function SigningPage() {
           completedFields={completedFields}
           isRecipientsTurn={isRecipientsTurn}
           allRecipients={allRecipients}
+          stampPlacements={stampPlacements}
         />
       </DocumentSigningAuthProvider>
     </DocumentSigningProvider>
