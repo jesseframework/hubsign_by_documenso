@@ -167,6 +167,11 @@ export const DocumentSigningPageView = ({
           showRecipientTooltip={true}
         />
 
+        {/* Read-only stamps placed by the sender — shown over the PDF so the
+            recipient sees them before signing. They get flattened into the
+            sealed PDF at completion time. */}
+        <DocumentSigningStampOverlay placements={stampPlacements} />
+
         {recipient.role !== RecipientRole.ASSISTANT && (
           <DocumentSigningAutoSign recipient={recipient} fields={fields} />
         )}
