@@ -152,7 +152,20 @@ export const run = async ({
       ? await getCertificatePdf({
           documentId,
           language: document.documentMeta?.language,
-        }).catch(() => null)
+          // Tell the renderer the seal's terminal state so the audit page
+          // shows "Completed" / "Rejected" instead of the live "Pending".
+          completionStatus: isRejected ? 'REJECTED' : 'COMPLETED',
+        }).catch((err) => {
+          // Don't abort the seal — but make this loud so we don't keep
+          // silently shipping certificate-less PDFs to production. Most
+          // common cause: Chromium / Playwright not installed in the
+          // production image (dev images already have it from npm install).
+          console.error(
+            '[seal-document.handler] Failed to render audit certificate. Document will be sealed without it.',
+            err,
+          );
+          return null;
+        })
       : null;
 
   const newDataId = await io.runTask('decorate-and-sign-pdf', async () => {
@@ -296,7 +309,16 @@ export const run = async ({
     });
   });
 
-  await io.runTask('send-completed-email', async () => {
+  // Non-fatal: by this point the document is fully sealed (PDF generated,
+  // status=COMPLETED, file swapped on documentData). If notification email
+  // fails — typically SMTP misconfig or network reachability (we've seen
+  // ECONNREFUSED to the org's relay) — log it but DO NOT rethrow. Throwing
+  // inside io.runTask causes the local jobs runner to retry the entire
+  // seal job up to 3x, re-rendering Chromium and re-uploading the PDF on
+  // each pass; that's how we ended up with cert-less PDFs in production.
+  // We deliberately do NOT wrap this in io.runTask anymore — it's a
+  // best-effort side-effect after the document is already sealed.
+  {
     let shouldSendCompletedEmail = sendEmail && !isResealing && !isRejected;
 
     if (isResealing && !isDocumentCompleted(document.status)) {
@@ -304,9 +326,16 @@ export const run = async ({
     }
 
     if (shouldSendCompletedEmail) {
-      await sendCompletedEmail({ documentId, requestMetadata });
+      try {
+        await sendCompletedEmail({ documentId, requestMetadata });
+      } catch (err) {
+        console.error(
+          '[seal-document.handler] sendCompletedEmail failed (non-fatal — document is already sealed):',
+          err,
+        );
+      }
     }
-  });
+  }
 
   const updatedDocument = await prisma.document.findFirstOrThrow({
     where: {
