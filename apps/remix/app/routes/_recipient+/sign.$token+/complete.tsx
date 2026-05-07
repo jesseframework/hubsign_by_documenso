@@ -208,6 +208,7 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
                 className="flex-1"
                 fileName={document.title}
                 documentData={document.documentData}
+                certificatePageCount={document.certificatePageCount}
                 disabled={!isDocumentCompleted(document.status)}
               />
             ) : (

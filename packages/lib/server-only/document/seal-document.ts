@@ -154,6 +154,12 @@ export const sealDocument = async ({
     await addRejectionStampToPdf(doc, rejectionReason);
   }
 
+  // Track how many trailing pages of the final sealed PDF are the audit
+  // certificate so the client can offer "Download without audit certificate"
+  // by slicing them off. 0 when the team disabled the cert or rendering
+  // failed (e.g. Chromium missing in production).
+  let certificatePageCount = 0;
+
   if (certificateData) {
     const certificate = await PDFDocument.load(certificateData);
 
@@ -162,6 +168,8 @@ export const sealDocument = async ({
     certificatePages.forEach((page) => {
       doc.addPage(page);
     });
+
+    certificatePageCount = certificatePages.length;
   }
 
   for (const field of fields) {
@@ -246,6 +254,7 @@ export const sealDocument = async ({
         status: isRejected ? DocumentStatus.REJECTED : DocumentStatus.COMPLETED,
         completedAt: new Date(),
         signatureHash,
+        certificatePageCount,
         // Clear the held password and mark the PDF as locked. After this point
         // the system has no way to recover the password.
         ...(document.pdfPassword

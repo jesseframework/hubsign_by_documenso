@@ -4,6 +4,7 @@ import { Trans } from '@lingui/react/macro';
 import {
   CheckCircle2Icon,
   ClockIcon,
+  FileIcon,
   FileTextIcon,
   Loader2,
   MailIcon,
@@ -23,7 +24,6 @@ import {
 } from '@documenso/trpc/server/document-router/schema';
 import { type TFolderWithSubfolders } from '@documenso/trpc/server/folder-router/schema';
 import { Button } from '@documenso/ui/primitives/button';
-import { Tabs, TabsList, TabsTrigger } from '@documenso/ui/primitives/tabs';
 
 import { CardMetric } from '~/components/general/metric-card';
 import { DocumentMoveToFolderDialog } from '~/components/dialogs/document-move-to-folder-dialog';
@@ -33,7 +33,6 @@ import { FolderMoveDialog } from '~/components/dialogs/folder-move-dialog';
 import { FolderSettingsDialog } from '~/components/dialogs/folder-settings-dialog';
 import { DocumentDropZoneWrapper } from '~/components/general/document/document-drop-zone-wrapper';
 import { DocumentSearch } from '~/components/general/document/document-search';
-import { DocumentStatus } from '~/components/general/document/document-status';
 import { DocumentUploadDropzone } from '~/components/general/document/document-upload';
 import { FolderCard } from '~/components/general/folder/folder-card';
 import { PeriodSelector } from '~/components/general/period-selector';
@@ -44,7 +43,7 @@ import { useOptionalCurrentTeam } from '~/providers/team';
 import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
-  return appMetaTags('Documents');
+  return appMetaTags('E-Sign Document');
 }
 
 const ZSearchParamsSchema = ZFindDocumentsInternalRequestSchema.pick({
@@ -109,27 +108,29 @@ export default function DocumentsPage() {
     void refetchFolders();
   }, [team?.url]);
 
-  const getTabHref = (value: keyof typeof ExtendedDocumentStatus) => {
-    const params = new URLSearchParams(searchParams);
-
-    params.set('status', value);
-
-    if (value === ExtendedDocumentStatus.ALL) {
-      params.delete('status');
-    }
-
-    if (params.has('page')) {
-      params.delete('page');
-    }
-
-    return `${formatDocumentsPath(team?.url)}?${params.toString()}`;
-  };
 
   useEffect(() => {
     if (data?.stats) {
       setStats(data.stats);
     }
   }, [data?.stats]);
+
+  // Build the URL for a status-filtered view of the document list. Used by
+  // the metric cards so clicking one filters the table the same way the
+  // (now-removed) tab strip used to.
+  const getStatusHref = (value: keyof typeof ExtendedDocumentStatus) => {
+    const params = new URLSearchParams(searchParams);
+    params.set('status', value);
+    if (value === ExtendedDocumentStatus.ALL) {
+      params.delete('status');
+    }
+    if (params.has('page')) {
+      params.delete('page');
+    }
+    return `${formatDocumentsPath(team?.url)}?${params.toString()}`;
+  };
+
+  const activeStatus = findDocumentSearchParams.status || ExtendedDocumentStatus.ALL;
 
   const navigateToFolder = (folderId?: string | null) => {
     const documentsPath = formatDocumentsPath(team?.url);
@@ -154,8 +155,9 @@ export default function DocumentsPage() {
           <CreateFolderDialog />
         </div>
 
-        {/* Stats grid */}
-        <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 lg:grid-cols-4">
+        {/* Stats grid — clickable, each card filters the document list to
+            its status. Mirrors the behaviour of the removed tab strip. */}
+        <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3 lg:grid-cols-5">
           <CardMetric
             icon={FileTextIcon}
             title="Total"
@@ -163,6 +165,8 @@ export default function DocumentsPage() {
             subtitle="All time"
             accentColor="#7c5cfc"
             iconBg="bg-primary/10"
+            href={getStatusHref(ExtendedDocumentStatus.ALL)}
+            isActive={activeStatus === ExtendedDocumentStatus.ALL}
           />
           <CardMetric
             icon={MailIcon}
@@ -171,6 +175,8 @@ export default function DocumentsPage() {
             subtitle="Needs action"
             accentColor="#3b5bdb"
             iconBg="bg-status-inbox-bg"
+            href={getStatusHref(ExtendedDocumentStatus.INBOX)}
+            isActive={activeStatus === ExtendedDocumentStatus.INBOX}
           />
           <CardMetric
             icon={ClockIcon}
@@ -179,6 +185,8 @@ export default function DocumentsPage() {
             subtitle="Awaiting others"
             accentColor="#c07a00"
             iconBg="bg-status-pending-bg"
+            href={getStatusHref(ExtendedDocumentStatus.PENDING)}
+            isActive={activeStatus === ExtendedDocumentStatus.PENDING}
           />
           <CardMetric
             icon={CheckCircle2Icon}
@@ -187,6 +195,18 @@ export default function DocumentsPage() {
             subtitle="Fully signed"
             accentColor="#1a9b6e"
             iconBg="bg-status-complete-bg"
+            href={getStatusHref(ExtendedDocumentStatus.COMPLETED)}
+            isActive={activeStatus === ExtendedDocumentStatus.COMPLETED}
+          />
+          <CardMetric
+            icon={FileIcon}
+            title="Draft"
+            value={stats[ExtendedDocumentStatus.DRAFT]}
+            subtitle="Not yet sent"
+            accentColor="#6b7280"
+            iconBg="bg-muted"
+            href={getStatusHref(ExtendedDocumentStatus.DRAFT)}
+            isActive={activeStatus === ExtendedDocumentStatus.DRAFT}
           />
         </div>
 
@@ -291,49 +311,16 @@ export default function DocumentsPage() {
         {/* Documents section title */}
         <div className="mt-8 mb-3">
           <h2 className="text-xl font-semibold tracking-tight">
-            <Trans>Documents</Trans>
+            <Trans>E-Sign Document</Trans>
           </h2>
         </div>
 
         {/* Table card with filters inside */}
         <div className="overflow-hidden rounded-[var(--r)] border border-border bg-card">
-          {/* Filter bar inside card */}
+          {/* Filter bar inside card — tabs removed (the dashboard cards
+              above already show the same per-status counts). */}
           <div className="flex items-center gap-2 border-b border-border p-2 sm:p-3">
-            {/* Tab pills - scrollable */}
-            <div className="scrollbar-hide min-w-0 flex-1 overflow-x-auto">
-              <Tabs value={findDocumentSearchParams.status || 'ALL'}>
-                <TabsList className="inline-flex w-auto gap-0.5 rounded-md border border-border bg-background p-[3px]">
-                  {[
-                    ExtendedDocumentStatus.ALL,
-                    ExtendedDocumentStatus.INBOX,
-                    ExtendedDocumentStatus.PENDING,
-                    ExtendedDocumentStatus.COMPLETED,
-                    ExtendedDocumentStatus.DRAFT,
-                  ].map((value) => (
-                    <TabsTrigger
-                      key={value}
-                      className="gap-1 whitespace-nowrap rounded px-2 py-1 text-[12px] font-medium data-[state=active]:bg-card data-[state=active]:font-semibold sm:gap-1.5 sm:px-3 sm:py-1.5"
-                      value={value}
-                      asChild
-                    >
-                      <Link to={getTabHref(value)} preventScrollReset>
-                        <DocumentStatus status={value} />
-                        <span className={`text-[10px] font-semibold rounded-full px-1.5 py-px ${
-                          findDocumentSearchParams.status === value || (!findDocumentSearchParams.status && value === 'ALL')
-                            ? 'bg-primary/10 text-primary'
-                            : 'bg-muted text-muted-foreground'
-                        }`}>
-                          {stats[value]}
-                        </span>
-                      </Link>
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </Tabs>
-            </div>
-
-            {/* Right side filters */}
-            <div className="ml-auto hidden flex-shrink-0 items-center gap-2 sm:flex">
+            <div className="ml-auto flex flex-shrink-0 items-center gap-2">
               {team && <DocumentsTableSenderFilter teamId={team.id} />}
               <PeriodSelector />
               <DocumentSearch initialValue={findDocumentSearchParams.query} />

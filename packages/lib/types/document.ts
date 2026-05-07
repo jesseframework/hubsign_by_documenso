@@ -125,6 +125,7 @@ export const ZDocumentManySchema = DocumentSchema.pick({
   templateId: true,
   folderId: true,
   useLegacyFieldInsertion: true,
+  certificatePageCount: true,
 }).extend({
   user: UserSchema.pick({
     id: true,
