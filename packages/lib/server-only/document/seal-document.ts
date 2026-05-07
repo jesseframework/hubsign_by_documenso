@@ -290,7 +290,20 @@ export const sealDocument = async ({
   });
 
   if (sendEmail && !isResealing) {
-    await sendCompletedEmail({ documentId, requestMetadata });
+    // Non-fatal: by this point the document is fully sealed (PDF generated,
+    // status=COMPLETED, signatureHash + certificatePageCount committed, file
+    // uploaded). If notification email fails — typically SMTP misconfig or
+    // network reachability — we log it but DO NOT rethrow. Throwing here
+    // would cause the local jobs runner to retry the entire seal up to 3
+    // times, re-rendering Chromium and re-uploading the PDF on each pass.
+    try {
+      await sendCompletedEmail({ documentId, requestMetadata });
+    } catch (err) {
+      console.error(
+        '[seal-document] sendCompletedEmail failed (non-fatal — document is already sealed):',
+        err,
+      );
+    }
   }
 
   const updatedDocument = await prisma.document.findFirstOrThrow({
