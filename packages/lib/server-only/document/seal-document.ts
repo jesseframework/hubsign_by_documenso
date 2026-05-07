@@ -129,7 +129,17 @@ export const sealDocument = async ({
           // Tell the renderer the seal's terminal state so the audit page
           // shows "Completed" / "Rejected" instead of the live "Pending".
           completionStatus: isRejected ? 'REJECTED' : 'COMPLETED',
-        }).catch(() => null)
+        }).catch((err) => {
+          // Don't abort the seal — but make this loud so we don't keep
+          // silently shipping certificate-less PDFs to production. Most
+          // common cause: Chromium / Playwright not installed in the
+          // production image (dev images already have it from npm install).
+          console.error(
+            '[seal-document] Failed to render audit certificate. Document will be sealed without it.',
+            err,
+          );
+          return null;
+        })
       : null;
 
   const doc = await PDFDocument.load(pdfData);
