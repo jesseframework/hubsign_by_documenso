@@ -5,6 +5,7 @@ import { env } from '@documenso/lib/utils/env';
 import { ResendTransport } from '@documenso/nodemailer-resend';
 
 import { MailChannelsTransport } from './transports/mailchannels';
+import { WorkHubTransport } from './transports/workhub';
 
 /**
  * Creates a Nodemailer transport object for sending emails.
@@ -21,6 +22,10 @@ import { MailChannelsTransport } from './transports/mailchannels';
  *   - `NEXT_PRIVATE_MAILCHANNELS_ENDPOINT`: Endpoint for MailChannels (optional)
  * - **resend**: Uses ResendTransport, requiring:
  *   - `NEXT_PRIVATE_RESEND_API_KEY`: API key for Resend
+ * - **workhub**: Uses WorkHubTransport (WorkHub BulkSender HTTP API), requiring:
+ *   - `NEXT_PRIVATE_WORKHUB_USERNAME`: BulkSender credential username
+ *   - `NEXT_PRIVATE_WORKHUB_PASSWORD`: BulkSender credential password
+ *   - `NEXT_PRIVATE_WORKHUB_ENDPOINT`: Override endpoint (optional, defaults to production)
  * - **smtp-api**: Uses a custom SMTP API configuration, requiring:
  *   - `NEXT_PRIVATE_SMTP_HOST`: The SMTP server host
  *   - `NEXT_PRIVATE_SMTP_APIKEY`: The API key for SMTP authentication
@@ -67,6 +72,22 @@ const getTransport = (): Transporter => {
     return createTransport(
       ResendTransport.makeTransport({
         apiKey: env('NEXT_PRIVATE_RESEND_API_KEY') || '',
+      }),
+    );
+  }
+
+  if (transport === 'workhub') {
+    if (!env('NEXT_PRIVATE_WORKHUB_USERNAME') || !env('NEXT_PRIVATE_WORKHUB_PASSWORD')) {
+      throw new Error(
+        'WorkHub transport requires NEXT_PRIVATE_WORKHUB_USERNAME and NEXT_PRIVATE_WORKHUB_PASSWORD',
+      );
+    }
+
+    return createTransport(
+      WorkHubTransport.makeTransport({
+        username: env('NEXT_PRIVATE_WORKHUB_USERNAME'),
+        password: env('NEXT_PRIVATE_WORKHUB_PASSWORD'),
+        endpoint: env('NEXT_PRIVATE_WORKHUB_ENDPOINT'),
       }),
     );
   }
