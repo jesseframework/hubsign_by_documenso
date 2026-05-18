@@ -14,6 +14,7 @@ ENV HUSKY=0
 ENV DOCKER_OUTPUT=1
 ENV SHARP_IGNORE_GLOBAL_LIBVIPS=1
 ENV SHARP_FORCE_GLOBAL_LIBVIPS=1
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 WORKDIR /app
 
@@ -34,6 +35,11 @@ RUN npm install --fetch-timeout=60000 --fetch-retries=3
 
 # Install turbo globally
 RUN npm install -g turbo@^1.9.3
+
+# Install Chromium + matching apt system libs for Playwright. Required by
+# seal-document so the audit certificate page renders into the final PDF.
+# Without these libs chromium.launch() throws and the cert is silently dropped.
+RUN npx playwright install --with-deps chromium
 
 # Build the application
 RUN npx turbo run build
