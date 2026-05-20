@@ -6,6 +6,11 @@ import type {
 import type { TDocumentEmailSettings } from '@documenso/lib/types/document-email';
 import type { TDocumentFormValues } from '@documenso/lib/types/document-form-values';
 import type { TFieldMetaNotOptionalSchema } from '@documenso/lib/types/field-meta';
+import type {
+  TWorkflowDefinition,
+  TWorkflowRunContext,
+  TWorkflowVariables,
+} from '@documenso/lib/types/workflow';
 
 /**
  * Global types for Prisma.Json instances.
@@ -19,6 +24,10 @@ declare global {
     type RecipientAuthOptions = TRecipientAuthOptions;
 
     type FieldMeta = TFieldMetaNotOptionalSchema;
+
+    type WorkflowDefinition = TWorkflowDefinition;
+    type WorkflowRunContext = TWorkflowRunContext;
+    type WorkflowVariables = TWorkflowVariables;
   }
 }
 

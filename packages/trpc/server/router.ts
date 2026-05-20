@@ -16,6 +16,7 @@ import { teamRouter } from './team-router/router';
 import { templateRouter } from './template-router/router';
 import { router } from './trpc';
 import { webhookRouter } from './webhook-router/router';
+import { workflowRouter } from './workflow-router/router';
 
 export const appRouter = router({
   auth: authRouter,
@@ -35,6 +36,7 @@ export const appRouter = router({
   embeddingPresign: embeddingPresignRouter,
   push: pushRouter,
   stamp: stampRouter,
+  workflow: workflowRouter,
 });
 
 export type AppRouter = typeof appRouter;

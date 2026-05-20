@@ -108,6 +108,7 @@ model User {
   dmsSavedSearches      DmsSavedSearch[]
   dmsAiConversations    DmsAiConversation[]
   dmsAiUsage            DmsAiUsage[]
+  createdWorkflows      Workflow[]            @relation("UserCreatedWorkflows")
 
   @@index([email])
 }
@@ -1589,6 +1590,7 @@ model Organization {
   aiUsage            DmsAiUsage[]
   seatPlans          OrgSeatPlan[]
   stamps             Stamp[]
+  workflows          Workflow[]           @relation("OrgWorkflows")
 }
 
 enum OrgSeatTier {
@@ -1834,4 +1836,105 @@ model DocumentStampPlacement {
 
   @@index([documentId])
   @@index([stampId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Generic Workflow Manager (org-scoped)
+//
+// A Workflow is a JSON-defined automation: a `trigger` (what starts it) plus a
+// `definition` (a graph of steps — the "processing stream"). Logic is injected
+// declaratively as JSONLogic rules inside the definition (see
+// packages/lib/types/workflow.ts) and at the code level via the action registry
+// (packages/lib/server-only/workflow/actions). Not to be confused with the
+// DMS-specific DmsWorkflow approval chains above.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum WorkflowTriggerType {
+  EVENT // fired by a system event (eSign / DMS lifecycle)
+  MANUAL // run on demand from the UI or API
+  SCHEDULE // fired on a cron schedule
+}
+
+enum WorkflowRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WorkflowRunStepStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+model Workflow {
+  id             String              @id @default(cuid())
+  organizationId Int
+  name           String
+  description    String?
+  enabled        Boolean             @default(false)
+
+  triggerType  WorkflowTriggerType @default(EVENT)
+  triggerEvent String? /// Event key when triggerType=EVENT, e.g. "DOCUMENT_COMPLETED" or "DMS_DOCUMENT_FILED".
+  cron         String? /// Standard 5-field cron expression when triggerType=SCHEDULE.
+  timezone     String?             @default("UTC")
+  nextRunAt    DateTime? /// Next computed fire time for scheduled workflows; null otherwise.
+
+  definition Json /// [WorkflowDefinition] The trigger gate + step graph (JSONLogic-based).
+  version    Int  @default(1)
+
+  createdById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization  @relation("OrgWorkflows", fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?         @relation("UserCreatedWorkflows", fields: [createdById], references: [id], onDelete: SetNull)
+  runs         WorkflowRun[]
+
+  @@index([organizationId])
+  @@index([triggerType, enabled])
+  @@index([triggerEvent])
+  @@index([nextRunAt])
+}
+
+model WorkflowRun {
+  id         String            @id @default(cuid())
+  workflowId String
+  status     WorkflowRunStatus @default(PENDING)
+  trigger    String /// How the run started: the event key, "MANUAL", or "SCHEDULE".
+  context    Json /// [WorkflowRunContext] Immutable input payload available to every step.
+  variables  Json? /// [WorkflowVariables] Mutable variable bag accumulated by SET_VARIABLE steps.
+  error      String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime          @default(now())
+
+  workflow Workflow          @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  steps    WorkflowRunStep[]
+
+  @@index([workflowId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model WorkflowRunStep {
+  id         String                @id @default(cuid())
+  runId      String
+  stepId     String /// Step id within the workflow definition.
+  type       String /// CONDITION | BRANCH | ACTION | DELAY | SET_VARIABLE
+  status     WorkflowRunStepStatus @default(PENDING)
+  input      Json? /// [WorkflowVariables] Snapshot of the resolved step input.
+  output     Json? /// [WorkflowVariables] Result of the step (action response, branch taken, etc.).
+  error      String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime              @default(now())
+
+  run WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
 }

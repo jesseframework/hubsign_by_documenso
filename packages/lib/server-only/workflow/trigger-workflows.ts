@@ -1,0 +1,137 @@
+/**
+ * Workflow trigger dispatch.
+ *
+ * `triggerWorkflows` finds enabled EVENT-triggered workflows for an organization,
+ * applies each one's optional JSONLogic trigger gate, creates a WorkflowRun and
+ * enqueues the execute-workflow job. `triggerWorkflowEvent` is the wiring helper
+ * called from event sites (it mirrors `triggerWebhook`'s signature, resolves the
+ * org, and is fully non-fatal). `enqueueWorkflowRun` is the shared low-level path
+ * used by event, manual and scheduled triggers.
+ */
+
+import { prisma } from '@documenso/prisma';
+
+import { jobs } from '../../jobs/client';
+import type { TWorkflowRunContext } from '../../types/workflow';
+import { WORKFLOW_EVENT_KEYS, ZWorkflowDefinitionSchema } from '../../types/workflow';
+import { evaluateCondition } from './logic';
+import { resolveOrganizationId } from './resolve-organization-id';
+
+const EXECUTE_WORKFLOW_JOB_NAME = 'internal.execute-workflow';
+
+const isWorkflowEvent = (event: string): boolean =>
+  (WORKFLOW_EVENT_KEYS as readonly string[]).includes(event);
+
+/**
+ * Create a PENDING run and enqueue it for execution. Returns the run id.
+ */
+export const enqueueWorkflowRun = async ({
+  workflowId,
+  trigger,
+  context,
+}: {
+  workflowId: string;
+  trigger: string;
+  context: TWorkflowRunContext;
+}): Promise<string> => {
+  const run = await prisma.workflowRun.create({
+    data: {
+      workflowId,
+      trigger,
+      status: 'PENDING',
+      context: context as PrismaJson.WorkflowRunContext,
+    },
+  });
+
+  await jobs.triggerJob({
+    name: EXECUTE_WORKFLOW_JOB_NAME,
+    payload: { runId: run.id },
+  });
+
+  return run.id;
+};
+
+/**
+ * Dispatch all matching EVENT workflows for an organization.
+ */
+export const triggerWorkflows = async ({
+  event,
+  organizationId,
+  data,
+}: {
+  event: string;
+  organizationId: number;
+  data: Record<string, unknown>;
+}): Promise<void> => {
+  const workflows = await prisma.workflow.findMany({
+    where: {
+      organizationId,
+      enabled: true,
+      triggerType: 'EVENT',
+      triggerEvent: event,
+    },
+  });
+
+  if (workflows.length === 0) {
+    return;
+  }
+
+  const now = new Date().toISOString();
+
+  for (const workflow of workflows) {
+    const parsed = ZWorkflowDefinitionSchema.safeParse(workflow.definition);
+
+    if (!parsed.success) {
+      // Skip invalid definitions rather than throwing inside an event path.
+      continue;
+    }
+
+    const context: TWorkflowRunContext = {
+      event,
+      trigger: parsed.data.trigger,
+      payload: data,
+      document: data,
+      organization: { id: organizationId },
+      now,
+    };
+
+    const gate = parsed.data.trigger.type === 'EVENT' ? parsed.data.trigger.condition : undefined;
+    if (!evaluateCondition(gate, context)) {
+      continue;
+    }
+
+    await enqueueWorkflowRun({ workflowId: workflow.id, trigger: event, context });
+  }
+};
+
+/**
+ * Event-site wiring helper. Resolves the organization from the document's
+ * team/owner and dispatches matching workflows. Non-fatal: never throws into the
+ * caller's request path.
+ */
+export const triggerWorkflowEvent = async ({
+  event,
+  data,
+  userId,
+  teamId,
+}: {
+  event: string;
+  data: Record<string, unknown>;
+  userId?: number | null;
+  teamId?: number | null;
+}): Promise<void> => {
+  try {
+    if (!isWorkflowEvent(event)) {
+      return;
+    }
+
+    const organizationId = await resolveOrganizationId({ teamId, userId });
+    if (!organizationId) {
+      return;
+    }
+
+    await triggerWorkflows({ event, organizationId, data });
+  } catch (err) {
+    console.error('[triggerWorkflowEvent] failed (non-fatal):', err);
+  }
+};
