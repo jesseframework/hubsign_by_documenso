@@ -62,6 +62,12 @@ export default function OrgSettingsPage() {
   // Email-to-sign
   const [emailToSignEnabled, setEmailToSignEnabled] = useState(false);
   const [emailToSignInitialized, setEmailToSignInitialized] = useState(false);
+  // Per-org WorkHub signature-inbox (receive) config
+  const [inboxEmail, setInboxEmail] = useState('');
+  const [workhubUsername, setWorkhubUsername] = useState('');
+  const [workhubPassword, setWorkhubPassword] = useState('');
+  const [workhubMailboxId, setWorkhubMailboxId] = useState('');
+  const [workhubApiBase, setWorkhubApiBase] = useState('');
 
   // OCR settings
   const [ocrApiUrl, setOcrApiUrl] = useState('');
@@ -183,7 +189,13 @@ export default function OrgSettingsPage() {
   }
 
   if (!emailToSignInitialized && org) {
-    setEmailToSignEnabled(Boolean((org as Record<string, unknown>).emailToSignEnabled));
+    const o = org as Record<string, unknown>;
+    setEmailToSignEnabled(Boolean(o.emailToSignEnabled));
+    setInboxEmail((o.inboxEmail as string) ?? '');
+    setWorkhubUsername((o.workhubUsername as string) ?? '');
+    setWorkhubPassword((o.workhubPassword as string) ?? '');
+    setWorkhubMailboxId((o.workhubMailboxId as string) ?? '');
+    setWorkhubApiBase((o.workhubApiBase as string) ?? '');
     setEmailToSignInitialized(true);
   }
 
@@ -928,9 +940,91 @@ export default function OrgSettingsPage() {
             </label>
           </div>
 
+          {/* WorkHub inbox (receive) connection — per org, same credential model as sending */}
+          <div className="mt-4 space-y-3">
+            <p className="text-[12px] font-medium text-muted-foreground">
+              <Trans>WorkHub inbox connection</Trans>
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>Inbox email (receiving address)</Trans>
+                </label>
+                <input
+                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  value={inboxEmail}
+                  onChange={(e) => setInboxEmail(e.target.value)}
+                  placeholder={`${org.slug}@inbox.your-domain.com`}
+                />
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>Mailbox ID (optional)</Trans>
+                </label>
+                <input
+                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  value={workhubMailboxId}
+                  onChange={(e) => setWorkhubMailboxId(e.target.value)}
+                  placeholder="leave blank to use the credential's mailbox"
+                />
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>WorkHub BulkSender username</Trans>
+                </label>
+                <input
+                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  value={workhubUsername}
+                  onChange={(e) => setWorkhubUsername(e.target.value)}
+                  placeholder="bsk_..."
+                  autoComplete="off"
+                />
+              </div>
+              <div>
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>WorkHub BulkSender password</Trans>
+                </label>
+                <input
+                  type="password"
+                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  value={workhubPassword}
+                  onChange={(e) => setWorkhubPassword(e.target.value)}
+                  placeholder="bsk...."
+                  autoComplete="new-password"
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>WorkHub API base (optional)</Trans>
+                </label>
+                <input
+                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  value={workhubApiBase}
+                  onChange={(e) => setWorkhubApiBase(e.target.value)}
+                  placeholder="https://api.workhubplatform.io/v1 (or staging)"
+                />
+              </div>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              <Trans>
+                Uses your org's WorkHub BulkSender credential (same as sending) to poll its mailbox.
+                The signature inbox shows incoming PDFs after OCR.
+              </Trans>
+            </p>
+          </div>
+
           <div className="mt-4 flex justify-end">
             <Button
-              onClick={() => void updateOrg.mutateAsync({ emailToSignEnabled })}
+              onClick={() =>
+                void updateOrg.mutateAsync({
+                  emailToSignEnabled,
+                  inboxEmail: inboxEmail || null,
+                  workhubUsername: workhubUsername || null,
+                  workhubPassword: workhubPassword || null,
+                  workhubMailboxId: workhubMailboxId || null,
+                  workhubApiBase: workhubApiBase || null,
+                })
+              }
               loading={updateOrg.isPending}
             >
               <Trans>Save Inbox Settings</Trans>

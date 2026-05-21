@@ -1,7 +1,10 @@
 import { Trans } from '@lingui/react/macro';
 import {
   BuildingIcon,
+  ClipboardCheckIcon,
   CreditCardIcon,
+  InboxIcon,
+  ListChecksIcon,
   SettingsIcon,
   ShieldIcon,
   StampIcon,
@@ -16,8 +19,11 @@ import { cn } from '@documenso/ui/lib/utils';
 const navItems = [
   { to: '/org/settings', icon: BuildingIcon, label: <Trans>Settings</Trans> },
   { to: '/org/members', icon: UsersIcon, label: <Trans>Members</Trans> },
+  { to: '/org/inbox', icon: InboxIcon, label: <Trans>Signature Inbox</Trans> },
   { to: '/org/permissions', icon: ShieldIcon, label: <Trans>DMS Permissions</Trans> },
   { to: '/org/workflows', icon: WorkflowIcon, label: <Trans>Workflows</Trans> },
+  { to: '/org/approvals', icon: ClipboardCheckIcon, label: <Trans>Approvals</Trans> },
+  { to: '/org/approval-templates', icon: ListChecksIcon, label: <Trans>Approval Setup</Trans> },
   { to: '/org/stamps', icon: StampIcon, label: <Trans>Stamps</Trans> },
   { to: '/org/billing', icon: CreditCardIcon, label: <Trans>Billing</Trans> },
   { to: '/org/recycle-bin', icon: Trash2Icon, label: <Trans>Recycle Bin</Trans> },

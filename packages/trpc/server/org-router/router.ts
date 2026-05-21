@@ -224,8 +224,13 @@ export const orgRouter = router({
         .optional(),
       oidcProviderLabel: z.string().max(80).nullable().optional(),
       disableSelfSignup: z.boolean().optional(),
-      // Email-to-sign
+      // Email-to-sign + WorkHub inbox (per-org receive config)
       emailToSignEnabled: z.boolean().optional(),
+      inboxEmail: z.string().nullable().optional(),
+      workhubUsername: z.string().nullable().optional(),
+      workhubPassword: z.string().nullable().optional(),
+      workhubMailboxId: z.string().nullable().optional(),
+      workhubApiBase: z.string().nullable().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const membership = await prisma.organizationMember.findFirst({

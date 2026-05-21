@@ -11,6 +11,7 @@ import { SEND_TEAM_MEMBER_LEFT_EMAIL_JOB_DEFINITION } from './definitions/emails
 import { BULK_SEND_TEMPLATE_JOB_DEFINITION } from './definitions/internal/bulk-send-template';
 import { EXECUTE_WEBHOOK_JOB_DEFINITION } from './definitions/internal/execute-webhook';
 import { EXECUTE_WORKFLOW_JOB_DEFINITION } from './definitions/internal/execute-workflow';
+import { PROCESS_INBOX_OCR_JOB_DEFINITION } from './definitions/internal/process-inbox-ocr';
 import { SEAL_DOCUMENT_JOB_DEFINITION } from './definitions/internal/seal-document';
 
 /**
@@ -31,6 +32,7 @@ export const jobsClient = new JobClient([
   BULK_SEND_TEMPLATE_JOB_DEFINITION,
   EXECUTE_WEBHOOK_JOB_DEFINITION,
   EXECUTE_WORKFLOW_JOB_DEFINITION,
+  PROCESS_INBOX_OCR_JOB_DEFINITION,
 ] as const);
 
 export const jobs = jobsClient;

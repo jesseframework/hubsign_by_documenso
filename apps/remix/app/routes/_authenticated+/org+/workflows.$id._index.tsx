@@ -441,7 +441,7 @@ export default function WorkflowEditorPage() {
                     value={triggerEvent}
                     onChange={(e) => setTriggerEvent(e.target.value)}
                   >
-                    {['eSign', 'DMS'].map((group) => (
+                    {['eSign', 'DMS', 'Inbox'].map((group) => (
                       <optgroup key={group} label={group}>
                         {WORKFLOW_EVENTS.filter((ev) => ev.group === group).map((ev) => (
                           <option key={ev.key} value={ev.key}>

@@ -44,6 +44,9 @@ export const WORKFLOW_EVENTS = [
   { key: 'DMS_DOCUMENT_FILED', label: 'DMS document filed', group: 'DMS' },
   { key: 'DMS_DOCUMENT_CLASSIFIED', label: 'DMS document classified', group: 'DMS' },
   { key: 'DMS_RETRIEVAL_REQUESTED', label: 'DMS retrieval requested', group: 'DMS' },
+  // Signature inbox (email-to-sign)
+  { key: 'INBOX_EMAIL_RECEIVED', label: 'Inbox email received', group: 'Inbox' },
+  { key: 'INBOX_OCR_COMPLETED', label: 'Inbox OCR completed', group: 'Inbox' },
 ] as const;
 
 export type WorkflowEventKey = (typeof WORKFLOW_EVENTS)[number]['key'];

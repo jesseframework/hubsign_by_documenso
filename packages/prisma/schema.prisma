@@ -428,6 +428,9 @@ model Document {
 
   stampPlacements DocumentStampPlacement[]
 
+  // Signature inbox (email-to-sign queue) link
+  inboxItem SignatureInboxItem?
+
   @@unique([documentDataId])
   @@index([userId])
   @@index([status])
@@ -1569,8 +1572,17 @@ model Organization {
 
   // Email-to-sign: when enabled, the org has a unique inbox alias that
   // accepts inbound emails with PDF attachments and creates DRAFT documents.
-  // The inbox alias is `{slug}@inbox.<your-domain>` (configured externally).
   emailToSignEnabled Boolean @default(false)
+
+  // Per-org signature-inbox (receive) config. The inbox is polled from WorkHub
+  // using the org's own WorkHub BulkSender credential (HTTP Basic) — the same
+  // auth model as sending — so each org reads its own mailbox. All fields are
+  // optional; an org configures these in Org Settings.
+  inboxEmail       String? /// Receiving address shown to users, e.g. fepro@inbox.your-domain.
+  workhubUsername  String? /// WorkHub BulkSender credential username (inbox API auth).
+  workhubPassword  String? /// WorkHub BulkSender credential password.
+  workhubMailboxId String? /// Optional mailbox override (?mailboxId=).
+  workhubApiBase   String? /// Optional per-org WorkHub API base override.
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1638,11 +1650,20 @@ model OrganizationMember {
   userId Int
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  // Manager hierarchy (used by approval-chain approver resolution).
+  managerId        String?
+  manager          OrganizationMember?  @relation("OrgMemberManager", fields: [managerId], references: [id], onDelete: SetNull)
+  subordinates     OrganizationMember[] @relation("OrgMemberManager")
+  department       String? /// Free-form department/grouping key (e.g. "Finance").
+  isDepartmentHead Boolean              @default(false)
+
   dmsPermissions DmsOrgPermission[]
 
   joinedAt DateTime @default(now())
 
   @@unique([organizationId, userId])
+  @@index([managerId])
+  @@index([organizationId, department])
 }
 
 model DmsOrgPermission {
@@ -1937,4 +1958,342 @@ model WorkflowRunStep {
   run WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
 
   @@index([runId])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Approval Chain module (org-scoped)
+//
+// A higher-level layer over the generic Workflow engine: template-driven approval
+// chains with dynamic approver resolution, JSONLogic conditional rules + validation,
+// reminders/escalation, and template chaining. Gates documents (e.g. those arriving
+// via the email-to-sign inbox) before they are released for signature.
+//
+// References to users/organizations are stored as plain ids (no FK) to keep the
+// module decoupled; integrity *within* the module uses relations + cascade.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ApprovalRequestStatus {
+  PENDING
+  IN_PROGRESS
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum ApprovalFlowStatus {
+  PENDING
+  EMAIL_SENT
+  EMAIL_READ
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum ApprovalDetermination {
+  FIXED_USER
+  ORG_ROLE
+  ROLE_MAPPING
+  REPORTING_MANAGER
+  DEPARTMENT_HEAD
+}
+
+enum ApprovalValidationSeverity {
+  CRITICAL
+  ERROR
+  WARNING
+  INFO
+}
+
+enum ApprovalOnApproveAction {
+  NONE
+  MARK_APPROVED
+  SEND_FOR_SIGNATURE
+}
+
+model ApprovalTemplate {
+  id             String  @id @default(cuid())
+  organizationId Int
+  name           String
+  description    String?
+  entityType     String  @default("Document") /// What this chain gates, e.g. "Document".
+  isActive       Boolean @default(true)
+  isDefault      Boolean @default(false) /// Picked when no rule/specific template matches.
+  triggerStatus  String? /// Optional entity status that triggers this template.
+
+  onApproveAction ApprovalOnApproveAction @default(MARK_APPROVED)
+
+  // Chaining — deterministic precedence: nextTemplateId > nextRuleSetId > triggerStatus.
+  nextTemplateId      String?
+  nextRuleSetId       String?
+  rejectionTemplateId String?
+
+  config Json? /// Free-form extra config.
+
+  createdById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  steps    ApprovalStep[]
+  requests ApprovalRequest[]
+
+  @@index([organizationId])
+  @@index([organizationId, entityType, isActive])
+  @@index([organizationId, entityType, isDefault])
+}
+
+model ApprovalStep {
+  id         String @id @default(cuid())
+  templateId String
+  stepNumber Int
+
+  name           String
+  determination  ApprovalDetermination @default(FIXED_USER)
+  approverRole   OrganizationRole? /// For ORG_ROLE.
+  fixedUserId    Int? /// For FIXED_USER.
+  roleMappingKey String? /// For ROLE_MAPPING (matches ApprovalRoleMapping.roleKey).
+  department     String? /// For DEPARTMENT_HEAD.
+
+  isParallel Boolean @default(false)
+  isOptional Boolean @default(false)
+  isEnd      Boolean @default(false)
+
+  // Reminder / escalation settings.
+  enableReminders          Boolean @default(false)
+  firstReminderAfterHours  Int?
+  secondReminderAfterHours Int?
+  escalationAfterHours     Int?
+  reminderIntervalHours    Int?
+  escalationRecipients     String? /// Comma-separated emails.
+
+  config Json? /// e.g. approver-chain config for ROLE_MAPPING.
+
+  template    ApprovalTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  validations ApprovalStepValidation[]
+
+  @@index([templateId])
+  @@index([templateId, stepNumber])
+}
+
+model ApprovalRequest {
+  id             String                @id @default(cuid())
+  organizationId Int
+  templateId     String?
+  entityType     String
+  entityId       String /// Stringified id of the gated entity (e.g. Document.id).
+  status         ApprovalRequestStatus @default(PENDING)
+  priority       String?
+  amount         Float? /// Optional numeric used by rules/validation.
+  currentStep    Int                   @default(1)
+  requestedById  Int?
+  documentFileId String? /// Optional snapshot/preview reference.
+  error          String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  template  ApprovalTemplate?         @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  flows     ApprovalFlowRecord[]
+  reminders ApprovalReminderHistory[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([entityType, entityId])
+  @@index([entityType, entityId, status])
+}
+
+model ApprovalFlowRecord {
+  id        String  @id @default(cuid())
+  requestId String
+  stepOrder Int
+  stepName  String?
+
+  approverId    Int?
+  approverName  String?
+  approverEmail String
+  approverRole  String?
+
+  isParallel Boolean            @default(false)
+  isOptional Boolean            @default(false)
+  status     ApprovalFlowStatus @default(PENDING)
+
+  token      String    @unique /// Secure single-use token for email approve/reject links.
+  assignedAt DateTime  @default(now())
+  actionedAt DateTime?
+  decision   String? /// "Approved" | "Rejected".
+  comments   String?
+
+  remindersSent  Int       @default(0)
+  lastReminderAt DateTime?
+
+  request   ApprovalRequest           @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  reminders ApprovalReminderHistory[]
+
+  @@index([requestId])
+  @@index([requestId, stepOrder])
+  @@index([approverEmail])
+  @@index([status])
+}
+
+model ApprovalRuleSet {
+  id             String   @id @default(cuid())
+  organizationId Int
+  entityType     String
+  name           String
+  priority       Int      @default(0)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  rules ApprovalRule[]
+
+  @@index([organizationId])
+  @@index([organizationId, entityType, isActive])
+}
+
+model ApprovalRule {
+  id              String   @id @default(cuid())
+  ruleSetId       String
+  name            String
+  conditionConfig Json /// JSONLogic deciding if this rule matches.
+  templateId      String? /// Template to use when matched.
+  priority        Int      @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  ruleSet ApprovalRuleSet @relation(fields: [ruleSetId], references: [id], onDelete: Cascade)
+
+  @@index([ruleSetId])
+  @@index([ruleSetId, isActive, priority])
+}
+
+model ApprovalRoleMapping {
+  id                String   @id @default(cuid())
+  organizationId    Int
+  roleType          String /// e.g. "Department".
+  roleKey           String /// e.g. "Finance".
+  approvalLevel     Int      @default(1)
+  primaryApproverId Int
+  backupApproverId  Int?
+  reminderHours     Int?
+  expiryHours       Int?
+  isParallel        Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([organizationId])
+  @@unique([organizationId, roleType, roleKey, approvalLevel])
+}
+
+model ApprovalValidationRule {
+  id              String                     @id @default(cuid())
+  organizationId  Int
+  name            String
+  validationType  String /// Conditional | Required | Range | Pattern | CrossField | Custom.
+  conditionConfig Json /// JSON config for the check.
+  errorMessage    String
+  severity        ApprovalValidationSeverity @default(ERROR)
+  entityType      String?
+  isActive        Boolean                    @default(true)
+  description     String?
+  createdAt       DateTime                   @default(now())
+  updatedAt       DateTime                   @updatedAt
+
+  steps ApprovalStepValidation[]
+
+  @@index([organizationId])
+  @@index([organizationId, isActive, validationType])
+  @@index([entityType])
+}
+
+model ApprovalStepValidation {
+  id               String  @id @default(cuid())
+  stepId           String
+  validationRuleId String
+  priority         Int     @default(0)
+  isActive         Boolean @default(true)
+
+  step           ApprovalStep           @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  validationRule ApprovalValidationRule @relation(fields: [validationRuleId], references: [id], onDelete: Cascade)
+
+  @@index([stepId])
+  @@index([validationRuleId])
+  @@index([stepId, priority])
+}
+
+model ApprovalReminderHistory {
+  id                String    @id @default(cuid())
+  requestId         String
+  flowRecordId      String
+  recipientEmail    String
+  reminderType      String /// "First" | "Second" | "Escalation" | "Interval".
+  sentAt            DateTime  @default(now())
+  respondedAt       DateTime?
+  responseAction    String?
+  responseTimeHours Float?
+  entityType        String?
+  entityAmount      Float?
+
+  request    ApprovalRequest    @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  flowRecord ApprovalFlowRecord @relation(fields: [flowRecordId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+  @@index([flowRecordId])
+  @@index([sentAt])
+  @@index([recipientEmail])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Signature Inbox (email-to-sign queue)
+//
+// Each inbound email PDF becomes a DRAFT Document plus a SignatureInboxItem that
+// tracks the queue: received → OCR (BMS ML) → ready → sent for signature →
+// completed. OCR-extracted data is stored for triage and to drive workflows
+// (the INBOX_OCR_COMPLETED event fires once OCR finishes).
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum InboxItemStatus {
+  RECEIVED
+  OCR_PROCESSING
+  OCR_COMPLETED
+  OCR_FAILED
+  READY
+  SENT_FOR_SIGNATURE
+  COMPLETED
+  ARCHIVED
+}
+
+model SignatureInboxItem {
+  id             String          @id @default(cuid())
+  organizationId Int
+  documentId     Int             @unique
+  status         InboxItemStatus @default(RECEIVED)
+
+  senderEmail       String?
+  subject           String?
+  receivedById      Int? /// Org member (user id) the inbound doc was attributed to.
+  externalMessageId String? /// Source message id (e.g. WorkHub email id) for idempotent polling.
+
+  // OCR / BMS ML output.
+  ocrProcessed  Boolean @default(false)
+  ocrText       String? /// Raw OCR text (may be large).
+  ocrConfidence Float?
+  mlConfidence  Float?
+  documentType  String?
+  ocrEngine     String?
+  needsReview   Boolean @default(false)
+  extractedData Json? /// Flattened field_name → value map from BMS ML.
+  ocrMeta       Json? /// Full OCR metadata (confidences, field_extractions, etc.).
+
+  error     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([organizationId, status])
+  @@index([createdAt])
+  @@index([externalMessageId])
 }
