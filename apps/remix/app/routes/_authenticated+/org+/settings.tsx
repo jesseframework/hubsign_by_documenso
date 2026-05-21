@@ -64,6 +64,7 @@ export default function OrgSettingsPage() {
   const [emailToSignInitialized, setEmailToSignInitialized] = useState(false);
   // Per-org WorkHub signature-inbox (receive) config
   const [inboxEmail, setInboxEmail] = useState('');
+  const [workhubApiKey, setWorkhubApiKey] = useState('');
   const [workhubUsername, setWorkhubUsername] = useState('');
   const [workhubPassword, setWorkhubPassword] = useState('');
   const [workhubMailboxId, setWorkhubMailboxId] = useState('');
@@ -192,6 +193,7 @@ export default function OrgSettingsPage() {
     const o = org as Record<string, unknown>;
     setEmailToSignEnabled(Boolean(o.emailToSignEnabled));
     setInboxEmail((o.inboxEmail as string) ?? '');
+    setWorkhubApiKey((o.workhubApiKey as string) ?? '');
     setWorkhubUsername((o.workhubUsername as string) ?? '');
     setWorkhubPassword((o.workhubPassword as string) ?? '');
     setWorkhubMailboxId((o.workhubMailboxId as string) ?? '');
@@ -911,9 +913,9 @@ export default function OrgSettingsPage() {
           <h2 className="text-[15px] font-semibold"><Trans>Email-to-Sign Inbox</Trans></h2>
           <p className="mt-1 text-[13px] text-muted-foreground">
             <Trans>
-              Forward a PDF to your org's inbox alias and HubSign creates a DRAFT signing
-              request automatically. The sender (you or any org member) then opens HubSign to
-              add recipients and send it out.
+              HubSign polls your existing WorkHub mailbox (configured below) for incoming PDFs,
+              runs them through OCR, and adds them to the Signature Inbox to review and send for
+              signature. No DNS or alias setup — it reads the mailbox you already use.
             </Trans>
           </p>
 
@@ -924,8 +926,7 @@ export default function OrgSettingsPage() {
               </label>
               <p className="mt-0.5 text-[12px] text-muted-foreground">
                 <Trans>
-                  Inbox alias: <code className="rounded bg-muted px-1">{org.slug}@inbox.hubsign.io</code>
-                  &nbsp;(requires DNS + inbound provider config — see README).
+                  When on, HubSign polls the WorkHub mailbox below for new PDFs to sign.
                 </Trans>
               </p>
             </div>
@@ -946,6 +947,22 @@ export default function OrgSettingsPage() {
               <Trans>WorkHub inbox connection</Trans>
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>WorkHub API key (x-api-key)</Trans>
+                </label>
+                <input
+                  type="password"
+                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  value={workhubApiKey}
+                  onChange={(e) => setWorkhubApiKey(e.target.value)}
+                  placeholder="generate in WorkHub → Settings → API Keys (needs email.read)"
+                  autoComplete="off"
+                />
+                <p className="mt-0.5 text-[11px] text-muted-foreground">
+                  <Trans>This is what reads the inbox. Generate it in WorkHub with email.read permission.</Trans>
+                </p>
+              </div>
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground">
                   <Trans>Inbox email (receiving address)</Trans>
@@ -970,7 +987,7 @@ export default function OrgSettingsPage() {
               </div>
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground">
-                  <Trans>WorkHub BulkSender username</Trans>
+                  <Trans>BulkSender username (optional fallback)</Trans>
                 </label>
                 <input
                   className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
@@ -982,7 +999,7 @@ export default function OrgSettingsPage() {
               </div>
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground">
-                  <Trans>WorkHub BulkSender password</Trans>
+                  <Trans>BulkSender password (optional fallback)</Trans>
                 </label>
                 <input
                   type="password"
@@ -1007,8 +1024,8 @@ export default function OrgSettingsPage() {
             </div>
             <p className="text-[11px] text-muted-foreground">
               <Trans>
-                Uses your org's WorkHub BulkSender credential (same as sending) to poll its mailbox.
-                The signature inbox shows incoming PDFs after OCR.
+                HubSign polls this WorkHub mailbox with the API key above and shows incoming PDFs in
+                the Signature Inbox after OCR. The BulkSender fields are an optional fallback.
               </Trans>
             </p>
           </div>
@@ -1019,6 +1036,7 @@ export default function OrgSettingsPage() {
                 void updateOrg.mutateAsync({
                   emailToSignEnabled,
                   inboxEmail: inboxEmail || null,
+                  workhubApiKey: workhubApiKey || null,
                   workhubUsername: workhubUsername || null,
                   workhubPassword: workhubPassword || null,
                   workhubMailboxId: workhubMailboxId || null,

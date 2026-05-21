@@ -1722,6 +1722,14 @@ msgstr "Bulk Send via CSV"
 msgid "Bulk Upload"
 msgstr "Bulk Upload"
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "BulkSender password (optional fallback)"
+msgstr "BulkSender password (optional fallback)"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "BulkSender username (optional fallback)"
+msgstr "BulkSender username (optional fallback)"
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 msgid "By"
 msgstr "By"
@@ -4096,8 +4104,8 @@ msgid "Forgot your password?"
 msgstr "Forgot your password?"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
-msgid "Forward a PDF to your org's inbox alias and HubSign creates a DRAFT signing request automatically. The sender (you or any org member) then opens HubSign to add recipients and send it out."
-msgstr "Forward a PDF to your org's inbox alias and HubSign creates a DRAFT signing request automatically. The sender (you or any org member) then opens HubSign to add recipients and send it out."
+#~ msgid "Forward a PDF to your org's inbox alias and HubSign creates a DRAFT signing request automatically. The sender (you or any org member) then opens HubSign to add recipients and send it out."
+#~ msgstr "Forward a PDF to your org's inbox alias and HubSign creates a DRAFT signing request automatically. The sender (you or any org member) then opens HubSign to add recipients and send it out."
 
 #: packages/ui/primitives/document-flow/types.ts
 msgid "Free Signature"
@@ -4269,6 +4277,14 @@ msgstr "Hide"
 msgid "Hide additional information"
 msgstr "Hide additional information"
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "HubSign polls this WorkHub mailbox with the API key above and shows incoming PDFs in the Signature Inbox after OCR. The BulkSender fields are an optional fallback."
+msgstr "HubSign polls this WorkHub mailbox with the API key above and shows incoming PDFs in the Signature Inbox after OCR. The BulkSender fields are an optional fallback."
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "HubSign polls your existing WorkHub mailbox (configured below) for incoming PDFs, runs them through OCR, and adds them to the Signature Inbox to review and send for signature. No DNS or alias setup — it reads the mailbox you already use."
+msgstr "HubSign polls your existing WorkHub mailbox (configured below) for incoming PDFs, runs them through OCR, and adds them to the Signature Inbox to review and send for signature. No DNS or alias setup — it reads the mailbox you already use."
+
 #: apps/remix/app/components/dialogs/account-delete-dialog.tsx
 msgid "HubSign will delete <0>all of your documents</0>, along with all of your completed documents, signatures, and all other resources belonging to your Account."
 msgstr "HubSign will delete <0>all of your documents</0>, along with all of your completed documents, signatures, and all other resources belonging to your Account."
@@ -4341,10 +4357,9 @@ msgstr "Inactive"
 msgid "Inbox"
 msgstr "Inbox"
 
-#. placeholder {0}: org.slug
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
-msgid "Inbox alias: <0>{0}@inbox.hubsign.io</0> (requires DNS + inbound provider config — see README)."
-msgstr "Inbox alias: <0>{0}@inbox.hubsign.io</0> (requires DNS + inbound provider config — see README)."
+#~ msgid "Inbox alias: <0>{0}@inbox.hubsign.io</0> (requires DNS + inbound provider config — see README)."
+#~ msgstr "Inbox alias: <0>{0}@inbox.hubsign.io</0> (requires DNS + inbound provider config — see README)."
 
 #: apps/remix/app/components/general/app-command-menu.tsx
 msgid "Inbox documents"
@@ -8127,6 +8142,10 @@ msgstr "This is a public verification page. It does not show the document conten
 msgid "This is how the document will reach the recipients once the document is ready for signing."
 msgstr "This is how the document will reach the recipients once the document is ready for signing."
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "This is what reads the inbox. Generate it in WorkHub with email.read permission."
+msgstr "This is what reads the inbox. Generate it in WorkHub with email.read permission."
+
 #: apps/remix/app/routes/_unauthenticated+/team.verify.transfer.$token.tsx
 msgid "This link is invalid or has expired. Please contact your team to resend a transfer request."
 msgstr "This link is invalid or has expired. Please contact your team to resend a transfer request."
@@ -8842,8 +8861,8 @@ msgid "Users with an email matching one of this org's allowed domains can't sign
 msgstr "Users with an email matching one of this org's allowed domains can't sign up themselves — they must be invited or use SSO. Set allowed domains above first."
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
-msgid "Uses your org's WorkHub BulkSender credential (same as sending) to poll its mailbox. The signature inbox shows incoming PDFs after OCR."
-msgstr "Uses your org's WorkHub BulkSender credential (same as sending) to poll its mailbox. The signature inbox shows incoming PDFs after OCR."
+#~ msgid "Uses your org's WorkHub BulkSender credential (same as sending) to poll its mailbox. The signature inbox shows incoming PDFs after OCR."
+#~ msgstr "Uses your org's WorkHub BulkSender credential (same as sending) to poll its mailbox. The signature inbox shows incoming PDFs after OCR."
 
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/checkbox-field.tsx
@@ -9356,6 +9375,10 @@ msgstr "Were you trying to edit this document instead?"
 msgid "When enabled, signers can choose who should sign next in the sequence instead of following the predefined order."
 msgstr "When enabled, signers can choose who should sign next in the sequence instead of following the predefined order."
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "When on, HubSign polls the WorkHub mailbox below for new PDFs to sign."
+msgstr "When on, HubSign polls the WorkHub mailbox below for new PDFs to sign."
+
 #. placeholder {0}: org.slug
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "When on, the SSO button appears on <0>/signin?org={0}</0>. New members are auto-added to this org on first SSO sign-in."
@@ -9411,12 +9434,16 @@ msgid "WorkHub API base (optional)"
 msgstr "WorkHub API base (optional)"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
-msgid "WorkHub BulkSender password"
-msgstr "WorkHub BulkSender password"
+msgid "WorkHub API key (x-api-key)"
+msgstr "WorkHub API key (x-api-key)"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
-msgid "WorkHub BulkSender username"
-msgstr "WorkHub BulkSender username"
+#~ msgid "WorkHub BulkSender password"
+#~ msgstr "WorkHub BulkSender password"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+#~ msgid "WorkHub BulkSender username"
+#~ msgstr "WorkHub BulkSender username"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "WorkHub inbox connection"

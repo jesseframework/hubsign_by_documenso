@@ -17,21 +17,37 @@ import { env } from '../../utils/env';
 
 export type WorkHubInboxConfig = {
   apiBase?: string | null;
+  apiKey?: string | null;
   username?: string | null;
   password?: string | null;
   mailboxId?: string | null;
 };
 
 export const isWorkHubInboxConfigured = (config: WorkHubInboxConfig): boolean =>
-  !!config.username && !!config.password;
+  !!config.apiKey || (!!config.username && !!config.password);
 
-const resolveBase = (config: WorkHubInboxConfig): string =>
-  (config.apiBase || env('NEXT_PRIVATE_WORKHUB_API_BASE') || 'https://api.workhubplatform.io/v1').replace(
-    /\/$/,
-    '',
-  );
+/**
+ * Resolve the API base, tolerating a missing version segment: both
+ * `https://host` and `https://host/v1` work (we ensure `/v1`).
+ */
+const resolveBase = (config: WorkHubInboxConfig): string => {
+  let base = (
+    config.apiBase ||
+    env('NEXT_PRIVATE_WORKHUB_API_BASE') ||
+    'https://api.workhubplatform.io/v1'
+  ).replace(/\/$/, '');
+  if (!/\/v\d+$/.test(base)) base += '/v1';
+  return base;
+};
 
+/**
+ * Auth: prefer the API key (`x-api-key`, the inbox read API's scheme); fall back
+ * to HTTP Basic with a BulkSender credential if that's all that's configured.
+ */
 const headers = (config: WorkHubInboxConfig): Record<string, string> => {
+  if (config.apiKey) {
+    return { 'x-api-key': config.apiKey, 'content-type': 'application/json' };
+  }
   const basic = Buffer.from(`${config.username ?? ''}:${config.password ?? ''}`).toString('base64');
   return { authorization: `Basic ${basic}`, 'content-type': 'application/json' };
 };
@@ -178,4 +194,39 @@ export const workhubMarkRead = async (
   emailId: string,
 ): Promise<void> => {
   await request(config, 'POST', `/email/inbox/${encodeURIComponent(emailId)}/mark-read`);
+};
+
+/** List the mailboxes the credential/key can access. */
+export const workhubListMailboxes = async (
+  config: WorkHubInboxConfig,
+): Promise<Array<{ id: string; primaryEmail: string }>> => {
+  const body = await request(config, 'GET', '/email/mailboxes');
+  return asArray(body).map((m) => {
+    const o = m as Record<string, unknown>;
+    return {
+      id: String(pick(o, ['id', 'mailboxId']) ?? ''),
+      primaryEmail: String(pick(o, ['primaryEmail', 'email', 'address']) ?? '').toLowerCase(),
+    };
+  });
+};
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Resolve the mailbox UUID to use. API-key callers must pass a UUID; we accept a
+ * UUID as-is, otherwise look it up by email (`mailboxId` if it's an email, else
+ * `inboxEmail`) via /email/mailboxes. Returns null if nothing matches.
+ */
+export const resolveMailboxId = async (
+  config: WorkHubInboxConfig,
+  inboxEmail?: string | null,
+): Promise<string | null> => {
+  const raw = (config.mailboxId ?? '').trim();
+  if (UUID_RE.test(raw)) return raw;
+
+  const targetEmail = (raw.includes('@') ? raw : inboxEmail ?? '').toLowerCase();
+  if (!targetEmail) return null;
+
+  const boxes = await workhubListMailboxes(config);
+  return boxes.find((b) => b.primaryEmail === targetEmail)?.id ?? null;
 };

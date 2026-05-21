@@ -227,6 +227,7 @@ export const orgRouter = router({
       // Email-to-sign + WorkHub inbox (per-org receive config)
       emailToSignEnabled: z.boolean().optional(),
       inboxEmail: z.string().nullable().optional(),
+      workhubApiKey: z.string().nullable().optional(),
       workhubUsername: z.string().nullable().optional(),
       workhubPassword: z.string().nullable().optional(),
       workhubMailboxId: z.string().nullable().optional(),

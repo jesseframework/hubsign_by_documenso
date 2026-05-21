@@ -1579,8 +1579,9 @@ model Organization {
   // auth model as sending — so each org reads its own mailbox. All fields are
   // optional; an org configures these in Org Settings.
   inboxEmail       String? /// Receiving address shown to users, e.g. fepro@inbox.your-domain.
-  workhubUsername  String? /// WorkHub BulkSender credential username (inbox API auth).
-  workhubPassword  String? /// WorkHub BulkSender credential password.
+  workhubApiKey    String? /// WorkHub API key (x-api-key) with email.read — reads the inbox.
+  workhubUsername  String? /// WorkHub BulkSender credential username (optional Basic fallback).
+  workhubPassword  String? /// WorkHub BulkSender credential password (optional Basic fallback).
   workhubMailboxId String? /// Optional mailbox override (?mailboxId=).
   workhubApiBase   String? /// Optional per-org WorkHub API base override.
 

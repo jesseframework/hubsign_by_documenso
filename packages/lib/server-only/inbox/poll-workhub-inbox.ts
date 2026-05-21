@@ -22,6 +22,7 @@ import { createInboxItem } from './create-inbox-item';
 import type { WorkHubInboxConfig } from './workhub-inbox-client';
 import {
   isWorkHubInboxConfigured,
+  resolveMailboxId,
   workhubFetchAttachment,
   workhubListAttachments,
   workhubListInbox,
@@ -37,6 +38,8 @@ const base64ToArrayBuffer = (b64: string): ArrayBuffer => {
 
 type OrgInbox = {
   id: number;
+  inboxEmail: string | null;
+  workhubApiKey: string | null;
   workhubUsername: string | null;
   workhubPassword: string | null;
   workhubMailboxId: string | null;
@@ -45,6 +48,7 @@ type OrgInbox = {
 
 const configFor = (org: OrgInbox): WorkHubInboxConfig => ({
   apiBase: org.workhubApiBase,
+  apiKey: org.workhubApiKey,
   username: org.workhubUsername,
   password: org.workhubPassword,
   mailboxId: org.workhubMailboxId,
@@ -52,10 +56,30 @@ const configFor = (org: OrgInbox): WorkHubInboxConfig => ({
 
 /** Poll a single organization's WorkHub inbox. */
 export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
-  const config = configFor(org);
-  if (!isWorkHubInboxConfigured(config)) {
+  const base = configFor(org);
+  if (!isWorkHubInboxConfigured(base)) {
     return { scanned: 0, imported: 0, skipped: 0, configured: false };
   }
+
+  // Resolve the mailbox UUID from the inbox email (API-key callers must pass a
+  // UUID; users only enter the email). Falls back to the credential's mailbox.
+  const mailboxId = await resolveMailboxId(base, org.inboxEmail);
+  if ((base.apiKey || org.workhubMailboxId) && !mailboxId) {
+    throw new Error(
+      `Could not resolve a WorkHub mailbox for "${org.inboxEmail ?? org.workhubMailboxId}". ` +
+        `Check the inbox email matches a mailbox the API key can access.`,
+    );
+  }
+  const config: WorkHubInboxConfig = { ...base, mailboxId };
+
+  // The org owns this mailbox, so trust what lands in it. Documents are owned by
+  // the matching member when the sender is one, otherwise by a default org owner
+  // (first admin) — external senders are expected on a shared mailbox.
+  const defaultOwner = await prisma.organizationMember.findFirst({
+    where: { organizationId: org.id },
+    orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
+    select: { userId: true },
+  });
 
   const messages = await workhubListInbox(config, {
     isRead: false,
@@ -83,15 +107,18 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
         continue;
       }
 
-      // Anti-spoofing: the sender must be a member of this org.
-      const member = await prisma.organizationMember.findFirst({
-        where: {
-          organizationId: org.id,
-          user: { email: { equals: msg.from, mode: 'insensitive' } },
-        },
-        select: { userId: true },
-      });
-      if (!member) {
+      // Attribute to the sender if they're a member, else to the default owner.
+      const member = msg.from
+        ? await prisma.organizationMember.findFirst({
+            where: {
+              organizationId: org.id,
+              user: { email: { equals: msg.from, mode: 'insensitive' } },
+            },
+            select: { userId: true },
+          })
+        : null;
+      const ownerUserId = member?.userId ?? defaultOwner?.userId;
+      if (!ownerUserId) {
         skipped += 1;
         continue;
       }
@@ -125,7 +152,7 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
           title: msg.subject || pdf.name,
           qrToken: prefixedId('qr'),
           documentDataId: documentData.id,
-          userId: member.userId,
+          userId: ownerUserId,
           source: DocumentSource.DOCUMENT,
           documentMeta: { create: { subject: msg.subject || undefined } },
         },
@@ -136,7 +163,7 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
         documentId: document.id,
         senderEmail: msg.from,
         subject: msg.subject,
-        receivedById: member.userId,
+        receivedById: ownerUserId,
         externalMessageId: msg.id,
       });
 
@@ -166,6 +193,8 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
 
 const ORG_SELECT = {
   id: true,
+  inboxEmail: true,
+  workhubApiKey: true,
   workhubUsername: true,
   workhubPassword: true,
   workhubMailboxId: true,
@@ -189,8 +218,10 @@ export const pollAllOrgInboxes = async (): Promise<PollResult> => {
   const orgs = await prisma.organization.findMany({
     where: {
       emailToSignEnabled: true,
-      workhubUsername: { not: null },
-      workhubPassword: { not: null },
+      OR: [
+        { workhubApiKey: { not: null } },
+        { AND: [{ workhubUsername: { not: null } }, { workhubPassword: { not: null } }] },
+      ],
     },
     select: ORG_SELECT,
   });
