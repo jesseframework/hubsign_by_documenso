@@ -35,7 +35,23 @@ export const appMetaTags = (title?: string) => {
     },
     {
       property: 'og:image',
-      content: `${NEXT_PUBLIC_WEBAPP_URL()}/opengraph-image.jpg`,
+      content: `${NEXT_PUBLIC_WEBAPP_URL()}/opengraph-image.jpg?v=2`,
+    },
+    {
+      property: 'og:image:width',
+      content: '1200',
+    },
+    {
+      property: 'og:image:height',
+      content: '630',
+    },
+    {
+      property: 'og:image:alt',
+      content: 'HubSign — the open signing infrastructure for modern businesses.',
+    },
+    {
+      property: 'og:site_name',
+      content: 'HubSign',
     },
     {
       property: 'og:type',
@@ -55,7 +71,7 @@ export const appMetaTags = (title?: string) => {
     },
     {
       name: 'twitter:image',
-      content: `${NEXT_PUBLIC_WEBAPP_URL()}/opengraph-image.jpg`,
+      content: `${NEXT_PUBLIC_WEBAPP_URL()}/opengraph-image.jpg?v=2`,
     },
   ];
 };

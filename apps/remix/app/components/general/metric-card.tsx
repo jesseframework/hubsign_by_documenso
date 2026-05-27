@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react/dist/lucide-react';
+import { Link } from 'react-router';
 
 import { cn } from '@documenso/ui/lib/utils';
 
@@ -10,6 +11,10 @@ export type CardMetricProps = {
   accentColor?: string;
   iconBg?: string;
   className?: string;
+  /** When set, the card becomes a link that navigates to this URL on click. */
+  href?: string;
+  /** Highlights the card when the current filter matches this metric. */
+  isActive?: boolean;
 };
 
 export const CardMetric = ({
@@ -20,11 +25,19 @@ export const CardMetric = ({
   accentColor,
   iconBg,
   className,
+  href,
+  isActive,
 }: CardMetricProps) => {
+  const Container: React.ElementType = href ? Link : 'div';
+  const containerProps = href ? { to: href, preventScrollReset: true } : {};
+
   return (
-    <div
+    <Container
+      {...containerProps}
       className={cn(
-        'relative overflow-hidden rounded-[var(--r)] border border-border bg-card p-3 sm:p-4',
+        'relative block overflow-hidden rounded-[var(--r)] border bg-card p-3 transition-colors sm:p-4',
+        href && 'cursor-pointer hover:border-primary/40 hover:bg-primary/[0.02]',
+        isActive ? 'border-primary ring-2 ring-primary/30' : 'border-border',
         className,
       )}
     >
@@ -62,6 +75,6 @@ export const CardMetric = ({
       {subtitle && (
         <div className="mt-0.5 hidden text-[11px] text-muted-foreground sm:block">{subtitle}</div>
       )}
-    </div>
+    </Container>
   );
 };

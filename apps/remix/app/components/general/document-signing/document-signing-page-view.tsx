@@ -9,6 +9,7 @@ import { DEFAULT_DOCUMENT_DATE_FORMAT } from '@documenso/lib/constants/date-form
 import { PDF_VIEWER_PAGE_SELECTOR } from '@documenso/lib/constants/pdf-viewer';
 import { DEFAULT_DOCUMENT_TIME_ZONE } from '@documenso/lib/constants/time-zones';
 import type { DocumentAndSender } from '@documenso/lib/server-only/document/get-document-by-token';
+import type { StampPlacementForToken } from '@documenso/lib/server-only/stamps/get-stamp-placements-for-token';
 import {
   ZCheckboxFieldMeta,
   ZDropdownFieldMeta,
@@ -36,6 +37,7 @@ import { DocumentSigningNumberField } from '~/components/general/document-signin
 import { DocumentSigningRadioField } from '~/components/general/document-signing/document-signing-radio-field';
 import { DocumentSigningRejectDialog } from '~/components/general/document-signing/document-signing-reject-dialog';
 import { DocumentSigningSignatureField } from '~/components/general/document-signing/document-signing-signature-field';
+import { DocumentSigningStampOverlay } from '~/components/general/document-signing/document-signing-stamp-overlay';
 import { DocumentSigningTextField } from '~/components/general/document-signing/document-signing-text-field';
 
 import { DocumentSigningRecipientProvider } from './document-signing-recipient-provider';
@@ -47,6 +49,7 @@ export type DocumentSigningPageViewProps = {
   completedFields: CompletedField[];
   isRecipientsTurn: boolean;
   allRecipients?: RecipientWithFields[];
+  stampPlacements?: StampPlacementForToken[];
 };
 
 export const DocumentSigningPageView = ({
@@ -56,6 +59,7 @@ export const DocumentSigningPageView = ({
   completedFields,
   isRecipientsTurn,
   allRecipients = [],
+  stampPlacements = [],
 }: DocumentSigningPageViewProps) => {
   const { documentData, documentMeta } = document;
 
@@ -162,6 +166,11 @@ export const DocumentSigningPageView = ({
           fields={completedFields}
           showRecipientTooltip={true}
         />
+
+        {/* Read-only stamps placed by the sender — shown over the PDF so the
+            recipient sees them before signing. They get flattened into the
+            sealed PDF at completion time. */}
+        <DocumentSigningStampOverlay placements={stampPlacements} />
 
         {recipient.role !== RecipientRole.ASSISTANT && (
           <DocumentSigningAutoSign recipient={recipient} fields={fields} />

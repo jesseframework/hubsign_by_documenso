@@ -65,6 +65,55 @@ const parseMailgunPayload = async (request: Request): Promise<InboundProviderPay
   return null;
 };
 
+const base64ToArrayBuffer = (b64: string): ArrayBuffer => {
+  const buf = Buffer.from(b64.replace(/^data:[^;]+;base64,/, ''), 'base64');
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
+};
+
+/**
+ * JSON inbound payload (e.g. WorkHub webhook). Mirrors WorkHub's BulkSender
+ * attachment shape: `{ to, from, subject, attachments: [{ fileName,
+ * contentBase64, mimeType }] }` and tolerates common field aliases.
+ */
+const parseJsonPayload = async (request: Request): Promise<InboundProviderPayload | null> => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const body = (await request.json().catch(() => null)) as any;
+  if (!body) return null;
+
+  const to = String(body.to ?? body.recipient ?? body.To ?? '');
+  const from = String(body.from ?? body.sender ?? body.From ?? '');
+  const subject = String(body.subject ?? body.Subject ?? '');
+  const attachments = body.attachments ?? body.Attachments ?? [];
+
+  if (Array.isArray(attachments)) {
+    for (const att of attachments) {
+      const name = String(att.fileName ?? att.filename ?? att.name ?? 'attachment.pdf');
+      const mime = String(att.mimeType ?? att.contentType ?? att.type ?? '');
+      const b64 = att.contentBase64 ?? att.content ?? att.contentBytes ?? att.data;
+      const isPdf = mime === 'application/pdf' || name.toLowerCase().endsWith('.pdf');
+      if (isPdf && typeof b64 === 'string') {
+        const arrayBuffer = base64ToArrayBuffer(b64);
+        return {
+          to,
+          from,
+          subject,
+          pdfFile: { name, type: 'application/pdf', arrayBuffer: async () => arrayBuffer },
+        };
+      }
+    }
+  }
+
+  return null;
+};
+
+const parseInboundPayload = async (request: Request): Promise<InboundProviderPayload | null> => {
+  const contentType = request.headers.get('content-type') ?? '';
+  if (contentType.includes('application/json')) {
+    return parseJsonPayload(request);
+  }
+  return parseMailgunPayload(request);
+};
+
 export const action = async ({ request }: Route.ActionArgs) => {
   const secret = env('NEXT_PRIVATE_INBOUND_EMAIL_SECRET');
 
@@ -80,7 +129,7 @@ export const action = async ({ request }: Route.ActionArgs) => {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const payload = await parseMailgunPayload(request);
+  const payload = await parseInboundPayload(request);
   if (!payload) {
     return Response.json({ error: 'No PDF attachment found in inbound email' }, { status: 400 });
   }
@@ -149,10 +198,65 @@ export const action = async ({ request }: Route.ActionArgs) => {
 
   const editUrl = `${NEXT_PUBLIC_WEBAPP_URL()}/documents/${document.id}/edit`;
 
+  // Signature inbox: queue the inbound document and kick off OCR (BMS ML). The
+  // OCR job fires the INBOX_OCR_COMPLETED workflow event when it finishes.
+  let inboxItemId: string | undefined;
+  try {
+    const { createInboxItem } = await import('@documenso/lib/server-only/inbox/create-inbox-item');
+    inboxItemId = await createInboxItem({
+      organizationId: member.organizationId,
+      documentId: document.id,
+      senderEmail,
+      subject: payload.subject || null,
+      receivedById: member.userId,
+    });
+  } catch (err) {
+    console.error('[email-to-sign] inbox/OCR dispatch failed (non-fatal):', err);
+  }
+
+  // Fire the pre-OCR "email received" workflow event.
+  try {
+    const { triggerWorkflows } = await import(
+      '@documenso/lib/server-only/workflow/trigger-workflows'
+    );
+    await triggerWorkflows({
+      event: 'INBOX_EMAIL_RECEIVED',
+      organizationId: member.organizationId,
+      data: {
+        documentId: document.id,
+        title: document.title,
+        sender: senderEmail,
+        subject: payload.subject || null,
+      },
+    });
+  } catch (err) {
+    console.error('[email-to-sign] INBOX_EMAIL_RECEIVED dispatch failed (non-fatal):', err);
+  }
+
+  // Route the inbound document through an approval chain if the org has one
+  // configured for documents. Non-fatal: a missing template just skips.
+  let approval: { requestId?: string; skipped?: string } = {};
+  try {
+    const { startApprovalRequest } = await import(
+      '@documenso/lib/server-only/approval/approval-execution'
+    );
+    const result = await startApprovalRequest({
+      organizationId: member.organizationId,
+      entityType: 'Document',
+      entityId: String(document.id),
+      requesterUserId: member.userId,
+    });
+    approval = 'skipped' in result ? { skipped: result.reason } : { requestId: result.requestId };
+  } catch (err) {
+    console.error('[email-to-sign] approval dispatch failed (non-fatal):', err);
+  }
+
   return Response.json({
     ok: true,
     documentId: document.id,
     editUrl,
+    inboxItemId,
+    approval,
     message: `Created DRAFT document "${document.title}" for ${member.user.email}.`,
   });
 };

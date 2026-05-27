@@ -23,6 +23,12 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: true,
+    // Don't recursively watch node_modules/.git — on macOS the per-directory
+    // fs.watch fallback otherwise blows past kern.maxfilesperproc (EMFILE) in a
+    // monorepo this size.
+    watch: {
+      ignored: ['**/node_modules/**', '**/.git/**'],
+    },
   },
   plugins: [
     reactRouter(),

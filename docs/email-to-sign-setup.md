@@ -6,9 +6,40 @@ The `/api/inbound/email-to-sign` endpoint accepts inbound emails from any provid
 
 ```
 NEXT_PRIVATE_INBOUND_EMAIL_SECRET="long-random-string"
+NEXT_PUBLIC_INBOUND_EMAIL_DOMAIN="inbox.your-domain.com"
 ```
 
-If this isn't set, the endpoint returns 503. If a request hits it without the matching `Authorization: Bearer <secret>` header, it returns 401.
+If the secret isn't set, the endpoint returns 503. Without the matching `Authorization: Bearer <secret>` header a request returns 401. `NEXT_PUBLIC_INBOUND_EMAIL_DOMAIN` is shown to users as their inbox alias (`<org-slug>@<domain>`) on the Signature Inbox page.
+
+## Inbox address
+
+Each org's address is **`<org-slug>@<NEXT_PUBLIC_INBOUND_EMAIL_DOMAIN>`** (e.g. `fepro@inbox.your-domain.com`). The handler identifies the org from the local part (the slug). Whatever receives mail for that domain (WorkHub or a mail provider) must forward it to `/api/inbound/email-to-sign`.
+
+## Accepted payloads
+
+Auto-detected by `Content-Type`:
+
+- **Mailgun multipart** — fields `recipient`, `sender`, `subject`, `attachment-N`.
+- **JSON (e.g. WorkHub webhook)** — `application/json`:
+  ```json
+  {
+    "to": "fepro@inbox.your-domain.com",
+    "from": "sender@company.com",
+    "subject": "Please sign",
+    "attachments": [
+      { "fileName": "contract.pdf", "mimeType": "application/pdf", "contentBase64": "JVBERi0..." }
+    ]
+  }
+  ```
+  Aliases tolerated: `recipient`/`To`, `sender`/`From`; attachment `filename`/`name`, `content`/`contentBytes`/`data`, `contentType`/`type`.
+
+## Getting mail from WorkHub
+
+WorkHub is wired for **outbound** only (BulkSender). For inbound, choose one:
+
+1. **WorkHub inbound webhook (preferred):** if the WorkHub portal (Email/Exchange module) can POST received mail to a URL, point it at `https://<app>/api/inbound/email-to-sign` with `Authorization: Bearer <secret>`. The JSON parser above handles WorkHub's attachment shape.
+2. **Poll WorkHub:** if WorkHub only exposes a "received messages" REST API, add a cron poller that lists new messages + downloads PDF attachments and calls `createInboxItem` (not built yet — needs the WorkHub inbound endpoints + auth).
+3. **MX / provider forward:** point `inbox.your-domain.com` MX at Mailgun/SES/Postmark inbound and forward to the endpoint. WorkHub stays outbound.
 
 ## Provider setup
 

@@ -334,6 +334,28 @@ export const dmsRouter = router({
         },
       });
 
+      // Workflow trigger — DMS document filed (non-fatal)
+      if (membership?.organizationId) {
+        try {
+          const { triggerWorkflows } = await import(
+            '@documenso/lib/server-only/workflow/trigger-workflows'
+          );
+          await triggerWorkflows({
+            event: 'DMS_DOCUMENT_FILED',
+            organizationId: membership.organizationId,
+            data: {
+              id: document.id,
+              title: document.title,
+              referenceNumber: document.referenceNumber,
+              uploadedById: document.uploadedById,
+              organizationId: membership.organizationId,
+            },
+          });
+        } catch (err) {
+          console.error('[workflow] DMS_DOCUMENT_FILED dispatch failed:', err);
+        }
+      }
+
       // Auto-OCR if requested or org has auto-process enabled
       const shouldOcr = autoOcr || membership?.organization?.ocrAutoProcess;
       if (shouldOcr && isBmsMlConfigured({
@@ -599,6 +621,31 @@ export const dmsRouter = router({
           details: `Retrieval request created: ${input.reason || 'No reason specified'}`,
         },
       });
+
+      // Workflow trigger — DMS retrieval requested (non-fatal)
+      try {
+        const { triggerWorkflows } = await import(
+          '@documenso/lib/server-only/workflow/trigger-workflows'
+        );
+        const { resolveOrganizationId } = await import(
+          '@documenso/lib/server-only/workflow/resolve-organization-id'
+        );
+        const organizationId = await resolveOrganizationId({ userId: ctx.user.id });
+        if (organizationId) {
+          await triggerWorkflows({
+            event: 'DMS_RETRIEVAL_REQUESTED',
+            organizationId,
+            data: {
+              id: request.id,
+              documentId: input.documentId,
+              requestedById: ctx.user.id,
+              reason: input.reason ?? null,
+            },
+          });
+        }
+      } catch (err) {
+        console.error('[workflow] DMS_RETRIEVAL_REQUESTED dispatch failed:', err);
+      }
 
       return request;
     }),

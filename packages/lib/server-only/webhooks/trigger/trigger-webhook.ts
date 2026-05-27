@@ -12,6 +12,14 @@ export type TriggerWebhookOptions = {
 };
 
 export const triggerWebhook = async ({ event, data, userId, teamId }: TriggerWebhookOptions) => {
+  // Every webhook-firing event is also a candidate workflow trigger. Dispatch
+  // matching org workflows here so all eSign lifecycle sites are covered by a
+  // single integration point. Fully non-fatal and independent of whether any
+  // webhook is registered. (DMS events have no webhook and are wired separately.)
+  await import('../../workflow/trigger-workflows')
+    .then(({ triggerWorkflowEvent }) => triggerWorkflowEvent({ event, data, userId, teamId }))
+    .catch(() => null);
+
   try {
     const body = {
       event,

@@ -1,7 +1,8 @@
 // https://github.com/Hopding/pdf-lib/issues/20#issuecomment-412852821
 import fontkit from '@pdf-lib/fontkit';
 import { FieldType } from '@prisma/client';
-import type { PDFDocument, PDFFont } from 'pdf-lib';
+import { DateTime } from 'luxon';
+import type { PDFDocument, PDFFont, PDFPage } from 'pdf-lib';
 import { RotationTypes, TextAlignment, degrees, radiansToDegrees, rgb } from 'pdf-lib';
 import { P, match } from 'ts-pattern';
 
@@ -137,6 +138,10 @@ export const insertFieldInPDF = async (pdf: PDFDocument, field: FieldWithSignatu
     await pdf.embedFont(fontCaveat);
   }
 
+  // Used to render the small underline + timestamp + doc-id caption beneath
+  // every signature. Always Noto regardless of whether the user typed or drew.
+  const fontNotoEmbedded = await pdf.embedFont(fontNoto);
+
   await match(field)
     .with(
       {
@@ -180,6 +185,18 @@ export const insertFieldInPDF = async (pdf: PDFDocument, field: FieldWithSignatu
             height: imageHeight,
             rotate: degrees(pageRotationInDegrees),
           });
+
+          drawSignatureCaption({
+            page,
+            captionFont: fontNotoEmbedded,
+            field,
+            renderedX: imageX,
+            renderedY: imageY,
+            renderedWidth: imageWidth,
+            pageWidth,
+            pageHeight,
+            pageRotationInDegrees,
+          });
         } else {
           const signatureText = field.signature?.typedSignature ?? '';
 
@@ -222,6 +239,18 @@ export const insertFieldInPDF = async (pdf: PDFDocument, field: FieldWithSignatu
             size: fontSize,
             font,
             rotate: degrees(pageRotationInDegrees),
+          });
+
+          drawSignatureCaption({
+            page,
+            captionFont: fontNotoEmbedded,
+            field,
+            renderedX: textX,
+            renderedY: textY,
+            renderedWidth: textWidth,
+            pageWidth,
+            pageHeight,
+            pageRotationInDegrees,
           });
         }
       },
@@ -473,6 +502,95 @@ export const insertFieldInPDF = async (pdf: PDFDocument, field: FieldWithSignatu
 
   return pdf;
 };
+
+/**
+ * Draw a thin underline plus a small caption (timestamp + last 4 of the
+ * document id) directly beneath a rendered signature so the printed PDF
+ * reads like a notarized signature line:
+ *
+ *     [signature]
+ *     ─────────────
+ *     2026-05-03 14:32:15 · #6133
+ *
+ * The caption uses Noto Sans at 7pt and is centered against the rendered
+ * signature width. Falls back gracefully if the signature has no `created`
+ * timestamp yet (shouldn't happen at seal time but we don't want to abort
+ * the seal over it).
+ */
+function drawSignatureCaption({
+  page,
+  captionFont,
+  field,
+  renderedX,
+  renderedY,
+  renderedWidth,
+  pageWidth,
+  pageHeight,
+  pageRotationInDegrees,
+}: {
+  page: PDFPage;
+  captionFont: PDFFont;
+  field: FieldWithSignature;
+  renderedX: number;
+  renderedY: number;
+  renderedWidth: number;
+  pageWidth: number;
+  pageHeight: number;
+  pageRotationInDegrees: number;
+}) {
+  const signedAt = field.signature?.created;
+  const docIdSuffix = String(field.documentId ?? '')
+    .padStart(4, '0')
+    .slice(-4);
+
+  // Underline is the same width as the signature footprint; min 80pt so even
+  // a tiny scribble gets a readable rule under it.
+  const lineWidth = Math.max(renderedWidth, 80);
+  const lineCenterX = renderedX + renderedWidth / 2;
+  const lineLeftX = lineCenterX - lineWidth / 2;
+
+  // Draw the underline 4pt below the signature's bottom edge. Note that
+  // `renderedY` is already in PDF-bottom-left space.
+  const lineY = renderedY - 4;
+
+  page.drawLine({
+    start: { x: lineLeftX, y: lineY },
+    end: { x: lineLeftX + lineWidth, y: lineY },
+    thickness: 0.5,
+    color: rgb(0.3, 0.3, 0.3),
+  });
+
+  // Caption sits 2pt below the underline.
+  const fontSize = 7;
+  const dateText = signedAt
+    ? DateTime.fromJSDate(signedAt).toFormat('yyyy-MM-dd HH:mm:ss')
+    : DateTime.now().toFormat('yyyy-MM-dd HH:mm:ss');
+  const captionText = `${dateText} · #${docIdSuffix}`;
+  const captionWidth = captionFont.widthOfTextAtSize(captionText, fontSize);
+  let captionX = lineCenterX - captionWidth / 2;
+  let captionY = lineY - fontSize - 2;
+
+  if (pageRotationInDegrees !== 0) {
+    const adjusted = adjustPositionForRotation(
+      pageWidth,
+      pageHeight,
+      captionX,
+      captionY,
+      pageRotationInDegrees,
+    );
+    captionX = adjusted.xPos;
+    captionY = adjusted.yPos;
+  }
+
+  page.drawText(captionText, {
+    x: captionX,
+    y: captionY,
+    size: fontSize,
+    font: captionFont,
+    color: rgb(0.35, 0.35, 0.35),
+    rotate: degrees(pageRotationInDegrees),
+  });
+}
 
 const adjustPositionForRotation = (
   pageWidth: number,

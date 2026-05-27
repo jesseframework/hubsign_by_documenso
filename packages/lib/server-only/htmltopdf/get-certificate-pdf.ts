@@ -10,9 +10,19 @@ export type GetCertificatePdfOptions = {
   documentId: number;
   // eslint-disable-next-line @typescript-eslint/ban-types
   language?: SupportedLanguageCodes | (string & {});
+  /**
+   * Hint the renderer about the seal's terminal status. The certificate is
+   * generated mid-seal (before the DB row flips to COMPLETED/REJECTED), so
+   * without this the audit page would print "Pending" on a finished document.
+   */
+  completionStatus?: 'COMPLETED' | 'REJECTED';
 };
 
-export const getCertificatePdf = async ({ documentId, language }: GetCertificatePdfOptions) => {
+export const getCertificatePdf = async ({
+  documentId,
+  language,
+  completionStatus,
+}: GetCertificatePdfOptions) => {
   const { chromium } = await import('playwright');
 
   const encryptedId = encryptSecondaryData({
@@ -52,7 +62,13 @@ export const getCertificatePdf = async ({ documentId, language }: GetCertificate
     },
   ]);
 
-  await page.goto(`${NEXT_PUBLIC_WEBAPP_URL()}/__htmltopdf/certificate?d=${encryptedId}`, {
+  const certUrl = new URL(`${NEXT_PUBLIC_WEBAPP_URL()}/__htmltopdf/certificate`);
+  certUrl.searchParams.set('d', encryptedId);
+  if (completionStatus) {
+    certUrl.searchParams.set('status', completionStatus);
+  }
+
+  await page.goto(certUrl.toString(), {
     waitUntil: 'networkidle',
     timeout: 10_000,
   });

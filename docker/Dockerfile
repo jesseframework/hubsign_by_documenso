@@ -1,7 +1,12 @@
 FROM node:20-slim AS base
 
-# Update packages and install build tools
-# qpdf is required at runtime to lock signed PDFs with a user-set password.
+# Update packages and install build tools.
+# - qpdf is required at runtime to lock signed PDFs with a user-set password.
+# - The libnss3/libatk*/libcups2/etc. cluster is required by Chromium so
+#   Playwright can render the audit certificate page to PDF at seal time.
+#   Without these libs `chromium.launch()` throws and the cert is dropped
+#   silently — which is what was causing certificates to appear in dev but
+#   not in production.
 RUN apt-get update && apt-get install -y \
   build-essential \
   python3 \
@@ -10,7 +15,24 @@ RUN apt-get update && apt-get install -y \
   bash \
   ca-certificates \
   curl \
-  qpdf && \
+  qpdf \
+  libnss3 \
+  libatk1.0-0 \
+  libatk-bridge2.0-0 \
+  libcups2 \
+  libxkbcommon0 \
+  libxcomposite1 \
+  libxdamage1 \
+  libxfixes3 \
+  libxrandr2 \
+  libgbm1 \
+  libpango-1.0-0 \
+  libcairo2 \
+  libasound2 \
+  libatspi2.0-0 \
+  libdrm2 \
+  fonts-liberation \
+  fonts-noto-color-emoji && \
   rm -rf /var/lib/apt/lists/*
 
 # Set environment for sharp
@@ -63,6 +85,15 @@ RUN cp -r ../../packages/lib/translations build/server/hono/packages/lib/transla
 WORKDIR /app
 RUN npm prune --omit=dev
 
+# Install only Playwright's Chromium browser into a persistent path so the
+# pruned production install can launch it. We do this AFTER `npm prune`
+# because Playwright's NPM package stays in the runtime tree (it's a prod
+# dependency), but the browser binary is downloaded separately and only
+# fetched if `playwright install` runs. Without this step `chromium.launch()`
+# throws "Executable doesn't exist" in the production runner stage.
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
+RUN npx playwright install chromium
+
 # --- Runner stage ---
 FROM base AS runner
 
@@ -74,6 +105,10 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 USER nodejs
 WORKDIR /app
+
+# Make the Chromium binaries we installed in the installer stage discoverable
+# at runtime. Must match the path used for `playwright install` above.
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
 
 COPY --from=installer --chown=nodejs:nodejs /app ./
 

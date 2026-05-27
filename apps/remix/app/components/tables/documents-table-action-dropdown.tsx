@@ -16,12 +16,14 @@ import {
   MoreHorizontal,
   MoveRight,
   Pencil,
+  Printer,
   Share,
   Trash2,
 } from 'lucide-react';
 import { Link } from 'react-router';
 
 import { downloadPDF } from '@documenso/lib/client-only/download-pdf';
+import { printPDF } from '@documenso/lib/client-only/print-pdf';
 import { useSession } from '@documenso/lib/client-only/providers/session';
 import type { TDocumentMany as TDocumentRow } from '@documenso/lib/types/document';
 import { isDocumentCompleted } from '@documenso/lib/utils/document';
@@ -99,6 +101,44 @@ export const DocumentsTableActionDropdown = ({
       toast({
         title: _(msg`Something went wrong`),
         description: _(msg`An error occurred while downloading your document.`),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const onDownloadWithoutCertificateClick = async () => {
+    try {
+      const document = !recipient
+        ? await trpcClient.document.getDocumentById.query({ documentId: row.id })
+        : await trpcClient.document.getDocumentByToken.query({ token: recipient.token });
+      const documentData = document?.documentData;
+      if (!documentData) return;
+      await downloadPDF({
+        documentData,
+        fileName: row.title,
+        stripTrailingPages: row.certificatePageCount ?? 0,
+      });
+    } catch {
+      toast({
+        title: _(msg`Something went wrong`),
+        description: _(msg`An error occurred while downloading your document.`),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const onPrintClick = async (stripTrailingPages: number) => {
+    try {
+      const document = !recipient
+        ? await trpcClient.document.getDocumentById.query({ documentId: row.id })
+        : await trpcClient.document.getDocumentByToken.query({ token: recipient.token });
+      const documentData = document?.documentData;
+      if (!documentData) return;
+      await printPDF({ documentData, stripTrailingPages });
+    } catch {
+      toast({
+        title: _(msg`Something went wrong`),
+        description: _(msg`An error occurred while preparing the print preview.`),
         variant: 'destructive',
       });
     }
@@ -185,10 +225,31 @@ export const DocumentsTableActionDropdown = ({
           <Trans>Download</Trans>
         </DropdownMenuItem>
 
+        {isComplete && (row.certificatePageCount ?? 0) > 0 && (
+          <DropdownMenuItem onClick={onDownloadWithoutCertificateClick}>
+            <Download className="mr-2 h-4 w-4" />
+            <Trans>Download (no audit certificate)</Trans>
+          </DropdownMenuItem>
+        )}
+
         <DropdownMenuItem onClick={onDownloadOriginalClick}>
           <FileDown className="mr-2 h-4 w-4" />
           <Trans>Download Original</Trans>
         </DropdownMenuItem>
+
+        {isComplete && (
+          <DropdownMenuItem onClick={() => void onPrintClick(0)}>
+            <Printer className="mr-2 h-4 w-4" />
+            <Trans>Print</Trans>
+          </DropdownMenuItem>
+        )}
+
+        {isComplete && (row.certificatePageCount ?? 0) > 0 && (
+          <DropdownMenuItem onClick={() => void onPrintClick(row.certificatePageCount ?? 0)}>
+            <Printer className="mr-2 h-4 w-4" />
+            <Trans>Print (no audit certificate)</Trans>
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuItem onClick={() => setDuplicateDialogOpen(true)}>
           <Copy className="mr-2 h-4 w-4" />

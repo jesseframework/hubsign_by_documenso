@@ -11,6 +11,7 @@ import {
   Edit,
   Loader,
   MoreHorizontal,
+  Printer,
   ScrollTextIcon,
   Share,
   Trash2,
@@ -18,6 +19,7 @@ import {
 import { Link, useNavigate } from 'react-router';
 
 import { downloadPDF } from '@documenso/lib/client-only/download-pdf';
+import { printPDF } from '@documenso/lib/client-only/print-pdf';
 import { useSession } from '@documenso/lib/client-only/providers/session';
 import { isDocumentCompleted } from '@documenso/lib/utils/document';
 import { formatDocumentsPath } from '@documenso/lib/utils/teams';
@@ -97,6 +99,64 @@ export const DocumentPageViewDropdown = ({ document }: DocumentPageViewDropdownP
     }
   };
 
+  const onDownloadWithoutCertificateClick = async () => {
+    try {
+      const documentWithData = await trpcClient.document.getDocumentById.query(
+        {
+          documentId: document.id,
+        },
+        {
+          context: {
+            teamId: team?.id?.toString(),
+          },
+        },
+      );
+
+      const documentData = documentWithData?.documentData;
+
+      if (!documentData) return;
+
+      await downloadPDF({
+        documentData,
+        fileName: document.title,
+        stripTrailingPages: document.certificatePageCount ?? 0,
+      });
+    } catch (err) {
+      toast({
+        title: _(msg`Something went wrong`),
+        description: _(msg`An error occurred while downloading your document.`),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const onPrintClick = async (stripTrailingPages = 0) => {
+    try {
+      const documentWithData = await trpcClient.document.getDocumentById.query(
+        {
+          documentId: document.id,
+        },
+        {
+          context: {
+            teamId: team?.id?.toString(),
+          },
+        },
+      );
+
+      const documentData = documentWithData?.documentData;
+
+      if (!documentData) return;
+
+      await printPDF({ documentData, stripTrailingPages });
+    } catch (err) {
+      toast({
+        title: _(msg`Something went wrong`),
+        description: _(msg`An error occurred while preparing the print preview.`),
+        variant: 'destructive',
+      });
+    }
+  };
+
   const onDownloadOriginalClick = async () => {
     try {
       const documentWithData = await trpcClient.document.getDocumentById.query(
@@ -155,10 +215,33 @@ export const DocumentPageViewDropdown = ({ document }: DocumentPageViewDropdownP
           </DropdownMenuItem>
         )}
 
+        {isComplete && (document.certificatePageCount ?? 0) > 0 && (
+          <DropdownMenuItem onClick={onDownloadWithoutCertificateClick}>
+            <Download className="mr-2 h-4 w-4" />
+            <Trans>Download (no audit certificate)</Trans>
+          </DropdownMenuItem>
+        )}
+
         <DropdownMenuItem onClick={onDownloadOriginalClick}>
           <Download className="mr-2 h-4 w-4" />
           <Trans>Download Original</Trans>
         </DropdownMenuItem>
+
+        {isComplete && (
+          <DropdownMenuItem onClick={() => void onPrintClick(0)}>
+            <Printer className="mr-2 h-4 w-4" />
+            <Trans>Print</Trans>
+          </DropdownMenuItem>
+        )}
+
+        {isComplete && (document.certificatePageCount ?? 0) > 0 && (
+          <DropdownMenuItem
+            onClick={() => void onPrintClick(document.certificatePageCount ?? 0)}
+          >
+            <Printer className="mr-2 h-4 w-4" />
+            <Trans>Print (no audit certificate)</Trans>
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuItem asChild>
           <Link to={`${documentsPath}/${document.id}/logs`}>

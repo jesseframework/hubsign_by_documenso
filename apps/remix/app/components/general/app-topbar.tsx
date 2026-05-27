@@ -5,6 +5,7 @@ import { HomeIcon, ChevronRightIcon, MenuIcon, SearchIcon } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
 
 import { AppCommandMenu } from './app-command-menu';
+import { TopbarPreferences } from './app-topbar-preferences';
 
 export type AppTopbarProps = {
   onHamburgerClick: () => void;
@@ -19,7 +20,7 @@ export const AppTopbar = ({ onHamburgerClick, title }: AppTopbarProps) => {
   const pathParts = location.pathname.split('/').filter(Boolean);
 
   const routeNames: Record<string, string> = {
-    documents: 'Documents',
+    documents: 'E-Sign Document',
     templates: 'Templates',
     settings: 'Settings',
     admin: 'Admin',
@@ -98,6 +99,9 @@ export const AppTopbar = ({ onHamburgerClick, title }: AppTopbarProps) => {
 
         {/* Right */}
         <div className="flex flex-shrink-0 items-center gap-2">
+          {/* Language + theme quick-pickers (live next to search). */}
+          <TopbarPreferences />
+
           {/* Search bar - hidden on mobile */}
           <button
             className="hidden items-center gap-2 rounded-md border border-border bg-muted px-3 py-1.5 text-[13px] text-muted-foreground transition-colors hover:border-primary/30 sm:flex"
