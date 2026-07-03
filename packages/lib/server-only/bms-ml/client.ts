@@ -167,7 +167,14 @@ export const bmsMlUploadDocument = async (
   if (!config.apiUrl) throw new Error('BMS ML API URL not configured');
 
   const formData = new FormData();
-  const blob = new Blob([fileBuffer], { type: 'application/octet-stream' });
+  // Type the part by extension so the service recognizes PDFs (it otherwise
+  // keys off filename/content-type); fall back to octet-stream.
+  const mime = /\.pdf$/i.test(fileName)
+    ? 'application/pdf'
+    : /\.(png|jpe?g|tiff?)$/i.test(fileName)
+      ? 'image/' + fileName.split('.').pop()!.toLowerCase().replace('jpg', 'jpeg').replace('tif', 'tiff')
+      : 'application/octet-stream';
+  const blob = new Blob([fileBuffer], { type: mime });
   formData.append('file', blob, fileName);
 
   const templateId = options?.templateId || config.defaultTemplateId;
@@ -196,7 +203,84 @@ export const bmsMlUploadDocument = async (
     throw new Error((error as { detail?: string }).detail || `BMS ML API error: ${response.status}`);
   }
 
-  return response.json() as Promise<BmsMlUploadResult>;
+  return normalizeUploadResult(await response.json());
+};
+
+// Keys in the `data` object that are metadata, not extracted invoice fields.
+const DATA_META_KEYS = new Set([
+  'id',
+  'created_at',
+  'updated_at',
+  'raw_extraction',
+  'completeness_score',
+  'required_fields_found',
+  'total_required_fields',
+]);
+
+/**
+ * Turn the BMS ML `data` object (canonical fields, each with a paired
+ * `<field>_confidence`) into the `field_extractions` row shape. The API only
+ * fills `field_extractions` when a saved template matches; for everything else
+ * the AI-extracted fields live in `data`, so derive rows from there.
+ */
+const deriveFieldExtractions = (
+  data: Record<string, unknown>,
+  invoice: Record<string, unknown>,
+): BmsMlUploadResult['invoice']['field_extractions'] => {
+  const rows: BmsMlUploadResult['invoice']['field_extractions'] = [];
+  const docConf =
+    (typeof invoice.ml_confidence === 'number' && invoice.ml_confidence) ||
+    (typeof invoice.ocr_confidence === 'number' && invoice.ocr_confidence) ||
+    0;
+  for (const [key, value] of Object.entries(data)) {
+    if (key.endsWith('_confidence') || DATA_META_KEYS.has(key)) continue;
+    if (value === null || value === undefined || value === '') continue;
+    const conf = data[`${key}_confidence`];
+    rows.push({
+      field_name: key,
+      field_type: typeof value === 'number' ? 'number' : 'text',
+      extracted_value: value,
+      confidence_score: typeof conf === 'number' ? conf : docConf,
+      extraction_method: invoice.ai_enhanced ? 'ml+ai' : String(invoice.extraction_method ?? 'ml'),
+      template_name: String(invoice.template_name ?? ''),
+      ai_fallback_used: Boolean(invoice.ai_enhanced),
+      requires_review: typeof conf === 'number' ? conf < 0.5 : false,
+    });
+  }
+  return rows;
+};
+
+/**
+ * The upload endpoint may return `{ invoice, processing_details }` or a flat
+ * invoice record; normalize to the former and ensure `field_extractions` is
+ * populated (from `data` when no template matched) so callers render uniformly.
+ */
+const normalizeUploadResult = (raw: unknown): BmsMlUploadResult => {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const invoice = ((r.invoice as Record<string, unknown>) ?? r) as BmsMlUploadResult['invoice'] &
+    Record<string, unknown>;
+
+  const data = invoice.data as Record<string, unknown> | undefined;
+  if ((!Array.isArray(invoice.field_extractions) || invoice.field_extractions.length === 0) && data) {
+    invoice.field_extractions = deriveFieldExtractions(data, invoice);
+  }
+
+  const processing_details =
+    (r.processing_details as BmsMlUploadResult['processing_details']) ??
+    ({
+      steps: [],
+      status: String(invoice.status ?? ''),
+      completeness: {
+        score: Number(data?.completeness_score ?? 0),
+        fields_found: Number(data?.required_fields_found ?? 0),
+        total_fields: Number(data?.total_required_fields ?? 0),
+        required_found: Number(data?.required_fields_found ?? 0),
+        required_total: Number(data?.total_required_fields ?? 0),
+      },
+      total_duration_ms: Number(invoice.processing_time_ms ?? 0),
+    } as BmsMlUploadResult['processing_details']);
+
+  return { invoice, processing_details };
 };
 
 /**

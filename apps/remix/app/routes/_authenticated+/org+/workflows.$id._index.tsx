@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import { ArrowLeftIcon, SaveIcon } from 'lucide-react';
+import { ArrowLeftIcon, SaveIcon, SparklesIcon } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router';
 
 import { WORKFLOW_EVENTS, ZWorkflowDefinitionSchema } from '@documenso/lib/types/workflow';
@@ -135,6 +135,10 @@ export default function WorkflowEditorPage() {
   // Raw full-definition JSON (import/export)
   const [rawText, setRawText] = useState('');
 
+  // AI generation
+  const [aiPrompt, setAiPrompt] = useState('');
+  const generate = trpc.workflow.generate.useMutation();
+
   // Hydrate from the loaded workflow once.
   useEffect(() => {
     if (initialized || !existing) return;
@@ -258,6 +262,40 @@ export default function WorkflowEditorPage() {
     }
   };
 
+  /** Generate the whole workflow from a natural-language prompt and fill the form. */
+  const onGenerate = async () => {
+    if (!aiPrompt.trim()) {
+      toast({ title: _(msg`Describe the workflow first`), variant: 'destructive' });
+      return;
+    }
+    try {
+      const g = await generate.mutateAsync({ prompt: aiPrompt });
+      const def = g.definition as {
+        trigger?: { type?: TriggerType; event?: string; cron?: string; timezone?: string; condition?: unknown };
+        startStepId?: string;
+        steps?: Record<string, unknown>;
+      };
+      setName(g.name);
+      setDescription(g.description);
+      const trigger = def.trigger ?? { type: 'EVENT' };
+      setTriggerType((trigger.type as TriggerType) ?? 'EVENT');
+      if (trigger.event) setTriggerEvent(trigger.event);
+      if (trigger.cron) setCron(trigger.cron);
+      if (trigger.timezone) setTimezone(trigger.timezone);
+      setConditionText(trigger.condition ? JSON.stringify(trigger.condition, null, 2) : '');
+      setStartStepId(def.startStepId ?? Object.keys(def.steps ?? {})[0] ?? '');
+      setStepsText(JSON.stringify(def.steps ?? {}, null, 2));
+      setView('builder');
+      toast({ title: _(msg`Workflow generated — review and Save`) });
+    } catch (err) {
+      toast({
+        title: _(msg`Generation failed`),
+        description: err instanceof Error ? err.message : String(err),
+        variant: 'destructive',
+      });
+    }
+  };
+
   const addStep = (kind: string) => {
     let steps: Record<string, unknown>;
     try {
@@ -342,6 +380,36 @@ export default function WorkflowEditorPage() {
           <Button size="sm" onClick={() => void onSave()} disabled={saving}>
             <SaveIcon className="mr-1 h-3.5 w-3.5" />
             <Trans>Save</Trans>
+          </Button>
+        </div>
+      </div>
+
+      {/* AI generation */}
+      <div className="rounded-[var(--r)] border border-primary/30 bg-primary/5 p-4">
+        <div className="mb-2 flex items-center gap-2">
+          <SparklesIcon className="h-4 w-4 text-primary" />
+          <h3 className="text-[14px] font-semibold">
+            <Trans>Describe it — AI builds the workflow</Trans>
+          </h3>
+        </div>
+        <p className="mb-2 text-[12px] text-muted-foreground">
+          <Trans>
+            Write what should happen in plain English. Example: "When an inbox document finishes
+            OCR and the vendor email contains bms, send it to the finance team to sign."
+          </Trans>
+        </p>
+        <textarea
+          className={monoCls}
+          rows={3}
+          value={aiPrompt}
+          onChange={(e) => setAiPrompt(e.target.value)}
+          placeholder="Describe the trigger, any conditions, and what to do…"
+          spellCheck
+        />
+        <div className="mt-2 flex justify-end">
+          <Button size="sm" onClick={() => void onGenerate()} disabled={generate.isPending}>
+            <SparklesIcon className="mr-1 h-3.5 w-3.5" />
+            {generate.isPending ? <Trans>Generating…</Trans> : <Trans>Generate with AI</Trans>}
           </Button>
         </div>
       </div>

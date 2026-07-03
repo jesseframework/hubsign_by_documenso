@@ -5,6 +5,7 @@
 import { prisma } from '@documenso/prisma';
 
 import { jobs } from '../../jobs/client';
+import { publishInboxEvent } from './inbox-events';
 
 export const createInboxItem = async ({
   organizationId,
@@ -37,6 +38,9 @@ export const createInboxItem = async ({
     name: 'internal.process-inbox-ocr',
     payload: { inboxItemId: item.id },
   });
+
+  // Notify any open inbox views that a new item arrived.
+  publishInboxEvent(organizationId, { type: 'new', inboxItemId: item.id });
 
   return item.id;
 };

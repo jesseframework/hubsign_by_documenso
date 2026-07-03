@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { generateWorkflowFromPrompt } from '@documenso/lib/server-only/workflow/ai-generate-workflow';
 import { computeNextRunAt } from '@documenso/lib/server-only/workflow/run-due-scheduled';
 import { enqueueWorkflowRun } from '@documenso/lib/server-only/workflow/trigger-workflows';
 import { isValidCron } from '@documenso/lib/server-only/workflow/cron';
@@ -100,6 +101,65 @@ export const workflowRouter = router({
       }
 
       return workflow;
+    }),
+
+  /** Generate a workflow definition from a natural-language prompt (AI). */
+  generate: authenticatedProcedure
+    .input(z.object({ prompt: z.string().min(1).max(2000) }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireOrgWriteAccess(ctx.user.id);
+      const organization = await prisma.organization.findUnique({
+        where: { id: membership.organizationId },
+        select: { name: true },
+      });
+
+      // Summarize the org's metadata directory so the AI targets real
+      // categories/keywords in LOOKUP_METADATA (exact + keyword modes).
+      const records = await prisma.metadataRecord.findMany({
+        where: { organizationId: membership.organizationId },
+        orderBy: [{ category: 'asc' }, { label: 'asc' }],
+        take: 200,
+        select: { category: true, label: true, email: true, data: true },
+      });
+      let metadataContext: string | undefined;
+      if (records.length > 0) {
+        const byCategory = new Map<string, string[]>();
+        for (const r of records) {
+          const d = (r.data && typeof r.data === 'object' ? r.data : {}) as Record<string, unknown>;
+          const kw = Array.isArray(d.keywords)
+            ? (d.keywords as unknown[]).map(String)
+            : typeof d.keywords === 'string'
+              ? d.keywords.split(',').map((k) => k.trim()).filter(Boolean)
+              : [];
+          const role = typeof d.role === 'string' ? d.role : '';
+          const parts = [
+            `"${r.label ?? ''}"`,
+            r.email ? `<${r.email}>` : '',
+            role ? `role=${role}` : '',
+            kw.length ? `keywords=[${kw.join(', ')}]` : '',
+          ].filter(Boolean);
+          const arr = byCategory.get(r.category) ?? [];
+          if (arr.length < 8) arr.push(parts.join(' '));
+          byCategory.set(r.category, arr);
+        }
+        const lines = [...byCategory.entries()].map(
+          ([cat, items]) => `- category "${cat}": ${items.join('; ')}`,
+        );
+        metadataContext =
+          `This organization's metadata directory (use these exact category names in LOOKUP_METADATA; ` +
+          `prefer keyword mode — omit "key" — when records have keywords):\n${lines.join('\n')}`;
+      }
+
+      const generated = await generateWorkflowFromPrompt({
+        prompt: input.prompt,
+        organizationName: organization?.name ?? undefined,
+        metadataContext,
+      });
+
+      // Defensive: ensure the generated trigger is still well-formed (e.g. cron).
+      assertValidDefinition(generated.definition);
+
+      return generated;
     }),
 
   create: authenticatedProcedure

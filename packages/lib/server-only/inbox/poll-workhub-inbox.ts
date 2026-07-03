@@ -23,6 +23,7 @@ import type { WorkHubInboxConfig } from './workhub-inbox-client';
 import {
   isWorkHubInboxConfigured,
   resolveMailboxId,
+  unwrapSerializedAttachment,
   workhubFetchAttachment,
   workhubListAttachments,
   workhubListInbox,
@@ -32,7 +33,9 @@ import {
 export type PollResult = { scanned: number; imported: number; skipped: number; configured: boolean };
 
 const base64ToArrayBuffer = (b64: string): ArrayBuffer => {
-  const buf = Buffer.from(b64, 'base64');
+  // WorkHub may wrap attachment bytes in a Java-serialized byte[] — unwrap to the
+  // real file before storing, otherwise the leading header corrupts the PDF.
+  const buf = unwrapSerializedAttachment(Buffer.from(b64, 'base64'));
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer;
 };
 

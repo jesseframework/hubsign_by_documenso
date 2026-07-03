@@ -142,6 +142,10 @@ const processStep = async (
         ) {
           vars[step.config.saveResponseAs] = (result as { body?: unknown }).body ?? null;
         }
+        // Metadata lookups expose their match as a variable (e.g. {{vars.lookup.email}}).
+        if (step.config.action === 'LOOKUP_METADATA' && step.config.saveAs) {
+          vars[step.config.saveAs] = result ?? null;
+        }
         next = step.next;
         output = { result: result as unknown } as Record<string, unknown>;
         break;

@@ -70,14 +70,18 @@ export default function DmsAiPage() {
         {usage && (
           <div className="text-right">
             <span className="text-[12px] text-muted-foreground">
-              {usage.queriesThisMonth} / {usage.limit} queries used
+              {usage.limit == null
+                ? `${usage.queriesThisMonth} queries used · Unlimited`
+                : `${usage.queriesThisMonth} / ${usage.limit} queries used`}
             </span>
-            <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-muted">
-              <div
-                className={`h-full rounded-full ${usage.remaining <= 5 ? 'bg-amber-500' : 'bg-primary'}`}
-                style={{ width: `${Math.min((usage.queriesThisMonth / usage.limit) * 100, 100)}%` }}
-              />
-            </div>
+            {usage.limit != null && (
+              <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full rounded-full ${(usage.remaining ?? 0) <= 5 ? 'bg-amber-500' : 'bg-primary'}`}
+                  style={{ width: `${Math.min((usage.queriesThisMonth / usage.limit) * 100, 100)}%` }}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

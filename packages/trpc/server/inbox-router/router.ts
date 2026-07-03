@@ -23,7 +23,7 @@ export const inboxRouter = router({
     .input(z.object({ status: z.string().optional(), limit: z.number().min(1).max(200).default(100) }).optional())
     .query(async ({ ctx, input }) => {
       const membership = await requireOrgMember(ctx.user.id);
-      return prisma.signatureInboxItem.findMany({
+      const items = await prisma.signatureInboxItem.findMany({
         where: { organizationId: membership.organizationId, status: input?.status as never },
         orderBy: { createdAt: 'desc' },
         take: input?.limit ?? 100,
@@ -35,6 +35,61 @@ export const inboxRouter = router({
               status: true,
               _count: { select: { recipients: true } },
             },
+          },
+        },
+      });
+
+      // Attach a per-item workflow-activity summary (correlated via run context).
+      const runs = await prisma.workflowRun.findMany({
+        where: { workflow: { organizationId: membership.organizationId }, trigger: 'INBOX_OCR_COMPLETED' },
+        orderBy: { createdAt: 'desc' },
+        take: 500,
+        select: { status: true, context: true },
+      });
+      const statusesByItem = new Map<string, string[]>();
+      for (const run of runs) {
+        const itemId = (run.context as { payload?: { inboxItemId?: unknown } })?.payload?.inboxItemId;
+        if (typeof itemId === 'string') {
+          const arr = statusesByItem.get(itemId) ?? [];
+          arr.push(run.status); // runs are desc, so [0] is the latest
+          statusesByItem.set(itemId, arr);
+        }
+      }
+
+      return items.map((item) => {
+        const statuses = statusesByItem.get(item.id) ?? [];
+        return { ...item, workflow: { status: statuses[0] ?? null, runs: statuses.length } };
+      });
+    }),
+
+  /** Workflow runs (with steps) triggered by this inbox item — for the row indicator. */
+  workflowActivity: authenticatedProcedure
+    .input(z.object({ inboxItemId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const membership = await requireOrgMember(ctx.user.id);
+      const item = await prisma.signatureInboxItem.findFirst({
+        where: { id: input.inboxItemId, organizationId: membership.organizationId },
+        select: { id: true },
+      });
+      if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'Inbox item not found.' });
+
+      return prisma.workflowRun.findMany({
+        where: {
+          trigger: 'INBOX_OCR_COMPLETED',
+          workflow: { organizationId: membership.organizationId },
+          context: { path: ['payload', 'inboxItemId'], equals: input.inboxItemId },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          status: true,
+          createdAt: true,
+          error: true,
+          workflow: { select: { name: true } },
+          steps: {
+            orderBy: { createdAt: 'asc' },
+            select: { stepId: true, type: true, status: true, error: true },
           },
         },
       });

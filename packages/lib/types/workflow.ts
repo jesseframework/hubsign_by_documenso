@@ -123,11 +123,53 @@ export const ZWorkflowActionSchema = z.discriminatedUnion('action', [
     title: z.string().default(''),
     message: z.string().default(''),
   }),
+  z.object({
+    action: z.literal('LOOKUP_METADATA'),
+    /** Lookup grouping, e.g. "vendor" or "signee". */
+    category: z.string().min(1),
+    /**
+     * EXACT-match mode: look up by normalized name. Supports {{templating}},
+     * e.g. "{{payload.extractedData.vendor_name}}". Omit to use keyword mode.
+     */
+    key: z.string().min(1).optional(),
+    /**
+     * KEYWORD mode (when `key` is omitted): scan this text for each record's
+     * keywords and return the first match. Supports {{templating}}. Defaults to
+     * all of the event's OCR fields when left blank.
+     */
+    keywordText: z.string().optional(),
+    /** Run variable to store the match in (use as {{vars.<saveAs>.email}}). */
+    saveAs: z.string().min(1).default('lookup'),
+  }),
+  z.object({
+    action: z.literal('SEND_FOR_SIGNATURE'),
+    /**
+     * Document to send. Defaults to the event's document (for INBOX_* events,
+     * the inbox payload's `document.id`). Supports {{templating}}.
+     */
+    documentId: z.union([z.string().min(1), z.number()]).optional(),
+    /** Signers to add before sending. `email`/`name` support {{templating}}. */
+    recipients: z
+      .array(
+        z.object({
+          email: z.string().min(1),
+          name: z.string().optional(),
+          role: z.enum(['SIGNER', 'APPROVER', 'CC', 'VIEWER']).default('SIGNER'),
+        }),
+      )
+      .min(1),
+  }),
 ]);
 
 export type TWorkflowAction = z.infer<typeof ZWorkflowActionSchema>;
 
-export const WORKFLOW_ACTION_TYPES = ['SEND_EMAIL', 'HTTP_REQUEST', 'NOTIFY'] as const;
+export const WORKFLOW_ACTION_TYPES = [
+  'SEND_EMAIL',
+  'HTTP_REQUEST',
+  'NOTIFY',
+  'SEND_FOR_SIGNATURE',
+  'LOOKUP_METADATA',
+] as const;
 
 // ─── Steps ───────────────────────────────────────────────────────────────────
 

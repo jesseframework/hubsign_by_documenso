@@ -604,6 +604,10 @@ msgstr "A field was removed"
 msgid "A field was updated"
 msgstr "A field was updated"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "A lookup directory (e.g. vendor → email) that workflows can resolve at runtime. Use the \"Look up metadata\" action to find a record by name and send notifications."
+msgstr "A lookup directory (e.g. vendor → email) that workflows can resolve at runtime. Use the \"Look up metadata\" action to find a record by name and send notifications."
+
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "A means to print or download documents for your records"
 msgstr "A means to print or download documents for your records"
@@ -774,6 +778,7 @@ msgid "Action"
 msgstr "Action"
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 #: apps/remix/app/components/tables/templates-table.tsx
@@ -826,6 +831,10 @@ msgstr "Add a stamp"
 #: packages/ui/primitives/document-flow/add-settings.tsx
 msgid "Add a URL to redirect the user to once the document is signed"
 msgstr "Add a URL to redirect the user to once the document is signed"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Add a vendor (name + email) above so workflows can look them up."
+msgstr "Add a vendor (name + email) above so workflows can look them up."
 
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/document/document-edit-form.tsx
@@ -905,6 +914,10 @@ msgstr "Add myself"
 #: packages/ui/primitives/template-flow/add-template-placeholder-recipients.tsx
 msgid "Add Myself"
 msgstr "Add Myself"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Add or update a record"
+msgstr "Add or update a record"
 
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
@@ -1128,6 +1141,7 @@ msgstr "Already have a password? You can sign in at <0>{baseUrl}/signin</0>"
 msgid "Already have an account? <0>Sign in instead</0>"
 msgstr "Already have an account? <0>Sign in instead</0>"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
 msgid "Amount"
 msgstr "Amount"
@@ -1859,6 +1873,11 @@ msgstr "Cannot remove signer"
 msgid "Categories for organizing documents (HR, Legal, Finance, Operations, etc.)"
 msgstr "Categories for organizing documents (HR, Legal, Finance, Operations, etc.)"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Category"
+msgstr "Category"
+
 #: packages/lib/constants/recipient-roles.ts
 msgid "Cc"
 msgstr "Cc"
@@ -1893,6 +1912,10 @@ msgstr "Change theme"
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
 msgid "Character Limit"
 msgstr "Character Limit"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "characters extracted"
+msgstr "characters extracted"
 
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Charts"
@@ -1974,10 +1997,15 @@ msgstr "Classification updated"
 msgid "Classifications"
 msgstr "Classifications"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Clear all"
+msgstr "Clear all"
+
 #: apps/remix/app/components/dialogs/template-use-dialog.tsx
 msgid "Clear file"
 msgstr "Clear file"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: packages/ui/primitives/data-table.tsx
 msgid "Clear filters"
 msgstr "Clear filters"
@@ -2129,6 +2157,10 @@ msgstr "Condition (JSONLogic, optional)"
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Condition is not valid JSON"
 msgstr "Condition is not valid JSON"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "confidence"
+msgstr "confidence"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Config (JSON) — e.g. { \"field\": \"document.title\" } or a JSONLogic rule"
@@ -2797,6 +2829,7 @@ msgid "Delete your account and all its contents, including completed documents. 
 msgstr "Delete your account and all its contents, including completed documents. This action is irreversible and will cancel your subscription, so proceed with caution."
 
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/audit-log.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 msgid "Deleted"
 msgstr "Deleted"
@@ -2813,6 +2846,10 @@ msgstr "Deleting account..."
 msgid "Department (blank = requester's)"
 msgstr "Department (blank = requester's)"
 
+#: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+msgid "Describe it — AI builds the workflow"
+msgstr "Describe it — AI builds the workflow"
+
 #: apps/remix/app/components/forms/stamp-generate-ai-dialog.tsx
 msgid "Describe the stamp"
 msgstr "Describe the stamp"
@@ -2824,6 +2861,10 @@ msgstr "Describe the stamp in a sentence or two and try again."
 #: apps/remix/app/components/forms/stamp-generate-ai-dialog.tsx
 msgid "Describe the stamp you want and we'll design it. The result is added to your library like any other stamp — drop it onto a document the same way."
 msgstr "Describe the stamp you want and we'll design it. The result is added to your library like any other stamp — drop it onto a document the same way."
+
+#: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+msgid "Describe the workflow first"
+msgstr "Describe the workflow first"
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
@@ -3577,6 +3618,10 @@ msgstr "Edit webhook"
 msgid "Edit workflow"
 msgstr "Edit workflow"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+#~ msgid "edited"
+#~ msgstr "edited"
+
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Electronic Delivery of Documents"
 msgstr "Electronic Delivery of Documents"
@@ -3587,6 +3632,8 @@ msgstr "Electronic Signature Disclosure"
 
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
 #: apps/remix/app/components/tables/admin-document-recipient-item-table.tsx
 #: apps/remix/app/components/tables/admin-dashboard-users-table.tsx
@@ -3800,6 +3847,8 @@ msgstr "Entity type"
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/recycle-bin.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
@@ -3922,6 +3971,10 @@ msgstr "External ID"
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "Extracted data (OCR)"
 msgstr "Extracted data (OCR)"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Extracted fields"
+msgstr "Extracted fields"
 
 #: apps/remix/app/components/dialogs/template-folder-create-dialog.tsx
 #: apps/remix/app/components/dialogs/template-folder-create-dialog.tsx
@@ -4154,9 +4207,18 @@ msgstr "Generate Links"
 msgid "Generate stamp with AI"
 msgstr "Generate stamp with AI"
 
+#: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 #: apps/remix/app/components/general/stamps/stamp-library.tsx
 msgid "Generate with AI"
 msgstr "Generate with AI"
+
+#: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+msgid "Generating…"
+msgstr "Generating…"
+
+#: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+msgid "Generation failed"
+msgstr "Generation failed"
 
 #: packages/ui/components/document/document-global-auth-action-select.tsx
 msgid "Global recipient action authentication"
@@ -4482,6 +4544,14 @@ msgstr "Invited At"
 msgid "Invoice"
 msgstr "Invoice"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+#~ msgid "Invoice details"
+#~ msgstr "Invoice details"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+#~ msgid "Invoice details saved"
+#~ msgstr "Invoice details saved"
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: apps/remix/app/components/tables/internal-audit-log-table.tsx
 msgid "IP Address"
@@ -4799,6 +4869,10 @@ msgstr "Mark as viewed"
 msgid "Mark as Viewed"
 msgstr "Mark as Viewed"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Matching is case-insensitive on the name. Re-saving the same name in a category updates it."
+msgstr "Matching is case-insensitive on the name. Re-saving the same name in a category updates it."
+
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "MAU (created document)"
 msgstr "MAU (created document)"
@@ -4854,6 +4928,11 @@ msgstr "Members"
 msgid "Message <0>(Optional)</0>"
 msgstr "Message <0>(Optional)</0>"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+msgid "Metadata"
+msgstr "Metadata"
+
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
 msgid "Min"
 msgstr "Min"
@@ -4875,6 +4954,10 @@ msgstr "Monthly Active Users: Users that created at least one Document"
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Monthly Active Users: Users that had at least one of their documents completed"
 msgstr "Monthly Active Users: Users that had at least one of their documents completed"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "more"
+msgstr "more"
 
 #: apps/remix/app/components/dialogs/template-move-to-folder-dialog.tsx
 #: apps/remix/app/components/dialogs/template-move-dialog.tsx
@@ -4932,6 +5015,7 @@ msgstr "N/A"
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
@@ -4960,6 +5044,10 @@ msgstr "N/A"
 msgid "Name"
 msgstr "Name"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Name (lookup key)"
+msgstr "Name (lookup key)"
+
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Name and message required"
 msgstr "Name and message required"
@@ -4967,6 +5055,10 @@ msgstr "Name and message required"
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Name and template required"
 msgstr "Name and template required"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Name is required"
+msgstr "Name is required"
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
@@ -5068,6 +5160,10 @@ msgstr "No documents due for retention review"
 msgid "No documents found"
 msgstr "No documents found"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "No documents match your filters"
+msgstr "No documents match your filters"
+
 #: apps/remix/app/routes/_authenticated+/dms+/search.tsx
 msgid "No documents match your search."
 msgstr "No documents match your search."
@@ -5100,6 +5196,10 @@ msgstr "No filing locations yet"
 #: apps/remix/app/components/embed/embed-document-rejected.tsx
 msgid "No further action is required from you at this time."
 msgstr "No further action is required from you at this time."
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "No metadata yet"
+msgstr "No metadata yet"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "No OCR data (engine not configured). You can still send for signature."
@@ -5259,12 +5359,24 @@ msgid "OCR & Document Processing"
 msgstr "OCR & Document Processing"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+#~ msgid "OCR engine not configured — you can still fill these in manually."
+#~ msgstr "OCR engine not configured — you can still fill these in manually."
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+#~ msgid "OCR failed — enter the fields manually or re-run OCR."
+#~ msgstr "OCR failed — enter the fields manually or re-run OCR."
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "OCR failed — you can re-run it or proceed manually."
 msgstr "OCR failed — you can re-run it or proceed manually."
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "OCR is running…"
 msgstr "OCR is running…"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+#~ msgid "OCR is running… fields will populate when it finishes."
+#~ msgstr "OCR is running… fields will populate when it finishes."
 
 #: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
 msgid "OCR Processing Queue"
@@ -5275,8 +5387,16 @@ msgid "OCR Queue"
 msgstr "OCR Queue"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
-msgid "OCR ran but found no structured fields."
-msgstr "OCR ran but found no structured fields."
+#~ msgid "OCR ran but found no structured fields."
+#~ msgstr "OCR ran but found no structured fields."
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "OCR ran but the template extracted no fields."
+msgstr "OCR ran but the template extracted no fields."
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "OCR results"
+msgstr "OCR results"
 
 #. placeholder {0}: document.team?.name
 #: apps/remix/app/components/general/document-signing/document-signing-page-view.tsx
@@ -6024,6 +6144,10 @@ msgstr "Reason must be less than 500 characters"
 msgid "Reauthentication is required to sign this field"
 msgstr "Reauthentication is required to sign this field"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Received"
+msgstr "Received"
+
 #: packages/ui/components/recipient/recipient-role-select.tsx
 msgid "Receives copy"
 msgstr "Receives copy"
@@ -6386,6 +6510,7 @@ msgid "Reusable image stamps you can drop onto any document before signing. PNG,
 msgstr "Reusable image stamps you can drop onto any document before signing. PNG, JPEG, or SVG."
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "Review"
 msgstr "Review"
 
@@ -6464,6 +6589,7 @@ msgid "Runs"
 msgstr "Runs"
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-number-field.tsx
@@ -6485,6 +6611,10 @@ msgstr "Save Domain Restrictions"
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Save Inbox Settings"
 msgstr "Save Inbox Settings"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+#~ msgid "Save invoice details"
+#~ msgstr "Save invoice details"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Save OCR Settings"
@@ -6514,6 +6644,10 @@ msgstr "Save Template"
 msgid "Save this password — once signed, the system discards it and you must share it with recipients yourself."
 msgstr "Save this password — once signed, the system discards it and you must share it with recipients yourself."
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Saved"
+msgstr "Saved"
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 msgid "Scan the QR code or visit the URL below to confirm this document is authentic."
 msgstr "Scan the QR code or visit the URL below to confirm this document is authentic."
@@ -6530,6 +6664,10 @@ msgstr "Search"
 #: apps/remix/app/routes/_authenticated+/admin+/documents._index.tsx
 msgid "Search by document title"
 msgstr "Search by document title"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Search by document, vendor, invoice #, PO #, or amount"
+msgstr "Search by document, vendor, invoice #, PO #, or amount"
 
 #: apps/remix/app/components/tables/admin-leaderboard-table.tsx
 #: apps/remix/app/components/tables/admin-dashboard-users-table.tsx
@@ -6830,6 +6968,12 @@ msgstr "Show templates in your public profile for your audience to sign and get 
 #: apps/remix/app/routes/_authenticated+/settings+/public-profile.tsx
 msgid "Show templates in your team public profile for your audience to sign and get started quickly"
 msgstr "Show templates in your team public profile for your audience to sign and get started quickly"
+
+#. placeholder {0}: filteredItems.length
+#. placeholder {1}: items.length
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Showing {0} of {1}"
+msgstr "Showing {0} of {1}"
 
 #: apps/remix/app/routes/_profile+/p.$url.tsx
 #: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
@@ -7261,6 +7405,7 @@ msgstr "Stats"
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/audit-log.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id.runs.tsx
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
@@ -8465,6 +8610,7 @@ msgid "Two-Factor Re-Authentication"
 msgstr "Two-Factor Re-Authentication"
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/components/tables/templates-table.tsx
 #: apps/remix/app/components/tables/admin-document-recipient-item-table.tsx
 #: packages/lib/constants/document.ts
@@ -9416,6 +9562,10 @@ msgstr "Workflow created"
 msgid "Workflow deleted"
 msgstr "Workflow deleted"
 
+#: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+msgid "Workflow generated — review and Save"
+msgstr "Workflow generated — review and Save"
+
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 msgid "Workflow run started"
 msgstr "Workflow run started"
@@ -9464,6 +9614,14 @@ msgstr "Write about the team"
 #: apps/remix/app/components/forms/public-profile-form.tsx
 msgid "Write about yourself"
 msgstr "Write about yourself"
+
+#: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+#~ msgid "Write what should happen in plain English. Example: \"When an inbox document finishes OCR and the vendor email contains bms, send it to jgray@fepro.io to sign.\""
+#~ msgstr "Write what should happen in plain English. Example: \"When an inbox document finishes OCR and the vendor email contains bms, send it to jgray@fepro.io to sign.\""
+
+#: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+msgid "Write what should happen in plain English. Example: \"When an inbox document finishes OCR and the vendor email contains bms, send it to the finance team to sign.\""
+msgstr "Write what should happen in plain English. Example: \"When an inbox document finishes OCR and the vendor email contains bms, send it to the finance team to sign.\""
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.billing.tsx
 #: apps/remix/app/components/general/billing-plans.tsx

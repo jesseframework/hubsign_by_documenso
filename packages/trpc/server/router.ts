@@ -9,6 +9,7 @@ import { embeddingPresignRouter } from './embedding-router/_router';
 import { fieldRouter } from './field-router/router';
 import { folderRouter } from './folder-router/router';
 import { inboxRouter } from './inbox-router/router';
+import { metadataRouter } from './metadata-router/router';
 import { profileRouter } from './profile-router/router';
 import { pushRouter } from './push-router/router';
 import { recipientRouter } from './recipient-router/router';
@@ -41,6 +42,7 @@ export const appRouter = router({
   workflow: workflowRouter,
   approval: approvalRouter,
   inbox: inboxRouter,
+  metadata: metadataRouter,
 });
 
 export type AppRouter = typeof appRouter;

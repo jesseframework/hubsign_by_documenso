@@ -2298,3 +2298,21 @@ model SignatureInboxItem {
   @@index([createdAt])
   @@index([externalMessageId])
 }
+
+/// Org-scoped lookup directory (e.g. vendor name → email) that workflows resolve
+/// at runtime via the LOOKUP_METADATA action — e.g. find a vendor's email from
+/// the OCR'd vendor name, then notify them.
+model MetadataRecord {
+  id             String   @id @default(cuid())
+  organizationId Int
+  category       String /// Grouping, e.g. "vendor".
+  key            String /// Normalized lookup key (lowercased + trimmed), e.g. the vendor name.
+  label          String? /// Original display value (un-normalized).
+  email          String? /// Primary email used for notifications.
+  data           Json? /// Arbitrary extra fields (phone, account number, …).
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, category, key])
+  @@index([organizationId, category])
+}
