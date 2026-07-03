@@ -11,6 +11,7 @@ import { Button } from '@documenso/ui/primitives/button';
 import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
+import { useInboxEvents } from '~/hooks/use-inbox-events';
 import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
@@ -20,6 +21,20 @@ export function meta() {
 const looksLikeEmail = (v: unknown): v is string =>
   typeof v === 'string' && /\S+@\S+\.\S+/.test(v);
 
+/** A single field the ML extracted — shape mirrors BMS ML `field_extractions`. */
+type FieldExtraction = {
+  field_name: string;
+  extracted_value: unknown;
+  confidence_score: number;
+  field_type?: string;
+  extraction_method?: string;
+  template_name?: string;
+  ai_fallback_used?: boolean;
+  requires_review?: boolean;
+};
+
+const pct = (c: number) => Math.round((c <= 1 ? c * 100 : c));
+
 export default function InboxItemPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
@@ -28,6 +43,9 @@ export default function InboxItemPage() {
   const utils = trpc.useUtils();
 
   const { data: item, isLoading, error } = trpc.inbox.get.useQuery({ id }, { enabled: !!id });
+
+  // Live-refresh this item (and the list) when its OCR finishes (SSE).
+  useInboxEvents(id);
 
   const [rows, setRows] = useState<Array<{ name: string; email: string }>>([{ name: '', email: '' }]);
   const [prefilled, setPrefilled] = useState(false);
@@ -63,10 +81,17 @@ export default function InboxItemPage() {
     return <div className="py-12 text-center text-muted-foreground">{error?.message ?? 'Not found'}</div>;
   }
 
-  const extracted = (item.extractedData ?? {}) as Record<string, unknown>;
-  const extractedEntries = Object.entries(extracted);
   const alreadySent = item.status === 'SENT_FOR_SIGNATURE' || item.document.status !== 'DRAFT';
   const label = 'block text-[11px] font-medium text-muted-foreground mb-1';
+
+  // Whatever the ML returned, rendered dynamically (fields vary by template).
+  const ocrMeta = (item.ocrMeta ?? {}) as {
+    fieldExtractions?: FieldExtraction[];
+    completeness?: { score?: number } | null;
+  };
+  const fields = ocrMeta.fieldExtractions ?? [];
+  const templateName = fields.find((f) => f.template_name)?.template_name;
+  const completeness = typeof ocrMeta.completeness?.score === 'number' ? ocrMeta.completeness.score : null;
 
   return (
     <div className="space-y-4">
@@ -99,9 +124,9 @@ export default function InboxItemPage() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* OCR extracted data */}
+        {/* OCR results — fields are whatever the ML template extracted */}
         <div className="rounded-[var(--r)] border border-border bg-card p-4">
-          <div className="mb-2 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between">
             <h3 className="text-[14px] font-semibold">
               <Trans>Extracted data (OCR)</Trans>
             </h3>
@@ -120,38 +145,126 @@ export default function InboxItemPage() {
                 <Trans>No OCR data (engine not configured). You can still send for signature.</Trans>
               )}
             </p>
-          ) : extractedEntries.length === 0 ? (
-            <p className="text-[12px] text-muted-foreground">
-              <Trans>OCR ran but found no structured fields.</Trans>
-            </p>
           ) : (
-            <table className="w-full text-[12px]">
-              <tbody>
-                {extractedEntries.map(([k, v]) => (
-                  <tr key={k} className="border-b border-border last:border-0">
-                    <td className="py-1.5 pr-3 text-muted-foreground">{k}</td>
-                    <td className="py-1.5 font-medium">{v == null ? '—' : String(v)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+            <>
+              {/* Summary: document type + overall confidence + completeness bar */}
+              <div className="mb-3 rounded border border-border bg-muted/20 p-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase text-muted-foreground">
+                    <Trans>OCR results</Trans>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    {item.documentType && (
+                      <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                        {item.documentType}
+                      </span>
+                    )}
+                    {item.ocrConfidence != null && (
+                      <span
+                        className={`rounded px-2 py-0.5 text-[10px] font-medium ${
+                          item.ocrConfidence >= 0.8
+                            ? 'bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-300'
+                            : item.ocrConfidence >= 0.5
+                              ? 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
+                              : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'
+                        }`}
+                      >
+                        {pct(item.ocrConfidence)}% <Trans>confidence</Trans>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {completeness != null && (
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className={`h-full rounded-full ${completeness >= 0.7 ? 'bg-green-500' : 'bg-amber-500'}`}
+                      style={{ width: `${completeness * 100}%` }}
+                    />
+                  </div>
+                )}
+              </div>
 
-          {item.ocrText && (
-            <div className="mt-3">
-              <button
-                type="button"
-                className="text-[11px] text-primary hover:underline"
-                onClick={() => setShowOcrText((s) => !s)}
-              >
-                {showOcrText ? '− Hide raw OCR text' : '+ Show raw OCR text'}
-              </button>
-              {showOcrText && (
-                <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2 font-mono text-[10px] text-muted-foreground">
-                  {item.ocrText}
-                </pre>
+              {fields.length > 0 ? (
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-medium text-muted-foreground">
+                      <Trans>Extracted fields</Trans>
+                    </span>
+                    {templateName && (
+                      <span className="text-[10px] text-muted-foreground">Template: {templateName}</span>
+                    )}
+                  </div>
+                  <div className="mt-1.5 space-y-1">
+                    {fields.map((field, i) => {
+                      const isLow = field.confidence_score < 0.5;
+                      const needsReview = field.requires_review || isLow || field.extracted_value == null;
+                      return (
+                        <div
+                          key={`${field.field_name}-${i}`}
+                          className={`flex items-center gap-2 rounded border px-2.5 py-1.5 ${
+                            needsReview
+                              ? 'border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/30'
+                              : 'border-border bg-muted/20'
+                          }`}
+                        >
+                          <div
+                            className={`h-2 w-2 flex-shrink-0 rounded-full ${
+                              field.confidence_score >= 0.7
+                                ? 'bg-green-500'
+                                : field.confidence_score >= 0.4
+                                  ? 'bg-amber-500'
+                                  : 'bg-red-500'
+                            }`}
+                            title={`${pct(field.confidence_score)}% confidence`}
+                          />
+                          <span className="min-w-[100px] text-[11px] font-medium capitalize text-muted-foreground">
+                            {field.field_name.replace(/_/g, ' ')}
+                          </span>
+                          <span className="flex-1 text-[12px] font-medium">
+                            {field.extracted_value != null ? String(field.extracted_value) : '—'}
+                          </span>
+                          <span className="text-[9px] text-muted-foreground">
+                            {pct(field.confidence_score)}%
+                            {field.extraction_method === 'ml+ai' || field.ai_fallback_used ? ' · AI' : ''}
+                          </span>
+                          {needsReview && (
+                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                              <Trans>Review</Trans>
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[12px] text-muted-foreground">
+                  <Trans>OCR ran but the template extracted no fields.</Trans>
+                </p>
               )}
-            </div>
+
+              {item.ocrText && (
+                <div className="mt-3 border-t border-border pt-2">
+                  <button
+                    type="button"
+                    className="text-[11px] text-primary hover:underline"
+                    onClick={() => setShowOcrText((s) => !s)}
+                  >
+                    {showOcrText ? '− Hide OCR content' : '+ Show OCR content'}
+                  </button>
+                  {showOcrText && (
+                    <>
+                      <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-2 font-mono text-[10px] text-muted-foreground">
+                        {item.ocrText}
+                      </pre>
+                      <p className="mt-1 text-[10px] text-muted-foreground">
+                        {item.ocrText.length} <Trans>characters extracted</Trans>
+                      </p>
+                    </>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
 

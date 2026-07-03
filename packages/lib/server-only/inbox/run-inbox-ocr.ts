@@ -14,6 +14,7 @@ import { prisma } from '@documenso/prisma';
 import { getFileServerSide } from '../../universal/upload/get-file.server';
 import { bmsMlUploadDocument, isBmsMlConfigured } from '../bms-ml/client';
 import { triggerWorkflows } from '../workflow/trigger-workflows';
+import { publishInboxEvent } from './inbox-events';
 
 const fireOcrCompleted = async (inboxItemId: string): Promise<void> => {
   const item = await prisma.signatureInboxItem.findUnique({
@@ -21,6 +22,9 @@ const fireOcrCompleted = async (inboxItemId: string): Promise<void> => {
     include: { document: { select: { id: true, title: true, status: true, userId: true } } },
   });
   if (!item) return;
+
+  // Push the finished OCR result to any open inbox views in realtime.
+  publishInboxEvent(item.organizationId, { type: 'ocr', inboxItemId: item.id, status: item.status });
 
   await triggerWorkflows({
     event: 'INBOX_OCR_COMPLETED',
@@ -83,7 +87,12 @@ export const runInboxOcr = async ({ inboxItemId }: { inboxItemId: string }): Pro
     const bytes = await getFileServerSide({ type: data.type, data: data.data });
     const buffer = Buffer.from(bytes);
 
-    const result = await bmsMlUploadDocument(buffer, item.document.title || 'document.pdf', {
+    // ML keys off the filename extension; the document title may have none
+    // (it's the email subject), so guarantee a .pdf name.
+    const baseName = item.document.title?.trim() || 'document';
+    const fileName = /\.pdf$/i.test(baseName) ? baseName : `${baseName}.pdf`;
+
+    const result = await bmsMlUploadDocument(buffer, fileName, {
       orgConfig,
       templateId: org?.ocrDefaultTemplateId ?? undefined,
     });

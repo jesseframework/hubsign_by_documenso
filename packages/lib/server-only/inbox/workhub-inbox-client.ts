@@ -112,7 +112,35 @@ const request = async (
 ): Promise<unknown> => {
   const res = await fetch(url(config, path), { method, headers: headers(config) });
   const text = await res.text();
-  const body = text ? JSON.parse(text) : null;
+
+  // The inbox API always answers JSON. Gateways/proxies and auth redirects can
+  // return an HTML or plain-text page instead (e.g. a "502 Bad Gateway" or a
+  // login page) — blindly JSON.parsing that yields a cryptic "Unexpected token
+  // '<'" error, so detect non-JSON bodies and surface something actionable.
+  const contentType = res.headers.get('content-type') ?? '';
+  const looksJson = contentType.includes('json') || /^\s*[[{]/.test(text);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- JSON shape is validated by callers
+  let body: any = null;
+  if (text) {
+    if (!looksJson) {
+      const snippet = text.replace(/\s+/g, ' ').trim().slice(0, 200);
+      throw new Error(
+        `WorkHub inbox ${method} ${path} failed: HTTP ${res.status} returned a non-JSON ` +
+          `response (content-type "${contentType || 'unknown'}"). The WorkHub API may be ` +
+          `unreachable or the API base URL may be misconfigured. Response: ${snippet}`,
+      );
+    }
+    try {
+      body = JSON.parse(text);
+    } catch {
+      throw new Error(
+        `WorkHub inbox ${method} ${path} failed: could not parse JSON (HTTP ${res.status}): ` +
+          text.slice(0, 200),
+      );
+    }
+  }
+
   if (!res.ok) {
     const message =
       (body && typeof body === 'object' && (body.detail || body.error)) || `HTTP ${res.status}`;
@@ -166,6 +194,34 @@ export const workhubListAttachments = async (
       isInline: Boolean(pick(o, ['isInline', 'inline'])),
     };
   });
+};
+
+/**
+ * Some mail backends (Exchange via WorkHub's Java service) return an attachment
+ * as a base64-encoded *Java-serialized* `byte[]` rather than the raw file bytes.
+ * The stored file then has a serialization header before the real content (e.g.
+ * `%PDF…`), which breaks OCR/preview. Detect the stream magic (0xACED0005) and
+ * return just the embedded byte[] payload; pass anything else through untouched.
+ */
+export const unwrapSerializedAttachment = (buf: Buffer): Buffer => {
+  if (buf.length < 6 || buf[0] !== 0xac || buf[1] !== 0xed || buf[2] !== 0x00 || buf[3] !== 0x05) {
+    return buf;
+  }
+  // A top-level serialized byte[] ends its class descriptor with TC_ENDBLOCKDATA
+  // (0x78) + TC_NULL (0x70), followed by a 4-byte big-endian length and the data.
+  let term = -1;
+  for (let i = 0; i + 1 < buf.length; i++) {
+    if (buf[i] === 0x78 && buf[i + 1] === 0x70) {
+      term = i;
+      break;
+    }
+  }
+  if (term >= 0 && term + 6 <= buf.length) {
+    const len = buf.readUInt32BE(term + 2);
+    const start = term + 6;
+    if (len > 0 && start + len <= buf.length) return buf.subarray(start, start + len);
+  }
+  return buf;
 };
 
 export const workhubFetchAttachment = async (

@@ -1,17 +1,52 @@
 import { version as APP_VERSION } from '../../../../../package.json';
 
+import { useState } from 'react';
+
 import { Trans } from '@lingui/react/macro';
 import {
+  ActivityIcon,
+  ArchiveIcon,
+  BarChart3Icon,
+  BellIcon,
+  BotIcon,
+  BracesIcon,
   BuildingIcon,
+  CheckSquareIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  ClipboardCheckIcon,
+  ClipboardListIcon,
+  ClockIcon,
   CombineIcon,
+  CpuIcon,
+  CreditCardIcon,
+  DatabaseIcon,
+  FileSearchIcon,
+  FileStackIcon,
   FileTextIcon,
   FolderArchiveIcon,
+  FolderTreeIcon,
+  Globe2Icon,
+  HeartIcon,
+  InboxIcon,
+  LayoutDashboardIcon,
+  ListChecksIcon,
+  LockIcon,
   LogOutIcon,
   PenLineIcon,
   SettingsIcon,
-  UsersIcon,
-  XIcon,
+  ShieldCheckIcon,
   ShieldIcon,
+  StampIcon,
+  Trash2Icon,
+  TrophyIcon,
+  UploadCloudIcon,
+  UserIcon,
+  UsersIcon,
+  Wallet2Icon,
+  WebhookIcon,
+  WorkflowIcon,
+  XIcon,
 } from 'lucide-react';
 import { Link, useLocation, useParams } from 'react-router';
 
@@ -29,6 +64,107 @@ export type AppSidebarProps = {
   isOpen: boolean;
   onClose: () => void;
 };
+
+type SubNavItem = {
+  to: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: React.ReactNode;
+  /** Match the path exactly (for dashboard-style index routes). */
+  exact?: boolean;
+  /** Also treat this prefix as active (for aliased routes). */
+  match?: string;
+};
+
+/**
+ * A top-level sidebar item with an expandable, nested submenu (guide rail +
+ * indented children). Auto-expands when its section is active; the chevron
+ * toggles it manually.
+ */
+function SidebarNavGroup({
+  to,
+  icon: Icon,
+  label,
+  items,
+  active,
+  pathname,
+  sidebarTextColor,
+  navStyle,
+  onClose,
+}: {
+  to: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: React.ReactNode;
+  items: SubNavItem[];
+  active: boolean;
+  pathname: string;
+  sidebarTextColor?: string;
+  navStyle: (active: boolean) => React.CSSProperties | undefined;
+  onClose: () => void;
+}) {
+  const [manual, setManual] = useState<boolean | null>(null);
+  const show = manual === null ? active : manual;
+
+  return (
+    <div>
+      <div className="flex items-center">
+        <Link
+          to={to}
+          className={`sidebar-nav-item flex-1 ${!sidebarTextColor && active ? 'active' : ''}`}
+          style={navStyle(active)}
+          onClick={onClose}
+        >
+          <Icon className="h-4 w-4 flex-shrink-0" />
+          {label}
+        </Link>
+        <button
+          type="button"
+          className="mr-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md"
+          style={{ color: sidebarTextColor ? `${sidebarTextColor}80` : 'hsl(var(--sidebar-text))' }}
+          onClick={() => setManual(!show)}
+          aria-label="Toggle menu"
+          aria-expanded={show}
+        >
+          {show ? (
+            <ChevronDownIcon className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronRightIcon className="h-3.5 w-3.5" />
+          )}
+        </button>
+      </div>
+
+      {show && (
+        <div
+          className="mb-1 ml-[18px] mt-0.5 space-y-px border-l pl-2.5"
+          style={{ borderColor: sidebarTextColor ? `${sidebarTextColor}25` : 'hsl(var(--sidebar-border))' }}
+        >
+          {items.map((item) => {
+            const itemActive = item.exact
+              ? pathname === item.to
+              : pathname.startsWith(item.to) || (item.match ? pathname.startsWith(item.match) : false);
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors ${
+                  !sidebarTextColor
+                    ? itemActive
+                      ? 'bg-primary/10 font-medium text-primary'
+                      : 'text-[hsl(var(--sidebar-text))] hover:bg-[hsl(var(--sidebar-hover))] hover:text-[hsl(var(--sidebar-text-active))]'
+                    : ''
+                }`}
+                style={navStyle(itemActive)}
+                onClick={onClose}
+              >
+                <item.icon className="h-3.5 w-3.5 flex-shrink-0 opacity-80" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) => {
   const location = useLocation();
@@ -52,6 +188,54 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
   };
 
   const { data: orgMembership } = trpc.org.getMyOrganization.useQuery();
+
+  // Expandable submenus (nested under their top-level item).
+  const orgNav: SubNavItem[] = [
+    { to: '/org/settings', icon: SettingsIcon, label: <Trans>Settings</Trans> },
+    { to: '/org/members', icon: UsersIcon, label: <Trans>Members</Trans> },
+    { to: '/org/inbox', icon: InboxIcon, label: <Trans>Signature Inbox</Trans> },
+    { to: '/org/permissions', icon: ShieldIcon, label: <Trans>DMS Permissions</Trans> },
+    { to: '/org/workflows', icon: WorkflowIcon, label: <Trans>Workflows</Trans> },
+    { to: '/org/metadata', icon: DatabaseIcon, label: <Trans>Metadata</Trans> },
+    { to: '/org/approvals', icon: ClipboardCheckIcon, label: <Trans>Approvals</Trans> },
+    { to: '/org/approval-templates', icon: ListChecksIcon, label: <Trans>Approval Setup</Trans> },
+    { to: '/org/stamps', icon: StampIcon, label: <Trans>Stamps</Trans> },
+    { to: '/org/billing', icon: CreditCardIcon, label: <Trans>Billing</Trans> },
+    { to: '/org/recycle-bin', icon: Trash2Icon, label: <Trans>Recycle Bin</Trans> },
+  ];
+  const dmsNav: SubNavItem[] = [
+    { to: '/dms', icon: LayoutDashboardIcon, label: <Trans>Dashboard</Trans>, exact: true },
+    { to: '/dms/documents', icon: ArchiveIcon, label: <Trans>Documents</Trans> },
+    { to: '/dms/bulk-upload', icon: UploadCloudIcon, label: <Trans>Bulk Upload</Trans> },
+    { to: '/dms/ocr-queue', icon: CpuIcon, label: <Trans>OCR Queue</Trans> },
+    { to: '/dms/search', icon: FileSearchIcon, label: <Trans>Search</Trans> },
+    { to: '/dms/filing', icon: FolderTreeIcon, label: <Trans>Filing Structure</Trans> },
+    { to: '/dms/favorites', icon: HeartIcon, label: <Trans>Favorites</Trans> },
+    { to: '/dms/approvals', icon: CheckSquareIcon, label: <Trans>Approvals</Trans> },
+    { to: '/dms/retrievals', icon: ClipboardListIcon, label: <Trans>Retrievals</Trans> },
+    { to: '/dms/retention', icon: ClockIcon, label: <Trans>Retention</Trans> },
+    { to: '/dms/activity', icon: ActivityIcon, label: <Trans>Activity</Trans> },
+    { to: '/dms/compliance', icon: ShieldCheckIcon, label: <Trans>Compliance</Trans> },
+    { to: '/dms/ai', icon: BotIcon, label: <Trans>AI Agent</Trans> },
+    { to: '/dms/settings', icon: SettingsIcon, label: <Trans>Settings</Trans> },
+  ];
+  const settingsNav: SubNavItem[] = [
+    { to: '/settings/profile', icon: UserIcon, label: <Trans>Profile</Trans> },
+    { to: '/settings/public-profile', icon: Globe2Icon, label: <Trans>Public Profile</Trans> },
+    { to: '/settings/security', icon: LockIcon, label: <Trans>Security</Trans> },
+    { to: '/settings/notifications', icon: BellIcon, label: <Trans>Notifications</Trans> },
+    { to: '/settings/tokens', icon: BracesIcon, label: <Trans>API Tokens</Trans> },
+    { to: '/settings/webhooks', icon: WebhookIcon, label: <Trans>Webhooks</Trans> },
+  ];
+  const adminNav: SubNavItem[] = [
+    { to: '/admin/stats', icon: BarChart3Icon, label: <Trans>Stats</Trans> },
+    { to: '/admin/users', icon: UsersIcon, label: <Trans>Users</Trans> },
+    { to: '/admin/documents', icon: FileStackIcon, label: <Trans>Documents</Trans> },
+    { to: '/admin/subscriptions', icon: Wallet2Icon, label: <Trans>Subscriptions</Trans> },
+    { to: '/admin/leaderboard', icon: TrophyIcon, label: <Trans>Leaderboard</Trans> },
+    { to: '/admin/site-settings', icon: SettingsIcon, label: <Trans>Site Settings</Trans>, match: '/admin/banner' },
+  ];
+  const onSettingsRoute = isActive('/settings') && !isActive('/settings/teams');
 
   // Org branding colors
   const orgBrand = orgMembership?.organization;
@@ -191,15 +375,17 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
           </Link>
 
           {isDmsEnabled && (
-            <Link
+            <SidebarNavGroup
               to="/dms"
-              className={`sidebar-nav-item ${!sidebarTextColor && location.pathname.startsWith('/dms') ? 'active' : ''}`}
-              style={navStyle(location.pathname.startsWith('/dms'))}
-              onClick={onClose}
-            >
-              <FolderArchiveIcon className="h-4 w-4 flex-shrink-0" />
-              <Trans>Doc Manager</Trans>
-            </Link>
+              icon={FolderArchiveIcon}
+              label={<Trans>Doc Manager</Trans>}
+              items={dmsNav}
+              active={location.pathname.startsWith('/dms')}
+              pathname={location.pathname}
+              sidebarTextColor={sidebarTextColor}
+              navStyle={navStyle}
+              onClose={onClose}
+            />
           )}
         </div>
 
@@ -211,15 +397,17 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
             <Trans>Workspace</Trans>
           </div>
 
-          <Link
+          <SidebarNavGroup
             to="/org/settings"
-            className={`sidebar-nav-item ${!sidebarTextColor && location.pathname.startsWith('/org') ? 'active' : ''}`}
-            style={navStyle(location.pathname.startsWith('/org'))}
-            onClick={onClose}
-          >
-            <BuildingIcon className="h-4 w-4 flex-shrink-0" />
-            <Trans>Organization</Trans>
-          </Link>
+            icon={BuildingIcon}
+            label={<Trans>Organization</Trans>}
+            items={orgNav}
+            active={location.pathname.startsWith('/org')}
+            pathname={location.pathname}
+            sidebarTextColor={sidebarTextColor}
+            navStyle={navStyle}
+            onClose={onClose}
+          />
 
           <Link
             to={getRootHref('/settings/teams')}
@@ -231,26 +419,30 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
             <Trans>Team</Trans>
           </Link>
 
-          <Link
-            to={getRootHref('/settings/profile')}
-            className={`sidebar-nav-item ${!sidebarTextColor && isActive('/settings') && !isActive('/settings/teams') ? 'active' : ''}`}
-            style={navStyle(isActive('/settings') && !isActive('/settings/teams'))}
-            onClick={onClose}
-          >
-            <SettingsIcon className="h-4 w-4 flex-shrink-0" />
-            <Trans>Settings</Trans>
-          </Link>
+          <SidebarNavGroup
+            to="/settings/profile"
+            icon={SettingsIcon}
+            label={<Trans>Settings</Trans>}
+            items={settingsNav}
+            active={onSettingsRoute}
+            pathname={location.pathname}
+            sidebarTextColor={sidebarTextColor}
+            navStyle={navStyle}
+            onClose={onClose}
+          />
 
           {isAdmin && (
-            <Link
+            <SidebarNavGroup
               to="/admin/stats"
-              className={`sidebar-nav-item ${!sidebarTextColor && location.pathname.startsWith('/admin') ? 'active' : ''}`}
-              style={navStyle(location.pathname.startsWith('/admin'))}
-              onClick={onClose}
-            >
-              <ShieldIcon className="h-4 w-4 flex-shrink-0" />
-              <Trans>Admin</Trans>
-            </Link>
+              icon={ShieldIcon}
+              label={<Trans>Admin</Trans>}
+              items={adminNav}
+              active={location.pathname.startsWith('/admin')}
+              pathname={location.pathname}
+              sidebarTextColor={sidebarTextColor}
+              navStyle={navStyle}
+              onClose={onClose}
+            />
           )}
         </div>
 

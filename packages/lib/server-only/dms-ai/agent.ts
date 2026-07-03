@@ -2,7 +2,36 @@ import { prisma } from '@documenso/prisma';
 
 import { env } from '../../utils/env';
 
-const FREE_QUERIES_PER_MONTH = Number(env('NEXT_PRIVATE_DMS_AI_FREE_QUERIES_PER_MONTH') || '20');
+/**
+ * Per-account upgrade: emails or user ids in NEXT_PRIVATE_DMS_AI_UNLIMITED_USERS
+ * (comma-separated) get an unlimited cap. Lets specific accounts (e.g. a dev/admin
+ * account) be upgraded without lifting the limit for everyone.
+ */
+const isUpgradedAccount = (user?: { id?: number; email?: string | null }): boolean => {
+  if (!user) return false;
+  const list = (env('NEXT_PRIVATE_DMS_AI_UNLIMITED_USERS') ?? '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+  if (!list.length) return false;
+  const email = user.email?.toLowerCase();
+  const id = user.id != null ? String(user.id) : undefined;
+  return Boolean((email && list.includes(email)) || (id && list.includes(id)));
+};
+
+/**
+ * Monthly DMS AI query cap for a user. Returns `null` for UNLIMITED — either the
+ * account is upgraded (allowlist) or the global env is "unlimited"/"0"/"-1".
+ * Unset env keeps the historical default of 20.
+ */
+export const getDmsAiQueryLimit = (user?: { id?: number; email?: string | null }): number | null => {
+  if (isUpgradedAccount(user)) return null;
+  const raw = (env('NEXT_PRIVATE_DMS_AI_FREE_QUERIES_PER_MONTH') ?? '').trim();
+  if (raw === '') return 20;
+  if (/^(unlimited|0|-1)$/i.test(raw)) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 20;
+};
 
 export type AiChatOptions = {
   userId: number;
@@ -16,7 +45,7 @@ export type AiChatResult = {
   messageId: string;
   content: string; // Rich HTML response
   tokensUsed: { prompt: number; completion: number };
-  usage: { queriesThisMonth: number; limit: number; remaining: number };
+  usage: { queriesThisMonth: number; limit: number | null; remaining: number | null };
 };
 
 /**
@@ -109,11 +138,11 @@ async function checkUsage(userId: number, organizationId?: number | null) {
     update: {},
   });
 
-  // TODO: Check if user has paid tier (seat plan) for higher limits
-  const limit = FREE_QUERIES_PER_MONTH;
-  const remaining = Math.max(limit - usage.totalQueries, 0);
+  const account = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  const limit = getDmsAiQueryLimit({ id: userId, email: account?.email });
+  const remaining = limit === null ? null : Math.max(limit - usage.totalQueries, 0);
 
-  return { usage, limit, remaining, allowed: remaining > 0 };
+  return { usage, limit, remaining, allowed: limit === null || (remaining ?? 0) > 0 };
 }
 
 /**
@@ -259,7 +288,7 @@ Respond to the user's question based on this data. If they ask for something not
     usage: {
       queriesThisMonth: usageCheck.usage.totalQueries + 1,
       limit: usageCheck.limit,
-      remaining: usageCheck.remaining - 1,
+      remaining: usageCheck.remaining === null ? null : usageCheck.remaining - 1,
     },
   };
 }

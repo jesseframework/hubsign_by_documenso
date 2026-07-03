@@ -1,7 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
-import { dmsAiChat, getAiConversations, getAiConversationMessages } from '@documenso/lib/server-only/dms-ai/agent';
+import { dmsAiChat, getAiConversations, getAiConversationMessages, getDmsAiQueryLimit } from '@documenso/lib/server-only/dms-ai/agent';
 import { bmsMlGetStatus, bmsMlGetTemplates, bmsMlUploadDocument, isBmsMlConfigured } from '@documenso/lib/server-only/bms-ml/client';
 import { prisma } from '@documenso/prisma';
 
@@ -1646,13 +1646,13 @@ export const dmsRouter = router({
       where: { userId_month: { userId: ctx.user.id, month } },
     });
 
-    const freeLimit = Number(process.env.NEXT_PRIVATE_DMS_AI_FREE_QUERIES_PER_MONTH || '20');
+    const freeLimit = getDmsAiQueryLimit({ id: ctx.user.id, email: ctx.user.email }); // null = unlimited
 
     return {
       queriesThisMonth: usage?.totalQueries || 0,
       tokensUsed: (usage?.totalPromptTokens || 0) + (usage?.totalCompletionTokens || 0),
       limit: freeLimit,
-      remaining: Math.max(freeLimit - (usage?.totalQueries || 0), 0),
+      remaining: freeLimit === null ? null : Math.max(freeLimit - (usage?.totalQueries || 0), 0),
     };
   }),
 });

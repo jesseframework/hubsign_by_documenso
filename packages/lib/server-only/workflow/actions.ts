@@ -8,6 +8,7 @@
  */
 
 import type { TWorkflowAction } from '../../types/workflow';
+import { normalizeMetadataKey } from '../../universal/metadata';
 import { renderTemplate, resolveTemplatesDeep, resolveValue } from './template';
 
 export type WorkflowLogger = {
@@ -140,6 +141,189 @@ const notify: WorkflowActionHandler<Extract<TWorkflowAction, { action: 'NOTIFY' 
   return { userId, sent };
 };
 
+const sendForSignature: WorkflowActionHandler<
+  Extract<TWorkflowAction, { action: 'SEND_FOR_SIGNATURE' }>
+> = async (config, { data, logger }) => {
+  const root = data as {
+    payload?: { document?: { id?: unknown } };
+    document?: { id?: unknown; document?: { id?: unknown } };
+    organization?: { id?: unknown };
+  };
+
+  // Resolve the document id: explicit config wins, else the event's document
+  // (INBOX_* payloads nest it under `document.document`).
+  const fromConfig =
+    config.documentId === undefined
+      ? undefined
+      : typeof config.documentId === 'number'
+        ? config.documentId
+        : resolveValue(config.documentId, data);
+  const rawId =
+    fromConfig ??
+    root.payload?.document?.id ??
+    root.document?.document?.id ??
+    root.document?.id;
+  const documentId = Number(rawId);
+  if (!documentId || Number.isNaN(documentId)) {
+    logger.warn('[workflow:SEND_FOR_SIGNATURE] no document id — skipping');
+    return { skipped: true, reason: 'no-document' };
+  }
+
+  const organizationId = Number(root.organization?.id);
+
+  const recipients = config.recipients
+    .map((r) => ({
+      email: renderTemplate(r.email, data).trim(),
+      name: r.name ? renderTemplate(r.name, data).trim() : '',
+      role: r.role ?? 'SIGNER',
+    }))
+    .filter((r) => /\S+@\S+\.\S+/.test(r.email));
+  if (recipients.length === 0) {
+    logger.warn('[workflow:SEND_FOR_SIGNATURE] no resolvable recipients — skipping');
+    return { skipped: true, reason: 'no-recipients' };
+  }
+
+  const { prisma } = await import('@documenso/prisma');
+
+  // Only documents that came through this org's signature inbox are eligible —
+  // stops a workflow from sending arbitrary documents.
+  const inboxItem = await prisma.signatureInboxItem.findFirst({
+    where: { documentId, organizationId },
+    select: { id: true },
+  });
+  if (!inboxItem) {
+    logger.warn(
+      `[workflow:SEND_FOR_SIGNATURE] document ${documentId} not in org ${organizationId} inbox — skipping`,
+    );
+    return { skipped: true, reason: 'document-not-in-org-inbox' };
+  }
+
+  const document = await prisma.document.findUnique({
+    where: { id: documentId },
+    include: { recipients: { select: { email: true } } },
+  });
+  if (!document) return { skipped: true, reason: 'document-not-found' };
+  if (document.status !== 'DRAFT') {
+    logger.warn(`[workflow:SEND_FOR_SIGNATURE] document ${documentId} is ${document.status} — skipping`);
+    return { skipped: true, reason: `already-${document.status}` };
+  }
+
+  const { nanoid } = await import('../../universal/id');
+  const existing = new Set(document.recipients.map((r) => r.email.toLowerCase()));
+  const added: string[] = [];
+  for (const r of recipients) {
+    if (existing.has(r.email.toLowerCase())) continue;
+    await prisma.recipient.create({
+      data: {
+        documentId,
+        email: r.email,
+        name: r.name,
+        token: nanoid(),
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- z.enum value matches RecipientRole
+        role: r.role as never,
+      },
+    });
+    existing.add(r.email.toLowerCase());
+    added.push(r.email);
+  }
+
+  const { sendDocument } = await import('../document/send-document');
+  await sendDocument({
+    documentId,
+    userId: document.userId,
+    teamId: document.teamId ?? undefined,
+    requestMetadata: { requestMetadata: {}, source: 'app', auth: null },
+  });
+
+  await prisma.signatureInboxItem.update({
+    where: { id: inboxItem.id },
+    data: { status: 'SENT_FOR_SIGNATURE' },
+  });
+
+  return { sent: true, documentId, recipients: recipients.map((r) => r.email), added };
+};
+
+/** Extra fields ({{vars.<saveAs>.email}}, .contactName, .role, …) from a record. */
+const recordExtra = (record: { data?: unknown }): Record<string, unknown> =>
+  record.data && typeof record.data === 'object' && !Array.isArray(record.data)
+    ? (record.data as Record<string, unknown>)
+    : {};
+
+/** A record's keywords (stored on data.keywords as an array or comma-string). */
+const recordKeywords = (record: { data?: unknown }): string[] => {
+  const raw = recordExtra(record).keywords;
+  const list = Array.isArray(raw) ? raw.map(String) : typeof raw === 'string' ? raw.split(',') : [];
+  return list.map((k) => k.trim().toLowerCase()).filter(Boolean);
+};
+
+const lookupMetadata: WorkflowActionHandler<
+  Extract<TWorkflowAction, { action: 'LOOKUP_METADATA' }>
+> = async (config, { data, logger }) => {
+  const organizationId = Number(
+    (data as { organization?: { id?: unknown } })?.organization?.id,
+  );
+  if (!organizationId) {
+    logger.warn('[workflow:LOOKUP_METADATA] missing organization — skipping');
+    return { found: false };
+  }
+
+  const { prisma } = await import('@documenso/prisma');
+
+  // EXACT mode — look up by normalized name.
+  if (config.key && config.key.trim()) {
+    const rawKey = renderTemplate(config.key, data).trim();
+    const key = normalizeMetadataKey(rawKey);
+    if (!key) return { found: false, key: rawKey };
+    const record = await prisma.metadataRecord.findUnique({
+      where: { organizationId_category_key: { organizationId, category: config.category, key } },
+    });
+    if (!record) return { found: false, key: rawKey };
+    return { found: true, key: rawKey, label: record.label, email: record.email, ...recordExtra(record) };
+  }
+
+  // KEYWORD mode — scan text for each record's keywords, return the first match.
+  // Default haystack = every OCR field the event carried, plus type + title.
+  let haystack = config.keywordText ? renderTemplate(config.keywordText, data) : '';
+  if (!haystack) {
+    const payload = (data as { payload?: Record<string, unknown> })?.payload ?? {};
+    const parts: string[] = [];
+    const extracted = payload.extractedData;
+    if (extracted && typeof extracted === 'object') {
+      parts.push(...Object.values(extracted as Record<string, unknown>).map((v) => String(v ?? '')));
+    }
+    if (payload.documentType) parts.push(String(payload.documentType));
+    const doc = payload.document as { title?: unknown } | undefined;
+    if (doc?.title) parts.push(String(doc.title));
+    haystack = parts.join(' ');
+  }
+  haystack = haystack.toLowerCase();
+
+  if (!haystack.trim()) {
+    logger.warn('[workflow:LOOKUP_METADATA] nothing to match keywords against — skipping');
+    return { found: false };
+  }
+
+  const records = await prisma.metadataRecord.findMany({
+    where: { organizationId, category: config.category },
+  });
+  for (const record of records) {
+    const matched = recordKeywords(record).find((kw) => haystack.includes(kw));
+    if (matched) {
+      logger.info(`[workflow:LOOKUP_METADATA] matched "${record.label}" on keyword "${matched}"`);
+      return {
+        found: true,
+        matchedKeyword: matched,
+        key: record.key,
+        label: record.label,
+        email: record.email,
+        ...recordExtra(record),
+      };
+    }
+  }
+
+  return { found: false };
+};
+
 /**
  * Maps each action name to a handler typed for *that* action's config variant.
  */
@@ -154,6 +338,8 @@ export const WORKFLOW_ACTIONS = {
   SEND_EMAIL: sendEmail,
   HTTP_REQUEST: httpRequest,
   NOTIFY: notify,
+  SEND_FOR_SIGNATURE: sendForSignature,
+  LOOKUP_METADATA: lookupMetadata,
 } satisfies WorkflowActionHandlerMap;
 
 /**
