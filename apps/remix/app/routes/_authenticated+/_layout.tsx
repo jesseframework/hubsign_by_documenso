@@ -57,7 +57,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
     <LimitsProvider initialValue={limits}>
       <div id="portal-header"></div>
 
-      {!user.emailVerified && <VerifyEmailBanner email={user.email} />}
+      <VerifyEmailBanner email={user.email} isEmailVerified={Boolean(user.emailVerified)} />
       {banner && <AppBanner banner={banner} />}
 
       <div className="sidebar-layout">
