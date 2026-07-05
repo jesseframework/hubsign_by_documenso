@@ -10,11 +10,13 @@ import { getPrimaryAccountPlanPrices } from '@documenso/ee/server-only/stripe/ge
 import { getProductByPriceId } from '@documenso/ee/server-only/stripe/get-product-by-price-id';
 import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
 import { STRIPE_PLAN_TYPE } from '@documenso/lib/constants/billing';
-import { type Stripe } from '@documenso/lib/server-only/stripe';
+import { stripe, type Stripe } from '@documenso/lib/server-only/stripe';
 import { getSubscriptionsByUserId } from '@documenso/lib/server-only/subscription/get-subscriptions-by-user-id';
 
 import { BillingPlans } from '~/components/general/billing-plans';
 import { BillingPortalButton } from '~/components/general/billing-portal-button';
+import { PlanSwitcher } from '~/components/general/plan-switcher';
+import { SubscriptionAddons } from '~/components/general/subscription-addons';
 import { appMetaTags } from '~/utils/meta';
 import { superLoaderJson, useSuperLoaderData } from '~/utils/super-json-loader';
 
@@ -36,9 +38,12 @@ export async function loader({ request }: Route.LoaderArgs) {
     await getStripeCustomerByUser(user).then((result) => result.user);
   }
 
-  const [subscriptions, prices, primaryAccountPlanPrices] = await Promise.all([
+  const [subscriptions, prices, addonPrices, primaryAccountPlanPrices] = await Promise.all([
     getSubscriptionsByUserId({ userId: user.id }),
-    getPricesByInterval({ plans: [STRIPE_PLAN_TYPE.REGULAR, STRIPE_PLAN_TYPE.PLATFORM, STRIPE_PLAN_TYPE.ENTERPRISE, STRIPE_PLAN_TYPE.DMS] }),
+    getPricesByInterval({
+      plans: [STRIPE_PLAN_TYPE.REGULAR, STRIPE_PLAN_TYPE.PLATFORM, STRIPE_PLAN_TYPE.ENTERPRISE],
+    }),
+    getPricesByInterval({ plans: [STRIPE_PLAN_TYPE.DMS] }),
     getPrimaryAccountPlanPrices(),
   ]);
 
@@ -60,20 +65,58 @@ export async function loader({ request }: Route.LoaderArgs) {
     );
   }
 
+  // Determine which add-ons (e.g. DMS) are already stacked on the live
+  // Stripe subscription, so the UI can show "Remove" instead of "Add".
+  const addonPriceIds = Object.values(addonPrices)
+    .flat()
+    .map(({ id }) => id);
+
+  let activeAddonPriceIds: string[] = [];
+
+  if (subscription?.status === SubscriptionStatus.ACTIVE) {
+    const stripeSubscription = await stripe.subscriptions
+      .retrieve(subscription.planId)
+      .catch(() => null);
+
+    activeAddonPriceIds =
+      stripeSubscription?.items.data
+        .map((item) => item.price.id)
+        .filter((priceId) => addonPriceIds.includes(priceId)) ?? [];
+  }
+
   const isMissingOrInactiveOrFreePlan =
     !subscription || subscription.status === SubscriptionStatus.INACTIVE;
 
+  // The interval (month/year) the subscriber's primary plan is billed at —
+  // used to keep plan switches and add-ons on the same interval, rather than
+  // mixing monthly/yearly items on one subscription.
+  const subscriptionInterval = subscription
+    ? Object.entries(prices).find(([, list]) =>
+        list.some((price) => price.id === subscription.priceId),
+      )?.[0]
+    : undefined;
+
   return superLoaderJson({
     prices,
+    addonPrices,
+    activeAddonPriceIds,
     subscription,
+    subscriptionInterval,
     subscriptionProductName: subscriptionProduct?.name,
     isMissingOrInactiveOrFreePlan,
   });
 }
 
 export default function TeamsSettingBillingPage() {
-  const { prices, subscription, subscriptionProductName, isMissingOrInactiveOrFreePlan } =
-    useSuperLoaderData<typeof loader>();
+  const {
+    prices,
+    addonPrices,
+    activeAddonPriceIds,
+    subscription,
+    subscriptionInterval,
+    subscriptionProductName,
+    isMissingOrInactiveOrFreePlan,
+  } = useSuperLoaderData<typeof loader>();
 
   const { i18n } = useLingui();
 
@@ -151,7 +194,27 @@ export default function TeamsSettingBillingPage() {
 
       <hr className="my-4" />
 
-      {isMissingOrInactiveOrFreePlan ? <BillingPlans prices={prices} /> : <BillingPortalButton />}
+      {isMissingOrInactiveOrFreePlan ? (
+        <BillingPlans prices={prices} />
+      ) : (
+        <>
+          <BillingPortalButton />
+          {subscriptionInterval && (
+            <>
+              <PlanSwitcher
+                prices={prices}
+                currentPriceId={subscription.priceId}
+                currentInterval={subscriptionInterval}
+              />
+              <SubscriptionAddons
+                prices={addonPrices}
+                activePriceIds={activeAddonPriceIds}
+                currentInterval={subscriptionInterval}
+              />
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }

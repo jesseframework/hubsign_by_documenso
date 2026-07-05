@@ -15,6 +15,8 @@ import { Card, CardContent, CardTitle } from '@documenso/ui/primitives/card';
 import { Tabs, TabsList, TabsTrigger } from '@documenso/ui/primitives/tabs';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
+import { EmbeddedCheckoutForm } from './embedded-checkout-form';
+
 type Interval = keyof PriceIntervals;
 
 const INTERVALS: Interval[] = ['day', 'week', 'month', 'year'];
@@ -43,20 +45,22 @@ export const BillingPlans = ({ prices }: BillingPlansProps) => {
 
   const [interval, setInterval] = useState<Interval>('month');
   const [checkoutSessionPriceId, setCheckoutSessionPriceId] = useState<string | null>(null);
+  const [embeddedClientSecret, setEmbeddedClientSecret] = useState<string | null>(null);
 
-  const { mutateAsync: createCheckoutSession } = trpc.profile.createCheckoutSession.useMutation();
+  const { mutateAsync: createEmbeddedCheckoutSession } =
+    trpc.profile.createEmbeddedCheckoutSession.useMutation();
 
   const onSubscribeClick = async (priceId: string) => {
     try {
       setCheckoutSessionPriceId(priceId);
 
-      const url = await createCheckoutSession({ priceId });
+      const clientSecret = await createEmbeddedCheckoutSession({ priceId });
 
-      if (!url) {
+      if (!clientSecret) {
         throw new Error('Unable to create session');
       }
 
-      window.open(url);
+      setEmbeddedClientSecret(clientSecret);
     } catch (_err) {
       toast({
         title: _(msg`Something went wrong`),
@@ -67,6 +71,18 @@ export const BillingPlans = ({ prices }: BillingPlansProps) => {
       setCheckoutSessionPriceId(null);
     }
   };
+
+  if (embeddedClientSecret) {
+    return (
+      <div>
+        <Button variant="ghost" size="sm" className="mb-4" onClick={() => setEmbeddedClientSecret(null)}>
+          <Trans>Back to plans</Trans>
+        </Button>
+
+        <EmbeddedCheckoutForm clientSecret={embeddedClientSecret} />
+      </div>
+    );
+  }
 
   return (
     <div>

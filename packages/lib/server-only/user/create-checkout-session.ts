@@ -1,6 +1,9 @@
 import type { User } from '@prisma/client';
 
-import { getCheckoutSession } from '@documenso/ee/server-only/stripe/get-checkout-session';
+import {
+  getCheckoutSession,
+  getEmbeddedCheckoutSession,
+} from '@documenso/ee/server-only/stripe/get-checkout-session';
 import { getStripeCustomerByUser } from '@documenso/ee/server-only/stripe/get-customer';
 import { getPortalSession } from '@documenso/ee/server-only/stripe/get-portal-session';
 import { NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
@@ -32,6 +35,20 @@ export const createCheckoutSession = async ({ user, priceId }: CreateCheckoutSes
   }
 
   return getCheckoutSession({
+    customerId: stripeCustomer.id,
+    priceId,
+    returnUrl: `${NEXT_PUBLIC_WEBAPP_URL()}/settings/billing`,
+  });
+};
+
+/**
+ * Same as `createCheckoutSession`, but returns a client secret for
+ * rendering Stripe's embedded checkout inline instead of a redirect URL.
+ */
+export const createEmbeddedCheckoutSession = async ({ user, priceId }: CreateCheckoutSession) => {
+  const { stripeCustomer } = await getStripeCustomerByUser(user);
+
+  return getEmbeddedCheckoutSession({
     customerId: stripeCustomer.id,
     priceId,
     returnUrl: `${NEXT_PUBLIC_WEBAPP_URL()}/settings/billing`,

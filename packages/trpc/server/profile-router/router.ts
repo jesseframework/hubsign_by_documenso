@@ -5,12 +5,17 @@ import { AppError } from '@documenso/lib/errors/app-error';
 import { setAvatarImage } from '@documenso/lib/server-only/profile/set-avatar-image';
 import { getSubscriptionsByUserId } from '@documenso/lib/server-only/subscription/get-subscriptions-by-user-id';
 import { createBillingPortal } from '@documenso/lib/server-only/user/create-billing-portal';
-import { createCheckoutSession } from '@documenso/lib/server-only/user/create-checkout-session';
+import {
+  createCheckoutSession,
+  createEmbeddedCheckoutSession,
+} from '@documenso/lib/server-only/user/create-checkout-session';
 import { deleteUser } from '@documenso/lib/server-only/user/delete-user';
 import { findUserSecurityAuditLogs } from '@documenso/lib/server-only/user/find-user-security-audit-logs';
 import { getUserById } from '@documenso/lib/server-only/user/get-user-by-id';
 import { updateProfile } from '@documenso/lib/server-only/user/update-profile';
 import { updatePublicProfile } from '@documenso/lib/server-only/user/update-public-profile';
+import { toggleSubscriptionAddon } from '@documenso/lib/server-only/user/toggle-subscription-addon';
+import { updateSubscriptionPlan } from '@documenso/lib/server-only/user/update-subscription-plan';
 
 import { adminProcedure, authenticatedProcedure, router } from '../trpc';
 import {
@@ -18,6 +23,7 @@ import {
   ZFindUserSecurityAuditLogsSchema,
   ZRetrieveUserByIdQuerySchema,
   ZSetProfileImageMutationSchema,
+  ZToggleSubscriptionAddonRequestSchema,
   ZUpdateProfileMutationSchema,
   ZUpdatePublicProfileMutationSchema,
 } from './schema';
@@ -60,6 +66,39 @@ export const profileRouter = router({
           name: ctx.user.name,
         },
         priceId: input.priceId,
+      });
+    }),
+
+  createEmbeddedCheckoutSession: authenticatedProcedure
+    .input(ZCreateCheckoutSessionRequestSchema)
+    .mutation(async ({ ctx, input }) => {
+      return await createEmbeddedCheckoutSession({
+        user: {
+          id: ctx.user.id,
+          customerId: ctx.user.customerId,
+          email: ctx.user.email,
+          name: ctx.user.name,
+        },
+        priceId: input.priceId,
+      });
+    }),
+
+  updateSubscriptionPlan: authenticatedProcedure
+    .input(ZCreateCheckoutSessionRequestSchema)
+    .mutation(async ({ ctx, input }) => {
+      return await updateSubscriptionPlan({
+        userId: ctx.user.id,
+        priceId: input.priceId,
+      });
+    }),
+
+  toggleSubscriptionAddon: authenticatedProcedure
+    .input(ZToggleSubscriptionAddonRequestSchema)
+    .mutation(async ({ ctx, input }) => {
+      return await toggleSubscriptionAddon({
+        userId: ctx.user.id,
+        priceId: input.priceId,
+        action: input.action,
       });
     }),
 
