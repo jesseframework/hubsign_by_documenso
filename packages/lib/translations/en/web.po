@@ -605,8 +605,12 @@ msgid "A field was updated"
 msgstr "A field was updated"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-msgid "A lookup directory (e.g. vendor → email) that workflows can resolve at runtime. Use the \"Look up metadata\" action to find a record by name and send notifications."
-msgstr "A lookup directory (e.g. vendor → email) that workflows can resolve at runtime. Use the \"Look up metadata\" action to find a record by name and send notifications."
+#~ msgid "A lookup directory (e.g. vendor → email) that workflows can resolve at runtime. Use the \"Look up metadata\" action to find a record by name and send notifications."
+#~ msgstr "A lookup directory (e.g. vendor → email) that workflows can resolve at runtime. Use the \"Look up metadata\" action to find a record by name and send notifications."
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "A lookup directory that workflows resolve at runtime — e.g. a vendor → email, or a signee/recipient (the person who will sign) → their email & role. Use the \"Look up metadata\" workflow action to find a record by name, then notify or send it to sign."
+msgstr "A lookup directory that workflows resolve at runtime — e.g. a vendor → email, or a signee/recipient (the person who will sign) → their email & role. Use the \"Look up metadata\" workflow action to find a record by name, then notify or send it to sign."
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "A means to print or download documents for your records"
@@ -803,7 +807,7 @@ msgstr "Active"
 msgid "Active Subscriptions"
 msgstr "Active Subscriptions"
 
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Activity"
 msgstr "Activity"
 
@@ -822,6 +826,14 @@ msgstr "Add"
 msgid "Add a document"
 msgstr "Add a document"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Add a record"
+msgstr "Add a record"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Add a record above (e.g. a vendor, or a signee who should sign) so workflows can look them up."
+msgstr "Add a record above (e.g. a vendor, or a signee who should sign) so workflows can look them up."
+
 #: apps/remix/app/components/forms/stamp-upload-dialog.tsx
 msgid "Add a stamp"
 msgstr "Add a stamp"
@@ -833,8 +845,8 @@ msgid "Add a URL to redirect the user to once the document is signed"
 msgstr "Add a URL to redirect the user to once the document is signed"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-msgid "Add a vendor (name + email) above so workflows can look them up."
-msgstr "Add a vendor (name + email) above so workflows can look them up."
+#~ msgid "Add a vendor (name + email) above so workflows can look them up."
+#~ msgstr "Add a vendor (name + email) above so workflows can look them up."
 
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/document/document-edit-form.tsx
@@ -916,8 +928,8 @@ msgid "Add Myself"
 msgstr "Add Myself"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-msgid "Add or update a record"
-msgstr "Add or update a record"
+#~ msgid "Add or update a record"
+#~ msgstr "Add or update a record"
 
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
@@ -997,7 +1009,6 @@ msgstr "Adding and removing seats will adjust your invoice accordingly."
 msgid "Additional brand information to display at the bottom of emails"
 msgstr "Additional brand information to display at the bottom of emails"
 
-#: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
 #: apps/remix/app/components/general/app-sidebar.tsx
 #: packages/lib/constants/teams.ts
 msgid "Admin"
@@ -1044,7 +1055,7 @@ msgid "Agreement rejected."
 msgstr "Agreement rejected."
 
 #: apps/remix/app/routes/_authenticated+/dms+/ai.tsx
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "AI Agent"
 msgstr "AI Agent"
 
@@ -1145,6 +1156,10 @@ msgstr "Already have an account? <0>Sign in instead</0>"
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
 msgid "Amount"
 msgstr "Amount"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Amounts"
+msgstr "Amounts"
 
 #: packages/email/templates/document-super-delete.tsx
 msgid "An admin has deleted your document \"{documentName}\"."
@@ -1407,6 +1422,7 @@ msgstr "Any Status"
 #: apps/remix/app/routes/_authenticated+/settings+/tokens.tsx
 #: apps/remix/app/components/general/settings-nav-mobile.tsx
 #: apps/remix/app/components/general/settings-nav-desktop.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-mobile.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-desktop.tsx
 msgid "API Tokens"
@@ -1434,7 +1450,7 @@ msgid "Apply to builder"
 msgstr "Apply to builder"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Approval Setup"
 msgstr "Approval Setup"
 
@@ -1447,8 +1463,8 @@ msgid "Approval workflow started"
 msgstr "Approval workflow started"
 
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Approvals"
 msgstr "Approvals"
 
@@ -1660,9 +1676,9 @@ msgstr "Before you get started, please confirm your email address by clicking th
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.billing.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/billing.tsx
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
 #: apps/remix/app/components/general/settings-nav-mobile.tsx
 #: apps/remix/app/components/general/settings-nav-desktop.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-mobile.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-desktop.tsx
 msgid "Billing"
@@ -1732,7 +1748,7 @@ msgid "Bulk Send via CSV"
 msgstr "Bulk Send via CSV"
 
 #: apps/remix/app/routes/_authenticated+/dms+/bulk-upload.tsx
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Bulk Upload"
 msgstr "Bulk Upload"
 
@@ -1796,6 +1812,7 @@ msgstr "Cabinet updated"
 msgid "Can prepare"
 msgstr "Can prepare"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approvals.$id.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/documents.tsx
@@ -2142,7 +2159,7 @@ msgstr "Completed Documents"
 msgid "Completed on {formattedDate}"
 msgstr "Completed on {formattedDate}"
 
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Compliance"
 msgstr "Compliance"
 
@@ -2280,6 +2297,10 @@ msgstr "Consent to Electronic Transactions"
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Contact Information"
 msgstr "Contact Information"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Contact name"
+msgstr "Contact name"
 
 #: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
 msgid "Contact sales for enterprise pricing."
@@ -2653,7 +2674,7 @@ msgstr "Dark"
 msgid "Dark Mode"
 msgstr "Dark Mode"
 
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Dashboard"
 msgstr "Dashboard"
 
@@ -2675,6 +2696,10 @@ msgstr "Date created"
 #: packages/ui/primitives/document-flow/add-settings.tsx
 msgid "Date Format"
 msgstr "Date Format"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Dates"
+msgstr "Dates"
 
 #: apps/remix/app/routes/_authenticated+/org+/approvals.$id.tsx
 msgid "Decision recorded"
@@ -2733,6 +2758,7 @@ msgstr "delete"
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks._index.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/tokens.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 #: apps/remix/app/components/tables/templates-table-action-dropdown.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
@@ -2995,7 +3021,7 @@ msgid "Distribution Method"
 msgstr "Distribution Method"
 
 #: apps/remix/app/routes/_authenticated+/org+/permissions.tsx
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "DMS Permissions"
 msgstr "DMS Permissions"
 
@@ -3026,7 +3052,6 @@ msgstr "Doc Merging"
 
 #: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id.logs.tsx
 #: apps/remix/app/routes/_authenticated+/documents.$id.logs.tsx
-#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 msgid "Document"
 msgstr "Document"
@@ -3216,7 +3241,6 @@ msgid "Document Limit Exceeded!"
 msgstr "Document Limit Exceeded!"
 
 #: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
 msgid "Document Manager"
 msgstr "Document Manager"
 
@@ -3384,11 +3408,11 @@ msgstr "Document{0} uploaded"
 #: apps/remix/app/routes/_authenticated+/documents.$id.edit.tsx
 #: apps/remix/app/routes/_authenticated+/documents.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/documents.tsx
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
-#: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
 #: apps/remix/app/components/tables/admin-dashboard-users-table.tsx
 #: apps/remix/app/components/general/user-profile-timur.tsx
 #: apps/remix/app/components/general/generic-error-layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/app-nav-mobile.tsx
 #: apps/remix/app/components/general/app-nav-desktop.tsx
 #: apps/remix/app/components/general/app-command-menu.tsx
@@ -3590,6 +3614,7 @@ msgstr "e.g. Round red APPROVED stamp with the company name and today's date"
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks._index.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/components/tables/templates-table-action-dropdown.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
 #: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
@@ -3599,6 +3624,10 @@ msgstr "e.g. Round red APPROVED stamp with the company name and today's date"
 #: apps/remix/app/components/general/document/document-page-view-button.tsx
 msgid "Edit"
 msgstr "Edit"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Edit record"
+msgstr "Edit record"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 msgid "Edit template"
@@ -3633,7 +3662,6 @@ msgstr "Electronic Signature Disclosure"
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
 #: apps/remix/app/components/tables/admin-document-recipient-item-table.tsx
 #: apps/remix/app/components/tables/admin-dashboard-users-table.tsx
@@ -3663,6 +3691,10 @@ msgstr "Electronic Signature Disclosure"
 #: packages/lib/constants/document.ts
 msgid "Email"
 msgstr "Email"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Email / Phone"
+msgstr "Email / Phone"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "Email a PDF to your org's inbox alias to see it here. Enable email-to-sign and OCR in Organization settings."
@@ -3849,6 +3881,7 @@ msgstr "Entity type"
 #: apps/remix/app/routes/_authenticated+/org+/recycle-bin.tsx
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
@@ -4011,7 +4044,7 @@ msgid "Failed: {failedCount}"
 msgstr "Failed: {failedCount}"
 
 #: apps/remix/app/routes/_authenticated+/dms+/favorites.tsx
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Favorites"
 msgstr "Favorites"
 
@@ -4081,7 +4114,7 @@ msgid "Filing Locations"
 msgstr "Filing Locations"
 
 #: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Filing Structure"
 msgstr "Filing Structure"
 
@@ -4169,8 +4202,8 @@ msgid "Freeform labels for quick document tagging"
 msgstr "Freeform labels for quick document tagging"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-msgid "From"
-msgstr "From"
+#~ msgid "From"
+#~ msgstr "From"
 
 #: apps/remix/app/components/general/document-signing/document-signing-name-field.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-form.tsx
@@ -4552,6 +4585,10 @@ msgstr "Invoice"
 #~ msgid "Invoice details saved"
 #~ msgstr "Invoice details saved"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Invoice info"
+msgstr "Invoice info"
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: apps/remix/app/components/tables/internal-audit-log-table.tsx
 msgid "IP Address"
@@ -4597,6 +4634,10 @@ msgstr "JSON"
 #: packages/ui/components/document/document-download-button.tsx
 msgid "Just the signed document pages"
 msgstr "Just the signed document pages"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Keywords (comma-separated)"
+msgstr "Keywords (comma-separated)"
 
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/radio-field.tsx
@@ -4648,7 +4689,7 @@ msgstr "Last updated at"
 msgid "Last used"
 msgstr "Last used"
 
-#: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Leaderboard"
 msgstr "Leaderboard"
 
@@ -4870,8 +4911,8 @@ msgid "Mark as Viewed"
 msgstr "Mark as Viewed"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-msgid "Matching is case-insensitive on the name. Re-saving the same name in a category updates it."
-msgstr "Matching is case-insensitive on the name. Re-saving the same name in a category updates it."
+#~ msgid "Matching is case-insensitive on the name. Re-saving the same name in a category updates it."
+#~ msgstr "Matching is case-insensitive on the name. Re-saving the same name in a category updates it."
 
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "MAU (created document)"
@@ -4916,7 +4957,7 @@ msgstr "Member Since"
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.members.tsx
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-mobile.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-desktop.tsx
 msgid "Members"
@@ -4929,7 +4970,7 @@ msgid "Message <0>(Optional)</0>"
 msgstr "Message <0>(Optional)</0>"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Metadata"
 msgstr "Metadata"
 
@@ -4956,8 +4997,8 @@ msgid "Monthly Active Users: Users that had at least one of their documents comp
 msgstr "Monthly Active Users: Users that had at least one of their documents completed"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-msgid "more"
-msgstr "more"
+#~ msgid "more"
+#~ msgstr "more"
 
 #: apps/remix/app/components/dialogs/template-move-to-folder-dialog.tsx
 #: apps/remix/app/components/dialogs/template-move-dialog.tsx
@@ -5015,7 +5056,6 @@ msgstr "N/A"
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
-#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
@@ -5047,6 +5087,10 @@ msgstr "Name"
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "Name (lookup key)"
 msgstr "Name (lookup key)"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Name / Contact"
+msgstr "Name / Contact"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Name and message required"
@@ -5332,6 +5376,7 @@ msgstr "Nothing waiting on you right now."
 #: apps/remix/app/routes/_authenticated+/settings+/notifications.tsx
 #: apps/remix/app/components/general/settings-nav-mobile.tsx
 #: apps/remix/app/components/general/settings-nav-desktop.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Notifications"
 msgstr "Notifications"
 
@@ -5351,8 +5396,8 @@ msgid "Number format"
 msgstr "Number format"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-msgid "OCR"
-msgstr "OCR"
+#~ msgid "OCR"
+#~ msgstr "OCR"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "OCR & Document Processing"
@@ -5382,7 +5427,7 @@ msgstr "OCR is running…"
 msgid "OCR Processing Queue"
 msgstr "OCR Processing Queue"
 
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "OCR Queue"
 msgstr "OCR Queue"
 
@@ -5464,6 +5509,10 @@ msgstr "Once your template is set up, share the link anywhere you want. The pers
 msgid "Only admins can access and view the document"
 msgstr "Only admins can access and view the document"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Only Category + Name are required. Name match is case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign request)."
+msgstr "Only Category + Name are required. Name match is case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign request)."
+
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Only managers and above can access and view the document"
 msgstr "Only managers and above can access and view the document"
@@ -5520,7 +5569,6 @@ msgstr "Or"
 msgid "Or continue with"
 msgstr "Or continue with"
 
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
 #: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Organization"
 msgstr "Organization"
@@ -5754,6 +5802,10 @@ msgstr "Personal"
 #: apps/remix/app/components/general/menu-switcher.tsx
 msgid "Personal Account"
 msgstr "Personal Account"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Phone"
+msgstr "Phone"
 
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/checkbox-field.tsx
 msgid "Pick a number"
@@ -6008,6 +6060,7 @@ msgstr "Processing stream (steps)"
 #: apps/remix/app/routes/_authenticated+/settings+/profile.tsx
 #: apps/remix/app/components/general/settings-nav-mobile.tsx
 #: apps/remix/app/components/general/settings-nav-desktop.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/app-command-menu.tsx
 msgid "Profile"
 msgstr "Profile"
@@ -6041,6 +6094,7 @@ msgstr "Public"
 #: apps/remix/app/routes/_authenticated+/settings+/public-profile.tsx
 #: apps/remix/app/components/general/settings-nav-mobile.tsx
 #: apps/remix/app/components/general/settings-nav-desktop.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-mobile.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-desktop.tsx
 msgid "Public Profile"
@@ -6069,6 +6123,10 @@ msgstr "Push notifications aren't configured"
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "Push notifications unavailable"
 msgstr "Push notifications unavailable"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Quick filters"
+msgstr "Quick filters"
 
 #: packages/ui/primitives/document-flow/types.ts
 msgid "Radio"
@@ -6237,7 +6295,7 @@ msgid "Recovery codes"
 msgstr "Recovery codes"
 
 #: apps/remix/app/routes/_authenticated+/org+/recycle-bin.tsx
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Recycle Bin"
 msgstr "Recycle Bin"
 
@@ -6453,7 +6511,7 @@ msgstr "Response submitted"
 msgid "Rest assured, your document is strictly confidential and will never be shared. Only your signing experience will be highlighted. Share your personalized signing card to showcase your signature!"
 msgstr "Rest assured, your document is strictly confidential and will never be shared. Only your signing experience will be highlighted. Share your personalized signing card to showcase your signature!"
 
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Retention"
 msgstr "Retention"
 
@@ -6473,7 +6531,7 @@ msgstr "Retrieval request created"
 msgid "Retrieval Requests"
 msgstr "Retrieval Requests"
 
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Retrievals"
 msgstr "Retrievals"
 
@@ -6526,6 +6584,8 @@ msgstr "Revoke"
 msgid "Revoke access"
 msgstr "Revoke access"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 #: apps/remix/app/components/tables/user-settings-current-teams-table.tsx
 #: apps/remix/app/components/tables/team-settings-members-table.tsx
@@ -6654,9 +6714,9 @@ msgstr "Scan the QR code or visit the URL below to confirm this document is auth
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.members.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/search.tsx
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
 #: apps/remix/app/components/tables/user-settings-teams-page-table.tsx
 #: apps/remix/app/components/tables/documents-table-sender-filter.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/app-nav-desktop.tsx
 msgid "Search"
 msgstr "Search"
@@ -6718,6 +6778,7 @@ msgstr "Secret"
 #: apps/remix/app/routes/_authenticated+/settings+/security._index.tsx
 #: apps/remix/app/components/general/settings-nav-mobile.tsx
 #: apps/remix/app/components/general/settings-nav-desktop.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Security"
 msgstr "Security"
 
@@ -6904,9 +6965,8 @@ msgstr "Set up your document properties and recipient information"
 msgid "Set up your template properties and recipient information"
 msgstr "Set up your template properties and recipient information"
 
-#: apps/remix/app/routes/_authenticated+/settings+/_layout.tsx
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
-#: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/app-nav-mobile.tsx
 #: apps/remix/app/components/general/app-command-menu.tsx
@@ -7083,7 +7143,7 @@ msgid "Signature ID"
 msgstr "Signature ID"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Signature Inbox"
 msgstr "Signature Inbox"
 
@@ -7202,7 +7262,7 @@ msgid "Site Banner"
 msgstr "Site Banner"
 
 #: apps/remix/app/routes/_authenticated+/admin+/site-settings.tsx
-#: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Site Settings"
 msgstr "Site Settings"
 
@@ -7356,7 +7416,7 @@ msgid "Stamp name"
 msgstr "Stamp name"
 
 #: apps/remix/app/routes/_authenticated+/org+/stamps.tsx
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/document/document-stamps-button.tsx
 msgid "Stamps"
 msgstr "Stamps"
@@ -7397,7 +7457,7 @@ msgstr "Started"
 msgid "Starting..."
 msgstr "Starting..."
 
-#: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Stats"
 msgstr "Stats"
 
@@ -7405,7 +7465,6 @@ msgstr "Stats"
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/audit-log.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id.runs.tsx
-#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
@@ -7463,7 +7522,7 @@ msgstr "Subscribe"
 msgid "Subscription"
 msgstr "Subscription"
 
-#: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Subscriptions"
 msgstr "Subscriptions"
 
@@ -8737,6 +8796,7 @@ msgstr "Unknown"
 msgid "Unpaid"
 msgstr "Unpaid"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
 #: apps/remix/app/components/tables/settings-public-profile-templates-table.tsx
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
@@ -8806,6 +8866,10 @@ msgstr "Update user"
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks.$id.tsx
 msgid "Update webhook"
 msgstr "Update webhook"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Updated"
+msgstr "Updated"
 
 #: apps/remix/app/components/forms/password.tsx
 msgid "Updating password..."
@@ -8998,7 +9062,7 @@ msgstr "User with this email already exists. Please use a different email addres
 msgid "Username can only container alphanumeric characters and dashes."
 msgstr "Username can only container alphanumeric characters and dashes."
 
-#: apps/remix/app/routes/_authenticated+/admin+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Users"
 msgstr "Users"
 
@@ -9032,6 +9096,10 @@ msgstr "Validation rules (block/warn before this step)"
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
 msgid "Value"
 msgstr "Value"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Vendor / Contact"
+msgstr "Vendor / Contact"
 
 #: apps/remix/app/components/general/verify-email-banner.tsx
 msgid "Verification Email Sent"
@@ -9478,6 +9546,7 @@ msgstr "Webhook URL"
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks._index.tsx
 #: apps/remix/app/components/general/settings-nav-mobile.tsx
 #: apps/remix/app/components/general/settings-nav-desktop.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-mobile.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-desktop.tsx
 msgid "Webhooks"
@@ -9575,7 +9644,7 @@ msgid "Workflow saved"
 msgstr "Workflow saved"
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
-#: apps/remix/app/routes/_authenticated+/org+/_layout.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Workflows"
 msgstr "Workflows"
 

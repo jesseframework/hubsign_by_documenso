@@ -9,6 +9,7 @@ import { SEND_TEAM_DELETED_EMAIL_JOB_DEFINITION } from './definitions/emails/sen
 import { SEND_TEAM_MEMBER_JOINED_EMAIL_JOB_DEFINITION } from './definitions/emails/send-team-member-joined-email';
 import { SEND_TEAM_MEMBER_LEFT_EMAIL_JOB_DEFINITION } from './definitions/emails/send-team-member-left-email';
 import { BULK_SEND_TEMPLATE_JOB_DEFINITION } from './definitions/internal/bulk-send-template';
+import { DELIVER_MS_TEAMS_JOB_DEFINITION } from './definitions/internal/deliver-ms-teams';
 import { EXECUTE_WEBHOOK_JOB_DEFINITION } from './definitions/internal/execute-webhook';
 import { EXECUTE_WORKFLOW_JOB_DEFINITION } from './definitions/internal/execute-workflow';
 import { PROCESS_INBOX_OCR_JOB_DEFINITION } from './definitions/internal/process-inbox-ocr';
@@ -33,6 +34,7 @@ export const jobsClient = new JobClient([
   EXECUTE_WEBHOOK_JOB_DEFINITION,
   EXECUTE_WORKFLOW_JOB_DEFINITION,
   PROCESS_INBOX_OCR_JOB_DEFINITION,
+  DELIVER_MS_TEAMS_JOB_DEFINITION,
 ] as const);
 
 export const jobs = jobsClient;
