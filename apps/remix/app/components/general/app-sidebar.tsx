@@ -57,6 +57,7 @@ import type { TGetTeamsResponse } from '@documenso/lib/server-only/team/get-team
 import { trpc } from '@documenso/trpc/react';
 
 import { BrandingLogo } from './branding-logo';
+import { SidebarUsageIndicator } from './sidebar-usage-indicator';
 
 export type AppSidebarProps = {
   user: SessionUser;
@@ -224,6 +225,12 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
     { to: '/settings/public-profile', icon: Globe2Icon, label: <Trans>Public Profile</Trans> },
     { to: '/settings/security', icon: LockIcon, label: <Trans>Security</Trans> },
     { to: '/settings/notifications', icon: BellIcon, label: <Trans>Notifications</Trans> },
+    // Org seat limits supersede personal billing entirely (see
+    // `getServerLimits`), so org members manage billing under Organization
+    // instead — this link only makes sense for accounts not in an org.
+    ...(!orgMembership?.organization
+      ? [{ to: '/settings/billing', icon: CreditCardIcon, label: <Trans>Billing</Trans> }]
+      : []),
     { to: '/settings/tokens', icon: BracesIcon, label: <Trans>API Tokens</Trans> },
     { to: '/settings/webhooks', icon: WebhookIcon, label: <Trans>Webhooks</Trans> },
   ];
@@ -260,6 +267,16 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
   const dividerStyle: React.CSSProperties | undefined = sidebarTextColor
     ? { background: `${sidebarTextColor}15` }
     : undefined;
+
+  // Org seat limits (when present) always supersede personal/team limits — see
+  // `getServerLimits`'s precedence — so the usage widget's upgrade link should
+  // point at org billing whenever the user belongs to an org, regardless of
+  // which route (personal or team) they're currently viewing.
+  const billingUrl = orgMembership?.organization
+    ? '/org/billing'
+    : teamUrl
+      ? `/t/${teamUrl}/settings/billing`
+      : '/settings/billing';
 
   const currentTeam = teams.find((t) => t.url === teamUrl);
   const displayName = orgMembership?.organization?.name
@@ -446,8 +463,12 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
           )}
         </div>
 
+        <div className="mt-auto">
+          <SidebarUsageIndicator billingUrl={billingUrl} sidebarTextColor={sidebarTextColor} />
+        </div>
+
         {/* Footer */}
-        <div className="mt-auto border-t p-3" style={{ borderColor: sidebarTextColor ? `${sidebarTextColor}20` : 'hsl(var(--sidebar-border))' }}>
+        <div className="border-t p-3" style={{ borderColor: sidebarTextColor ? `${sidebarTextColor}20` : 'hsl(var(--sidebar-border))' }}>
           <div className="flex items-center gap-2">
             <Link
               to={getRootHref('/settings/profile')}

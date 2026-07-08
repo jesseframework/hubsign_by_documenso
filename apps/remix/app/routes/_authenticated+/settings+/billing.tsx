@@ -1,10 +1,11 @@
 import { Trans, useLingui } from '@lingui/react/macro';
 import { SubscriptionStatus } from '@prisma/client';
-import { redirect } from 'react-router';
+import { redirect, Link } from 'react-router';
 import { match } from 'ts-pattern';
 
 import { getSession } from '@documenso/auth/server/lib/utils/get-session';
 import { getStripeCustomerByUser } from '@documenso/ee/server-only/stripe/get-customer';
+import type { PriceWithProduct } from '@documenso/ee/server-only/stripe/get-prices-by-interval';
 import { getPricesByInterval } from '@documenso/ee/server-only/stripe/get-prices-by-interval';
 import { getPrimaryAccountPlanPrices } from '@documenso/ee/server-only/stripe/get-primary-account-plan-prices';
 import { getProductByPriceId } from '@documenso/ee/server-only/stripe/get-product-by-price-id';
@@ -12,6 +13,7 @@ import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
 import { STRIPE_PLAN_TYPE } from '@documenso/lib/constants/billing';
 import { stripe, type Stripe } from '@documenso/lib/server-only/stripe';
 import { getSubscriptionsByUserId } from '@documenso/lib/server-only/subscription/get-subscriptions-by-user-id';
+import { prisma } from '@documenso/prisma';
 
 import { BillingPlans } from '~/components/general/billing-plans';
 import { BillingPortalButton } from '~/components/general/billing-portal-button';
@@ -32,6 +34,19 @@ export async function loader({ request }: Route.LoaderArgs) {
   // Redirect if subscriptions are not enabled.
   if (!IS_BILLING_ENABLED()) {
     throw redirect('/settings/profile');
+  }
+
+  // Org seat limits supersede personal subscription limits entirely (see
+  // `getServerLimits`), regardless of context or whether a seat is even
+  // assigned yet — so personal billing is genuinely irrelevant for any org
+  // member, not just once they're seated. Skip the Stripe/price fetching
+  // below and point them at Organization > Billing instead.
+  const orgMembership = await prisma.organizationMember.findFirst({
+    where: { userId: user.id },
+  });
+
+  if (orgMembership) {
+    return superLoaderJson({ isOrgManaged: true as const });
   }
 
   if (!user.customerId) {
@@ -87,38 +102,77 @@ export async function loader({ request }: Route.LoaderArgs) {
   const isMissingOrInactiveOrFreePlan =
     !subscription || subscription.status === SubscriptionStatus.INACTIVE;
 
-  // The interval (month/year) the subscriber's primary plan is billed at —
-  // used to keep plan switches and add-ons on the same interval, rather than
-  // mixing monthly/yearly items on one subscription.
-  const subscriptionInterval = subscription
-    ? Object.entries(prices).find(([, list]) =>
-        list.some((price) => price.id === subscription.priceId),
-      )?.[0]
-    : undefined;
+  // Fetch the subscriber's own price directly (with its product expanded)
+  // rather than looking it up inside the freshly-fetched *active* price list.
+  // A subscriber can be "grandfathered" on a price that's since been archived
+  // (e.g. after a plan restructure/reprice) — archived prices are still valid
+  // on existing subscriptions, they just don't show up as options for new
+  // checkouts. Deriving the interval this way means the plan switcher and
+  // add-ons section still render correctly for those subscribers, instead of
+  // silently disappearing because their current price isn't in the "active"
+  // list used to compute it.
+  let currentPrice: PriceWithProduct | null = null;
+
+  if (subscription) {
+    currentPrice = await stripe.prices
+      .retrieve(subscription.priceId, { expand: ['product'] })
+      // `expand` isn't reflected in the SDK's return type, so the product
+      // comes back as a full object despite the type saying `string`.
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      .then((price) => price as unknown as PriceWithProduct)
+      .catch(() => null);
+  }
+
+  const subscriptionInterval = currentPrice?.recurring?.interval;
 
   return superLoaderJson({
+    isOrgManaged: false as const,
     prices,
     addonPrices,
     activeAddonPriceIds,
     subscription,
     subscriptionInterval,
+    currentPrice,
     subscriptionProductName: subscriptionProduct?.name,
     isMissingOrInactiveOrFreePlan,
   });
 }
 
 export default function TeamsSettingBillingPage() {
+  const data = useSuperLoaderData<typeof loader>();
+  const { i18n } = useLingui();
+
+  if (data.isOrgManaged) {
+    return (
+      <div>
+        <h3 className="text-2xl font-semibold">
+          <Trans>Billing</Trans>
+        </h3>
+
+        <hr className="my-4" />
+
+        <p className="text-muted-foreground text-sm">
+          <Trans>
+            Your billing is managed by your organization.{' '}
+            <Link to="/org/billing" className="text-primary underline underline-offset-4">
+              View organization billing
+            </Link>
+          </Trans>
+        </p>
+      </div>
+    );
+  }
+
   const {
     prices,
     addonPrices,
     activeAddonPriceIds,
     subscription,
     subscriptionInterval,
+    currentPrice,
     subscriptionProductName,
     isMissingOrInactiveOrFreePlan,
-  } = useSuperLoaderData<typeof loader>();
-
-  const { i18n } = useLingui();
+  } = data;
 
   return (
     <div>
@@ -205,6 +259,7 @@ export default function TeamsSettingBillingPage() {
                 prices={prices}
                 currentPriceId={subscription.priceId}
                 currentInterval={subscriptionInterval}
+                currentPrice={currentPrice}
               />
               <SubscriptionAddons
                 prices={addonPrices}

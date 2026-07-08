@@ -276,6 +276,13 @@ export const documentRouter = router({
         });
       }
 
+      if ((recipients?.length ?? 0) > remaining.recipients) {
+        throw new AppError(AppErrorCode.LIMIT_EXCEEDED, {
+          message: 'You have exceeded the number of recipients allowed per document on your plan.',
+          statusCode: 400,
+        });
+      }
+
       const fileName = title.endsWith('.pdf') ? title : `${title}.pdf`;
 
       const { url, key } = await getPresignPostUrl(fileName, 'application/pdf');

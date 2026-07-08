@@ -4,7 +4,7 @@ import type { STRIPE_PLAN_TYPE } from '@documenso/lib/constants/billing';
 import { stripe } from '@documenso/lib/server-only/stripe';
 
 // Utility type to handle usage of the `expand` option.
-type PriceWithProduct = Stripe.Price & { product: Stripe.Product };
+export type PriceWithProduct = Stripe.Price & { product: Stripe.Product };
 
 export type PriceIntervals = Record<Stripe.Price.Recurring.Interval, PriceWithProduct[]>;
 

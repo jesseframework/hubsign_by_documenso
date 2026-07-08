@@ -7,6 +7,7 @@ import { AlertTriangle, Globe2Icon, InfoIcon, Link2Icon, Loader, LockIcon } from
 import { Link } from 'react-router';
 
 import { useLimits } from '@documenso/ee/server-only/limits/provider/client';
+import { isApproachingLimit } from '@documenso/ee/server-only/limits/thresholds';
 import { useUpdateSearchParams } from '@documenso/lib/client-only/hooks/use-update-search-params';
 import { formatTemplatesPath } from '@documenso/lib/utils/teams';
 import type { TFindTemplatesResponse } from '@documenso/trpc/server/template-router/schema';
@@ -43,7 +44,7 @@ export const TemplatesTable = ({
   templateRootPath,
 }: TemplatesTableProps) => {
   const { _, i18n } = useLingui();
-  const { remaining } = useLimits();
+  const { quota, remaining } = useLimits();
 
   const team = useOptionalCurrentTeam();
 
@@ -211,6 +212,24 @@ export const TemplatesTable = ({
               <Link className="underline underline-offset-4" to="/settings/billing">
                 Upgrade your account to continue!
               </Link>
+            </Trans>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {remaining.documents > 0 && isApproachingLimit(quota.documents, remaining.documents) && (
+        <Alert variant="secondary" className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>
+            <Trans>Approaching your document limit</Trans>
+          </AlertTitle>
+          <AlertDescription className="mt-2">
+            <Trans>
+              You have {remaining.documents} of {quota.documents} documents remaining this month.{' '}
+              <Link className="underline underline-offset-4" to="/settings/billing">
+                Upgrade your account
+              </Link>{' '}
+              to avoid interruptions.
             </Trans>
           </AlertDescription>
         </Alert>

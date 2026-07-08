@@ -1,19 +1,89 @@
 import { match } from 'ts-pattern';
 
-import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
+import { IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 import { STRIPE_PLAN_TYPE } from '@documenso/lib/constants/billing';
+import { ORG_DMS_ADDON_PRICE_CENTS, ORG_SEAT_TIERS } from '@documenso/lib/constants/org-tiers';
+import { jobs } from '@documenso/lib/jobs/client';
 import type { Stripe } from '@documenso/lib/server-only/stripe';
 import { stripe } from '@documenso/lib/server-only/stripe';
 import { createTeamFromPendingTeam } from '@documenso/lib/server-only/team/create-team';
 import { env } from '@documenso/lib/utils/env';
 import { prisma } from '@documenso/prisma';
 
+import { onOrgSubscriptionDeleted } from './on-org-subscription-deleted';
+import { onOrgSubscriptionUpdated } from './on-org-subscription-updated';
 import { onSubscriptionDeleted } from './on-subscription-deleted';
 import { onSubscriptionUpdated } from './on-subscription-updated';
+
+/**
+ * Newer Stripe API versions move `current_period_end` from the subscription
+ * onto its items — mirrors the same fallback used by `onSubscriptionUpdated`
+ * and `onOrgSubscriptionUpdated`.
+ */
+const getSubscriptionPeriodEndISO = (subscription: Stripe.Subscription): string | undefined => {
+  const item = subscription.items.data[0];
+
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  const itemPeriodEnd = (item as unknown as { current_period_end?: number })?.current_period_end;
+
+  const periodEndSeconds = itemPeriodEnd ?? subscription.current_period_end;
+
+  return periodEndSeconds ? new Date(periodEndSeconds * 1000).toISOString() : undefined;
+};
+
+/** Individual/team prices are fully Stripe-metadata-driven, so the plan name comes from the product. */
+const resolvePlanNameAndPrice = (subscription: Stripe.Subscription) => {
+  const item = subscription.items.data[0];
+  const { product } = item.price;
+
+  const planName = typeof product === 'string' || product.deleted ? 'Plan' : product.name;
+
+  const unitAmount = item.price.unit_amount ?? 0;
+  const priceFormatted = `$${((unitAmount * (item.quantity ?? 1)) / 100).toFixed(2)}/month`;
+
+  return { planName, priceFormatted };
+};
+
+/** Org seat prices are dynamically created at checkout time, so use the canonical tier table instead. */
+const resolveOrgPlanNameAndPrice = (subscription: Stripe.Subscription) => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  const tier = subscription.metadata?.tier as keyof typeof ORG_SEAT_TIERS | undefined;
+  const quantity = Number(subscription.metadata?.quantity ?? 1);
+  const dmsEnabled = subscription.metadata?.dmsEnabled === 'true';
+
+  const tierConfig = tier ? ORG_SEAT_TIERS[tier] : undefined;
+
+  const planName = tierConfig
+    ? `${tierConfig.name} (${quantity} seat${quantity > 1 ? 's' : ''})`
+    : 'Organization Plan';
+
+  const totalCents = tierConfig
+    ? tierConfig.priceCents * quantity + (dmsEnabled ? ORG_DMS_ADDON_PRICE_CENTS * quantity : 0)
+    : 0;
+
+  const priceFormatted = `$${(totalCents / 100).toFixed(2)}/month`;
+
+  return { planName, priceFormatted };
+};
 
 type StripeWebhookResponse = {
   success: boolean;
   message: string;
+};
+
+/**
+ * Org-seat subscriptions (`org-router.ts`'s `purchaseSeats`) are tagged with
+ * this metadata shape. Individual/team subscriptions never set `type`, so
+ * this only matches genuine org checkouts.
+ */
+const getOrganizationIdFromSubscription = (subscription: Stripe.Subscription): number | null => {
+  if (subscription.metadata?.type !== 'organization') {
+    return null;
+  }
+
+  const organizationId = Number(subscription.metadata.organizationId);
+
+  return Number.isNaN(organizationId) ? null : organizationId;
 };
 
 export const stripeWebhookHandler = async (req: Request): Promise<Response> => {
@@ -113,11 +183,69 @@ export const stripeWebhookHandler = async (req: Request): Promise<Response> => {
           );
         }
 
-        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+          expand: ['items.data.price.product'],
+        });
+
+        const baseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
+        const periodEnd = getSubscriptionPeriodEndISO(subscription);
+
+        const organizationId = getOrganizationIdFromSubscription(subscription);
+
+        if (organizationId !== null) {
+          await onOrgSubscriptionUpdated({ organizationId, subscription });
+
+          const orgAdmin = await prisma.organizationMember.findFirst({
+            where: { organizationId, role: 'ORG_ADMIN' },
+            include: { user: true },
+          });
+
+          if (orgAdmin) {
+            const { planName, priceFormatted } = resolveOrgPlanNameAndPrice(subscription);
+
+            await jobs.triggerJob({
+              name: 'send.subscription.purchase-confirmation.email',
+              payload: {
+                email: orgAdmin.user.email,
+                name: orgAdmin.user.name || undefined,
+                planName,
+                priceFormatted,
+                periodEnd,
+                billingUrl: `${baseUrl}/org/billing`,
+              },
+            });
+          }
+
+          return Response.json(
+            { success: true, message: 'Webhook received' } satisfies StripeWebhookResponse,
+            { status: 200 },
+          );
+        }
 
         // Handle team creation after seat checkout.
         if (subscription.items.data[0].price.metadata.plan === STRIPE_PLAN_TYPE.TEAM) {
-          await handleTeamSeatCheckout({ subscription });
+          const teamId = await handleTeamSeatCheckout({ subscription });
+
+          const team = await prisma.team.findFirst({
+            where: { id: teamId },
+            include: { owner: true },
+          });
+
+          if (team) {
+            const { planName, priceFormatted } = resolvePlanNameAndPrice(subscription);
+
+            await jobs.triggerJob({
+              name: 'send.subscription.purchase-confirmation.email',
+              payload: {
+                email: team.owner.email,
+                name: team.owner.name || undefined,
+                planName,
+                priceFormatted,
+                periodEnd,
+                billingUrl: `${baseUrl}/t/${team.url}/settings/billing`,
+              },
+            });
+          }
 
           return Response.json(
             { success: true, message: 'Webhook received' } satisfies StripeWebhookResponse,
@@ -138,6 +266,24 @@ export const stripeWebhookHandler = async (req: Request): Promise<Response> => {
 
         await onSubscriptionUpdated({ userId, subscription });
 
+        const purchasingUser = await prisma.user.findFirst({ where: { id: userId } });
+
+        if (purchasingUser) {
+          const { planName, priceFormatted } = resolvePlanNameAndPrice(subscription);
+
+          await jobs.triggerJob({
+            name: 'send.subscription.purchase-confirmation.email',
+            payload: {
+              email: purchasingUser.email,
+              name: purchasingUser.name || undefined,
+              planName,
+              priceFormatted,
+              periodEnd,
+              billingUrl: `${baseUrl}/settings/billing`,
+            },
+          });
+        }
+
         return Response.json(
           { success: true, message: 'Webhook received' } satisfies StripeWebhookResponse,
           { status: 200 },
@@ -151,6 +297,17 @@ export const stripeWebhookHandler = async (req: Request): Promise<Response> => {
           typeof subscription.customer === 'string'
             ? subscription.customer
             : subscription.customer.id;
+
+        const organizationId = getOrganizationIdFromSubscription(subscription);
+
+        if (organizationId !== null) {
+          await onOrgSubscriptionUpdated({ organizationId, subscription });
+
+          return Response.json(
+            { success: true, message: 'Webhook received' } satisfies StripeWebhookResponse,
+            { status: 200 },
+          );
+        }
 
         if (subscription.items.data[0].price.metadata.plan === STRIPE_PLAN_TYPE.TEAM) {
           const team = await prisma.team.findFirst({
@@ -250,6 +407,17 @@ export const stripeWebhookHandler = async (req: Request): Promise<Response> => {
           );
         }
 
+        const organizationId = getOrganizationIdFromSubscription(subscription);
+
+        if (organizationId !== null) {
+          await onOrgSubscriptionUpdated({ organizationId, subscription });
+
+          return Response.json(
+            { success: true, message: 'Webhook received' } satisfies StripeWebhookResponse,
+            { status: 200 },
+          );
+        }
+
         if (subscription.items.data[0].price.metadata.plan === STRIPE_PLAN_TYPE.TEAM) {
           const team = await prisma.team.findFirst({
             where: {
@@ -341,6 +509,17 @@ export const stripeWebhookHandler = async (req: Request): Promise<Response> => {
           );
         }
 
+        const organizationId = getOrganizationIdFromSubscription(subscription);
+
+        if (organizationId !== null) {
+          await onOrgSubscriptionUpdated({ organizationId, subscription });
+
+          return Response.json(
+            { success: true, message: 'Webhook received' } satisfies StripeWebhookResponse,
+            { status: 200 },
+          );
+        }
+
         if (subscription.items.data[0].price.metadata.plan === STRIPE_PLAN_TYPE.TEAM) {
           const team = await prisma.team.findFirst({
             where: {
@@ -401,6 +580,17 @@ export const stripeWebhookHandler = async (req: Request): Promise<Response> => {
       .with('customer.subscription.deleted', async () => {
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
         const subscription = event.data.object as Stripe.Subscription;
+
+        const organizationId = getOrganizationIdFromSubscription(subscription);
+
+        if (organizationId !== null) {
+          await onOrgSubscriptionDeleted({ organizationId });
+
+          return Response.json(
+            { success: true, message: 'Webhook received' } satisfies StripeWebhookResponse,
+            { status: 200 },
+          );
+        }
 
         await onSubscriptionDeleted({ subscription });
 

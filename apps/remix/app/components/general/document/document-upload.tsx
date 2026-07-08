@@ -8,6 +8,7 @@ import { useNavigate, useParams } from 'react-router';
 import { match } from 'ts-pattern';
 
 import { useLimits } from '@documenso/ee/server-only/limits/provider/client';
+import { isApproachingLimit } from '@documenso/ee/server-only/limits/thresholds';
 import { useAnalytics } from '@documenso/lib/client-only/hooks/use-analytics';
 import { useSession } from '@documenso/lib/client-only/providers/session';
 import { APP_DOCUMENT_UPLOAD_SIZE_LIMIT } from '@documenso/lib/constants/app';
@@ -179,7 +180,13 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
             remaining.documents > 0 &&
             Number.isFinite(remaining.documents) && (
               <TooltipContent>
-                <p className="text-sm">
+                <p
+                  className={cn(
+                    'text-sm',
+                    isApproachingLimit(quota.documents, remaining.documents) &&
+                      'font-medium text-amber-600 dark:text-amber-400',
+                  )}
+                >
                   <Trans>
                     {remaining.documents} of {quota.documents} documents remaining this month.
                   </Trans>

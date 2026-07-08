@@ -5,7 +5,7 @@ import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import { useRevalidator } from 'react-router';
 
-import type { PriceIntervals } from '@documenso/ee/server-only/stripe/get-prices-by-interval';
+import type { PriceIntervals, PriceWithProduct } from '@documenso/ee/server-only/stripe/get-prices-by-interval';
 import { STRIPE_PLAN_TYPE } from '@documenso/lib/constants/billing';
 import { toHumanPrice } from '@documenso/lib/universal/stripe/to-human-price';
 import { trpc } from '@documenso/trpc/react';
@@ -19,9 +19,21 @@ export type PlanSwitcherProps = {
   currentPriceId: string;
   /** The interval (month/year) the subscriber's current plan is billed at. */
   currentInterval: string;
+  /**
+   * The subscriber's own price, fetched directly rather than looked up in
+   * `prices` (which only contains *active* prices). A subscriber can be
+   * grandfathered on a price that's since been archived after a plan
+   * restructure — falls back to searching `prices` if not provided.
+   */
+  currentPrice?: PriceWithProduct | null;
 };
 
-export const PlanSwitcher = ({ prices, currentPriceId, currentInterval }: PlanSwitcherProps) => {
+export const PlanSwitcher = ({
+  prices,
+  currentPriceId,
+  currentInterval,
+  currentPrice: currentPriceProp,
+}: PlanSwitcherProps) => {
   const { _ } = useLingui();
   const { toast } = useToast();
   const revalidator = useRevalidator();
@@ -32,7 +44,7 @@ export const PlanSwitcher = ({ prices, currentPriceId, currentInterval }: PlanSw
 
   const intervalPrices = prices[currentInterval as keyof PriceIntervals] ?? [];
 
-  const currentPrice = intervalPrices.find((price) => price.id === currentPriceId);
+  const currentPrice = currentPriceProp ?? intervalPrices.find((price) => price.id === currentPriceId);
 
   // Only offer switches within the subscriber's current billing interval —
   // switching monthly <-> yearly mid-term is a business decision (proration

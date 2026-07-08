@@ -234,7 +234,17 @@ export const templateRouter = router({
       const limits = await getServerLimits({ email: ctx.user.email, teamId });
 
       if (limits.remaining.documents === 0) {
-        throw new Error('You have reached your document limit.');
+        throw new AppError(AppErrorCode.LIMIT_EXCEEDED, {
+          message: 'You have reached your document limit for this month. Please upgrade your plan.',
+          statusCode: 400,
+        });
+      }
+
+      if (recipients.length > limits.remaining.recipients) {
+        throw new AppError(AppErrorCode.LIMIT_EXCEEDED, {
+          message: 'You have exceeded the number of recipients allowed per document on your plan.',
+          statusCode: 400,
+        });
       }
 
       const document: Document = await createDocumentFromTemplate({

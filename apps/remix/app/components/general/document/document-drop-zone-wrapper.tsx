@@ -9,6 +9,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { match } from 'ts-pattern';
 
 import { useLimits } from '@documenso/ee/server-only/limits/provider/client';
+import { isApproachingLimit } from '@documenso/ee/server-only/limits/thresholds';
 import { useAnalytics } from '@documenso/lib/client-only/hooks/use-analytics';
 import { useSession } from '@documenso/lib/client-only/providers/session';
 import { APP_DOCUMENT_UPLOAD_SIZE_LIMIT, IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
@@ -174,7 +175,14 @@ export const DocumentDropZoneWrapper = ({ children, className }: DocumentDropZon
               team?.id === undefined &&
               remaining.documents > 0 &&
               Number.isFinite(remaining.documents) && (
-                <p className="text-muted-foreground/80 mt-4 text-sm">
+                <p
+                  className={cn(
+                    'mt-4 text-sm',
+                    isApproachingLimit(quota.documents, remaining.documents)
+                      ? 'font-medium text-amber-500 dark:text-amber-400'
+                      : 'text-muted-foreground/80',
+                  )}
+                >
                   <Trans>
                     {remaining.documents} of {quota.documents} documents remaining this month.
                   </Trans>
