@@ -2325,3 +2325,161 @@ model MetadataRecord {
   @@unique([organizationId, category, key])
   @@index([organizationId, category])
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Microsoft Teams integration
+//
+// Everything here is prefixed `MsTeams` to keep it distinct from HubSign's own
+// `Team` workspace models above — "team" is badly overloaded once Microsoft is
+// in the picture. `msTeamId` is a Microsoft Teams team; `teamId` elsewhere in
+// this schema is always a HubSign team.
+//
+// An org connects Teams once (MsTeamsConnection) and then attaches one or more
+// destinations (MsTeamsChannelLink). Two transports exist and render the same
+// Adaptive Cards:
+//
+//   WEBHOOK — a Power Automate "when a webhook request is received" URL. Zero
+//             setup, works for self-hosters, but fire-and-forget: a posted card
+//             can never be edited, so live trackers are unavailable.
+//   BOT     — Azure Bot Service. Requires app registration + a Teams admin to
+//             install the app, but unlocks in-place card updates (the live
+//             tracker) and Action.Execute buttons.
+//
+// Office 365 Connectors / the legacy MessageCard format are deliberately NOT
+// supported — Microsoft is retiring them.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum MsTeamsTransport {
+  WEBHOOK
+  BOT
+}
+
+enum MsTeamsDeliveryStatus {
+  SUCCESS
+  FAILED
+}
+
+/// One Microsoft Teams connection per HubSign organization.
+model MsTeamsConnection {
+  id             String           @id @default(cuid())
+  organizationId Int              @unique
+  transport      MsTeamsTransport @default(WEBHOOK)
+  /// AAD tenant that installed the bot. Always null for WEBHOOK transport.
+  tenantId       String?
+  enabled        Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  channels MsTeamsChannelLink[]
+}
+
+/// A destination a connection posts to — one Teams channel, or one webhook URL.
+model MsTeamsChannelLink {
+  id           String            @id @default(cuid())
+  connectionId String
+  connection   MsTeamsConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  /// Display label, e.g. "Acme Corp > #contracts".
+  name String
+
+  /// WEBHOOK transport: the Power Automate flow URL. Null for BOT transport.
+  webhookUrl String?
+
+  /// BOT transport: Bot Connector addressing captured at link time. `serviceUrl`
+  /// is only ever written from a signature-verified inbound activity.
+  conversationId String?
+  serviceUrl     String?
+  /// Microsoft Teams team id (NOT a HubSign Team.id).
+  msTeamId       String?
+  /// Microsoft Teams channel id.
+  msChannelId    String?
+
+  /// WorkflowEventKey values that post here. Empty array = every event.
+  events String[]
+
+  /// Post one live status card per document and edit it in place as recipients
+  /// act. Requires BOT transport; ignored on WEBHOOK.
+  tracker Boolean @default(false)
+
+  /// Post a recurring summary card. `digestCron` is a 5-field cron expression
+  /// evaluated by the same parser the scheduled workflows use.
+  digest          Boolean   @default(false)
+  digestCron      String?
+  digestTimezone  String    @default("UTC")
+  digestLastRunAt DateTime?
+
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cards      MsTeamsCardRef[]
+  deliveries MsTeamsDelivery[]
+
+  /// A conversation may only be linked once per connection. Postgres treats
+  /// NULLs as distinct, so WEBHOOK links (conversationId = null) are unaffected.
+  @@unique([connectionId, conversationId])
+  @@index([connectionId])
+}
+
+/// Pointer to a posted tracker card so later events can PUT an updated copy over
+/// it. One card per (channel, document). BOT transport only.
+model MsTeamsCardRef {
+  id            String             @id @default(cuid())
+  channelLinkId String
+  channelLink   MsTeamsChannelLink @relation(fields: [channelLinkId], references: [id], onDelete: Cascade)
+
+  documentId Int
+  /// Bot Connector activity id returned when the card was first posted.
+  activityId     String
+  conversationId String
+  serviceUrl     String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([channelLinkId, documentId])
+  @@index([documentId])
+}
+
+/// Delivery audit log — the Microsoft Teams analogue of WebhookCall.
+model MsTeamsDelivery {
+  id            String             @id @default(cuid())
+  channelLinkId String
+  channelLink   MsTeamsChannelLink @relation(fields: [channelLinkId], references: [id], onDelete: Cascade)
+
+  event        String
+  status       MsTeamsDeliveryStatus
+  transport    MsTeamsTransport
+  requestBody  Json
+  responseCode Int?
+  responseBody Json?
+  error        String?
+  createdAt    DateTime              @default(now())
+
+  @@index([channelLinkId, createdAt])
+}
+
+/// Short-lived, single-use handle binding a Teams conversation to a HubSign org.
+///
+/// The bot posts a card containing a deep link carrying this row's `id` as an
+/// opaque `state`. An org admin follows it while authenticated in HubSign and
+/// confirms the binding, at which point an MsTeamsChannelLink is created and the
+/// row is consumed. `id` is a 32-byte CSPRNG value, not a cuid.
+model MsTeamsLinkRequest {
+  id String @id
+
+  tenantId       String
+  conversationId String
+  serviceUrl     String
+  msTeamId       String?
+  msChannelId    String?
+  channelName    String?
+  /// Activity id of the prompt card, so it can be rewritten to "✅ Linked".
+  promptActivityId String?
+
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([expiresAt])
+}

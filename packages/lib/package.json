@@ -12,7 +12,8 @@
   "scripts": {
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "clean": "rimraf node_modules"
+    "clean": "rimraf node_modules",
+    "test": "vitest"
   },
   "dependencies": {
     "@auth/kysely-adapter": "^0.6.0",
@@ -57,6 +58,7 @@
   "devDependencies": {
     "@playwright/browser-chromium": "1.43.0",
     "@types/luxon": "^3.3.1",
-    "@types/pg": "^8.11.4"
+    "@types/pg": "^8.11.4",
+    "vitest": "^2.1.8"
   }
 }
