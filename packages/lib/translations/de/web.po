@@ -116,10 +116,6 @@ msgstr "{0, plural, one {1 Empfänger} other {# Empfänger}}"
 msgid "{0, plural, one {Waiting on 1 recipient} other {Waiting on # recipients}}"
 msgstr "{0, plural, one {Warte auf 1 Empfänger} other {Warte auf # Empfänger}}"
 
-#: apps/remix/app/components/general/webhook-multiselect-combobox.tsx
-#~ msgid "{0, plural, zero {Select values} other {# selected...}}"
-#~ msgstr "{0, plural, zero {Werte auswählen} other {# ausgewählt...}}"
-
 #. placeholder {0}: doc.binId ? 'Move Document' : 'File Document'
 #. placeholder {0}: doc.binId ? 'Move Here' : 'File Here'
 #. placeholder {0}: _(FRIENDLY_FIELD_TYPE[fieldType as FieldType])
@@ -128,6 +124,14 @@ msgstr "{0, plural, one {Warte auf 1 Empfänger} other {Warte auf # Empfänger}}
 #: apps/remix/app/components/general/document-signing/document-signing-auto-sign.tsx
 msgid "{0}"
 msgstr "{0}"
+
+#. placeholder {0}: pendingConflict.kind === 'purchase' ? 'You have' : 'This member has'
+#. placeholder {1}: pendingConflict.planName
+#. placeholder {2}: pendingConflict.priceFormatted
+#. placeholder {3}: pendingConflict.kind === 'purchase' ? 'Purchasing seats will assign you the first one and cancel your personal plan' : 'Assigning them an org seat will cancel it'
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "{0} an active <0>{1}</0> personal subscription ({2}). {3} immediately — unused time is credited to the account balance, not refunded to the card. Continue?"
+msgstr ""
 
 #. placeholder {0}: team.name
 #: apps/remix/app/components/dialogs/public-profile-template-manage-dialog.tsx
@@ -610,10 +614,6 @@ msgid "A field was updated"
 msgstr "Ein Feld wurde aktualisiert"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-#~ msgid "A lookup directory (e.g. vendor → email) that workflows can resolve at runtime. Use the \"Look up metadata\" action to find a record by name and send notifications."
-#~ msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "A lookup directory that workflows resolve at runtime — e.g. a vendor → email, or a signee/recipient (the person who will sign) → their email & role. Use the \"Look up metadata\" workflow action to find a record by name, then notify or send it to sign."
 msgstr ""
 
@@ -823,9 +823,15 @@ msgstr ""
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
+#: apps/remix/app/components/general/subscription-addons.tsx
 #: apps/remix/app/components/dialogs/team-email-add-dialog.tsx
 msgid "Add"
 msgstr "Hinzufügen"
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Add a channel"
+msgstr ""
 
 #: packages/ui/primitives/document-dropzone.tsx
 msgid "Add a document"
@@ -848,10 +854,6 @@ msgstr ""
 #: packages/ui/primitives/document-flow/add-settings.tsx
 msgid "Add a URL to redirect the user to once the document is signed"
 msgstr "Fügen Sie eine URL hinzu, um den Benutzer nach der Unterzeichnung des Dokuments weiterzuleiten"
-
-#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-#~ msgid "Add a vendor (name + email) above so workflows can look them up."
-#~ msgstr ""
 
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/document/document-edit-form.tsx
@@ -899,6 +901,10 @@ msgstr ""
 msgid "Add at least one signer"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Add channel"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/team-email-add-dialog.tsx
 msgid "Add email"
 msgstr "E-Mail hinzufügen"
@@ -931,10 +937,6 @@ msgstr "Mich selbst hinzufügen"
 #: packages/ui/primitives/template-flow/add-template-placeholder-recipients.tsx
 msgid "Add Myself"
 msgstr "Mich hinzufügen"
-
-#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-#~ msgid "Add or update a record"
-#~ msgstr ""
 
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
@@ -1004,6 +1006,18 @@ msgstr "Fügen Sie die Empfänger hinzu, um das Dokument zu erstellen"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Add validation rule"
+msgstr ""
+
+#: apps/remix/app/components/general/subscription-addons.tsx
+msgid "Add-on added"
+msgstr ""
+
+#: apps/remix/app/components/general/subscription-addons.tsx
+msgid "Add-on removed"
+msgstr ""
+
+#: apps/remix/app/components/general/subscription-addons.tsx
+msgid "Add-ons"
 msgstr ""
 
 #: apps/remix/app/components/dialogs/team-checkout-create-dialog.tsx
@@ -1087,6 +1101,10 @@ msgstr "Alle Dokumente wurden verarbeitet. Alle neuen Dokumente, die gesendet od
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "All documents related to the electronic signing process will be provided to you electronically through our platform or via email. It is your responsibility to ensure that your email address is current and that you can receive and open our emails."
 msgstr "Alle Dokumente, die mit dem elektronischen Unterzeichnungsprozess zusammenhängen, werden Ihnen elektronisch über unsere Plattform oder per E-Mail zur Verfügung gestellt. Es liegt in Ihrer Verantwortung, sicherzustellen, dass Ihre E-Mail-Adresse aktuell ist und dass Sie unsere E-Mails empfangen und öffnen können."
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "All events"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/templates.folders._index.tsx
 #: apps/remix/app/routes/_authenticated+/documents.folders._index.tsx
@@ -1336,9 +1354,17 @@ msgstr "Beim Unterschreiben als Assistent ist ein Fehler aufgetreten."
 msgid "An error occurred while signing the document."
 msgstr "Ein Fehler ist aufgetreten, während das Dokument unterzeichnet wurde."
 
+#: apps/remix/app/components/general/plan-switcher.tsx
+msgid "An error occurred while trying to change your plan."
+msgstr ""
+
 #: apps/remix/app/components/general/billing-plans.tsx
 msgid "An error occurred while trying to create a checkout session."
 msgstr "Ein Fehler ist aufgetreten, während versucht wurde, eine Checkout-Sitzung zu erstellen."
+
+#: apps/remix/app/components/general/subscription-addons.tsx
+msgid "An error occurred while trying to update your add-ons."
+msgstr ""
 
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/document/document-edit-form.tsx
@@ -1452,6 +1478,16 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Apply to builder"
+msgstr ""
+
+#. placeholder {0}: quota.directTemplates - remaining.directTemplates
+#. placeholder {1}: quota.directTemplates
+#: apps/remix/app/components/dialogs/template-direct-link-dialog.tsx
+msgid "Approaching your direct template limit ({0}/{1})"
+msgstr ""
+
+#: apps/remix/app/components/tables/templates-table.tsx
+msgid "Approaching your document limit"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
@@ -1654,6 +1690,11 @@ msgstr "Zurück"
 msgid "Back to Documents"
 msgstr "Zurück zu Dokumenten"
 
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+#: apps/remix/app/components/general/billing-plans.tsx
+msgid "Back to plans"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/admin+/site-settings.tsx
 msgid "Background Color"
 msgstr "Hintergrundfarbe"
@@ -1671,18 +1712,16 @@ msgstr "Backup-Codes"
 msgid "Banner Updated"
 msgstr "Banner aktualisiert"
 
-#: apps/remix/app/components/forms/signup.tsx
-#~ msgid "Basic details"
-#~ msgstr "Basisdetails"
-
 #: packages/email/template-components/template-confirmation-email.tsx
 msgid "Before you get started, please confirm your email address by clicking the button below:"
 msgstr "Bitte bestätige vor dem Start deine E-Mail-Adresse, indem du auf den Button unten klickst:"
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.billing.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/billing.tsx
+#: apps/remix/app/routes/_authenticated+/settings+/billing.tsx
 #: apps/remix/app/components/general/settings-nav-mobile.tsx
 #: apps/remix/app/components/general/settings-nav-desktop.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/app-sidebar.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-mobile.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-desktop.tsx
@@ -1818,6 +1857,7 @@ msgid "Can prepare"
 msgstr "Kann vorbereiten"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approvals.$id.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/documents.tsx
@@ -1879,6 +1919,14 @@ msgstr "Kann vorbereiten"
 msgid "Cancel"
 msgstr "Abbrechen"
 
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Cancel personal plan?"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Cancel plan & continue"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
 msgid "Cancelled by user"
 msgstr "Vom Benutzer abgebrochen"
@@ -1926,9 +1974,17 @@ msgstr ""
 msgid "Change language"
 msgstr ""
 
+#: apps/remix/app/components/general/plan-switcher.tsx
+msgid "Change plan"
+msgstr ""
+
 #: apps/remix/app/components/general/app-topbar-preferences.tsx
 #: apps/remix/app/components/general/app-topbar-preferences.tsx
 msgid "Change theme"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Channels"
 msgstr ""
 
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
@@ -1994,10 +2050,6 @@ msgstr "Wählen..."
 #: apps/remix/app/components/general/claim-account.tsx
 msgid "Claim account"
 msgstr "Konto beanspruchen"
-
-#: apps/remix/app/components/forms/signup.tsx
-#~ msgid "Claim username"
-#~ msgstr "Benutzername beanspruchen"
 
 #: apps/remix/app/components/forms/signup.tsx
 msgid "Claim your username now"
@@ -2287,9 +2339,17 @@ msgstr "E-Mail bestätigen"
 msgid "Confirmation email sent"
 msgstr "Bestätigungs-E-Mail gesendet"
 
-#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
-#~ msgid "Connect your AI service to automatically process documents. Set <0>NEXT_PRIVATE_AI_SERVICE_URL</0> in your environment."
-#~ msgstr ""
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Connect Microsoft Teams to post document notifications into a channel. The connection belongs to your organization — every member's documents flow through it."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Connect via bot"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Connect via webhook"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Connect your BMS ML service for automatic OCR, field extraction, and document classification."
@@ -2616,7 +2676,6 @@ msgid "Created at"
 msgstr ""
 
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/audit-log.tsx
-#: apps/remix/app/routes/_authenticated+/admin+/subscriptions.tsx
 msgid "Created At"
 msgstr "Erstellt am"
 
@@ -2639,6 +2698,10 @@ msgstr "Erstellt am"
 msgid "Created on {0}"
 msgstr "Erstellt am {0}"
 
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Cron (5-field)"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Cron expression"
 msgstr ""
@@ -2655,9 +2718,9 @@ msgstr "Aktuelles Passwort"
 msgid "Current password is incorrect."
 msgstr "Aktuelles Passwort ist falsch."
 
-#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
-#~ msgid "Current Plan"
-#~ msgstr ""
+#: apps/remix/app/components/general/plan-switcher.tsx
+msgid "Current plan"
+msgstr ""
 
 #: apps/remix/app/components/dialogs/template-bulk-send-dialog.tsx
 msgid "Current recipients:"
@@ -2906,6 +2969,10 @@ msgstr ""
 msgid "Design approval chains and the rules that pick them."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Destination"
+msgstr ""
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 msgid "Details"
 msgstr "Einzelheiten"
@@ -2968,6 +3035,10 @@ msgstr "Direkter Vorlagenlink gelöscht"
 msgid "Direct template link usage exceeded ({0}/{1})"
 msgstr "Die Verwendung des direkten Vorlagenlinks wurde überschritten ({0}/{1})"
 
+#: apps/remix/app/components/general/sidebar-usage-indicator.tsx
+msgid "Direct templates"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/public-profile-template-manage-dialog.tsx
 msgid "Disable"
 msgstr "Deaktivieren"
@@ -3008,6 +3079,10 @@ msgstr "Das Deaktivieren der direkten Link-Signatur verhindert, dass jemand auf 
 #: apps/remix/app/components/dialogs/admin-user-disable-dialog.tsx
 msgid "Disabling the user results in the user not being able to use the account. It also disables all the related contents such as subscription, webhooks, teams, and API keys."
 msgstr "Das Deaktivieren des Benutzers führt dazu, dass der Benutzer das Konto nicht mehr nutzen kann. Es werden auch alle zugehörigen Inhalte wie Abonnements, Webhooks, Teams und API-Schlüssel deaktiviert."
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Disconnect"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Discovery / Well-Known URL"
@@ -3051,10 +3126,6 @@ msgstr ""
 msgid "Doc Merging"
 msgstr ""
 
-#: apps/remix/app/components/general/app-bottom-nav.tsx
-#~ msgid "Docs"
-#~ msgstr ""
-
 #: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id.logs.tsx
 #: apps/remix/app/routes/_authenticated+/documents.$id.logs.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
@@ -3076,10 +3147,6 @@ msgstr "Dokument \"{0}\" - Ablehnung Bestätigt"
 #: packages/lib/jobs/definitions/emails/send-document-cancelled-emails.handler.ts
 msgid "Document \"{0}\" Cancelled"
 msgstr "Dokument „{0}“ abgebrochen"
-
-#: apps/remix/app/routes/_authenticated+/dms+/retention.tsx
-#~ msgid "Document {0}"
-#~ msgstr ""
 
 #: packages/ui/primitives/template-flow/add-template-settings.tsx
 #: packages/ui/primitives/document-flow/add-settings.tsx
@@ -3446,6 +3513,10 @@ msgstr "Dokumente empfangen"
 msgid "Documents that have reached their retention period and require action."
 msgstr ""
 
+#: apps/remix/app/components/general/sidebar-usage-indicator.tsx
+msgid "Documents this month"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Documents Viewed"
 msgstr "Dokumente angesehen"
@@ -3461,6 +3532,11 @@ msgstr "Haben Sie kein Konto? <0>Registrieren</0>"
 
 #: apps/remix/app/components/general/document/document-stamps-button.tsx
 msgid "Done"
+msgstr ""
+
+#: apps/remix/app/components/general/plan-switcher.tsx
+#: apps/remix/app/components/general/plan-switcher.tsx
+msgid "Downgrade"
 msgstr ""
 
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
@@ -3532,10 +3608,6 @@ msgstr "Ziehen Sie Ihr PDF hierher."
 #: apps/remix/app/components/embed/authoring/configure-document-upload.tsx
 msgid "Drag and drop or click to upload"
 msgstr ""
-
-#: apps/remix/app/components/general/document/document-drop-zone-wrapper.tsx
-#~ msgid "Drag and drop your PDF file here"
-#~ msgstr ""
 
 #: apps/remix/app/components/general/document/document-drop-zone-wrapper.tsx
 msgid "Drag and drop your PDF files here"
@@ -3613,10 +3685,6 @@ msgstr ""
 msgid "e.g. Round red APPROVED stamp with the company name and today's date"
 msgstr ""
 
-#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
-#~ msgid "Each member in your organization uses one seat. Add or remove members from the Members page."
-#~ msgstr ""
-
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks._index.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
@@ -3651,10 +3719,6 @@ msgstr "Webhook bearbeiten"
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Edit workflow"
 msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
-#~ msgid "edited"
-#~ msgstr ""
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Electronic Delivery of Documents"
@@ -3828,6 +3892,7 @@ msgstr ""
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks.$id.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/site-settings.tsx
 #: apps/remix/app/components/dialogs/webhook-create-dialog.tsx
 msgid "Enabled"
@@ -3844,10 +3909,6 @@ msgstr "Beigefügte Dokument"
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 msgid "Ends chain"
 msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/admin+/subscriptions.tsx
-msgid "Ends On"
-msgstr "Endet am"
 
 #: apps/remix/app/components/forms/team-branding-preferences-form.tsx
 msgid "Enter your brand details"
@@ -3894,6 +3955,8 @@ msgstr ""
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approvals.$id.tsx
@@ -3970,6 +4033,14 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Event"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Events"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Events — leave all unchecked to receive every event"
 msgstr ""
 
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
@@ -4194,10 +4265,6 @@ msgstr "Passwort vergessen?"
 msgid "Forgot your password?"
 msgstr "Hast du dein Passwort vergessen?"
 
-#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
-#~ msgid "Forward a PDF to your org's inbox alias and HubSign creates a DRAFT signing request automatically. The sender (you or any org member) then opens HubSign to add recipients and send it out."
-#~ msgstr ""
-
 #: packages/ui/primitives/document-flow/types.ts
 msgid "Free Signature"
 msgstr "Freie Unterschrift"
@@ -4205,10 +4272,6 @@ msgstr "Freie Unterschrift"
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "Freeform labels for quick document tagging"
 msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-#~ msgid "From"
-#~ msgstr ""
 
 #: apps/remix/app/components/general/document-signing/document-signing-name-field.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-form.tsx
@@ -4256,6 +4319,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Generation failed"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Give seat"
 msgstr ""
 
 #: packages/ui/components/document/document-global-auth-action-select.tsx
@@ -4359,6 +4426,10 @@ msgstr "Hey, ich bin Timur"
 msgid "Hi {0}, this is a friendly reminder that <0>{inviterName}</0> is still waiting for your signature on this document. It's been waiting <1>{daysWaiting} days</1>."
 msgstr ""
 
+#: packages/email/templates/subscription-renewal-reminder.tsx
+msgid "Hi {name}, your plan renews soon"
+msgstr ""
+
 #: packages/email/templates/bulk-send-complete.tsx
 msgid "Hi {userName},"
 msgstr "Hallo, {userName},"
@@ -4448,6 +4519,10 @@ msgstr ""
 msgid "In progress"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "In Teams, open the channel → ⋯ → Workflows → \"Post to a channel when a webhook request is received\". Copy the generated URL and paste it here. Do not use the legacy \"Incoming Webhook\" connector — Microsoft is retiring it."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 msgid "Inactive"
 msgstr ""
@@ -4456,10 +4531,6 @@ msgstr ""
 #: apps/remix/app/components/general/document/document-status.tsx
 msgid "Inbox"
 msgstr "Posteingang"
-
-#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
-#~ msgid "Inbox alias: <0>{0}@inbox.hubsign.io</0> (requires DNS + inbound provider config — see README)."
-#~ msgstr ""
 
 #: apps/remix/app/components/general/app-command-menu.tsx
 msgid "Inbox documents"
@@ -4475,6 +4546,11 @@ msgstr "Signaturzertifikat in das Dokument einfügen"
 
 #: packages/ui/components/document/document-download-button.tsx
 msgid "Includes the Final Audit Report page"
+msgstr ""
+
+#: apps/remix/app/components/general/plan-switcher.tsx
+#: apps/remix/app/components/general/plan-switcher.tsx
+msgid "Includes:"
 msgstr ""
 
 #: apps/remix/app/components/general/template/template-page-view-information.tsx
@@ -4496,9 +4572,18 @@ msgstr "Initialen"
 msgid "Inserted"
 msgstr "Eingefügt"
 
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Install the HubSign app in Teams, then add it to a channel. The bot will post a link prompt there — follow it back here to bind that channel to this organization."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Instance Stats"
 msgstr "Instanzstatistiken"
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
+msgid "Integrations"
+msgstr ""
 
 #: apps/remix/app/components/forms/2fa/view-recovery-codes-dialog.tsx
 msgid "Invalid code. Please try again."
@@ -4558,10 +4643,6 @@ msgstr "Einladen"
 msgid "Invite member"
 msgstr "Mitglied einladen"
 
-#: apps/remix/app/routes/_authenticated+/org+/members.tsx
-#~ msgid "Invite Member"
-#~ msgstr ""
-
 #: apps/remix/app/components/dialogs/team-member-invite-dialog.tsx
 msgid "Invite Members"
 msgstr "Mitglieder einladen"
@@ -4581,14 +4662,6 @@ msgstr "Eingeladen am"
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
 msgid "Invoice"
 msgstr "Rechnung"
-
-#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
-#~ msgid "Invoice details"
-#~ msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
-#~ msgid "Invoice details saved"
-#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "Invoice info"
@@ -4826,9 +4899,9 @@ msgstr "Vorlage verwalten und anzeigen"
 msgid "Manage billing"
 msgstr "Rechnungsmanagement"
 
-#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
-#~ msgid "Manage billing for {0}. Per-seat pricing with DMS add-on."
-#~ msgstr ""
+#: packages/email/templates/subscription-renewal-reminder.tsx
+msgid "Manage Billing"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/settings+/notifications.tsx
 msgid "Manage browser push notifications for document events."
@@ -4861,10 +4934,6 @@ msgstr "Abonnement verwalten"
 #: apps/remix/app/components/general/billing-portal-button.tsx
 msgid "Manage Subscription"
 msgstr "Abonnement verwalten"
-
-#: apps/remix/app/routes/_authenticated+/admin+/subscriptions.tsx
-msgid "Manage subscriptions"
-msgstr "Abonnements verwalten"
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.billing.tsx
 msgid "Manage team subscription."
@@ -4914,10 +4983,6 @@ msgstr "Als gesehen markieren"
 #: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
 msgid "Mark as Viewed"
 msgstr "Als angesehen markieren"
-
-#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-#~ msgid "Matching is case-insensitive on the name. Re-saving the same name in a category updates it."
-#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "MAU (created document)"
@@ -4979,6 +5044,10 @@ msgstr "Nachricht <0>(Optional)</0>"
 msgid "Metadata"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Microsoft Teams"
+msgstr ""
+
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
 msgid "Min"
 msgstr "Min"
@@ -5000,10 +5069,6 @@ msgstr "Monatlich aktive Benutzer: Benutzer, die mindestens ein Dokument erstell
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Monthly Active Users: Users that had at least one of their documents completed"
 msgstr "Monatlich aktive Benutzer: Benutzer, die mindestens eines ihrer Dokumente abgeschlossen haben"
-
-#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-#~ msgid "more"
-#~ msgstr ""
 
 #: apps/remix/app/components/dialogs/template-move-to-folder-dialog.tsx
 #: apps/remix/app/components/dialogs/template-move-dialog.tsx
@@ -5061,6 +5126,8 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
@@ -5177,6 +5244,10 @@ msgstr "Nächster"
 msgid "Next field"
 msgstr "Nächstes Feld"
 
+#: packages/email/templates/subscription-renewal-reminder.tsx
+msgid "No action is needed if you'd like to continue — you'll be billed automatically."
+msgstr ""
+
 #: apps/remix/app/components/tables/documents-table-empty-state.tsx
 msgid "No active drafts"
 msgstr "Keine aktiven Entwürfe"
@@ -5191,6 +5262,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 msgid "No approval templates yet"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "No channels yet."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
@@ -5365,6 +5440,10 @@ msgstr "Keine Sorge, das passiert! Geben Sie Ihre E-Mail ein, und wir senden Ihn
 msgid "None"
 msgstr "Keine"
 
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Not connected yet."
+msgstr ""
+
 #: apps/remix/app/components/forms/signin.tsx
 msgid "Not supported"
 msgstr "Nicht unterstützt"
@@ -5400,21 +5479,9 @@ msgstr "Nummer"
 msgid "Number format"
 msgstr "Zahlenformat"
 
-#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-#~ msgid "OCR"
-#~ msgstr ""
-
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "OCR & Document Processing"
 msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
-#~ msgid "OCR engine not configured — you can still fill these in manually."
-#~ msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
-#~ msgid "OCR failed — enter the fields manually or re-run OCR."
-#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "OCR failed — you can re-run it or proceed manually."
@@ -5424,10 +5491,6 @@ msgstr ""
 msgid "OCR is running…"
 msgstr ""
 
-#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
-#~ msgid "OCR is running… fields will populate when it finishes."
-#~ msgstr ""
-
 #: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
 msgid "OCR Processing Queue"
 msgstr ""
@@ -5435,10 +5498,6 @@ msgstr ""
 #: apps/remix/app/components/general/app-sidebar.tsx
 msgid "OCR Queue"
 msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
-#~ msgid "OCR ran but found no structured fields."
-#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "OCR ran but the template extracted no fields."
@@ -5510,6 +5569,10 @@ msgstr "Sobald Sie den QR-Code gescannt oder den Code manuell eingegeben haben, 
 msgid "Once your template is set up, share the link anywhere you want. The person who opens the link will be able to enter their information in the direct link recipient field and complete any other fields assigned to them."
 msgstr "Sobald Ihre Vorlage eingerichtet ist, teilen Sie den Link überall, wo Sie möchten. Die Person, die den Link öffnet, kann ihre Informationen im Feld für direkte Empfänger eingeben und alle anderen ihr zugewiesenen Felder ausfüllen."
 
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "One connection per organization. Add channels below."
+msgstr ""
+
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Only admins can access and view the document"
 msgstr "Nur Administratoren können auf das Dokument zugreifen und es anzeigen"
@@ -5521,6 +5584,10 @@ msgstr ""
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Only managers and above can access and view the document"
 msgstr "Nur Manager und darüber können auf das Dokument zugreifen und es anzeigen"
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Only organization admins and managers can change these settings."
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/doc-merge.tsx
 #: apps/remix/app/routes/_authenticated+/doc-merge.tsx
@@ -5842,6 +5909,10 @@ msgstr "Wählen Sie eine der folgenden Vereinbarungen aus und beginnen Sie das S
 msgid "Placeholder"
 msgstr "Platzhalter"
 
+#: apps/remix/app/components/general/plan-switcher.tsx
+msgid "Plan updated"
+msgstr ""
+
 #. placeholder {0}: _(actionVerb).toLowerCase()
 #: packages/email/template-components/template-document-invite.tsx
 msgid "Please {0} your document<0/>\"{documentName}\""
@@ -5997,6 +6068,14 @@ msgstr "Bitte geben Sie <0>{0}</0> ein, um zu bestätigen."
 msgid "PNG · JPEG · SVG · 2 MB max"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Post a recurring digest"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "Power Automate webhook URL"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/dms+/compliance.tsx
 msgid "Pre-configured retention schedules for different document types and industries."
 msgstr ""
@@ -6018,10 +6097,6 @@ msgstr "Vorschau"
 #: apps/remix/app/components/general/direct-template/direct-template-page.tsx
 msgid "Preview and configure template."
 msgstr "Vorschau und Vorlagen konfigurieren."
-
-#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
-#~ msgid "Pricing Details"
-#~ msgstr ""
 
 #: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
 #: apps/remix/app/components/general/document/document-page-view-dropdown.tsx
@@ -6109,10 +6184,6 @@ msgstr "Öffentliches Profil"
 msgid "Public profile URL"
 msgstr "Öffentlicher Profil-URL"
 
-#: apps/remix/app/components/forms/signup.tsx
-#~ msgid "Public profile username"
-#~ msgstr "Öffentlicher Profil-Benutzername"
-
 #: apps/remix/app/components/tables/templates-table.tsx
 msgid "Public templates are connected to your public profile. Any modifications to public templates will also appear in your public profile."
 msgstr "Öffentliche Vorlagen sind mit Ihrem öffentlichen Profil verbunden. Änderungen an öffentlichen Vorlagen erscheinen auch in Ihrem öffentlichen Profil."
@@ -6127,6 +6198,10 @@ msgstr ""
 
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "Push notifications unavailable"
+msgstr ""
+
+#: packages/email/templates/subscription-purchase-confirmation.tsx
+msgid "Questions about your plan? Manage or cancel anytime from your <0>billing settings</0>."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
@@ -6405,6 +6480,7 @@ msgstr ""
 #: apps/remix/app/components/tables/team-settings-members-table.tsx
 #: apps/remix/app/components/tables/team-settings-member-invites-table.tsx
 #: apps/remix/app/components/tables/settings-public-profile-templates-table.tsx
+#: apps/remix/app/components/general/subscription-addons.tsx
 #: apps/remix/app/components/general/teams/team-email-dropdown.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-field-container.tsx
 #: apps/remix/app/components/forms/team-branding-preferences-form.tsx
@@ -6416,6 +6492,10 @@ msgstr ""
 #: packages/ui/primitives/document-flow/add-fields.tsx
 msgid "Remove"
 msgstr "Entfernen"
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Remove seat"
+msgstr ""
 
 #: apps/remix/app/components/dialogs/team-email-delete-dialog.tsx
 msgid "Remove team email"
@@ -6677,10 +6757,6 @@ msgstr ""
 msgid "Save Inbox Settings"
 msgstr ""
 
-#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
-#~ msgid "Save invoice details"
-#~ msgstr ""
-
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Save OCR Settings"
 msgstr ""
@@ -6760,15 +6836,15 @@ msgid "Searching..."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
-#~ msgid "Seat Allocation"
-#~ msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 msgid "Seat assigned"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 msgid "Seat Plans"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Seat removed"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
@@ -6950,10 +7026,6 @@ msgstr ""
 msgid "Set the redirect URL on your provider to: <0>{0}/api/auth/callback/oidc?org={1}</0>"
 msgstr ""
 
-#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
-#~ msgid "Set Up Billing ({memberCount} seats × ${seatPrice} + ${dmsPrice} DMS)"
-#~ msgstr ""
-
 #: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
 msgid "Set up filing structure"
 msgstr ""
@@ -6991,11 +7063,6 @@ msgstr "Teilen"
 #: packages/ui/components/document/document-share-button.tsx
 msgid "Share Signature Card"
 msgstr "Unterschriftenkarte teilen"
-
-#: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
-#: apps/remix/app/components/general/document/document-page-view-dropdown.tsx
-#~ msgid "Share Signing Card"
-#~ msgstr "Signaturkarte teilen"
 
 #: packages/lib/constants/template.ts
 msgid "Share the Link"
@@ -7205,10 +7272,6 @@ msgid "Signing"
 msgstr "Unterzeichnung"
 
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
-#~ msgid "Signing Certificate"
-#~ msgstr "Unterzeichnungszertifikat"
-
-#: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 msgid "Signing certificate provided by"
 msgstr "Unterzeichnungszertifikat bereitgestellt von"
 
@@ -7296,7 +7359,9 @@ msgstr ""
 #: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
 #: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
 #: apps/remix/app/components/tables/documents-table-action-button.tsx
+#: apps/remix/app/components/general/subscription-addons.tsx
 #: apps/remix/app/components/general/share-document-download-button.tsx
+#: apps/remix/app/components/general/plan-switcher.tsx
 #: apps/remix/app/components/general/billing-portal-button.tsx
 #: apps/remix/app/components/general/billing-plans.tsx
 #: apps/remix/app/components/general/teams/team-layout-billing-banner.tsx
@@ -7473,7 +7538,6 @@ msgstr "Statistiken"
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
-#: apps/remix/app/routes/_authenticated+/admin+/subscriptions.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/documents._index.tsx
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
 #: apps/remix/app/components/tables/documents-table.tsx
@@ -7527,10 +7591,6 @@ msgstr "Abonnieren"
 msgid "Subscription"
 msgstr "Abonnement"
 
-#: apps/remix/app/components/general/app-sidebar.tsx
-msgid "Subscriptions"
-msgstr "Abonnements"
-
 #: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
 #: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
@@ -7580,6 +7640,10 @@ msgstr "Zusammenfassung:"
 
 #: apps/remix/app/routes/_authenticated+/dms+/bulk-upload.tsx
 msgid "Supports PDF, JPEG, PNG, TIFF. Upload invoices, receipts, bank statements, or any documents."
+msgstr ""
+
+#: apps/remix/app/components/general/plan-switcher.tsx
+msgid "Switch"
 msgstr ""
 
 #: apps/remix/app/components/general/app-topbar-preferences.tsx
@@ -7861,12 +7925,12 @@ msgid "Text Color"
 msgstr "Textfarbe"
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
-#~ msgid "Thank you for using Hub Sign to perform your electronic document signing. The purpose of this disclosure is to inform you about the process, legality, and your rights regarding the use of electronic signatures on our platform. By opting to use an electronic signature, you are agreeing to the terms and conditions outlined below."
-#~ msgstr ""
-
-#: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Thank you for using HubSign to perform your electronic document signing. The purpose of this disclosure is to inform you about the process, legality, and your rights regarding the use of electronic signatures on our platform. By opting to use an electronic signature, you are agreeing to the terms and conditions outlined below."
 msgstr "Vielen Dank, dass Sie HubSign zur elektronischen Unterzeichnung Ihrer Dokumente verwenden. Der Zweck dieser Offenlegung besteht darin, Sie über den Prozess, die Rechtmäßigkeit und Ihre Rechte in Bezug auf die Verwendung elektronischer Unterschriften auf unserer Plattform zu informieren. Indem Sie sich entscheiden, eine elektronische Unterschrift zu verwenden, stimmen Sie den nachfolgend dargelegten Bedingungen zu."
+
+#: packages/email/templates/subscription-purchase-confirmation.tsx
+msgid "Thanks for subscribing, {name}!"
+msgstr ""
 
 #: apps/remix/app/components/forms/stamp-upload-dialog.tsx
 msgid "That image is too large (max 2 MB)."
@@ -7899,6 +7963,10 @@ msgstr "Die Authentifizierung, die erforderlich ist, damit Empfänger das Signat
 #: packages/ui/components/document/document-global-auth-access-select.tsx
 msgid "The authentication required for recipients to view the document."
 msgstr "Die Authentifizierung, die erforderlich ist, damit Empfänger das Dokument anzeigen können."
+
+#: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+msgid "The bot transport is unavailable — this deployment has no Azure Bot credentials. The webhook transport posts the same cards, but cannot update a card after it is posted, so live trackers and in-Teams buttons are disabled."
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/admin+/site-settings.tsx
 msgid "The content to show in the banner, HTML is allowed"
@@ -8183,10 +8251,6 @@ msgstr "Es gibt noch keine abgeschlossenen Dokumente. Dokumente, die Sie erstell
 msgid "There was an error uploading your file. Please try again."
 msgstr ""
 
-#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
-#~ msgid "These documents are waiting for OCR text extraction. Connect the AI service to process them automatically."
-#~ msgstr ""
-
 #: apps/remix/app/components/general/teams/team-email-usage.tsx
 msgid "They have permission on your behalf to:"
 msgstr "Sie haben in Ihrem Namen die Erlaubnis, zu:"
@@ -8295,10 +8359,6 @@ msgstr "Dieses Dokument wurde mit einem direkten Link erstellt."
 #: apps/remix/app/routes/_share+/verify.$token.tsx
 msgid "This document was rejected by a signer and is not a completed agreement."
 msgstr ""
-
-#: packages/email/template-components/template-footer.tsx
-#~ msgid "This document was sent using <0>Hub Sign.</0>"
-#~ msgstr ""
 
 #: packages/email/template-components/template-footer.tsx
 msgid "This document was sent using <0>HubSign.</0>"
@@ -8882,10 +8942,16 @@ msgstr "Passwort wird aktualisiert..."
 msgid "Updating Your Information"
 msgstr "Aktualisierung Ihrer Informationen"
 
+#: apps/remix/app/components/general/plan-switcher.tsx
+#: apps/remix/app/components/general/plan-switcher.tsx
 #: packages/ui/primitives/document-upload.tsx
 #: packages/ui/primitives/document-dropzone.tsx
 msgid "Upgrade"
 msgstr "Upgrade"
+
+#: apps/remix/app/components/general/sidebar-usage-indicator.tsx
+msgid "Upgrade plan"
+msgstr ""
 
 #: apps/remix/app/components/general/stamps/stamp-library.tsx
 msgid "Upgrade your organization plan to upload and apply custom stamps on documents."
@@ -8998,10 +9064,6 @@ msgstr "Die hochgeladene Datei ist zu klein"
 msgid "Uploaded file not an allowed file type"
 msgstr "Die hochgeladene Datei ist kein zulässiger Dateityp"
 
-#: apps/remix/app/components/general/document/document-drop-zone-wrapper.tsx
-#~ msgid "Uploading document..."
-#~ msgstr ""
-
 #: apps/remix/app/routes/_authenticated+/dms+/documents.tsx
 msgid "Uploading..."
 msgstr ""
@@ -9039,19 +9101,11 @@ msgstr "Benutzer"
 msgid "User has no password."
 msgstr "Benutzer hat kein Passwort."
 
-#: apps/remix/app/routes/_authenticated+/admin+/subscriptions.tsx
-msgid "User ID"
-msgstr "Benutzer-ID"
-
 #: apps/remix/app/components/dialogs/admin-user-enable-dialog.tsx
 #: apps/remix/app/components/dialogs/admin-user-disable-dialog.tsx
 #: apps/remix/app/components/dialogs/admin-user-delete-dialog.tsx
 msgid "User not found."
 msgstr "Benutzer nicht gefunden."
-
-#: apps/remix/app/components/forms/signup.tsx
-#~ msgid "User profiles are here!"
-#~ msgstr "Benutzerprofile sind hier!"
 
 #: apps/remix/app/components/general/menu-switcher.tsx
 msgid "User settings"
@@ -9072,10 +9126,6 @@ msgstr "Benutzer"
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Users with an email matching one of this org's allowed domains can't sign up themselves — they must be invited or use SSO. Set allowed domains above first."
 msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
-#~ msgid "Uses your org's WorkHub BulkSender credential (same as sending) to poll its mailbox. The signature inbox shows incoming PDFs after OCR."
-#~ msgstr ""
 
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/checkbox-field.tsx
@@ -9182,6 +9232,10 @@ msgstr "Alle verwandten Dokumente anzeigen"
 msgid "View all security activity related to your account."
 msgstr "Sehen Sie sich alle Sicherheitsaktivitäten in Ihrem Konto an."
 
+#: packages/email/templates/subscription-purchase-confirmation.tsx
+msgid "View Billing"
+msgstr ""
+
 #: apps/remix/app/components/forms/2fa/view-recovery-codes-dialog.tsx
 msgid "View Codes"
 msgstr "Codes ansehen"
@@ -9270,6 +9324,10 @@ msgstr "Warten auf deine Reihe"
 
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
 msgid "Waiting on you"
+msgstr ""
+
+#: packages/email/templates/subscription-renewal-reminder.tsx
+msgid "Want to make changes first? Update or cancel your plan from your <0>billing settings</0>."
 msgstr ""
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
@@ -9660,14 +9718,6 @@ msgid "WorkHub API key (x-api-key)"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
-#~ msgid "WorkHub BulkSender password"
-#~ msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
-#~ msgid "WorkHub BulkSender username"
-#~ msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "WorkHub inbox connection"
 msgstr ""
 
@@ -9686,10 +9736,6 @@ msgstr "Schreiben Sie über das Team"
 #: apps/remix/app/components/forms/public-profile-form.tsx
 msgid "Write about yourself"
 msgstr "Schreiben Sie über sich selbst"
-
-#: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
-#~ msgid "Write what should happen in plain English. Example: \"When an inbox document finishes OCR and the vendor email contains bms, send it to jgray@fepro.io to sign.\""
-#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Write what should happen in plain English. Example: \"When an inbox document finishes OCR and the vendor email contains bms, send it to the finance team to sign.\""
@@ -9839,9 +9885,25 @@ msgstr "Sie haben derzeit keinen Kundenrecord, das sollte nicht passieren. Bitte
 msgid "You do not have permission to create a token for this team"
 msgstr "Sie haben keine Berechtigung, ein Token für dieses Team zu erstellen"
 
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "You don't have a seat assigned — ask your org admin."
+msgstr ""
+
 #: packages/email/template-components/template-document-cancel.tsx
 msgid "You don't need to sign it anymore."
 msgstr "Du musst es nicht mehr unterschreiben."
+
+#. placeholder {0}: remaining.directTemplates
+#. placeholder {1}: remaining.directTemplates === 1 ? '' : 's'
+#: apps/remix/app/components/dialogs/template-direct-link-dialog.tsx
+msgid "You have {0} direct template{1} remaining. <0>Upgrade your account</0> to avoid interruptions."
+msgstr ""
+
+#. placeholder {0}: remaining.documents
+#. placeholder {1}: quota.documents
+#: apps/remix/app/components/tables/templates-table.tsx
+msgid "You have {0} of {1} documents remaining this month. <0>Upgrade your account</0> to avoid interruptions."
+msgstr ""
 
 #. placeholder {0}: data.teamName
 #: apps/remix/app/routes/_unauthenticated+/team.invite.$token.tsx
@@ -10010,10 +10072,6 @@ msgid "You need to setup 2FA to mark this document as viewed."
 msgstr "Sie müssen 2FA einrichten, um dieses Dokument als angesehen zu markieren."
 
 #: apps/remix/app/components/forms/signup.tsx
-#~ msgid "You will get notified & be able to set up your hubsign public profile when we launch the feature."
-#~ msgstr "Sie werden benachrichtigt und können Ihr HubSign öffentliches Profil einrichten, wenn wir die Funktion starten."
-
-#: apps/remix/app/components/forms/signup.tsx
 msgid "You will get notified & be able to set up your HubSign public profile when we launch the feature."
 msgstr ""
 
@@ -10045,6 +10103,30 @@ msgstr ""
 msgid "You've blocked notifications for this site. Re-enable them in your browser settings and refresh."
 msgstr ""
 
+#: packages/lib/jobs/definitions/emails/send-subscription-purchase-confirmation-email.handler.ts
+msgid "Your {planName} plan is active"
+msgstr ""
+
+#: packages/email/templates/subscription-purchase-confirmation.tsx
+msgid "Your {planName} plan is active — thanks for subscribing to HubSign"
+msgstr ""
+
+#: packages/email/templates/subscription-renewal-reminder.tsx
+msgid "Your {planName} plan renews {renewalDateFormatted}"
+msgstr ""
+
+#: packages/lib/jobs/definitions/emails/send-subscription-renewal-reminder-email.handler.ts
+msgid "Your {planName} plan renews on {renewalDateFormatted}"
+msgstr ""
+
+#: packages/email/templates/subscription-purchase-confirmation.tsx
+msgid "Your <0>{planName}</0> plan is now active at <1>{priceFormatted}</1>."
+msgstr ""
+
+#: packages/email/templates/subscription-renewal-reminder.tsx
+msgid "Your <0>{planName}</0> plan will renew on <1>{renewalDateFormatted}</1> at <2>{priceFormatted}</2>."
+msgstr ""
+
 #: apps/remix/app/components/dialogs/account-delete-dialog.tsx
 msgid "Your account has been deleted successfully."
 msgstr "Ihr Konto wurde erfolgreich gelöscht."
@@ -10060,6 +10142,10 @@ msgstr "Ihr Avatar wurde erfolgreich aktualisiert."
 #: apps/remix/app/routes/_authenticated+/admin+/site-settings.tsx
 msgid "Your banner has been updated successfully."
 msgstr "Ihr Banner wurde erfolgreich aktualisiert."
+
+#: apps/remix/app/routes/_authenticated+/settings+/billing.tsx
+msgid "Your billing is managed by your organization. <0>View organization billing</0>"
+msgstr ""
 
 #: apps/remix/app/components/forms/team-branding-preferences-form.tsx
 msgid "Your brand website URL"
@@ -10137,16 +10223,8 @@ msgid "Your email has already been confirmed. You can now use all features of Hu
 msgstr ""
 
 #: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
-#~ msgid "Your email has already been confirmed. You can now use all features of HubSign."
-#~ msgstr "Ihre E-Mail wurde bereits bestätigt. Sie können jetzt alle Funktionen von HubSign nutzen."
-
-#: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
 msgid "Your email has been successfully confirmed! You can now use all features of Hub Sign."
 msgstr ""
-
-#: apps/remix/app/routes/_unauthenticated+/verify-email.$token.tsx
-#~ msgid "Your email has been successfully confirmed! You can now use all features of HubSign."
-#~ msgstr "Ihre E-Mail wurde erfolgreich bestätigt! Sie können jetzt alle Funktionen von HubSign nutzen."
 
 #. placeholder {0}: teamEmail.team.name
 #. placeholder {1}: teamEmail.team.url
@@ -10179,6 +10257,14 @@ msgstr "Dein Passwort wurde aktualisiert."
 #: apps/remix/app/components/general/teams/team-layout-billing-banner.tsx
 msgid "Your payment for teams is overdue. Please settle the payment to avoid any service disruptions."
 msgstr "Ihre Zahlung für Teams ist überfällig. Bitte begleichen Sie die Zahlung, um Unterbrechungen des Dienstes zu vermeiden."
+
+#: apps/remix/app/routes/_authenticated+/org+/billing.tsx
+msgid "Your Plan"
+msgstr ""
+
+#: packages/email/templates/subscription-purchase-confirmation.tsx
+msgid "Your plan will renew on {periodEndFormatted}."
+msgstr ""
 
 #: apps/remix/app/components/forms/profile.tsx
 msgid "Your profile has been updated successfully."
