@@ -43,7 +43,6 @@ import {
   UploadCloudIcon,
   UserIcon,
   UsersIcon,
-  Wallet2Icon,
   WebhookIcon,
   WorkflowIcon,
   XIcon,
@@ -238,7 +237,6 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
     { to: '/admin/stats', icon: BarChart3Icon, label: <Trans>Stats</Trans> },
     { to: '/admin/users', icon: UsersIcon, label: <Trans>Users</Trans> },
     { to: '/admin/documents', icon: FileStackIcon, label: <Trans>Documents</Trans> },
-    { to: '/admin/subscriptions', icon: Wallet2Icon, label: <Trans>Subscriptions</Trans> },
     { to: '/admin/leaderboard', icon: TrophyIcon, label: <Trans>Leaderboard</Trans> },
     { to: '/admin/site-settings', icon: SettingsIcon, label: <Trans>Site Settings</Trans>, match: '/admin/banner' },
   ];

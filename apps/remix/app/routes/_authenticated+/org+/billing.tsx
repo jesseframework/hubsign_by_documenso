@@ -12,7 +12,13 @@ import {
 } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 
-import { ORG_DMS_ADDON_PRICE_CENTS, ORG_SEAT_TIERS } from '@documenso/lib/constants/org-tiers';
+import {
+  ORG_DMS_ADDON_PRICE_CENTS,
+  ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT,
+  ORG_SEAT_TIERS,
+  getOrgYearlyPriceCents,
+} from '@documenso/lib/constants/org-tiers';
+import type { OrgBillingInterval } from '@documenso/lib/constants/org-tiers';
 import { trpc } from '@documenso/trpc/react';
 import {
   AlertDialog,
@@ -48,6 +54,8 @@ const TIER_CONFIG = Object.fromEntries(
     {
       name: config.name,
       price: config.priceCents / 100,
+      yearlyPrice: getOrgYearlyPriceCents(config.priceCents, config.yearlyDiscountPercent) / 100,
+      yearlyDiscountPercent: config.yearlyDiscountPercent,
       docs: config.documents ?? '∞',
       color: TIER_COLORS[tier as keyof typeof ORG_SEAT_TIERS],
       minSeats: config.minSeats,
@@ -55,10 +63,27 @@ const TIER_CONFIG = Object.fromEntries(
   ]),
 ) as Record<
   keyof typeof ORG_SEAT_TIERS,
-  { name: string; price: number; docs: number | string; color: string; minSeats: number }
+  {
+    name: string;
+    price: number;
+    yearlyPrice: number;
+    yearlyDiscountPercent: number;
+    docs: number | string;
+    color: string;
+    minSeats: number;
+  }
 >;
 
 const DMS_ADDON_PRICE = ORG_DMS_ADDON_PRICE_CENTS / 100;
+const DMS_ADDON_YEARLY_PRICE =
+  getOrgYearlyPriceCents(ORG_DMS_ADDON_PRICE_CENTS, ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT) / 100;
+
+const seatPriceFor = (tier: string, interval: string) => {
+  const config = TIER_CONFIG[tier as keyof typeof TIER_CONFIG];
+  return interval === 'year' ? config?.yearlyPrice ?? 0 : config?.price ?? 0;
+};
+
+const dmsPriceFor = (interval: string) => (interval === 'year' ? DMS_ADDON_YEARLY_PRICE : DMS_ADDON_PRICE);
 
 export default function OrgBillingPage() {
   const { _ } = useLingui();
@@ -86,21 +111,32 @@ export default function OrgBillingPage() {
 
   const [buyTier, setBuyTier] = useState<string>('BUSINESS');
   const [buyQty, setBuyQty] = useState(ORG_SEAT_TIERS.BUSINESS.minSeats);
+  const [buyInterval, setBuyInterval] = useState<OrgBillingInterval>('month');
   const [buyDms, setBuyDms] = useState(false);
   const [showBuy, setShowBuy] = useState(false);
   const [embeddedClientSecret, setEmbeddedClientSecret] = useState<string | null>(null);
 
   // Once the org has a seat plan, purchases are top-ups — no picking a tier
-  // (only one is possible) and no minimum (the tier minimum only applies to
-  // establishing it in the first place).
+  // or interval (only one of each is possible per org) and no minimum (the
+  // tier minimum only applies to establishing it in the first place).
   const isTopUp = Boolean(seatPlans && seatPlans.length > 0);
 
-  // An org can only be on one seat tier at a time — once one exists, lock
-  // `buyTier` to match it and default quantity to a single top-up seat
-  // instead of the first-purchase minimum.
+  // Once DMS is part of the org's plan, top-ups can't opt out of it (the
+  // server keeps it on regardless — see `dmsNowEnabled` in `purchaseSeats`),
+  // so the checkbox is locked on rather than defaulting to unchecked and
+  // showing a price that doesn't match what's actually charged.
+  const dmsLockedOn = isTopUp && Boolean(seatPlans?.[0]?.dmsEnabled);
+
+  // An org can only be on one seat tier — and one billing interval — at a
+  // time (a single Stripe subscription can't mix monthly/yearly items).
+  // Once either exists, lock `buyTier`/`buyInterval` to match and default
+  // quantity to a single top-up seat instead of the first-purchase minimum.
   useEffect(() => {
     if (seatPlans && seatPlans.length > 0) {
       setBuyTier(seatPlans[0].tier);
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      setBuyInterval((seatPlans[0].billingInterval as OrgBillingInterval | undefined) ?? 'month');
+      setBuyDms(seatPlans[0].dmsEnabled);
       setBuyQty(1);
     }
   }, [seatPlans]);
@@ -185,6 +221,7 @@ export default function OrgBillingPage() {
     void purchaseSeats.mutateAsync({
       tier: buyTier as 'BUSINESS' | 'ENTERPRISE',
       quantity: finalQty,
+      interval: buyInterval,
       dmsEnabled,
     });
   };
@@ -232,13 +269,15 @@ export default function OrgBillingPage() {
     (m) => m.id !== membership.id && (m.role === 'ORG_ADMIN' || m.role === 'DMS_ADMIN'),
   );
 
-  // Calculate totals
+  // Calculate totals — an org is on exactly one tier/interval at a time, so
+  // every `seatPlans` row shares the same `billingInterval` in practice.
   const totalSeats = seatPlans?.reduce((sum, p) => sum + p.quantity, 0) ?? 0;
   const assignedSeats = seatPlans?.reduce((sum, p) => sum + p.assigned, 0) ?? 0;
-  const monthlyTotal =
+  const orgInterval = seatPlans?.[0]?.billingInterval ?? 'month';
+  const billedTotal =
     seatPlans?.reduce((sum, p) => {
-      const seatPrice = TIER_CONFIG[p.tier as keyof typeof TIER_CONFIG]?.price ?? 0;
-      const dmsPrice = p.dmsEnabled && p.tier !== 'ENTERPRISE' ? DMS_ADDON_PRICE : 0;
+      const seatPrice = seatPriceFor(p.tier, p.billingInterval);
+      const dmsPrice = p.dmsEnabled && p.tier !== 'ENTERPRISE' ? dmsPriceFor(p.billingInterval) : 0;
       return sum + (seatPrice + dmsPrice) * p.quantity;
     }, 0) ?? 0;
 
@@ -263,9 +302,11 @@ export default function OrgBillingPage() {
               {TIER_CONFIG[membership.seatTier as keyof typeof TIER_CONFIG]?.name}
             </span>{' '}
             — $
-            {(TIER_CONFIG[membership.seatTier as keyof typeof TIER_CONFIG]?.price ?? 0) +
-              (membership.dmsAddon && membership.seatTier !== 'ENTERPRISE' ? DMS_ADDON_PRICE : 0)}
-            /mo
+            {seatPriceFor(membership.seatTier, orgInterval) +
+              (membership.dmsAddon && membership.seatTier !== 'ENTERPRISE'
+                ? dmsPriceFor(orgInterval)
+                : 0)}
+            /{orgInterval === 'year' ? 'yr' : 'mo'}
             {membership.dmsAddon && ' · DMS included'}
           </p>
         ) : (
@@ -290,8 +331,10 @@ export default function OrgBillingPage() {
           <p className="mt-1 text-2xl font-semibold text-green-600">{totalSeats - assignedSeats}</p>
         </div>
         <div className="rounded-[var(--r)] border border-border bg-card p-3">
-          <span className="text-[10px] font-semibold uppercase text-muted-foreground">Monthly</span>
-          <p className="mt-1 text-2xl font-semibold">${monthlyTotal}</p>
+          <span className="text-[10px] font-semibold uppercase text-muted-foreground">
+            {orgInterval === 'year' ? 'Yearly' : 'Monthly'}
+          </span>
+          <p className="mt-1 text-2xl font-semibold">${billedTotal}</p>
         </div>
       </div>
 
@@ -339,7 +382,9 @@ export default function OrgBillingPage() {
                   // exist, the tier is fixed; this purchase just adds more.
                   <div className="mt-1 flex h-8 items-center rounded-md border border-border bg-muted px-2 text-[13px]">
                     {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.name} — $
-                    {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.price}/seat/mo
+                    {seatPriceFor(buyTier, buyInterval) +
+                      (buyDms && buyTier !== 'ENTERPRISE' ? dmsPriceFor(buyInterval) : 0)}
+                    /seat/{buyInterval === 'year' ? 'yr' : 'mo'}
                   </div>
                 ) : (
                   <select
@@ -367,6 +412,37 @@ export default function OrgBillingPage() {
                 )}
               </div>
               <div>
+                <label className="text-[12px] font-medium text-muted-foreground">Billing</label>
+                {isTopUp ? (
+                  // Interval is locked with the tier — a single Stripe
+                  // subscription can't mix monthly/yearly items.
+                  <div className="mt-1 flex h-8 items-center rounded-md border border-border bg-muted px-2 text-[13px]">
+                    {buyInterval === 'year' ? 'Yearly' : 'Monthly'}
+                  </div>
+                ) : (
+                  <div className="mt-1 flex h-8 overflow-hidden rounded-md border border-border text-[13px]">
+                    <button
+                      type="button"
+                      className={`px-2.5 ${
+                        buyInterval === 'month' ? 'bg-primary text-primary-foreground' : 'bg-background'
+                      }`}
+                      onClick={() => setBuyInterval('month')}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      type="button"
+                      className={`border-l border-border px-2.5 ${
+                        buyInterval === 'year' ? 'bg-primary text-primary-foreground' : 'bg-background'
+                      }`}
+                      onClick={() => setBuyInterval('year')}
+                    >
+                      Yearly · Save {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.yearlyDiscountPercent}%
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div>
                 <label className="text-[12px] font-medium text-muted-foreground">
                   {isTopUp
                     ? 'Additional seats'
@@ -382,24 +458,32 @@ export default function OrgBillingPage() {
                 />
               </div>
               {buyTier !== 'ENTERPRISE' && (
-                <label className="flex items-center gap-1.5 text-[12px]">
+                <label
+                  className="flex items-center gap-1.5 text-[12px]"
+                  title={
+                    dmsLockedOn
+                      ? "Your plan includes DMS — it can't be removed when buying additional seats."
+                      : undefined
+                  }
+                >
                   <input
                     type="checkbox"
                     checked={buyDms}
+                    disabled={dmsLockedOn}
                     onChange={(e) => setBuyDms(e.target.checked)}
                     className="rounded"
                   />
                   <span className="font-medium text-muted-foreground">
-                    + DMS Add-On (${DMS_ADDON_PRICE}/seat/mo)
+                    + DMS Add-On (${dmsPriceFor(buyInterval)}/seat/{buyInterval === 'year' ? 'yr' : 'mo'})
                   </span>
                 </label>
               )}
               <div className="text-[13px] font-medium text-muted-foreground">
                 = $
                 {buyQty *
-                  ((TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.price ?? 0) +
-                    (buyDms && buyTier !== 'ENTERPRISE' ? DMS_ADDON_PRICE : 0))}
-                /month
+                  (seatPriceFor(buyTier, buyInterval) +
+                    (buyDms && buyTier !== 'ENTERPRISE' ? dmsPriceFor(buyInterval) : 0))}
+                /{buyInterval === 'year' ? 'year' : 'month'}
               </div>
               <Button
                 size="sm"
@@ -421,6 +505,12 @@ export default function OrgBillingPage() {
           <div className="divide-y divide-border">
             {seatPlans.map((plan) => {
               const config = TIER_CONFIG[plan.tier as keyof typeof TIER_CONFIG];
+              // All-in per-seat rate (base + DMS if included) — shown
+              // consistently everywhere a per-seat price appears, so it
+              // never contradicts the all-in total or the "Your Plan" card.
+              const allInSeatPrice =
+                seatPriceFor(plan.tier, plan.billingInterval) +
+                (plan.dmsEnabled && plan.tier !== 'ENTERPRISE' ? dmsPriceFor(plan.billingInterval) : 0);
               return (
                 <div key={plan.id} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -428,8 +518,10 @@ export default function OrgBillingPage() {
                       {config?.name || plan.tier}
                     </div>
                     <span className="text-[12px] text-muted-foreground">
-                      ${config?.price}/seat/mo · {config?.docs} docs/mo
+                      ${allInSeatPrice}/seat/
+                      {plan.billingInterval === 'year' ? 'yr' : 'mo'} · {config?.docs} docs/mo
                       {plan.dmsEnabled && ' · DMS included'}
+                      {plan.billingInterval === 'year' && ' · Yearly'}
                     </span>
                   </div>
                   <div className="flex items-center gap-4">
@@ -441,10 +533,12 @@ export default function OrgBillingPage() {
                     </div>
                     <span className="text-[13px] font-semibold">
                       $
-                      {((config?.price ?? 0) +
-                        (plan.dmsEnabled && plan.tier !== 'ENTERPRISE' ? DMS_ADDON_PRICE : 0)) *
+                      {(seatPriceFor(plan.tier, plan.billingInterval) +
+                        (plan.dmsEnabled && plan.tier !== 'ENTERPRISE'
+                          ? dmsPriceFor(plan.billingInterval)
+                          : 0)) *
                         plan.quantity}
-                      /mo
+                      /{plan.billingInterval === 'year' ? 'yr' : 'mo'}
                     </span>
                   </div>
                 </div>
@@ -567,6 +661,7 @@ export default function OrgBillingPage() {
                   void purchaseSeats.mutateAsync({
                     tier: buyTier as 'BUSINESS' | 'ENTERPRISE',
                     quantity: pendingConflict.quantity,
+                    interval: buyInterval,
                     dmsEnabled: pendingConflict.dmsEnabled,
                     acknowledgeCancelPersonalPlan: true,
                   });

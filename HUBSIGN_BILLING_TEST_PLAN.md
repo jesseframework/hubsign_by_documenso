@@ -1,12 +1,14 @@
-# Billing Roadmap — Manual UI Test Plan (Phases 0–9)
+# Billing Roadmap — Manual UI Test Plan (Phases 0–11)
 
 Covers everything built so far: org webhook activation + embedded checkout (0), tier/limit
 consolidation + recipient enforcement (1), billing emails (2), approaching-limit warnings (3),
 individual plan restructure (4), org seat tier consolidation (5), DMS add-on feature list (6),
-consolidated billing home (7), self-service seat change guardrails (8), and non-optimistic
-purchases with real top-up support (9) — three follow-up rounds fixing bugs found while testing
-the earlier phases (Phase 5 has been rewritten twice — the org seat dropdown/checkbox UI it
-originally described no longer exists).
+consolidated billing home (7), self-service seat change guardrails (8), non-optimistic
+purchases with real top-up support (9), yearly billing + org DMS top-up fixes (10), and the
+Basic/Pro-only pricing update + admin subscriptions page removal (11) — several follow-up rounds
+fixing bugs found while testing the earlier phases (Phase 4 and Phase 5 have each been rewritten
+since they were first written — Phase 4's original 3-tier pricing no longer applies, and the org
+seat dropdown/checkbox UI Phase 5 originally described no longer exists).
 
 All Stripe changes were made in **test mode** — `.env`'s `NEXT_PRIVATE_STRIPE_API_KEY` is
 currently `sk_test_...`. Don't switch it to a live key while running this plan.
@@ -21,9 +23,10 @@ currently `sk_test_...`. Don't switch it to a live key while running this plan.
    ```
    Runs on `http://localhost:3000`.
 
-2. **Start the Stripe webhook forwarder** in a second terminal (needed for Phases 0, 2, 4, 5, 9 —
-   anything that goes through a real checkout, including the admin auto-assign purchase flow in
-   Phase 5c and first-time org purchases in Phase 9d):
+2. **Start the Stripe webhook forwarder** in a second terminal (needed for Phases 0, 2, 4, 5, 9,
+   10, 11 — anything that goes through a real checkout, including the admin auto-assign purchase
+   flow in Phase 5c, first-time org purchases in Phase 9d, yearly org purchases in Phase 10a, and
+   individual plan subscriptions in Phase 4/11):
    ```
    stripe listen --api-key sk_test_<your key> --forward-to http://localhost:3000/api/stripe/webhook
    ```
@@ -158,22 +161,24 @@ the free plan no matter how many you create. To verify this alert specifically:
 
 ## Phase 4 — Individual plan restructure
 
+**Updated 2026-07-08:** the "Dedicated Instance" tier was scratched and Pro's price changed —
+this section now reflects the current Basic/Pro-only lineup, not the original 3-tier proposal.
+
 1. [ ] Go to `/settings/billing` on an account with no active subscription.
-2. [ ] Confirm exactly **three** plan cards show: **Basic** ($35/mo), **Pro** ($45/mo),
-       **Dedicated Instance** ($100/mo) — not the old Pro/Business/Enterprise names or prices.
+2. [ ] Confirm exactly **two** plan cards show: **Basic** ($35/mo) and **Pro** ($50/mo) — no
+       "Dedicated Instance" card.
 3. [ ] Confirm each card's feature list matches:
        - Basic: 50 documents/month, up to 50 recipients/document, 5 direct signing links, email
          support.
        - Pro: 100 documents/month, up to 500 recipients/document, 20 direct signing links,
          priority email support.
-       - Dedicated Instance: unlimited documents/recipients/direct links, DMS included,
-         dedicated-tier priority support.
-4. [ ] Toggle the interval tabs (Monthly/Yearly) — yearly should show $336/$432/$960
-       respectively (20% off monthly).
+4. [ ] Toggle the interval tabs (Monthly/Yearly) — yearly should show **$420** (Basic) and
+       **$600** (Pro) — exactly 12× the monthly price, **no discount** (this was a deliberate
+       change; yearly used to be 20% off).
 5. [ ] Subscribe to **Basic** with the test card — confirm the embedded checkout flow works and
        you land back on the billing page showing you're subscribed to "Basic".
 6. [ ] From an already-subscribed state, open the plan switcher and confirm you can switch
-       between Basic/Pro/Dedicated Instance.
+       between Basic and Pro.
 
 ---
 
@@ -367,6 +372,75 @@ wrote to the local seat count **before payment was ever confirmed**.
 3. [ ] Optional: open Purchase Seats, click Purchase, and instead of paying, close/abandon the
        embedded checkout — confirm the Seat Plans table still shows nothing purchased (no
        phantom seats from the abandoned attempt).
+
+---
+
+## Phase 10 — Yearly billing + org DMS top-up fixes
+
+Testing the DMS top-up flow surfaced a chain of bugs (a Stripe param error, a stale metadata
+flag causing DMS to silently not sync, a duplicate Stripe item, and top-ups never actually
+invoicing immediately) — fixing those became the natural point to also add **yearly billing**
+for org seats, since it touched the same code paths.
+
+**10a. Yearly billing — first purchase**
+1. [ ] On a fresh org, open **Purchase Seats** — confirm a **Billing** toggle appears next to
+       **Plan Tier** with **Monthly**/**Yearly** options (Monthly selected by default).
+2. [ ] Switch to **Yearly** — confirm the per-seat price and the live `= $X/year` preview update
+       to the yearly rate (Business: check `packages/lib/constants/org-tiers.ts` for the current
+       discount %; it's applied to `priceCents * 12`).
+3. [ ] Complete a yearly purchase — confirm the embedded checkout shows the yearly amount, and
+       after completing, the **Seat Plans** table shows the tier priced `/yr` with a "Yearly"
+       badge.
+
+**10b. Interval is locked after first purchase, same as tier**
+1. [ ] With seats already purchased (either interval), open **Purchase Seats** again — confirm
+       **Billing** is now a fixed, read-only display (Monthly or Yearly, whichever you bought),
+       not a toggle — a subscription can't mix monthly and yearly items.
+2. [ ] Top up seats — confirm it charges at the same interval as the original purchase, no option
+       to switch.
+
+**10c. DMS top-up: no duplicate items, correct checkbox, correct price everywhere**
+1. [ ] On an org that does **not** yet have DMS, top up seats with **+ DMS Add-On** checked —
+       confirm it completes without error (this used to fail with a Stripe `price_data` param
+       error), and the Stripe Dashboard test mode shows exactly **one** new DMS line item on the
+       existing subscription (not a second, duplicate DMS product).
+2. [ ] Reopen **Purchase Seats** on that same org — confirm the **+ DMS Add-On** checkbox is now
+       **checked and disabled**, with a tooltip on hover ("Your plan includes DMS — it can't be
+       removed when buying additional seats.") — it no longer defaults unchecked and undercounts
+       the price.
+3. [ ] Confirm the displayed price is **consistent everywhere**: the **Your Plan** card, the
+       **Seat Plans** row's per-seat rate, and the purchase form's fixed tier box should all show
+       the same all-in per-seat price (base + DMS), not a lower base-only number in one place and
+       the correct total in another.
+4. [ ] Top up seats again (no DMS change) — confirm it's charged **immediately** (no waiting for
+       next billing cycle) — check Stripe Dashboard test mode for a paid invoice matching the
+       prorated amount right after the purchase, not just a pending/draft line item.
+
+**10d. `dmsAddon` stays in sync for already-seated members**
+1. [ ] Find (or create) an org where a member was assigned a seat **before** DMS was enabled on
+       the plan. After enabling DMS via a top-up, confirm that member's **Your Plan** card (and
+       their badge in **Member Seat Assignment**) now shows "DMS included" / "+ DMS" — previously
+       this only ever updated for whoever triggered the purchase, leaving everyone else stale.
+
+**10e. Purchase confirmation email fires on top-ups too**
+1. [ ] Complete a seat top-up (with real email delivery per the one-time setup note above) —
+       confirm you receive the "Your [Plan] plan is active" email showing the **updated** seat
+       count and price — previously this email only fired on the very first purchase, never on
+       top-ups.
+2. [ ] Confirm giving/removing a seat via **Member Seat Assignment** does **not** send this email
+       — only an actual purchase (which changes what's billed) should trigger it.
+
+---
+
+## Phase 11 — Admin subscriptions page removed
+
+Basic/Pro pricing is now covered by the updated **Phase 4** above — this phase is just the admin
+page removal.
+
+1. [ ] As an admin, open the sidebar — confirm there is **no** "Subscriptions" link under the
+       Admin section (Stats/Users/Documents/Leaderboard/Site Settings should still all be there).
+2. [ ] Navigate directly to `/admin/subscriptions` — confirm it 404s rather than showing the old
+       read-only subscriptions table.
 
 ---
 

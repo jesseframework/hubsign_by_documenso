@@ -5,15 +5,23 @@ import { SubscriptionStatus } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { getOrCreateOrgPrice } from '@documenso/ee/server-only/stripe/get-or-create-org-price';
 import { onOrgSubscriptionUpdated } from '@documenso/ee/server-only/stripe/webhook/on-org-subscription-updated';
 import { onSubscriptionDeleted } from '@documenso/ee/server-only/stripe/webhook/on-subscription-deleted';
+import {
+  getSubscriptionPeriodEndISO,
+  resolveOrgPlanNameAndPrice,
+} from '@documenso/ee/server-only/stripe/webhook/resolve-org-plan-price';
 import { IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 import { getI18nInstance } from '@documenso/lib/client-only/providers/i18n-server';
 import {
   ORG_DMS_ADDON_PRICE_CENTS,
+  ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT,
   ORG_SEAT_TIERS,
   ORG_UNLIMITED_SENTINEL,
+  getOrgYearlyPriceCents,
 } from '@documenso/lib/constants/org-tiers';
+import type { OrgBillingInterval } from '@documenso/lib/constants/org-tiers';
 import { env } from '@documenso/lib/utils/env';
 import { renderEmailWithI18N } from '@documenso/lib/utils/render-email-with-i18n';
 import crypto from 'crypto';
@@ -22,6 +30,7 @@ import { mailer } from '@documenso/email/mailer';
 import { OrgMemberInviteEmailTemplate } from '@documenso/email/templates/org-member-invite';
 import { OrgMemberWelcomeEmailTemplate } from '@documenso/email/templates/org-member-welcome';
 import { ONE_DAY } from '@documenso/lib/constants/time';
+import { jobs } from '@documenso/lib/jobs/client';
 import { stripe } from '@documenso/lib/server-only/stripe';
 import { prisma } from '@documenso/prisma';
 
@@ -616,6 +625,7 @@ export const orgRouter = router({
     .input(z.object({
       tier: z.enum(['BUSINESS', 'ENTERPRISE']),
       quantity: z.number().min(1).max(100),
+      interval: z.enum(['month', 'year']).default('month'),
       dmsEnabled: z.boolean().optional(),
       acknowledgeCancelPersonalPlan: z.boolean().optional(),
     }))
@@ -662,11 +672,30 @@ export const orgRouter = router({
         recipientsPerMonth: tierLimits.recipients ?? ORG_UNLIMITED_SENTINEL,
         directTemplates: tierLimits.directTemplates ?? ORG_UNLIMITED_SENTINEL,
         dmsEnabled: tierLimits.dmsEnabled,
-        price: tierLimits.priceCents,
         minSeats: tierLimits.minSeats,
       };
 
       const dmsEnabled = input.dmsEnabled ?? config.dmsEnabled;
+
+      // Interval is chosen once, at first purchase, and locked thereafter —
+      // a single Stripe subscription can't mix monthly and yearly items, so
+      // top-ups must reuse the org's existing interval regardless of what
+      // the client sends (the UI locks this field once seats exist, but
+      // don't trust a stale client over the org's actual committed interval).
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      const interval: OrgBillingInterval = isTopUp
+        ? ((existingSeatPlan?.billingInterval as OrgBillingInterval | undefined) ?? 'month')
+        : input.interval;
+
+      const seatUnitAmountCents =
+        interval === 'year'
+          ? getOrgYearlyPriceCents(tierLimits.priceCents, tierLimits.yearlyDiscountPercent)
+          : tierLimits.priceCents;
+
+      const dmsUnitAmountCents =
+        interval === 'year'
+          ? getOrgYearlyPriceCents(ORG_DMS_ADDON_PRICE_CENTS, ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT)
+          : ORG_DMS_ADDON_PRICE_CENTS;
 
       // The tier minimum only applies to establishing the tier in the first
       // place — once the org already meets it, buying 1-2 more is fine.
@@ -716,6 +745,7 @@ export const orgRouter = router({
                 recipientsPerMonth: config.recipientsPerMonth,
                 directTemplates: config.directTemplates,
                 dmsEnabled,
+                billingInterval: interval,
               },
             });
 
@@ -735,6 +765,8 @@ export const orgRouter = router({
 
         return seatPlan;
       }
+
+      const baseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
 
       if (isTopUp) {
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
@@ -778,20 +810,18 @@ export const orgRouter = router({
           } else {
             // Unlike Checkout Session line items, `subscriptions.update`
             // doesn't accept an inline `price_data.product_data` — it needs
-            // a real product/price to reference, so create those first.
-            const dmsProduct = await stripe.products.create({
-              name: 'Document Manager (DMS) Add-On',
-              metadata: { type: 'org_dms', tier: input.tier },
+            // a real product/price to reference, hence the get-or-create
+            // lookup (also reused by the first-purchase branch below, so DMS
+            // Prices are never spawned by more than one code path).
+            const dmsPriceId = await getOrCreateOrgPrice({
+              type: 'org_dms',
+              tier: input.tier,
+              interval,
+              unitAmountCents: dmsUnitAmountCents,
+              productName: 'Document Manager (DMS) Add-On',
             });
 
-            const dmsPrice = await stripe.prices.create({
-              currency: 'usd',
-              unit_amount: ORG_DMS_ADDON_PRICE_CENTS,
-              recurring: { interval: 'month' },
-              product: dmsProduct.id,
-            });
-
-            items.push({ price: dmsPrice.id, quantity: newQuantity });
+            items.push({ price: dmsPriceId, quantity: newQuantity });
           }
         }
 
@@ -809,6 +839,7 @@ export const orgRouter = router({
             ...liveSubscription.metadata,
             purchasingMemberId: membership.id,
             dmsEnabled: dmsNowEnabled.toString(),
+            interval,
           },
         });
 
@@ -822,53 +853,60 @@ export const orgRouter = router({
           subscription: updatedSubscription,
         });
 
+        // Only the purchase itself (this call) triggers a confirmation email
+        // — not `assignSeat`/`unassignSeat`, which don't change what's billed,
+        // and not the async webhook replay of this same update (it only syncs
+        // state, see `handler.ts`'s `customer.subscription.updated` branch).
+        const { planName, priceFormatted } = resolveOrgPlanNameAndPrice(updatedSubscription);
+
+        await jobs.triggerJob({
+          name: 'send.subscription.purchase-confirmation.email',
+          payload: {
+            email: ctx.user.email,
+            name: ctx.user.name || undefined,
+            planName,
+            priceFormatted,
+            periodEnd: getSubscriptionPeriodEndISO(updatedSubscription),
+            billingUrl: `${baseUrl}/org/billing`,
+          },
+        });
+
         return { success: true };
       }
 
       // First purchase — create a Stripe checkout session. `OrgSeatPlan` and
       // seat assignment are intentionally NOT written here — they're only
       // ever written from confirmed Stripe state once the webhook fires
-      // (`onOrgSubscriptionUpdated`), not optimistically before payment.
+      // (`onOrgSubscriptionUpdated`), including the purchase-confirmation
+      // email (`handler.ts`'s `checkout.session.completed` branch).
       const customerId = await getOrCreateStripeCustomer(org, ctx.user.email);
-      const baseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
 
-      const lineItems: Array<{
-        price_data: {
-          currency: string;
-          product_data: { name: string; metadata: Record<string, string> };
-          unit_amount: number;
-          recurring: { interval: 'month' };
-        };
-        quantity: number;
-      }> = [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `HubSign ${input.tier.charAt(0) + input.tier.slice(1).toLowerCase()} Seat`,
-              metadata: { type: 'org_seat', tier: input.tier },
-            },
-            unit_amount: config.price,
-            recurring: { interval: 'month' },
-          },
-          quantity: input.quantity,
-        },
+      // Resolved via `getOrCreateOrgPrice` (same as the top-up branch) rather
+      // than inline `price_data` — a real, reusable Price per (tier, interval)
+      // instead of a brand-new ephemeral one on every first purchase.
+      const seatPriceId = await getOrCreateOrgPrice({
+        type: 'org_seat',
+        tier: input.tier,
+        interval,
+        unitAmountCents: seatUnitAmountCents,
+        productName: `HubSign ${input.tier.charAt(0) + input.tier.slice(1).toLowerCase()} Seat`,
+      });
+
+      const lineItems: Array<{ price: string; quantity: number }> = [
+        { price: seatPriceId, quantity: input.quantity },
       ];
 
       // Add DMS add-on line item if enabled
       if (dmsEnabled && input.tier !== 'ENTERPRISE') {
-        lineItems.push({
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: 'Document Manager (DMS) Add-On',
-              metadata: { type: 'org_dms', tier: input.tier },
-            },
-            unit_amount: ORG_DMS_ADDON_PRICE_CENTS,
-            recurring: { interval: 'month' },
-          },
-          quantity: input.quantity,
+        const dmsPriceId = await getOrCreateOrgPrice({
+          type: 'org_dms',
+          tier: input.tier,
+          interval,
+          unitAmountCents: dmsUnitAmountCents,
+          productName: 'Document Manager (DMS) Add-On',
         });
+
+        lineItems.push({ price: dmsPriceId, quantity: input.quantity });
       }
 
       const sessionParams = {
@@ -882,6 +920,7 @@ export const orgRouter = router({
             tier: input.tier,
             quantity: input.quantity.toString(),
             dmsEnabled: dmsEnabled.toString(),
+            interval,
             purchasingMemberId: membership.id,
           },
         },

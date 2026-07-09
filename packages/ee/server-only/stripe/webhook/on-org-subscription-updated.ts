@@ -70,6 +70,9 @@ export const onOrgSubscriptionUpdated = async ({
       directTemplates: tierLimits.directTemplates ?? ORG_UNLIMITED_SENTINEL,
       dmsEnabled,
       quantity: seatItem.quantity ?? 0,
+      // Falls back to "month" for pre-yearly-billing subscriptions whose
+      // metadata predates this field.
+      billingInterval: subscription.metadata?.interval === 'year' ? 'year' : 'month',
     };
 
     const existingSeatPlan = await prisma.orgSeatPlan.findFirst({
@@ -84,6 +87,16 @@ export const onOrgSubscriptionUpdated = async ({
       : await prisma.orgSeatPlan.create({
           data: { ...seatPlanData, tier, organizationId },
         });
+
+    // `dmsAddon` is set on each member at the moment they're assigned a
+    // seat — if DMS gets enabled (or disabled) on the org's plan *after*
+    // that, already-seated members never see it reflected without this:
+    // keep every member currently on this tier in sync with its current
+    // `dmsEnabled` state, not just whoever triggered this particular sync.
+    await prisma.organizationMember.updateMany({
+      where: { organizationId, seatTier: tier },
+      data: { dmsAddon: tier === 'ENTERPRISE' ? true : dmsEnabled },
+    });
 
     // Only present on the first-purchase (checkout) path — a top-up already
     // self-assigns synchronously in `purchaseSeats` since it doesn't need to

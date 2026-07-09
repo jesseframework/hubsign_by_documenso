@@ -1633,6 +1633,10 @@ model OrgSeatPlan {
   // How many are currently assigned
   assigned Int @default(0)
 
+  // "month" | "year" — chosen once at first purchase, locked thereafter
+  // (a single Stripe subscription can't mix billing intervals).
+  billingInterval String @default("month")
+
   // Stripe
   stripePriceId String?
 

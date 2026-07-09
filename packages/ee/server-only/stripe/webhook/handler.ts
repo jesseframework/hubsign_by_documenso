@@ -2,7 +2,6 @@ import { match } from 'ts-pattern';
 
 import { IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 import { STRIPE_PLAN_TYPE } from '@documenso/lib/constants/billing';
-import { ORG_DMS_ADDON_PRICE_CENTS, ORG_SEAT_TIERS } from '@documenso/lib/constants/org-tiers';
 import { jobs } from '@documenso/lib/jobs/client';
 import type { Stripe } from '@documenso/lib/server-only/stripe';
 import { stripe } from '@documenso/lib/server-only/stripe';
@@ -14,22 +13,7 @@ import { onOrgSubscriptionDeleted } from './on-org-subscription-deleted';
 import { onOrgSubscriptionUpdated } from './on-org-subscription-updated';
 import { onSubscriptionDeleted } from './on-subscription-deleted';
 import { onSubscriptionUpdated } from './on-subscription-updated';
-
-/**
- * Newer Stripe API versions move `current_period_end` from the subscription
- * onto its items — mirrors the same fallback used by `onSubscriptionUpdated`
- * and `onOrgSubscriptionUpdated`.
- */
-const getSubscriptionPeriodEndISO = (subscription: Stripe.Subscription): string | undefined => {
-  const item = subscription.items.data[0];
-
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  const itemPeriodEnd = (item as unknown as { current_period_end?: number })?.current_period_end;
-
-  const periodEndSeconds = itemPeriodEnd ?? subscription.current_period_end;
-
-  return periodEndSeconds ? new Date(periodEndSeconds * 1000).toISOString() : undefined;
-};
+import { getSubscriptionPeriodEndISO, resolveOrgPlanNameAndPrice } from './resolve-org-plan-price';
 
 /** Individual/team prices are fully Stripe-metadata-driven, so the plan name comes from the product. */
 const resolvePlanNameAndPrice = (subscription: Stripe.Subscription) => {
@@ -40,28 +24,6 @@ const resolvePlanNameAndPrice = (subscription: Stripe.Subscription) => {
 
   const unitAmount = item.price.unit_amount ?? 0;
   const priceFormatted = `$${((unitAmount * (item.quantity ?? 1)) / 100).toFixed(2)}/month`;
-
-  return { planName, priceFormatted };
-};
-
-/** Org seat prices are dynamically created at checkout time, so use the canonical tier table instead. */
-const resolveOrgPlanNameAndPrice = (subscription: Stripe.Subscription) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  const tier = subscription.metadata?.tier as keyof typeof ORG_SEAT_TIERS | undefined;
-  const quantity = Number(subscription.metadata?.quantity ?? 1);
-  const dmsEnabled = subscription.metadata?.dmsEnabled === 'true';
-
-  const tierConfig = tier ? ORG_SEAT_TIERS[tier] : undefined;
-
-  const planName = tierConfig
-    ? `${tierConfig.name} (${quantity} seat${quantity > 1 ? 's' : ''})`
-    : 'Organization Plan';
-
-  const totalCents = tierConfig
-    ? tierConfig.priceCents * quantity + (dmsEnabled ? ORG_DMS_ADDON_PRICE_CENTS * quantity : 0)
-    : 0;
-
-  const priceFormatted = `$${(totalCents / 100).toFixed(2)}/month`;
 
   return { planName, priceFormatted };
 };
