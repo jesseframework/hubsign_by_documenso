@@ -4548,6 +4548,7 @@ msgstr "Dołącz certyfikat podpisu do dokumentu"
 msgid "Includes the Final Audit Report page"
 msgstr ""
 
+#: apps/remix/app/components/general/subscription-addons.tsx
 #: apps/remix/app/components/general/plan-switcher.tsx
 #: apps/remix/app/components/general/plan-switcher.tsx
 msgid "Includes:"
