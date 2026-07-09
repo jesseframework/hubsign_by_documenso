@@ -7,12 +7,15 @@ import {
   ArchiveIcon,
   CheckCircleIcon,
   CreditCardIcon,
+  InfoIcon,
   PlusIcon,
   UsersIcon,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 
 import {
+  ORG_DMS_ADDON_DESCRIPTION,
+  ORG_DMS_ADDON_FEATURES,
   ORG_DMS_ADDON_PRICE_CENTS,
   ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT,
   ORG_SEAT_TIERS,
@@ -31,6 +34,7 @@ import {
   AlertDialogTitle,
 } from '@documenso/ui/primitives/alert-dialog';
 import { Button } from '@documenso/ui/primitives/button';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@documenso/ui/primitives/hover-card';
 import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
@@ -82,6 +86,30 @@ const seatPriceFor = (tier: string, interval: string) => {
   const config = TIER_CONFIG[tier as keyof typeof TIER_CONFIG];
   return interval === 'year' ? config?.yearlyPrice ?? 0 : config?.price ?? 0;
 };
+
+// Static marketing copy (not per-render state), so this lives outside the
+// page component — shown wherever DMS is offered or already included, since
+// a bare `title=` tooltip can't render a bulleted feature list.
+const DmsFeaturesHoverCard = () => (
+  <HoverCard openDelay={120} closeDelay={120}>
+    <HoverCardTrigger asChild>
+      <button type="button" className="inline-flex items-center" aria-label="What's included with DMS">
+        <InfoIcon className="h-3.5 w-3.5 text-muted-foreground" />
+      </button>
+    </HoverCardTrigger>
+    <HoverCardContent align="start" className="w-72 p-3 text-[12px]">
+      <p className="mb-2 text-muted-foreground">{ORG_DMS_ADDON_DESCRIPTION}</p>
+      <p className="mb-1 font-semibold">Includes:</p>
+      <ul className="divide-y">
+        {ORG_DMS_ADDON_FEATURES.map((feature) => (
+          <li key={feature} className="py-1.5 text-muted-foreground">
+            {feature}
+          </li>
+        ))}
+      </ul>
+    </HoverCardContent>
+  </HoverCard>
+);
 
 const dmsPriceFor = (interval: string) => (interval === 'year' ? DMS_ADDON_YEARLY_PRICE : DMS_ADDON_PRICE);
 
@@ -307,7 +335,12 @@ export default function OrgBillingPage() {
                 ? dmsPriceFor(orgInterval)
                 : 0)}
             /{orgInterval === 'year' ? 'yr' : 'mo'}
-            {membership.dmsAddon && ' · DMS included'}
+            {membership.dmsAddon && (
+              <>
+                {' '}
+                · DMS included <DmsFeaturesHoverCard />
+              </>
+            )}
           </p>
         ) : (
           <p className="mt-1 text-[13px] text-muted-foreground">
@@ -478,6 +511,11 @@ export default function OrgBillingPage() {
                   </span>
                 </label>
               )}
+              {buyTier !== 'ENTERPRISE' && (
+                <div className="-ml-2">
+                  <DmsFeaturesHoverCard />
+                </div>
+              )}
               <div className="text-[13px] font-medium text-muted-foreground">
                 = $
                 {buyQty *
@@ -517,10 +555,15 @@ export default function OrgBillingPage() {
                     <div className={`text-[14px] font-semibold ${config?.color || ''}`}>
                       {config?.name || plan.tier}
                     </div>
-                    <span className="text-[12px] text-muted-foreground">
+                    <span className="inline-flex items-center gap-1 text-[12px] text-muted-foreground">
                       ${allInSeatPrice}/seat/
                       {plan.billingInterval === 'year' ? 'yr' : 'mo'} · {config?.docs} docs/mo
-                      {plan.dmsEnabled && ' · DMS included'}
+                      {plan.dmsEnabled && (
+                        <>
+                          {' '}
+                          · DMS included <DmsFeaturesHoverCard />
+                        </>
+                      )}
                       {plan.billingInterval === 'year' && ' · Yearly'}
                     </span>
                   </div>

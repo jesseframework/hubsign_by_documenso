@@ -50,6 +50,31 @@ export const ORG_DMS_ADDON_PRICE_CENTS = 1500;
 /** Business is the only tier where DMS is a separate add-on — Enterprise bundles it into the tier price/discount above. */
 export const ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT = 10;
 
+/**
+ * Marketing copy for the DMS add-on, shown alongside its price wherever it's
+ * offered on the org billing page. Copied verbatim from the Stripe product
+ * ("Document Manager Add-On") rather than fetched live — org billing's
+ * pricing/config is already locally defined (see `ORG_SEAT_TIERS` above),
+ * so this follows the same pattern instead of adding a new Stripe fetch just
+ * for static copy. Keep in sync manually if the Stripe product changes.
+ */
+export const ORG_DMS_ADDON_DESCRIPTION =
+  'Document Manager add-on — email documents into your organization inbox, OCR-extract the data, and route them for review and signing.';
+
+export const ORG_DMS_ADDON_FEATURES = [
+  'Bulk document upload',
+  'OCR extraction queue (BMS ML)',
+  'Full-text search',
+  'Custom filing structure',
+  'Favorites',
+  'Approval workflows',
+  'Retrieval requests',
+  'Retention policies',
+  'Activity log',
+  'Compliance templates',
+  'AI Agent base access',
+];
+
 /** `OrgSeatPlan.documentsPerMonth`/`recipientsPerMonth`/`directTemplates` are non-nullable Prisma Ints and can't store `Infinity`. */
 export const ORG_UNLIMITED_SENTINEL = 999999;
 

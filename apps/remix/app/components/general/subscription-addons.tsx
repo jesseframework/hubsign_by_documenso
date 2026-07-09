@@ -72,7 +72,7 @@ export const SubscriptionAddons = ({
           return (
             <div
               key={price.id}
-              className="flex items-center justify-between gap-3 rounded-lg border p-3"
+              className="flex items-start justify-between gap-3 rounded-lg border p-3"
             >
               <div>
                 <div className="font-medium">{price.product.name}</div>
@@ -80,6 +80,28 @@ export const SubscriptionAddons = ({
                   ${toHumanPrice(price.unit_amount ?? 0)} {price.currency.toUpperCase()} /{' '}
                   {price.recurring?.interval}
                 </div>
+
+                {price.product.description && (
+                  <div className="text-muted-foreground mt-1.5 text-sm">
+                    {price.product.description}
+                  </div>
+                )}
+
+                {price.product.features && price.product.features.length > 0 && (
+                  <div className="text-muted-foreground mt-3">
+                    <div className="text-sm font-medium">
+                      <Trans>Includes:</Trans>
+                    </div>
+
+                    <ul className="mt-1 divide-y text-sm">
+                      {price.product.features.map((feature, index) => (
+                        <li key={index} className="py-2">
+                          {feature.name}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
 
               <Button
