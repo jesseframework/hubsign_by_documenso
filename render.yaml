@@ -24,10 +24,6 @@ services:
       - key: NEXTAUTH_SECRET
         generateValue: true
 
-      # Cron
-      - key: NEXT_PRIVATE_CRON_SECRET
-        generateValue: true
-
       # Database
       - key: NEXT_PRIVATE_DATABASE_URL
         fromDatabase:
@@ -147,27 +143,6 @@ services:
       # Features Optional
       - key: NEXT_PUBLIC_DISABLE_SIGNUP
         sync: false
-
-  - type: cron
-    name: documenso-inbox-poll
-    runtime: node
-    plan: starter  # Render doesn't offer a free plan for cron job services.
-    schedule: "*/5 * * * *"
-    buildCommand: 'echo "no build required"'
-    startCommand: >-
-      curl -sf -X POST "$WEBAPP_URL/api/cron/inbox-poll"
-      -H "Authorization: Bearer $CRON_SECRET"
-    envVars:
-      - key: WEBAPP_URL
-        fromService:
-          name: documenso-app
-          type: web
-          envVarKey: RENDER_EXTERNAL_URL
-      - key: CRON_SECRET
-        fromService:
-          name: documenso-app
-          type: web
-          envVarKey: NEXT_PRIVATE_CRON_SECRET
 
 databases:
   - name: documenso-db
