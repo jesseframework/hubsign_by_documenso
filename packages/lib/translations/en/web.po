@@ -4543,6 +4543,7 @@ msgstr "Include the Signing Certificate in the Document"
 msgid "Includes the Final Audit Report page"
 msgstr "Includes the Final Audit Report page"
 
+#: apps/remix/app/components/general/subscription-addons.tsx
 #: apps/remix/app/components/general/plan-switcher.tsx
 #: apps/remix/app/components/general/plan-switcher.tsx
 msgid "Includes:"
