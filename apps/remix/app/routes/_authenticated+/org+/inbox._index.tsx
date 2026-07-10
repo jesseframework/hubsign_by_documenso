@@ -605,23 +605,19 @@ export default function SignatureInboxPage() {
                 return (
                   <tr key={item.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     {/* Invoice info */}
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex items-start gap-1.5">
-                        {isUnread && (
-                          <span
-                            className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary"
-                            aria-label="Unread"
-                          />
-                        )}
-                        <Link
-                          to={`/org/inbox/${item.id}`}
-                          className={`text-[13px] hover:text-primary hover:underline ${
-                            isUnread ? 'font-bold' : 'font-semibold'
-                          }`}
-                        >
-                          {headline}
-                        </Link>
-                      </div>
+                    <td
+                      className={`border-l-[3px] px-4 py-3 align-top ${
+                        isUnread ? 'border-l-primary' : 'border-l-transparent'
+                      }`}
+                    >
+                      <Link
+                        to={`/org/inbox/${item.id}`}
+                        className={`text-[13px] hover:text-primary hover:underline ${
+                          isUnread ? 'font-bold' : 'font-medium text-foreground/80'
+                        }`}
+                      >
+                        {headline}
+                      </Link>
                       {f.invoiceNumber && item.document.title !== f.invoiceNumber && (
                         <p className="text-[11px] text-muted-foreground">{item.document.title}</p>
                       )}

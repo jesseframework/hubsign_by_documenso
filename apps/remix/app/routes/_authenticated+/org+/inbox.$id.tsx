@@ -47,6 +47,15 @@ export default function InboxItemPage() {
   // Live-refresh this item (and the list) when its OCR finishes (SSE).
   useInboxEvents(id);
 
+  // `get` marks the item read as a side effect — invalidate the list/unread
+  // count so they don't keep showing it as unread from a stale cache once
+  // the user navigates back.
+  useEffect(() => {
+    if (!item) return;
+    void utils.inbox.list.invalidate();
+    void utils.inbox.unreadCount.invalidate();
+  }, [item, utils]);
+
   const [rows, setRows] = useState<Array<{ name: string; email: string }>>([{ name: '', email: '' }]);
   const [prefilled, setPrefilled] = useState(false);
   const [showOcrText, setShowOcrText] = useState(false);
