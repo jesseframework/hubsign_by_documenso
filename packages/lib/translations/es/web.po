@@ -621,6 +621,10 @@ msgstr ""
 msgid "A means to print or download documents for your records"
 msgstr "Un medio para imprimir o descargar documentos para sus registros"
 
+#: apps/remix/app/components/forms/push-notification-preferences.tsx
+msgid "A new document arrives in your Signature Inbox from WorkHub."
+msgstr ""
+
 #: packages/lib/jobs/definitions/emails/send-team-member-joined-email.handler.ts
 msgid "A new member has joined your team"
 msgstr "Un nuevo miembro se ha unido a tu equipo"
@@ -5209,6 +5213,10 @@ msgstr "Nunca"
 #: apps/remix/app/components/forms/token.tsx
 msgid "Never expire"
 msgstr "Nunca expira"
+
+#: apps/remix/app/components/forms/push-notification-preferences.tsx
+msgid "New inbox item"
+msgstr ""
 
 #: apps/remix/app/components/forms/password.tsx
 msgid "New Password"

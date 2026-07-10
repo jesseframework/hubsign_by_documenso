@@ -616,6 +616,10 @@ msgstr "A lookup directory that workflows resolve at runtime â€” e.g. a vendor â
 msgid "A means to print or download documents for your records"
 msgstr "A means to print or download documents for your records"
 
+#: apps/remix/app/components/forms/push-notification-preferences.tsx
+msgid "A new document arrives in your Signature Inbox from WorkHub."
+msgstr "A new document arrives in your Signature Inbox from WorkHub."
+
 #: packages/lib/jobs/definitions/emails/send-team-member-joined-email.handler.ts
 msgid "A new member has joined your team"
 msgstr "A new member has joined your team"
@@ -5204,6 +5208,10 @@ msgstr "Never"
 #: apps/remix/app/components/forms/token.tsx
 msgid "Never expire"
 msgstr "Never expire"
+
+#: apps/remix/app/components/forms/push-notification-preferences.tsx
+msgid "New inbox item"
+msgstr "New inbox item"
 
 #: apps/remix/app/components/forms/password.tsx
 msgid "New Password"
