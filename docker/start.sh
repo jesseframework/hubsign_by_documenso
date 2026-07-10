@@ -6,6 +6,10 @@ echo "🚀 Starting HubSign application..."
 # Create certificate file from environment variable if provided
 if [ ! -z "$NEXT_PRIVATE_SIGNING_LOCAL_FILE_CONTENTS" ]; then
     echo "📋 Creating certificate file from environment variable..."
+    # Ensure the cert directory exists. The Dockerfile does not create /app/certs,
+    # so a fresh image lacks it; without this mkdir the redirect below fails and
+    # `set -e` aborts startup with exit 2 (crash-loop). Self-heal here.
+    mkdir -p /app/certs
     # Create the certificate file from base64 content
     echo "$NEXT_PRIVATE_SIGNING_LOCAL_FILE_CONTENTS" | base64 -d > /app/certs/signing-cert.p12
     

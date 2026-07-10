@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { dmsAiChat, getAiConversations, getAiConversationMessages, getDmsAiQueryLimit } from '@documenso/lib/server-only/dms-ai/agent';
 import { bmsMlGetStatus, bmsMlGetTemplates, bmsMlUploadDocument, isBmsMlConfigured } from '@documenso/lib/server-only/bms-ml/client';
+import { getFileServerSide } from '@documenso/lib/universal/upload/get-file.server';
 import { prisma } from '@documenso/prisma';
 
 import { authenticatedProcedure, router } from '../trpc';
@@ -1058,14 +1059,12 @@ export const dmsRouter = router({
           return { status: 'error', message: 'Document data not found' };
         }
 
-        // Convert to buffer
-        let fileBuffer: Buffer;
-        if (documentData.type === 'BYTES_64') {
-          fileBuffer = Buffer.from(documentData.data, 'base64');
-        } else {
-          // For S3, we'd need to fetch the file — simplified for now
-          return { status: 'error', message: 'S3 storage OCR requires file download first' };
-        }
+        // Read the file into a buffer. getFileServerSide handles every storage
+        // backend — inline BYTES/BYTES_64 and S3_PATH (presigned GET + fetch) —
+        // so S3-stored documents OCR the same as inline ones (mirrors the
+        // Signature-Inbox OCR path in run-inbox-ocr.ts).
+        const bytes = await getFileServerSide({ type: documentData.type, data: documentData.data });
+        const fileBuffer = Buffer.from(bytes);
 
         // Call BMS ML API
         const result = await bmsMlUploadDocument(fileBuffer, doc.fileName, {
