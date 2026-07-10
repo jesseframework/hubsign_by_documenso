@@ -143,38 +143,56 @@ export default function OrgBillingPage() {
   const [buyDms, setBuyDms] = useState(false);
   const [showBuy, setShowBuy] = useState(false);
   const [embeddedClientSecret, setEmbeddedClientSecret] = useState<string | null>(null);
+  // Per-member tier choice for "Give seat", only shown/needed when the org
+  // has 2+ tiers with open seats — keyed by member id since each unseated
+  // row picks independently.
+  const [giveSeatTier, setGiveSeatTier] = useState<Record<string, string>>({});
 
-  // Once the org has a seat plan, purchases are top-ups — no picking a tier
-  // or interval (only one of each is possible per org) and no minimum (the
-  // tier minimum only applies to establishing it in the first place).
-  const isTopUp = Boolean(seatPlans && seatPlans.length > 0);
+  // An org can hold more than one tier at once now (mixed licensing, like
+  // Business + Enterprise seats in one org — see `purchaseSeats`), so
+  // "is this a top-up" depends on which tier is *currently selected* in the
+  // form, not whether the org has a plan at all.
+  const hasAnySeatPlan = Boolean(seatPlans && seatPlans.length > 0);
+  const existingPlanForSelectedTier = seatPlans?.find((p) => p.tier === buyTier);
+  const isTopUpForSelectedTier = Boolean(existingPlanForSelectedTier);
 
-  // Once DMS is part of the org's plan, top-ups can't opt out of it (the
-  // server keeps it on regardless — see `dmsNowEnabled` in `purchaseSeats`),
-  // so the checkbox is locked on rather than defaulting to unchecked and
-  // showing a price that doesn't match what's actually charged.
-  const dmsLockedOn = isTopUp && Boolean(seatPlans?.[0]?.dmsEnabled);
+  // Once DMS is part of the *selected tier's* plan, top-ups can't opt out of
+  // it (the server keeps it on regardless — see `dmsNowEnabled` in
+  // `purchaseSeats`), so the checkbox is locked on rather than defaulting to
+  // unchecked and showing a price that doesn't match what's actually charged.
+  const dmsLockedOn = Boolean(existingPlanForSelectedTier?.dmsEnabled);
 
-  // An org can only be on one seat tier — and one billing interval — at a
-  // time (a single Stripe subscription can't mix monthly/yearly items).
-  // Once either exists, lock `buyTier`/`buyInterval` to match and default
-  // quantity to a single top-up seat instead of the first-purchase minimum.
+  // Billing interval is locked org-wide the moment *any* tier has been
+  // purchased — a single Stripe subscription can't mix monthly/yearly items
+  // across tiers, even if the tiers themselves can coexist.
   useEffect(() => {
     if (seatPlans && seatPlans.length > 0) {
-      setBuyTier(seatPlans[0].tier);
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       setBuyInterval((seatPlans[0].billingInterval as OrgBillingInterval | undefined) ?? 'month');
-      setBuyDms(seatPlans[0].dmsEnabled);
-      setBuyQty(1);
     }
   }, [seatPlans]);
+
+  // Keep quantity/DMS defaults in sync with whichever tier is currently
+  // selected: topping up an existing tier resets to a single additional
+  // seat mirroring its current DMS status; picking a tier with no plan yet
+  // resets to that tier's minimum (Enterprise always includes DMS).
+  useEffect(() => {
+    if (existingPlanForSelectedTier) {
+      setBuyDms(existingPlanForSelectedTier.dmsEnabled);
+      setBuyQty(1);
+    } else {
+      setBuyDms(buyTier === 'ENTERPRISE');
+      setBuyQty(TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buyTier, existingPlanForSelectedTier?.dmsEnabled]);
 
   // A single conflict dialog covers both flows that can strand an active
   // personal subscription: purchasing seats (the admin auto-consumes seat #1)
   // and manually assigning a seat to another member.
   const [pendingConflict, setPendingConflict] = useState<
     | { kind: 'purchase'; quantity: number; dmsEnabled: boolean; planName: string; priceFormatted: string }
-    | { kind: 'assign'; memberId: string; planName: string; priceFormatted: string }
+    | { kind: 'assign'; memberId: string; tier: string; planName: string; priceFormatted: string }
     | null
   >(null);
 
@@ -227,7 +245,7 @@ export default function OrgBillingPage() {
   const handlePurchaseClick = async () => {
     if (!membership) return;
 
-    const minSeats = isTopUp ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1;
+    const minSeats = isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1;
     const finalQty = Math.max(buyQty, minSeats);
     const dmsEnabled = buyTier === 'ENTERPRISE' ? true : buyDms;
 
@@ -257,20 +275,21 @@ export default function OrgBillingPage() {
   // Checks whether the target member has an active personal subscription
   // before assigning an org seat (which would supersede it) — shows a
   // confirmation dialog if so, otherwise assigns directly.
-  const handleGiveSeat = async (memberId: string) => {
+  const handleGiveSeat = async (memberId: string, tier: string) => {
     const conflict = await utils.org.getMemberBillingConflict.fetch({ memberId });
 
     if (conflict.hasActivePlan) {
       setPendingConflict({
         kind: 'assign',
         memberId,
+        tier,
         planName: conflict.planName,
         priceFormatted: conflict.priceFormatted,
       });
       return;
     }
 
-    void assignSeat.mutateAsync({ memberId });
+    void assignSeat.mutateAsync({ memberId, tier: tier as 'BUSINESS' | 'ENTERPRISE' });
   };
 
   if (isLoading) return <div className="py-12 text-center text-muted-foreground">Loading...</div>;
@@ -297,8 +316,13 @@ export default function OrgBillingPage() {
     (m) => m.id !== membership.id && (m.role === 'ORG_ADMIN' || m.role === 'DMS_ADMIN'),
   );
 
-  // Calculate totals — an org is on exactly one tier/interval at a time, so
-  // every `seatPlans` row shares the same `billingInterval` in practice.
+  // Tiers with at least one open seat — when there's more than one, "Give
+  // seat" needs to ask which tier rather than assuming the org's only one.
+  const availableTiers = seatPlans?.filter((p) => p.assigned < p.quantity) ?? [];
+
+  // Calculate totals — every tier still shares one `billingInterval` (a
+  // single Stripe subscription can't mix monthly/yearly items), even though
+  // an org can now hold more than one tier at once.
   const totalSeats = seatPlans?.reduce((sum, p) => sum + p.quantity, 0) ?? 0;
   const assignedSeats = seatPlans?.reduce((sum, p) => sum + p.assigned, 0) ?? 0;
   const orgInterval = seatPlans?.[0]?.billingInterval ?? 'month';
@@ -410,43 +434,33 @@ export default function OrgBillingPage() {
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground">Plan Tier</label>
-                {seatPlans && seatPlans.length > 0 ? (
-                  // An org can only be on one seat tier at a time — once seats
-                  // exist, the tier is fixed; this purchase just adds more.
-                  <div className="mt-1 flex h-8 items-center rounded-md border border-border bg-muted px-2 text-[13px]">
-                    {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.name} — $
-                    {seatPriceFor(buyTier, buyInterval) +
-                      (buyDms && buyTier !== 'ENTERPRISE' ? dmsPriceFor(buyInterval) : 0)}
-                    /seat/{buyInterval === 'year' ? 'yr' : 'mo'}
-                  </div>
-                ) : (
-                  <select
-                    className="mt-1 block h-8 rounded-md border border-border bg-background px-2 text-[13px]"
-                    value={buyTier}
-                    onChange={(e) => {
-                      const newTier = e.target.value as keyof typeof TIER_CONFIG;
-                      setBuyTier(newTier);
-                      // Enterprise always includes DMS
-                      if (newTier === 'ENTERPRISE') setBuyDms(true);
-                      // Enforce minimum seats for the selected tier
-                      const minSeats = TIER_CONFIG[newTier]?.minSeats ?? 1;
-                      if (buyQty < minSeats) setBuyQty(minSeats);
-                    }}
-                  >
-                    {Object.entries(TIER_CONFIG).map(([tier, config]) => (
+                {/* An org can hold more than one tier at once (mixed licensing) —
+                    always selectable, whether picking a tier to top up or a new
+                    one to add alongside whatever the org already has. */}
+                <select
+                  className="mt-1 block h-8 rounded-md border border-border bg-background px-2 text-[13px]"
+                  value={buyTier}
+                  onChange={(e) => setBuyTier(e.target.value as keyof typeof TIER_CONFIG)}
+                >
+                  {Object.entries(TIER_CONFIG).map(([tier, config]) => {
+                    const existingPlan = seatPlans?.find((p) => p.tier === tier);
+                    return (
                       <option key={tier} value={tier}>
                         {config.name} — ${config.price}/seat/mo (
                         {config.docs === '∞' ? 'unlimited' : `${config.docs} docs`}
-                        {tier === 'ENTERPRISE' ? ' + DMS' : ''}, min {config.minSeats} seat
-                        {config.minSeats > 1 ? 's' : ''})
+                        {tier === 'ENTERPRISE' ? ' + DMS' : ''}
+                        {existingPlan
+                          ? `, ${existingPlan.quantity} seats active`
+                          : `, min ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}`}
+                        )
                       </option>
-                    ))}
-                  </select>
-                )}
+                    );
+                  })}
+                </select>
               </div>
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground">Billing</label>
-                {isTopUp ? (
+                {hasAnySeatPlan ? (
                   // Interval is locked with the tier — a single Stripe
                   // subscription can't mix monthly/yearly items.
                   <div className="mt-1 flex h-8 items-center rounded-md border border-border bg-muted px-2 text-[13px]">
@@ -477,14 +491,14 @@ export default function OrgBillingPage() {
               </div>
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground">
-                  {isTopUp
+                  {isTopUpForSelectedTier
                     ? 'Additional seats'
                     : `Quantity (min ${TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1})`}
                 </label>
                 <Input
                   className="mt-1 h-8 w-20 text-[13px]"
                   type="number"
-                  min={isTopUp ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1}
+                  min={isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1}
                   max={100}
                   value={buyQty}
                   onChange={(e) => setBuyQty(Number(e.target.value))}
@@ -528,7 +542,7 @@ export default function OrgBillingPage() {
                 onClick={() => void handlePurchaseClick()}
                 loading={purchaseSeats.isPending}
                 disabled={
-                  buyQty < (isTopUp ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1)
+                  buyQty < (isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1)
                 }
               >
                 Purchase
@@ -635,6 +649,22 @@ export default function OrgBillingPage() {
                   <span className="text-[11px] text-muted-foreground">No seat</span>
                 )}
 
+                {isAdmin && !member.seatTier && availableTiers.length > 1 && (
+                  <select
+                    className="h-8 rounded-md border border-border bg-background px-1.5 text-[12px]"
+                    value={giveSeatTier[member.id] ?? availableTiers[0].tier}
+                    onChange={(e) =>
+                      setGiveSeatTier((prev) => ({ ...prev, [member.id]: e.target.value }))
+                    }
+                  >
+                    {availableTiers.map((plan) => (
+                      <option key={plan.tier} value={plan.tier}>
+                        {plan.tier}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
                 {isAdmin && (
                   <Button
                     size="sm"
@@ -649,7 +679,8 @@ export default function OrgBillingPage() {
                       if (member.seatTier) {
                         void unassignSeat.mutateAsync({ memberId: member.id });
                       } else {
-                        void handleGiveSeat(member.id);
+                        const tier = giveSeatTier[member.id] ?? availableTiers[0]?.tier ?? 'BUSINESS';
+                        void handleGiveSeat(member.id, tier);
                       }
                     }}
                   >
@@ -698,6 +729,7 @@ export default function OrgBillingPage() {
                 if (pendingConflict?.kind === 'assign') {
                   void assignSeat.mutateAsync({
                     memberId: pendingConflict.memberId,
+                    tier: pendingConflict.tier as 'BUSINESS' | 'ENTERPRISE',
                     acknowledgeCancelPersonalPlan: true,
                   });
                 } else if (pendingConflict?.kind === 'purchase') {

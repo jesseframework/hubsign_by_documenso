@@ -36,7 +36,7 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
   },
   ENTERPRISE: {
     name: 'Enterprise',
-    priceCents: 5500,
+    priceCents: 7500,
     yearlyDiscountPercent: 12,
     minSeats: 20,
     documents: null,

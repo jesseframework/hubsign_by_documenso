@@ -639,31 +639,22 @@ export const orgRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN' });
       }
 
-      // An org can only be on one seat tier at a time — no mixing Business and
-      // Enterprise seats within the same org.
-      const otherTierPlan = await prisma.orgSeatPlan.findFirst({
-        where: { organizationId: membership.organizationId, tier: { not: input.tier } },
-      });
-
-      if (otherTierPlan && otherTierPlan.quantity > 0) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Your organization is already on the ${otherTierPlan.tier} plan. An organization can only be on one seat tier at a time.`,
-        });
-      }
-
       const org = membership.organization;
 
-      // A "top-up" — the org already has a live subscription for this tier —
-      // adds quantity directly to it instead of starting a new subscription.
-      // Only a first purchase goes through Checkout.
+      // An org can hold more than one tier at once now (mixed licensing,
+      // like Business + Enterprise M365 seats in one tenant) — so the
+      // question isn't "does the org have a plan" but two separate ones:
+      // does *this* tier already exist (top-up vs. establishing it), and
+      // does the org have *any* subscription yet (modify it vs. first-ever
+      // Checkout). A brand-new tier added to an org that already has a
+      // subscription for a different tier still modifies that existing
+      // subscription (as a new item) rather than starting a second one.
       const existingSeatPlan = await prisma.orgSeatPlan.findFirst({
         where: { organizationId: membership.organizationId, tier: input.tier },
       });
 
-      const isTopUp = Boolean(
-        existingSeatPlan && org.stripeSubscriptionId && org.stripeSeatPriceId,
-      );
+      const hasExistingTierPlan = Boolean(existingSeatPlan);
+      const isTopUp = Boolean(org.stripeSubscriptionId);
 
       const tierLimits = ORG_SEAT_TIERS[input.tier];
 
@@ -677,14 +668,20 @@ export const orgRouter = router({
 
       const dmsEnabled = input.dmsEnabled ?? config.dmsEnabled;
 
-      // Interval is chosen once, at first purchase, and locked thereafter —
-      // a single Stripe subscription can't mix monthly and yearly items, so
-      // top-ups must reuse the org's existing interval regardless of what
-      // the client sends (the UI locks this field once seats exist, but
-      // don't trust a stale client over the org's actual committed interval).
+      // Interval is chosen once, at the org's first-ever seat purchase, and
+      // locked thereafter across *every* tier — a single Stripe subscription
+      // can't mix monthly and yearly items, so a second tier added later
+      // must reuse whichever interval any existing tier on this org already
+      // committed to, not just this specific tier's own plan (which may not
+      // exist yet if this is the org's first purchase of it).
+      const anyExistingSeatPlan = isTopUp
+        ? (existingSeatPlan ??
+          (await prisma.orgSeatPlan.findFirst({ where: { organizationId: membership.organizationId } })))
+        : null;
+
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-      const interval: OrgBillingInterval = isTopUp
-        ? ((existingSeatPlan?.billingInterval as OrgBillingInterval | undefined) ?? 'month')
+      const interval: OrgBillingInterval = anyExistingSeatPlan
+        ? ((anyExistingSeatPlan.billingInterval as OrgBillingInterval | undefined) ?? 'month')
         : input.interval;
 
       const seatUnitAmountCents =
@@ -697,9 +694,10 @@ export const orgRouter = router({
           ? getOrgYearlyPriceCents(ORG_DMS_ADDON_PRICE_CENTS, ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT)
           : ORG_DMS_ADDON_PRICE_CENTS;
 
-      // The tier minimum only applies to establishing the tier in the first
-      // place — once the org already meets it, buying 1-2 more is fine.
-      if (!isTopUp && input.quantity < config.minSeats) {
+      // The tier minimum only applies to establishing *that tier*, whether
+      // it's the org's first tier ever or a second one added alongside an
+      // existing one — once a tier already meets it, buying 1-2 more is fine.
+      if (!hasExistingTierPlan && input.quantity < config.minSeats) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: `${input.tier} plan requires a minimum of ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}.`,
@@ -777,28 +775,46 @@ export const orgRouter = router({
           expand: ['items.data.price.product'],
         });
 
-        const seatItem = liveSubscription.items.data.find(
-          (item) => item.price.id === org.stripeSeatPriceId,
-        );
-
-        if (!seatItem) {
-          throw new Error('Seat item not found on subscription');
-        }
-
-        // Look up by the cached price id first; fall back to scanning live
-        // items by product metadata if that's stale (the exact staleness
-        // that previously caused a duplicate DMS item/product to be created
-        // on every top-up instead of reusing the existing one).
-        const existingDmsItem =
-          liveSubscription.items.data.find((item) => item.price.id === org.stripeDmsPriceId) ??
+        // Look up this *specific tier's* items — an org's subscription can
+        // now hold items for more than one tier at once (mixed licensing),
+        // so matching by cached price id first, falling back to scanning by
+        // product metadata `{ type, tier }` (the same self-healing pattern
+        // already used here for DMS) is what keeps this tier-correct instead
+        // of accidentally grabbing another tier's item.
+        const findTierItem = (type: 'org_seat' | 'org_dms', cachedPriceId?: string | null) =>
+          liveSubscription.items.data.find((item) => cachedPriceId && item.price.id === cachedPriceId) ??
           liveSubscription.items.data.find((item) => {
             const { product } = item.price;
-            return typeof product !== 'string' && !product.deleted && product.metadata?.type === 'org_dms';
+            return (
+              typeof product !== 'string' &&
+              !product.deleted &&
+              product.metadata?.type === type &&
+              product.metadata?.tier === input.tier
+            );
           });
 
-        const items: Array<{ id?: string; price?: string; quantity: number }> = [
-          { id: seatItem.id, quantity: newQuantity },
-        ];
+        const seatItem = findTierItem('org_seat', existingSeatPlan?.stripePriceId);
+
+        const items: Array<{ id?: string; price?: string; quantity: number }> = [];
+
+        if (seatItem) {
+          items.push({ id: seatItem.id, quantity: newQuantity });
+        } else {
+          // This tier doesn't exist on the subscription yet — adding it
+          // alongside whatever other tier(s) the org already has, rather
+          // than starting a second subscription.
+          const seatPriceId = await getOrCreateOrgPrice({
+            type: 'org_seat',
+            tier: input.tier,
+            interval,
+            unitAmountCents: seatUnitAmountCents,
+            productName: `HubSign ${input.tier.charAt(0) + input.tier.slice(1).toLowerCase()} Seat`,
+          });
+
+          items.push({ price: seatPriceId, quantity: newQuantity });
+        }
+
+        const existingDmsItem = findTierItem('org_dms', null);
 
         // Once enabled, DMS stays enabled even if this particular top-up
         // didn't touch the checkbox (it defaults unchecked on every purchase).
@@ -828,18 +844,22 @@ export const orgRouter = router({
         // One atomic call for seat + DMS together: `always_invoice` charges
         // the prorated amount to the card on file immediately (Stripe's
         // default just queues it for the next billing cycle), matching the
-        // agreed "direct charge, no extra screen" behavior. Also refreshes
-        // `purchasingMemberId` (so a not-yet-seated admin still gets
-        // auto-assigned) and `dmsEnabled` (which `onOrgSubscriptionUpdated`
-        // reads, not the live items list, to know whether item[1] is DMS).
+        // agreed "direct charge, no extra screen" behavior. `tier` is set to
+        // *this* purchase's tier every time (not spread from stale prior
+        // metadata) since it now means "which tier to auto-assign the
+        // purchasing member's seat to" — each item is self-describing via
+        // its own product metadata, so quantity/dmsEnabled no longer need to
+        // live in subscription-level metadata at all.
         const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
           items,
           proration_behavior: 'always_invoice',
+          expand: ['items.data.price.product'],
           metadata: {
             ...liveSubscription.metadata,
+            organizationId: org.id.toString(),
+            type: 'organization',
+            tier: input.tier,
             purchasingMemberId: membership.id,
-            dmsEnabled: dmsNowEnabled.toString(),
-            interval,
           },
         });
 
@@ -917,10 +937,10 @@ export const orgRouter = router({
           metadata: {
             organizationId: org.id.toString(),
             type: 'organization',
+            // Which tier to auto-assign the purchasing member's seat to —
+            // each item is self-describing via its own product metadata, so
+            // quantity/dmsEnabled no longer need to live here too.
             tier: input.tier,
-            quantity: input.quantity.toString(),
-            dmsEnabled: dmsEnabled.toString(),
-            interval,
             purchasingMemberId: membership.id,
           },
         },
@@ -980,6 +1000,9 @@ export const orgRouter = router({
   assignSeat: authenticatedProcedure
     .input(z.object({
       memberId: z.string(),
+      // An org can hold more than one tier at once now (mixed licensing) —
+      // the caller has to say which tier's seat to assign.
+      tier: z.enum(['BUSINESS', 'ENTERPRISE']),
       acknowledgeCancelPersonalPlan: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -991,13 +1014,12 @@ export const orgRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN' });
       }
 
-      // An org only ever has one active seat tier — no tier to choose.
       const seatPlan = await prisma.orgSeatPlan.findFirst({
-        where: { organizationId: myMembership.organizationId },
+        where: { organizationId: myMembership.organizationId, tier: input.tier },
       });
 
       if (!seatPlan) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No seats purchased. Purchase seats first.' });
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No seats purchased for this tier. Purchase seats first.' });
       }
 
       const targetMember = await prisma.organizationMember.findUniqueOrThrow({
@@ -1026,8 +1048,11 @@ export const orgRouter = router({
         }
       }
 
-      // Already seated — a member can only ever hold *the* org's one tier, so
-      // there's nothing to reassign.
+      // Already seated — a member holds exactly one tier at a time (same as
+      // M365 licensing: a user has one SKU, even if the tenant offers
+      // several), so this is a no-op rather than stacking a second tier.
+      // Switching a member's tier would mean unassign-then-assign, not
+      // supported as a single action here.
       if (targetMember.seatTier) {
         return targetMember;
       }

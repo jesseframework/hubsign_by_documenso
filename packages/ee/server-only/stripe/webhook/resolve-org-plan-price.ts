@@ -24,11 +24,29 @@ export const getSubscriptionPeriodEndISO = (subscription: Stripe.Subscription): 
  * (top-ups update the Stripe items directly, never that metadata field).
  * Interval is read the same way (an item's `price.recurring.interval`)
  * rather than assumed, now that org seats support both monthly and yearly.
+ *
+ * An org's subscription can hold items for more than one tier at once
+ * (mixed licensing) — `subscription.metadata.tier` identifies which tier
+ * *this particular purchase* was for, so this only sums that tier's own
+ * items (matched via each item's product metadata, same as
+ * `onOrgSubscriptionUpdated`), not the org's combined total across tiers —
+ * otherwise the email would show one tier's name next to another tier's
+ * price.
  */
 export const resolveOrgPlanNameAndPrice = (subscription: Stripe.Subscription) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
   const tier = subscription.metadata?.tier as keyof typeof ORG_SEAT_TIERS | undefined;
-  const seatItem = subscription.items.data[0];
+
+  const itemsForTier = subscription.items.data.filter((item) => {
+    const { product } = item.price;
+    return typeof product !== 'string' && !product.deleted && product.metadata?.tier === tier;
+  });
+
+  const seatItem =
+    itemsForTier.find((item) => {
+      const { product } = item.price;
+      return typeof product !== 'string' && !product.deleted && product.metadata?.type === 'org_seat';
+    }) ?? subscription.items.data[0];
+
   const quantity = seatItem?.quantity ?? 1;
   const interval = seatItem?.price.recurring?.interval === 'year' ? 'year' : 'month';
 
@@ -38,10 +56,11 @@ export const resolveOrgPlanNameAndPrice = (subscription: Stripe.Subscription) =>
     ? `${tierConfig.name} (${quantity} seat${quantity > 1 ? 's' : ''})`
     : 'Organization Plan';
 
-  // Sum the subscription's actual line items rather than recomputing from
+  // Sum just this tier's own line items rather than recomputing from
   // `ORG_SEAT_TIERS` — the live subscription is the source of truth for
-  // what's actually billed (avoids drift from the DMS-enabled metadata flag).
-  const totalCents = subscription.items.data.reduce(
+  // what's actually billed for this tier (avoids drift from local config).
+  const items = itemsForTier.length > 0 ? itemsForTier : subscription.items.data;
+  const totalCents = items.reduce(
     (sum, item) => sum + (item.price.unit_amount ?? 0) * (item.quantity ?? 0),
     0,
   );

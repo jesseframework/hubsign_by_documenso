@@ -2,6 +2,7 @@ import type { OrgSeatTier } from '@prisma/client';
 import { match } from 'ts-pattern';
 
 import { ORG_SEAT_TIERS, ORG_UNLIMITED_SENTINEL } from '@documenso/lib/constants/org-tiers';
+import { stripe } from '@documenso/lib/server-only/stripe';
 import type { Stripe } from '@documenso/lib/server-only/stripe';
 import { prisma } from '@documenso/prisma';
 
@@ -10,59 +11,81 @@ export type OnOrgSubscriptionUpdatedOptions = {
   subscription: Stripe.Subscription;
 };
 
+const isOrgSeatTier = (value: unknown): value is OrgSeatTier =>
+  typeof value === 'string' && value in ORG_SEAT_TIERS;
+
 export const onOrgSubscriptionUpdated = async ({
   organizationId,
-  subscription,
+  subscription: passedInSubscription,
 }: OnOrgSubscriptionUpdatedOptions) => {
+  // Re-fetch with product data expanded regardless of what the caller passed
+  // in — an org's subscription can now hold items for more than one tier at
+  // once, so classifying them requires each item's own product metadata
+  // (`{ type, tier, interval }`, tagged by `getOrCreateOrgPrice`), not a
+  // single subscription-level `tier`/array position. Not every call site
+  // expands this (the `customer.subscription.updated` webhook branch hands
+  // over the raw, unexpanded event payload), so this makes the function
+  // correct regardless of caller rather than relying on caller discipline.
+  const subscription = await stripe.subscriptions.retrieve(passedInSubscription.id, {
+    expand: ['items.data.price.product'],
+  });
+
   const billingStatus = match(subscription.status)
     .with('active', () => 'active')
     .with('past_due', () => 'past_due')
     .otherwise(() => 'inactive');
 
-  // `purchaseSeats` (org-router.ts) tags the *product* metadata with
-  // `{ type: 'org_seat' | 'org_dms' }`, not the price — and Stripe doesn't
-  // expand product data on a plain `subscriptions.retrieve()` call, so price
-  // metadata is empty here regardless. Use the subscription's own metadata
-  // (set at checkout time) and the deterministic item order `purchaseSeats`
-  // constructs instead: seat item is always items[0], the optional DMS
-  // add-on (when `dmsEnabled`) is always items[1].
-  const dmsEnabled = subscription.metadata?.dmsEnabled === 'true';
+  type ClassifiedItem = { item: Stripe.SubscriptionItem; type: string; tier: OrgSeatTier };
 
-  const seatItem = subscription.items.data[0];
-  const dmsItem = dmsEnabled ? subscription.items.data[1] : undefined;
+  const classifiedItems: ClassifiedItem[] = subscription.items.data.flatMap((item) => {
+    const { product } = item.price;
+    if (typeof product === 'string' || product.deleted) return [];
+    const { type, tier } = product.metadata ?? {};
+    if ((type !== 'org_seat' && type !== 'org_dms') || !isOrgSeatTier(tier)) return [];
+    return [{ item, type, tier }];
+  });
 
   // Mirrors `onSubscriptionUpdated`'s fallback: newer Stripe API versions move
   // `current_period_end` from the subscription onto its items.
+  const anyItem = subscription.items.data[0];
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  const itemPeriodEnd = (seatItem as unknown as { current_period_end?: number })
-    ?.current_period_end;
-
+  const itemPeriodEnd = (anyItem as unknown as { current_period_end?: number })?.current_period_end;
   const periodEndSeconds = itemPeriodEnd ?? subscription.current_period_end;
   const periodEnd = periodEndSeconds ? new Date(periodEndSeconds * 1000) : undefined;
 
+  // Aggregate across every tier on this subscription — `Organization` only
+  // ever tracked a single seat price/count, which stops being meaningful
+  // once an org can hold more than one tier at once. `OrgSeatPlan` (below)
+  // is the per-tier source of truth now; these fields are kept only for
+  // rough backward-compatible display (total seats, subscription status).
+  const totalSeatCount = classifiedItems
+    .filter((c) => c.type === 'org_seat')
+    .reduce((sum, c) => sum + (c.item.quantity ?? 0), 0);
+
   await prisma.organization.update({
-    where: {
-      id: organizationId,
-    },
+    where: { id: organizationId },
     data: {
       stripeSubscriptionId: subscription.id,
-      stripeSeatPriceId: seatItem?.price.id,
-      stripeDmsPriceId: dmsItem?.price.id,
-      seatCount: seatItem?.quantity ?? 0,
+      seatCount: totalSeatCount,
       billingStatus,
       periodEnd,
     },
   });
 
-  // `OrgSeatPlan`/seat assignment are only ever written here, from confirmed
-  // Stripe state — never optimistically from `purchaseSeats` itself, whether
-  // it's the first purchase (checkout) or a top-up (direct quantity update).
-  // Both land here as `checkout.session.completed` / `customer.subscription.updated`.
-  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  const tier = subscription.metadata?.tier as OrgSeatTier | undefined;
+  // `OrgSeatPlan` rows are only ever written here, from confirmed Stripe
+  // state — never optimistically from `purchaseSeats` itself, whether it's
+  // the first purchase (checkout) or a top-up (direct item update). Both
+  // land here as `checkout.session.completed` / `customer.subscription.updated`.
+  const tiersOnThisSubscription = new Set(classifiedItems.map((c) => c.tier));
 
-  if (tier && tier in ORG_SEAT_TIERS && seatItem) {
+  for (const tier of tiersOnThisSubscription) {
+    const seatItem = classifiedItems.find((c) => c.tier === tier && c.type === 'org_seat')?.item;
+    const dmsItem = classifiedItems.find((c) => c.tier === tier && c.type === 'org_dms')?.item;
+
+    if (!seatItem) continue;
+
     const tierLimits = ORG_SEAT_TIERS[tier];
+    const dmsEnabled = tierLimits.dmsEnabled || Boolean(dmsItem);
 
     const seatPlanData = {
       documentsPerMonth: tierLimits.documents ?? ORG_UNLIMITED_SENTINEL,
@@ -70,9 +93,8 @@ export const onOrgSubscriptionUpdated = async ({
       directTemplates: tierLimits.directTemplates ?? ORG_UNLIMITED_SENTINEL,
       dmsEnabled,
       quantity: seatItem.quantity ?? 0,
-      // Falls back to "month" for pre-yearly-billing subscriptions whose
-      // metadata predates this field.
-      billingInterval: subscription.metadata?.interval === 'year' ? 'year' : 'month',
+      billingInterval: seatItem.price.recurring?.interval === 'year' ? 'year' : 'month',
+      stripePriceId: seatItem.price.id,
     };
 
     const existingSeatPlan = await prisma.orgSeatPlan.findFirst({
@@ -89,21 +111,25 @@ export const onOrgSubscriptionUpdated = async ({
         });
 
     // `dmsAddon` is set on each member at the moment they're assigned a
-    // seat — if DMS gets enabled (or disabled) on the org's plan *after*
+    // seat — if DMS gets enabled (or disabled) on this tier's plan *after*
     // that, already-seated members never see it reflected without this:
     // keep every member currently on this tier in sync with its current
     // `dmsEnabled` state, not just whoever triggered this particular sync.
     await prisma.organizationMember.updateMany({
       where: { organizationId, seatTier: tier },
-      data: { dmsAddon: tier === 'ENTERPRISE' ? true : dmsEnabled },
+      data: { dmsAddon: dmsEnabled },
     });
 
     // Only present on the first-purchase (checkout) path — a top-up already
     // self-assigns synchronously in `purchaseSeats` since it doesn't need to
     // wait on a webhook. Idempotent: skipped if the member is already seated.
+    // Metadata's `tier` here means "which tier to auto-assign the purchasing
+    // member to" specifically — not "the subscription's tier" (there can be
+    // more than one now) — so this only fires for the tier that matches it.
     const purchasingMemberId = subscription.metadata?.purchasingMemberId;
+    const purchasingMemberTier = subscription.metadata?.tier;
 
-    if (purchasingMemberId) {
+    if (purchasingMemberId && purchasingMemberTier === tier) {
       const purchasingMember = await prisma.organizationMember.findUnique({
         where: { id: purchasingMemberId },
       });
@@ -120,10 +146,7 @@ export const onOrgSubscriptionUpdated = async ({
 
         await prisma.organizationMember.update({
           where: { id: purchasingMemberId },
-          data: {
-            seatTier: tier,
-            dmsAddon: tier === 'ENTERPRISE' ? true : dmsEnabled,
-          },
+          data: { seatTier: tier, dmsAddon: dmsEnabled },
         });
       }
     }
