@@ -1811,6 +1811,7 @@ model PushNotificationPreference {
   documentCompleted Boolean @default(true)
   documentRejected  Boolean @default(true)
   reminderReceived  Boolean @default(true)
+  inboxItemReceived Boolean @default(true)
 }
 
 // Premium per-user / per-team reusable stamps. Three construction kinds:
@@ -2297,8 +2298,9 @@ model SignatureInboxItem {
   ocrMeta       Json? /// Full OCR metadata (confidences, field_extractions, etc.).
 
   error     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  viewedAt  DateTime? /// Set when a user first opens the item. Null = unread (Outlook-style, shared across the org).
 
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 

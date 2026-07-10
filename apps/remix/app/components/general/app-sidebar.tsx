@@ -190,11 +190,31 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
 
   const { data: orgMembership } = trpc.org.getMyOrganization.useQuery();
 
+  // Unread Signature Inbox count — visible from anywhere in the app, not
+  // just the inbox page itself, polled so it stays reasonably fresh.
+  const { data: unreadInboxCount } = trpc.inbox.unreadCount.useQuery(undefined, {
+    enabled: Boolean(orgMembership?.organization),
+    refetchInterval: 30_000,
+  });
+
   // Expandable submenus (nested under their top-level item).
   const orgNav: SubNavItem[] = [
     { to: '/org/settings', icon: SettingsIcon, label: <Trans>Settings</Trans> },
     { to: '/org/members', icon: UsersIcon, label: <Trans>Members</Trans> },
-    { to: '/org/inbox', icon: InboxIcon, label: <Trans>Signature Inbox</Trans> },
+    {
+      to: '/org/inbox',
+      icon: InboxIcon,
+      label: (
+        <span className="flex w-full items-center justify-between gap-2">
+          <Trans>Signature Inbox</Trans>
+          {Boolean(unreadInboxCount) && (
+            <span className="flex h-4 min-w-4 flex-shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+              {unreadInboxCount}
+            </span>
+          )}
+        </span>
+      ),
+    },
     { to: '/org/permissions', icon: ShieldIcon, label: <Trans>DMS Permissions</Trans> },
     { to: '/org/workflows', icon: WorkflowIcon, label: <Trans>Workflows</Trans> },
     { to: '/org/metadata', icon: DatabaseIcon, label: <Trans>Metadata</Trans> },
@@ -335,6 +355,11 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
           </button>
         </div>
 
+        {/* Scrollable middle: workspace switcher + nav groups. `min-h-0` lets a
+            flex child actually shrink and scroll instead of growing to fit
+            all content (a classic flexbox gotcha) — otherwise expanding every
+            nav group pushes content off-screen with no way to reach it. */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
         {/* Workspace switcher */}
         <div
           className="mx-3 mt-3 mb-2 flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2"
@@ -462,8 +487,9 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
             />
           )}
         </div>
+        </div>
 
-        <div className="mt-auto">
+        <div className="mt-auto flex-shrink-0">
           <SidebarUsageIndicator billingUrl={billingUrl} sidebarTextColor={sidebarTextColor} />
         </div>
 

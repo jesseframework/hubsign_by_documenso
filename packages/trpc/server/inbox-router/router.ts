@@ -113,8 +113,30 @@ export const inboxRouter = router({
         },
       });
       if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'Inbox item not found.' });
+
+      // Mirrors Outlook: opening an item marks it read automatically. Shared
+      // across the org (this is a shared queue, not a per-user mailbox), so
+      // whoever opens it first marks it read for everyone.
+      if (!item.viewedAt) {
+        item.viewedAt = (
+          await prisma.signatureInboxItem.update({
+            where: { id: item.id },
+            data: { viewedAt: new Date() },
+            select: { viewedAt: true },
+          })
+        ).viewedAt;
+      }
+
       return item;
     }),
+
+  /** Count of unread items for the sidebar badge. */
+  unreadCount: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await requireOrgMember(ctx.user.id);
+    return prisma.signatureInboxItem.count({
+      where: { organizationId: membership.organizationId, viewedAt: null },
+    });
+  }),
 
   /** Add signer(s) (if provided) then send the document for signature. */
   sendForSignature: authenticatedProcedure
