@@ -37,7 +37,7 @@ serve({ fetch: handler.fetch, port });
 // eslint-disable-next-line no-console
 console.log(`Server listening on http://localhost:${port}`);
 
-// WorkHub inbox polling is scheduled from `app/entry.server.tsx` instead of
-// here — that module is loaded identically under `npm run dev` and this
-// production build, so a single scheduler now covers both instead of this
-// file's poller only ever running in production.
+// WorkHub inbox fetching is manual-only (the "Fetch from WorkHub" button) —
+// no background poller. An earlier automatic poller was reverted after it
+// exhausted WorkHub's API quota; automatic refresh should be push-based
+// (WorkHub notifying HubSign) rather than polling, pending that integration.

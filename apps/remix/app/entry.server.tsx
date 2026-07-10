@@ -9,27 +9,11 @@ import type { AppLoadContext, EntryContext } from 'react-router';
 import { ServerRouter } from 'react-router';
 
 import { APP_I18N_OPTIONS } from '@documenso/lib/constants/i18n';
-import { pollAllOrgInboxes } from '@documenso/lib/server-only/inbox/poll-workhub-inbox';
 import { dynamicActivate, extractLocaleData } from '@documenso/lib/utils/i18n';
-import { remember } from '@documenso/lib/utils/remember';
 
 import { langCookie } from './storage/lang-cookie.server';
 
 export const streamTimeout = 5_000;
-
-// Self-scheduled WorkHub inbox polling, run in-process so it works identically
-// under `react-router dev` and the production build — unlike a scheduler in
-// `server/main.js`, which is only ever executed by the production Hono
-// bundle. `remember` (also used for the Prisma client singleton) guards
-// against Vite HMR re-evaluating this module and spinning up duplicate
-// intervals.
-const INBOX_POLL_INTERVAL_MS = 20_000;
-
-remember('inboxPollScheduler', () => {
-  const poll = () => void pollAllOrgInboxes().catch((err) => console.error('[inbox-poll]', err));
-  poll();
-  return setInterval(poll, INBOX_POLL_INTERVAL_MS);
-});
 
 export default async function handleRequest(
   request: Request,

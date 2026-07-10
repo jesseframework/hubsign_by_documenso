@@ -75,6 +75,17 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
   }
   const config: WorkHubInboxConfig = { ...base, mailboxId };
 
+  // Persist the resolved UUID so every future call short-circuits `resolveMailboxId`'s
+  // own UUID check (workhub-inbox-client.ts) instead of hitting `GET /email/mailboxes`
+  // again — that endpoint was the direct cause of a quota_exceeded incident when this
+  // ran on a 20s poll; still worth avoiding on every manual fetch too.
+  if (mailboxId && org.workhubMailboxId !== mailboxId) {
+    await prisma.organization.update({
+      where: { id: org.id },
+      data: { workhubMailboxId: mailboxId },
+    });
+  }
+
   // The org owns this mailbox, so trust what lands in it. Documents are owned by
   // the matching member when the sender is one, otherwise by a default org owner
   // (first admin) — external senders are expected on a shared mailbox.
@@ -105,8 +116,11 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
         select: { id: true },
       });
       if (existing) {
+        // Already imported (matched via externalMessageId) — the original import
+        // already called mark-read once on success, so retrying it here on every
+        // subsequent fetch that re-encounters this message is wasted quota with no
+        // effect on local state.
         skipped += 1;
-        await workhubMarkRead(config, msg.id).catch(() => null);
         continue;
       }
 
