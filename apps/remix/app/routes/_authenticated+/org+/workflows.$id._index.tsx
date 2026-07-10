@@ -12,6 +12,19 @@ import { Button } from '@documenso/ui/primitives/button';
 import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
+import type { TSimpleCondition } from '~/components/workflows/condition-rule-builder';
+import {
+  ConditionRuleBuilder,
+  emptySimpleCondition,
+  jsonLogicToSimpleCondition,
+  simpleConditionToJsonLogic,
+} from '~/components/workflows/condition-rule-builder';
+import type { TStepKind } from '~/components/workflows/step-visual-editor';
+import {
+  StepVisualEditor,
+  canRepresentStepsVisually,
+  snippetFor,
+} from '~/components/workflows/step-visual-editor';
 import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
@@ -43,61 +56,52 @@ const fieldCls =
   'block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary';
 const monoCls = `${fieldCls} font-mono text-[12px]`;
 
-const snippetFor = (id: string, kind: string): Record<string, unknown> => {
-  switch (kind) {
-    case 'CONDITION':
-      return {
-        id,
-        type: 'CONDITION',
-        name: 'Check condition',
-        config: { rule: { '==': [{ var: 'event' }, 'DOCUMENT_COMPLETED'] } },
-      };
-    case 'SEND_EMAIL':
-      return {
-        id,
-        type: 'ACTION',
-        name: 'Send email',
-        config: {
-          action: 'SEND_EMAIL',
-          to: '{{document.user.email}}',
-          subject: 'Subject here',
-          html: '<p>Body here</p>',
-        },
-      };
-    case 'HTTP_REQUEST':
-      return {
-        id,
-        type: 'ACTION',
-        name: 'HTTP request',
-        config: {
-          action: 'HTTP_REQUEST',
-          method: 'POST',
-          url: 'https://example.com/hook',
-          headers: { 'content-type': 'application/json' },
-          body: { documentId: '{{document.id}}' },
-          saveResponseAs: 'apiResponse',
-        },
-      };
-    case 'NOTIFY':
-      return {
-        id,
-        type: 'ACTION',
-        name: 'Notify user',
-        config: { action: 'NOTIFY', userId: 'OWNER', title: 'Heads up', message: 'Something happened' },
-      };
-    case 'DELAY':
-      return { id, type: 'DELAY', name: 'Wait', config: { hours: 1 } };
-    case 'SET_VARIABLE':
-      return {
-        id,
-        type: 'SET_VARIABLE',
-        name: 'Set variable',
-        config: { assignments: { myVar: { var: 'document.title' } } },
-      };
-    default:
-      return { id, type: kind };
+type TEditMode = 'simple' | 'advanced';
+
+const safeJsonParse = <T,>(text: string, fallback: T): T => {
+  if (!text.trim()) return fallback;
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return fallback;
   }
 };
+
+/** Default UI mode for the trigger condition — "simple" unless it's too complex to show as rows. */
+const conditionModeFor = (conditionText: string): TEditMode =>
+  jsonLogicToSimpleCondition(safeJsonParse(conditionText, undefined)) !== null ? 'simple' : 'advanced';
+
+/** Default UI mode for the steps builder — "simple" unless it uses a step type/config it can't show. */
+const stepsModeFor = (stepsText: string): TEditMode =>
+  canRepresentStepsVisually(safeJsonParse(stepsText, {})) ? 'simple' : 'advanced';
+
+/** Small "Simple / Advanced (JSON)" switch used by both the trigger condition and the steps builder. */
+const ModeToggle = ({
+  mode,
+  onSimple,
+  onAdvanced,
+}: {
+  mode: TEditMode;
+  onSimple: () => void;
+  onAdvanced: () => void;
+}) => (
+  <div className="flex rounded-md border border-border p-0.5 text-[11px]">
+    <button
+      type="button"
+      className={`rounded px-2 py-0.5 ${mode === 'simple' ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}
+      onClick={onSimple}
+    >
+      <Trans>Simple</Trans>
+    </button>
+    <button
+      type="button"
+      className={`rounded px-2 py-0.5 ${mode === 'advanced' ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}
+      onClick={onAdvanced}
+    >
+      <Trans>Advanced (JSON)</Trans>
+    </button>
+  </div>
+);
 
 export default function WorkflowEditorPage() {
   const { _ } = useLingui();
@@ -127,10 +131,12 @@ export default function WorkflowEditorPage() {
   const [cron, setCron] = useState('0 9 * * *');
   const [timezone, setTimezone] = useState('UTC');
   const [conditionText, setConditionText] = useState('');
+  const [conditionMode, setConditionMode] = useState<TEditMode>('simple');
 
-  // Steps (the processing stream, edited as JSON)
+  // Steps (the processing stream) — a visual builder by default, with a raw-JSON escape hatch.
   const [startStepId, setStartStepId] = useState('notify');
   const [stepsText, setStepsText] = useState(STARTER_STEPS);
+  const [stepsMode, setStepsMode] = useState<TEditMode>(() => stepsModeFor(STARTER_STEPS));
 
   // Raw full-definition JSON (import/export)
   const [rawText, setRawText] = useState('');
@@ -158,9 +164,13 @@ export default function WorkflowEditorPage() {
     if (trigger.event) setTriggerEvent(trigger.event);
     if (trigger.cron) setCron(trigger.cron);
     if (trigger.timezone) setTimezone(trigger.timezone);
-    setConditionText(trigger.condition ? JSON.stringify(trigger.condition, null, 2) : '');
+    const newConditionText = trigger.condition ? JSON.stringify(trigger.condition, null, 2) : '';
+    setConditionText(newConditionText);
+    setConditionMode(conditionModeFor(newConditionText));
     setStartStepId(def.startStepId ?? Object.keys(def.steps ?? {})[0] ?? '');
-    setStepsText(JSON.stringify(def.steps ?? {}, null, 2));
+    const newStepsText = JSON.stringify(def.steps ?? {}, null, 2);
+    setStepsText(newStepsText);
+    setStepsMode(stepsModeFor(newStepsText));
     setInitialized(true);
   }, [existing, initialized]);
 
@@ -282,9 +292,13 @@ export default function WorkflowEditorPage() {
       if (trigger.event) setTriggerEvent(trigger.event);
       if (trigger.cron) setCron(trigger.cron);
       if (trigger.timezone) setTimezone(trigger.timezone);
-      setConditionText(trigger.condition ? JSON.stringify(trigger.condition, null, 2) : '');
+      const newConditionText = trigger.condition ? JSON.stringify(trigger.condition, null, 2) : '';
+      setConditionText(newConditionText);
+      setConditionMode(conditionModeFor(newConditionText));
       setStartStepId(def.startStepId ?? Object.keys(def.steps ?? {})[0] ?? '');
-      setStepsText(JSON.stringify(def.steps ?? {}, null, 2));
+      const newStepsText = JSON.stringify(def.steps ?? {}, null, 2);
+      setStepsText(newStepsText);
+      setStepsMode(stepsModeFor(newStepsText));
       setView('builder');
       toast({ title: _(msg`Workflow generated — review and Save`) });
     } catch (err) {
@@ -294,26 +308,6 @@ export default function WorkflowEditorPage() {
         variant: 'destructive',
       });
     }
-  };
-
-  const addStep = (kind: string) => {
-    let steps: Record<string, unknown>;
-    try {
-      steps = JSON.parse(stepsText);
-    } catch {
-      toast({ title: _(msg`Fix the steps JSON first`), variant: 'destructive' });
-      return;
-    }
-    const base = kind === 'CONDITION' ? 'condition' : kind.toLowerCase();
-    let stepId = base;
-    let n = 1;
-    while (steps[stepId]) {
-      n += 1;
-      stepId = `${base}_${n}`;
-    }
-    steps[stepId] = snippetFor(stepId, kind);
-    setStepsText(JSON.stringify(steps, null, 2));
-    if (!startStepId) setStartStepId(stepId);
   };
 
   const applyRawJson = () => {
@@ -333,11 +327,70 @@ export default function WorkflowEditorPage() {
     if (trigger.event) setTriggerEvent(trigger.event);
     if (trigger.cron) setCron(trigger.cron);
     if (trigger.timezone) setTimezone(trigger.timezone);
-    setConditionText(trigger.condition ? JSON.stringify(trigger.condition, null, 2) : '');
+    const newConditionText = trigger.condition ? JSON.stringify(trigger.condition, null, 2) : '';
+    setConditionText(newConditionText);
+    setConditionMode(conditionModeFor(newConditionText));
     setStartStepId(parsed.startStepId ?? Object.keys(parsed.steps ?? {})[0] ?? '');
-    setStepsText(JSON.stringify(parsed.steps ?? {}, null, 2));
+    const newStepsText = JSON.stringify(parsed.steps ?? {}, null, 2);
+    setStepsText(newStepsText);
+    setStepsMode(stepsModeFor(newStepsText));
     setView('builder');
     toast({ title: _(msg`Applied to builder`) });
+  };
+
+  /** Apply a change from the simple condition rows back into `conditionText`. */
+  const applySimpleCondition = (next: TSimpleCondition) => {
+    const json = simpleConditionToJsonLogic(next);
+    setConditionText(json === undefined ? '' : JSON.stringify(json, null, 2));
+  };
+
+  const trySwitchConditionToSimple = () => {
+    if (conditionModeFor(conditionText) === 'advanced') {
+      toast({
+        title: _(msg`Can't show this condition visually`),
+        description: _(
+          msg`It uses logic more complex than simple field comparisons. Simplify it, or keep editing as JSON.`,
+        ),
+        variant: 'destructive',
+      });
+      return;
+    }
+    setConditionMode('simple');
+  };
+
+  const trySwitchStepsToSimple = () => {
+    if (stepsModeFor(stepsText) === 'advanced') {
+      toast({
+        title: _(msg`Can't show these steps visually`),
+        description: _(
+          msg`Some steps use logic this editor can't display (e.g. branching or advanced rules). Simplify them, or keep editing as JSON.`,
+        ),
+        variant: 'destructive',
+      });
+      return;
+    }
+    setStepsMode('simple');
+  };
+
+  /** Insert a ready-made step snippet directly into the raw steps JSON (advanced mode only). */
+  const addStepToRaw = (kind: TStepKind) => {
+    let steps: Record<string, unknown>;
+    try {
+      steps = JSON.parse(stepsText);
+    } catch {
+      toast({ title: _(msg`Fix the steps JSON first`), variant: 'destructive' });
+      return;
+    }
+    const base = kind === 'CONDITION' ? 'condition' : kind.toLowerCase();
+    let stepId = base;
+    let n = 1;
+    while (steps[stepId]) {
+      n += 1;
+      stepId = `${base}_${n}`;
+    }
+    steps[stepId] = snippetFor(stepId, kind);
+    setStepsText(JSON.stringify(steps, null, 2));
+    if (!startStepId) setStartStepId(stepId);
   };
 
   if (!isNew && isLoading) {
@@ -551,65 +604,108 @@ export default function WorkflowEditorPage() {
             </div>
 
             <div className="mt-3">
-              <label className={labelCls}>
-                <Trans>Condition (JSONLogic, optional)</Trans>
-              </label>
-              <textarea
-                className={monoCls}
-                rows={4}
-                value={conditionText}
-                onChange={(e) => setConditionText(e.target.value)}
-                placeholder='{ "==": [ { "var": "document.status" }, "COMPLETED" ] }'
-                spellCheck={false}
-              />
+              <div className="mb-1 flex items-center justify-between">
+                <label className={labelCls}>
+                  <Trans>Only run when… (optional)</Trans>
+                </label>
+                <ModeToggle
+                  mode={conditionMode}
+                  onSimple={trySwitchConditionToSimple}
+                  onAdvanced={() => setConditionMode('advanced')}
+                />
+              </div>
+
+              {conditionMode === 'simple' ? (
+                <ConditionRuleBuilder
+                  value={
+                    jsonLogicToSimpleCondition(safeJsonParse(conditionText, undefined)) ??
+                    emptySimpleCondition()
+                  }
+                  onChange={applySimpleCondition}
+                />
+              ) : (
+                <textarea
+                  className={monoCls}
+                  rows={4}
+                  value={conditionText}
+                  onChange={(e) => setConditionText(e.target.value)}
+                  placeholder='{ "==": [ { "var": "document.status" }, "COMPLETED" ] }'
+                  spellCheck={false}
+                />
+              )}
             </div>
           </div>
 
           {/* Steps */}
           <div className="rounded-[var(--r)] border border-border bg-card p-4">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 className="text-[14px] font-semibold">
                 <Trans>Processing stream (steps)</Trans>
               </h3>
-              <div className="flex flex-wrap gap-1">
-                {['CONDITION', 'SEND_EMAIL', 'HTTP_REQUEST', 'NOTIFY', 'DELAY', 'SET_VARIABLE'].map(
-                  (kind) => (
+              <ModeToggle
+                mode={stepsMode}
+                onSimple={trySwitchStepsToSimple}
+                onAdvanced={() => setStepsMode('advanced')}
+              />
+            </div>
+
+            {stepsMode === 'simple' ? (
+              <StepVisualEditor
+                steps={safeJsonParse<Record<string, unknown>>(stepsText, {})}
+                startStepId={startStepId}
+                onStepsChange={(next) => setStepsText(JSON.stringify(next, null, 2))}
+                onStartStepIdChange={setStartStepId}
+              />
+            ) : (
+              <>
+                <div className="mb-2 flex flex-wrap gap-1">
+                  {(
+                    [
+                      'CONDITION',
+                      'SEND_EMAIL',
+                      'HTTP_REQUEST',
+                      'NOTIFY',
+                      'DELAY',
+                      'SET_VARIABLE',
+                    ] as TStepKind[]
+                  ).map((kind) => (
                     <Button
                       key={kind}
                       size="sm"
                       variant="outline"
                       className="h-7 text-[11px]"
-                      onClick={() => addStep(kind)}
+                      onClick={() => addStepToRaw(kind)}
                     >
                       + {kind.replace(/_/g, ' ').toLowerCase()}
                     </Button>
-                  ),
-                )}
-              </div>
-            </div>
+                  ))}
+                </div>
 
-            <div className="mb-2 max-w-xs">
-              <label className={labelCls}>
-                <Trans>Start step id</Trans>
-              </label>
-              <Input
-                className="h-8 font-mono text-[12px]"
-                value={startStepId}
-                onChange={(e) => setStartStepId(e.target.value)}
-              />
-            </div>
+                <div className="mb-2 max-w-xs">
+                  <label className={labelCls}>
+                    <Trans>Start step id</Trans>
+                  </label>
+                  <Input
+                    className="h-8 font-mono text-[12px]"
+                    value={startStepId}
+                    onChange={(e) => setStartStepId(e.target.value)}
+                  />
+                </div>
 
-            <label className={labelCls}>
-              <Trans>Steps (JSON object keyed by step id)</Trans>
-            </label>
-            <textarea
-              className={monoCls}
-              rows={18}
-              value={stepsText}
-              onChange={(e) => setStepsText(e.target.value)}
-              spellCheck={false}
-            />
-            <p className="mt-1 text-[11px] text-muted-foreground">
+                <label className={labelCls}>
+                  <Trans>Steps (JSON object keyed by step id)</Trans>
+                </label>
+                <textarea
+                  className={monoCls}
+                  rows={18}
+                  value={stepsText}
+                  onChange={(e) => setStepsText(e.target.value)}
+                  spellCheck={false}
+                />
+              </>
+            )}
+
+            <p className="mt-2 text-[11px] text-muted-foreground">
               {previewDefinition ? (
                 <span className="text-emerald-600 dark:text-emerald-400">
                   <Trans>Definition is valid.</Trans>
