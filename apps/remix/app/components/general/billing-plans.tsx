@@ -19,14 +19,12 @@ import { EmbeddedCheckoutForm } from './embedded-checkout-form';
 
 type Interval = keyof PriceIntervals;
 
-const INTERVALS: Interval[] = ['day', 'week', 'month', 'year'];
+const INTERVALS: Interval[] = ['month', 'year'];
 
 // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
 const isInterval = (value: unknown): value is Interval => INTERVALS.includes(value as Interval);
 
 const FRIENDLY_INTERVALS: Record<Interval, MessageDescriptor> = {
-  day: msg`Daily`,
-  week: msg`Weekly`,
   month: msg`Monthly`,
   year: msg`Yearly`,
 };

@@ -6,7 +6,12 @@ import { stripe } from '@documenso/lib/server-only/stripe';
 // Utility type to handle usage of the `expand` option.
 export type PriceWithProduct = Stripe.Price & { product: Stripe.Product };
 
-export type PriceIntervals = Record<Stripe.Price.Recurring.Interval, PriceWithProduct[]>;
+// Only month/year are ever legitimate customer-facing billing intervals —
+// deliberately narrower than Stripe's own `day`/`week`/`month`/`year` so a
+// stray non-month/year test Price (tagged with the same `plan` metadata as a
+// real product) can never surface as a selectable interval on a billing page
+// again, regardless of what's active in Stripe.
+export type PriceIntervals = Record<'month' | 'year', PriceWithProduct[]>;
 
 export type GetPricesByIntervalOptions = {
   /**
@@ -35,15 +40,15 @@ export const getPricesByInterval = async ({ plans }: GetPricesByIntervalOptions 
   });
 
   const intervals: PriceIntervals = {
-    day: [],
-    week: [],
     month: [],
     year: [],
   };
 
-  // Add each price to the correct interval.
+  // Add each price to the correct interval — silently drops anything that
+  // isn't month/year (e.g. a `day` test-verification price) rather than
+  // surfacing it.
   for (const price of prices) {
-    if (price.recurring?.interval) {
+    if (price.recurring?.interval === 'month' || price.recurring?.interval === 'year') {
       // We use `expand` to get the product, but it's not typed as part of the Price type.
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
       intervals[price.recurring.interval].push(price as PriceWithProduct);
@@ -51,8 +56,6 @@ export const getPricesByInterval = async ({ plans }: GetPricesByIntervalOptions 
   }
 
   // Order all prices by unit_amount.
-  intervals.day.sort((a, b) => Number(a.unit_amount) - Number(b.unit_amount));
-  intervals.week.sort((a, b) => Number(a.unit_amount) - Number(b.unit_amount));
   intervals.month.sort((a, b) => Number(a.unit_amount) - Number(b.unit_amount));
   intervals.year.sort((a, b) => Number(a.unit_amount) - Number(b.unit_amount));
 
