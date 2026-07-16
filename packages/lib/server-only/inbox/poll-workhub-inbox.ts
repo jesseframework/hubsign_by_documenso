@@ -60,6 +60,17 @@ const configFor = (org: OrgInbox): WorkHubInboxConfig => ({
 /** Poll a single organization's WorkHub inbox. */
 export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
   const base = configFor(org);
+  // Surface the common misconfiguration loudly: BulkSender username/password is a
+  // send-only (HTTP Basic) credential that the inbox API rejects. If that's all the
+  // org set, tell them exactly what to fix instead of silently reporting "not
+  // configured" (which reads as "I never set anything up").
+  if (!base.apiKey && (base.username || base.password)) {
+    throw new Error(
+      'WorkHub inbox is set up with BulkSender username/password only, which the ' +
+        'inbox API rejects (HTTP Basic is send-only). Add a WorkHub API key with ' +
+        'email.read permission in Org Settings → WorkHub inbox connection.',
+    );
+  }
   if (!isWorkHubInboxConfigured(base)) {
     return { scanned: 0, imported: 0, skipped: 0, configured: false };
   }
