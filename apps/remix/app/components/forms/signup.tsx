@@ -16,6 +16,7 @@ import { authClient } from '@documenso/auth/client';
 import { useAnalytics } from '@documenso/lib/client-only/hooks/use-analytics';
 import { NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
+import { alphaid } from '@documenso/lib/universal/id';
 import { env } from '@documenso/lib/utils/env';
 import { ZPasswordSchema } from '@documenso/trpc/server/auth-router/schema';
 import { cn } from '@documenso/ui/lib/utils';
@@ -181,13 +182,15 @@ export const SignUpForm = ({
         return;
       }
 
-      // Auto-generate username from name and submit directly
+      // Auto-generate username from name and submit directly. This field is no longer
+      // user-facing, so it's suffixed with a random id to avoid colliding with other
+      // users who share a name (previously caused a hard signup failure).
       const nameValue = form.getValues('name');
-      const autoUrl = nameValue
+      const nameSlug = nameValue
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '')
-        || `user-${Date.now().toString(36)}`;
+        .replace(/^-|-$/g, '');
+      const autoUrl = `${nameSlug ? `${nameSlug}-` : 'user-'}${alphaid(8)}`;
 
       form.setValue('url', autoUrl);
 
