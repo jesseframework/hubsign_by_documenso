@@ -6,11 +6,15 @@
  *   GET    /v1/email/inbox/{id}/attachments/{aid}          fetch attachment (base64)
  *   POST   /v1/email/inbox/{id}/mark-read                  mark read
  *
- * Auth: HTTP Basic with the org's WorkHub BulkSender credential — the SAME auth
- * model as sending (WorkHub binds the credential to a mailbox server-side). The
- * credential is stored per-organization, so each org reads its own mailbox.
- * Response parsing is tolerant of field-name variations until the live shape is
- * pinned.
+ * Auth: an `x-api-key` WorkHub API key (`whk_…`) with `email.read` (+ `email.update`
+ * for mark-read). This is DIFFERENT from sending: the inbox REST API's auth
+ * middleware accepts ONLY `x-api-key` or a user Bearer JWT — HTTP Basic (the
+ * BulkSender username/password used for SMTP send) is NOT a supported scheme and
+ * returns 401 `unauthenticated`. API-key callers are also required to target a
+ * `mailboxId` (there is no user identity to resolve a default mailbox from), which
+ * the poller resolves from the org's inbox email. The API key is stored per
+ * organization, so each org reads its own mailbox. Response parsing is tolerant of
+ * field-name variations until the live shape is pinned.
  */
 
 import { env } from '../../utils/env';
@@ -24,7 +28,10 @@ export type WorkHubInboxConfig = {
 };
 
 export const isWorkHubInboxConfigured = (config: WorkHubInboxConfig): boolean =>
-  !!config.apiKey || (!!config.username && !!config.password);
+  // Only an API key can read the inbox. BulkSender username/password (HTTP Basic)
+  // is a send-only credential and is rejected by the inbox API's auth middleware,
+  // so it does NOT count as configured here.
+  !!config.apiKey;
 
 /**
  * Resolve the API base, tolerating a missing version segment: both
@@ -41,15 +48,20 @@ const resolveBase = (config: WorkHubInboxConfig): string => {
 };
 
 /**
- * Auth: prefer the API key (`x-api-key`, the inbox read API's scheme); fall back
- * to HTTP Basic with a BulkSender credential if that's all that's configured.
+ * The inbox read API authenticates via `x-api-key` only. There is deliberately no
+ * HTTP Basic fallback: the WorkHub auth middleware rejects Basic with a 401, so a
+ * "successful" Basic request never happens — failing here with an actionable
+ * message beats emitting a doomed request that surfaces as a cryptic 401/502.
  */
 const headers = (config: WorkHubInboxConfig): Record<string, string> => {
-  if (config.apiKey) {
-    return { 'x-api-key': config.apiKey, 'content-type': 'application/json' };
+  if (!config.apiKey) {
+    throw new Error(
+      'WorkHub inbox requires an API key (x-api-key) with email.read permission. ' +
+        'BulkSender username/password (HTTP Basic) is a send-only credential and is ' +
+        'rejected by the inbox API — set the "WorkHub API key" field in Org Settings.',
+    );
   }
-  const basic = Buffer.from(`${config.username ?? ''}:${config.password ?? ''}`).toString('base64');
-  return { authorization: `Basic ${basic}`, 'content-type': 'application/json' };
+  return { 'x-api-key': config.apiKey, 'content-type': 'application/json' };
 };
 
 const url = (config: WorkHubInboxConfig, path: string): string => {
