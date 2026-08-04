@@ -10,6 +10,7 @@ import { fieldRouter } from './field-router/router';
 import { folderRouter } from './folder-router/router';
 import { inboxRouter } from './inbox-router/router';
 import { metadataRouter } from './metadata-router/router';
+import { msTeamsRouter } from './ms-teams-router/router';
 import { profileRouter } from './profile-router/router';
 import { pushRouter } from './push-router/router';
 import { recipientRouter } from './recipient-router/router';
@@ -43,6 +44,7 @@ export const appRouter = router({
   approval: approvalRouter,
   inbox: inboxRouter,
   metadata: metadataRouter,
+  msTeams: msTeamsRouter,
 });
 
 export type AppRouter = typeof appRouter;

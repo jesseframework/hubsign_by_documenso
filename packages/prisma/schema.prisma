@@ -57,8 +57,8 @@ model User {
   // to set a password on first login.
   mustChangePassword Boolean @default(false)
 
-  pushTokens         PushDeviceToken[]
-  pushNotifPrefs     PushNotificationPreference?
+  pushTokens     PushDeviceToken[]
+  pushNotifPrefs PushNotificationPreference?
 
   accounts             Account[]
   sessions             Session[]
@@ -85,30 +85,30 @@ model User {
   avatarImage        AvatarImage?           @relation(fields: [avatarImageId], references: [id], onDelete: SetNull)
 
   // DMS relations
-  dmsLocations          DmsLocation[]
-  dmsDocuments          DmsDocument[]
-  dmsCheckedOutDocs     DmsDocument[] @relation("DmsCheckedOutBy")
-  dmsVersions           DmsVersion[]
-  dmsRetrievalRequests  DmsRetrievalRequest[] @relation("DmsRetrievalRequester")
-  dmsRetrievalApprovals DmsRetrievalRequest[] @relation("DmsRetrievalApprover")
-  dmsFilingRules        DmsFilingRule[]
-  dmsAuditLogs          DmsAuditLog[]
-  dmsComments           DmsComment[]
-  dmsWorkflowsInitiated DmsWorkflow[] @relation("DmsWorkflowInitiator")
-  dmsWorkflowSteps      DmsWorkflowStep[] @relation("DmsWorkflowAssignee")
-  dmsPermissions        DmsPermission[]
-  dmsPermissionsGranted DmsPermission[] @relation("DmsPermissionGranter")
-  dmsDocumentLinks      DmsDocumentLink[]
-  dmsFavorites          DmsFavorite[]
-  dmsShareLinks         DmsShareLink[]
-  dmsAutoFilingSettings DmsAutoFilingSettings?
-  organizationMemberships OrganizationMember[]
-  dmsOrgPermissionsGranted DmsOrgPermission[] @relation("DmsOrgPermissionGranter")
-  dmsRecycleBinItems    DmsRecycleBinItem[] @relation("DmsRecycleBinDeleter")
-  dmsSavedSearches      DmsSavedSearch[]
-  dmsAiConversations    DmsAiConversation[]
-  dmsAiUsage            DmsAiUsage[]
-  createdWorkflows      Workflow[]            @relation("UserCreatedWorkflows")
+  dmsLocations             DmsLocation[]
+  dmsDocuments             DmsDocument[]
+  dmsCheckedOutDocs        DmsDocument[]          @relation("DmsCheckedOutBy")
+  dmsVersions              DmsVersion[]
+  dmsRetrievalRequests     DmsRetrievalRequest[]  @relation("DmsRetrievalRequester")
+  dmsRetrievalApprovals    DmsRetrievalRequest[]  @relation("DmsRetrievalApprover")
+  dmsFilingRules           DmsFilingRule[]
+  dmsAuditLogs             DmsAuditLog[]
+  dmsComments              DmsComment[]
+  dmsWorkflowsInitiated    DmsWorkflow[]          @relation("DmsWorkflowInitiator")
+  dmsWorkflowSteps         DmsWorkflowStep[]      @relation("DmsWorkflowAssignee")
+  dmsPermissions           DmsPermission[]
+  dmsPermissionsGranted    DmsPermission[]        @relation("DmsPermissionGranter")
+  dmsDocumentLinks         DmsDocumentLink[]
+  dmsFavorites             DmsFavorite[]
+  dmsShareLinks            DmsShareLink[]
+  dmsAutoFilingSettings    DmsAutoFilingSettings?
+  organizationMemberships  OrganizationMember[]
+  dmsOrgPermissionsGranted DmsOrgPermission[]     @relation("DmsOrgPermissionGranter")
+  dmsRecycleBinItems       DmsRecycleBinItem[]    @relation("DmsRecycleBinDeleter")
+  dmsSavedSearches         DmsSavedSearch[]
+  dmsAiConversations       DmsAiConversation[]
+  dmsAiUsage               DmsAiUsage[]
+  createdWorkflows         Workflow[]             @relation("UserCreatedWorkflows")
 
   @@index([email])
 }
@@ -272,16 +272,19 @@ enum SubscriptionStatus {
 }
 
 model Subscription {
-  id                Int                @id @default(autoincrement())
-  status            SubscriptionStatus @default(INACTIVE)
-  planId            String             @unique
-  priceId           String
-  periodEnd         DateTime?
-  userId            Int?
-  teamId            Int?               @unique
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  cancelAtPeriodEnd Boolean            @default(false)
+  id                              Int                @id @default(autoincrement())
+  status                          SubscriptionStatus @default(INACTIVE)
+  planId                          String             @unique
+  priceId                         String
+  periodEnd                       DateTime?
+  userId                          Int?
+  teamId                          Int?               @unique
+  createdAt                       DateTime           @default(now())
+  updatedAt                       DateTime           @updatedAt
+  cancelAtPeriodEnd               Boolean            @default(false)
+  // Tracks the `periodEnd` a renewal reminder was already sent for, so the
+  // scheduled reminder job doesn't re-send until the subscription renews.
+  renewalReminderSentForPeriodEnd DateTime?
 
   team Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -712,14 +715,14 @@ model Team {
   organization   Organization? @relation("OrgTeams", fields: [organizationId], references: [id])
 
   // DMS relations
-  dmsLocations       DmsLocation[]
-  dmsDocumentTypes   DmsDocumentType[]
-  dmsClassifications DmsClassification[]
-  dmsTags            DmsTag[]
-  dmsDocuments            DmsDocument[]
-  dmsFilingRules          DmsFilingRule[]
-  dmsComplianceTemplates  DmsComplianceTemplate[]
-  dmsAutoFilingSettings   DmsAutoFilingSettings[]
+  dmsLocations           DmsLocation[]
+  dmsDocumentTypes       DmsDocumentType[]
+  dmsClassifications     DmsClassification[]
+  dmsTags                DmsTag[]
+  dmsDocuments           DmsDocument[]
+  dmsFilingRules         DmsFilingRule[]
+  dmsComplianceTemplates DmsComplianceTemplate[]
+  dmsAutoFilingSettings  DmsAutoFilingSettings[]
 }
 
 model TeamPending {
@@ -976,7 +979,7 @@ enum DmsRetrievalStatus {
 // ── Filing Structure ──
 
 model DmsLocation {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
   address     String?
   description String?
@@ -998,7 +1001,7 @@ model DmsLocation {
 }
 
 model DmsCabinet {
-  id          String @id @default(cuid())
+  id          String  @id @default(cuid())
   name        String
   description String?
 
@@ -1043,7 +1046,7 @@ model DmsBin {
 // ── Document Types & Classification ──
 
 model DmsDocumentType {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
   name           String
   description    String?
   /// [DmsMetadataSchema]
@@ -1104,29 +1107,29 @@ model DmsTag {
 // ── Core Document ──
 
 model DmsDocument {
-  id              String              @id @default(cuid())
-  title           String
-  description     String?
-  referenceNumber String?             @unique
-  fileUrl         String
-  fileName        String
-  fileType        String
-  fileSize        Int
-  ocrText         String?
-  ocrProcessed    Boolean             @default(false)
-  status          DmsDocumentStatus   @default(ACTIVE)
-  format          DmsDocumentFormat   @default(DIGITAL)
-  confidentiality DmsConfidentiality  @default(INTERNAL)
-  disposalStatus  DmsDisposalStatus   @default(NOT_DUE)
-  disposalDate    DateTime?
+  id                   String             @id @default(cuid())
+  title                String
+  description          String?
+  referenceNumber      String?            @unique
+  fileUrl              String
+  fileName             String
+  fileType             String
+  fileSize             Int
+  ocrText              String?
+  ocrProcessed         Boolean            @default(false)
+  status               DmsDocumentStatus  @default(ACTIVE)
+  format               DmsDocumentFormat  @default(DIGITAL)
+  confidentiality      DmsConfidentiality @default(INTERNAL)
+  disposalStatus       DmsDisposalStatus  @default(NOT_DUE)
+  disposalDate         DateTime?
   disposalApprovedById Int?
-  disposalNotes   String?
-  physicalLocation String?
-  labelPrinted    Boolean             @default(false)
+  disposalNotes        String?
+  physicalLocation     String?
+  labelPrinted         Boolean            @default(false)
   /// [DmsDocumentMetadata]
-  metadata        Json?
-  retentionDate   DateTime?
-  expiryDate      DateTime?
+  metadata             Json?
+  retentionDate        DateTime?
+  expiryDate           DateTime?
 
   // Filing location
   binId String?
@@ -1134,7 +1137,7 @@ model DmsDocument {
 
   // Classification
   documentTypeId   String?
-  documentType     DmsDocumentType? @relation(fields: [documentTypeId], references: [id])
+  documentType     DmsDocumentType?   @relation(fields: [documentTypeId], references: [id])
   classificationId String?
   classification   DmsClassification? @relation(fields: [classificationId], references: [id])
 
@@ -1160,18 +1163,18 @@ model DmsDocument {
   organization   Organization? @relation("OrgDmsDocuments", fields: [organizationId], references: [id])
 
   // Relations
-  tags             DmsDocumentTag[]
-  recycleBinItem   DmsRecycleBinItem?
-  versions         DmsVersion[]
+  tags              DmsDocumentTag[]
+  recycleBinItem    DmsRecycleBinItem?
+  versions          DmsVersion[]
   retrievalRequests DmsRetrievalRequest[]
-  auditLogs        DmsAuditLog[]
-  comments         DmsComment[]
-  workflows        DmsWorkflow[]
-  permissions      DmsPermission[]
-  linksAsSource    DmsDocumentLink[] @relation("DmsLinkSource")
-  linksAsTarget    DmsDocumentLink[] @relation("DmsLinkTarget")
-  favorites        DmsFavorite[]
-  shareLinks       DmsShareLink[]
+  auditLogs         DmsAuditLog[]
+  comments          DmsComment[]
+  workflows         DmsWorkflow[]
+  permissions       DmsPermission[]
+  linksAsSource     DmsDocumentLink[]     @relation("DmsLinkSource")
+  linksAsTarget     DmsDocumentLink[]     @relation("DmsLinkTarget")
+  favorites         DmsFavorite[]
+  shareLinks        DmsShareLink[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1181,7 +1184,7 @@ model DmsDocumentTag {
   documentId String
   document   DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
   tagId      String
-  tag        DmsTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tag        DmsTag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@id([documentId, tagId])
 }
@@ -1189,11 +1192,11 @@ model DmsDocumentTag {
 // ── Versioning ──
 
 model DmsVersion {
-  id      String @id @default(cuid())
-  version Int
-  fileUrl String
+  id       String  @id @default(cuid())
+  version  Int
+  fileUrl  String
   fileSize Int
-  notes   String?
+  notes    String?
 
   documentId String
   document   DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
@@ -1207,8 +1210,8 @@ model DmsVersion {
 // ── Retrieval Requests ──
 
 model DmsRetrievalRequest {
-  id     String              @id @default(cuid())
-  status DmsRetrievalStatus  @default(PENDING)
+  id     String             @id @default(cuid())
+  status DmsRetrievalStatus @default(PENDING)
   notes  String?
   reason String?
 
@@ -1236,10 +1239,10 @@ model DmsFilingRule {
   active Boolean @default(true)
 
   /// [DmsFilingCondition]
-  condition Json
+  condition        Json
   // Destination
-  binId          String?
-  documentTypeId String?
+  binId            String?
+  documentTypeId   String?
   classificationId String?
 
   teamId Int?
@@ -1258,9 +1261,9 @@ model DmsFilingRule {
 // ── Audit Log ──
 
 model DmsAuditLog {
-  id     String @id @default(cuid())
-  action String
-  details String?
+  id        String  @id @default(cuid())
+  action    String
+  details   String?
   ipAddress String?
 
   documentId String
@@ -1327,12 +1330,12 @@ model DmsWorkflow {
 }
 
 model DmsWorkflowStep {
-  id       String                @id @default(cuid())
-  step     Int
-  action   String                @default("APPROVE")
-  status   DmsWorkflowStepStatus @default(PENDING)
-  notes    String?
-  dueDate  DateTime?
+  id      String                @id @default(cuid())
+  step    Int
+  action  String                @default("APPROVE")
+  status  DmsWorkflowStepStatus @default(PENDING)
+  notes   String?
+  dueDate DateTime?
 
   workflowId String
   workflow   DmsWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
@@ -1361,9 +1364,9 @@ model DmsPermission {
 
   // Can be scoped to location, document, or classification
   locationId       String?
-  location         DmsLocation? @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  location         DmsLocation?       @relation(fields: [locationId], references: [id], onDelete: Cascade)
   documentId       String?
-  document         DmsDocument? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document         DmsDocument?       @relation(fields: [documentId], references: [id], onDelete: Cascade)
   classificationId String?
   classification   DmsClassification? @relation(fields: [classificationId], references: [id], onDelete: Cascade)
 
@@ -1418,13 +1421,13 @@ model DmsFavorite {
 // ── Secure Share Links ──
 
 model DmsShareLink {
-  id        String   @id @default(cuid())
-  token     String   @unique @default(cuid())
+  id        String    @id @default(cuid())
+  token     String    @unique @default(cuid())
   password  String?
   expiresAt DateTime?
   maxViews  Int?
-  viewCount Int      @default(0)
-  active    Boolean  @default(true)
+  viewCount Int       @default(0)
+  active    Boolean   @default(true)
 
   documentId String
   document   DmsDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
@@ -1438,13 +1441,13 @@ model DmsShareLink {
 // ── Compliance Templates ──
 
 model DmsComplianceTemplate {
-  id              String @id @default(cuid())
-  name            String
-  description     String?
-  industry        String
-  retentionYears  Int
-  disposalAction  String @default("ARCHIVE")
-  legalBasis      String?
+  id             String  @id @default(cuid())
+  name           String
+  description    String?
+  industry       String
+  retentionYears Int
+  disposalAction String  @default("ARCHIVE")
+  legalBasis     String?
 
   teamId Int?
   team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -1468,8 +1471,8 @@ model DmsAutoFilingSettings {
   confidentiality  DmsConfidentiality @default(INTERNAL)
   autoOcr          Boolean            @default(true)
 
-  userId Int    @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   teamId Int?
   team   Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
@@ -1506,39 +1509,43 @@ enum DmsPermissionAction {
 }
 
 model Organization {
-  id     Int    @id @default(autoincrement())
-  name   String
-  slug   String @unique
-  domain String? @unique
+  id      Int     @id @default(autoincrement())
+  name    String
+  slug    String  @unique
+  domain  String? @unique
   logoUrl String?
 
   // Branding
-  brandingLogo              String?  // URL or base64
-  brandingPrimaryColor      String?  // hex e.g. #7c5cfc
-  brandingAccentColor       String?  // hex e.g. #f59e0b
-  brandingSidebarBg         String?  // hex e.g. #0d0d10
-  brandingSidebarTextColor  String?  // hex e.g. #f4f2ff
-  brandingNavActiveColor   String?  // hex for active nav item
-  brandingButtonColor       String?  // hex e.g. #7c5cfc
-  brandingButtonHoverColor  String?  // hex e.g. #6a4af0
-  brandingButtonTextColor   String?  // hex e.g. #ffffff
+  brandingLogo             String? // URL or base64
+  brandingPrimaryColor     String? // hex e.g. #7c5cfc
+  brandingAccentColor      String? // hex e.g. #f59e0b
+  brandingSidebarBg        String? // hex e.g. #0d0d10
+  brandingSidebarTextColor String? // hex e.g. #f4f2ff
+  brandingNavActiveColor   String? // hex for active nav item
+  brandingButtonColor      String? // hex e.g. #7c5cfc
+  brandingButtonHoverColor String? // hex e.g. #6a4af0
+  brandingButtonTextColor  String? // hex e.g. #ffffff
 
   // OCR / BMS ML Settings
-  ocrApiUrl            String?  // e.g. http://bms-ml:8080/api/v1
-  ocrApiKey            String?  // API key or JWT token
-  ocrApiUsername       String?  // For JWT auth: username
-  ocrApiPassword       String?  // For JWT auth: password
-  ocrDefaultTemplateId Int?     // Default extraction template ID
-  ocrAutoProcess       Boolean  @default(false) // Auto-OCR on upload
-  ocrDefaultEngine     String?  // auto, doctr, easyocr, tesseract, pymupdf
+  ocrApiUrl            String? // e.g. http://bms-ml:8080/api/v1
+  ocrApiKey            String? // API key or JWT token
+  ocrApiUsername       String? // For JWT auth: username
+  ocrApiPassword       String? // For JWT auth: password
+  ocrDefaultTemplateId Int? // Default extraction template ID
+  ocrAutoProcess       Boolean @default(false) // Auto-OCR on upload
+  ocrDefaultEngine     String? // auto, doctr, easyocr, tesseract, pymupdf
 
   // Stripe billing
-  stripeCustomerId     String? @unique
-  stripeSubscriptionId String? @unique
-  stripeSeatPriceId    String?
-  stripeDmsPriceId     String?
-  seatCount            Int     @default(0)
-  billingStatus        String  @default("inactive") // inactive, active, past_due
+  stripeCustomerId                String?   @unique
+  stripeSubscriptionId            String?   @unique
+  stripeSeatPriceId               String?
+  stripeDmsPriceId                String?
+  seatCount                       Int       @default(0)
+  billingStatus                   String    @default("inactive") // inactive, active, past_due
+  periodEnd                       DateTime?
+  // Tracks the `periodEnd` a renewal reminder was already sent for, so the
+  // scheduled reminder job doesn't re-send until the subscription renews.
+  renewalReminderSentForPeriodEnd DateTime?
 
   defaultConfidentiality DmsConfidentiality @default(INTERNAL)
 
@@ -1560,11 +1567,11 @@ model Organization {
   // these credentials instead of the global env-based config. Office 365
   // and Google Workspace both speak OIDC so this works for any provider with
   // a valid well-known discovery URL.
-  oidcEnabled         Boolean @default(false)
-  oidcClientId        String?
-  oidcClientSecret    String?
-  oidcWellKnownUrl    String?
-  oidcProviderLabel   String? // display name on the SSO button (e.g. "Sign in with Acme SSO")
+  oidcEnabled       Boolean @default(false)
+  oidcClientId      String?
+  oidcClientSecret  String?
+  oidcWellKnownUrl  String?
+  oidcProviderLabel String? // display name on the SSO button (e.g. "Sign in with Acme SSO")
 
   // When true, users matching the org's allowedEmailDomains cannot self-signup
   // via the public signup page; they must be invited or use SSO.
@@ -1588,27 +1595,26 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members            OrganizationMember[]
-  teams              Team[]               @relation("OrgTeams")
-  dmsLocations       DmsLocation[]        @relation("OrgDmsLocations")
-  dmsDocumentTypes   DmsDocumentType[]    @relation("OrgDmsDocTypes")
-  dmsClassifications DmsClassification[]  @relation("OrgDmsClassifications")
-  dmsTags            DmsTag[]             @relation("OrgDmsTags")
-  dmsDocuments       DmsDocument[]        @relation("OrgDmsDocuments")
-  dmsFilingRules     DmsFilingRule[]      @relation("OrgDmsFilingRules")
+  members                OrganizationMember[]
+  teams                  Team[]                  @relation("OrgTeams")
+  dmsLocations           DmsLocation[]           @relation("OrgDmsLocations")
+  dmsDocumentTypes       DmsDocumentType[]       @relation("OrgDmsDocTypes")
+  dmsClassifications     DmsClassification[]     @relation("OrgDmsClassifications")
+  dmsTags                DmsTag[]                @relation("OrgDmsTags")
+  dmsDocuments           DmsDocument[]           @relation("OrgDmsDocuments")
+  dmsFilingRules         DmsFilingRule[]         @relation("OrgDmsFilingRules")
   dmsComplianceTemplates DmsComplianceTemplate[] @relation("OrgDmsCompliance")
-  recycleBin         DmsRecycleBinItem[]
-  savedSearches      DmsSavedSearch[]
-  aiConversations    DmsAiConversation[]
-  aiUsage            DmsAiUsage[]
-  seatPlans          OrgSeatPlan[]
-  stamps             Stamp[]
-  workflows          Workflow[]           @relation("OrgWorkflows")
+  recycleBin             DmsRecycleBinItem[]
+  savedSearches          DmsSavedSearch[]
+  aiConversations        DmsAiConversation[]
+  aiUsage                DmsAiUsage[]
+  seatPlans              OrgSeatPlan[]
+  stamps                 Stamp[]
+  workflows              Workflow[]              @relation("OrgWorkflows")
 }
 
 enum OrgSeatTier {
-  STARTER
-  PRO
+  BUSINESS
   ENTERPRISE
 }
 
@@ -1617,15 +1623,19 @@ model OrgSeatPlan {
   tier OrgSeatTier
 
   // Limits for this seat
-  documentsPerMonth Int     @default(20)
-  recipientsPerMonth Int    @default(50)
-  directTemplates   Int     @default(5)
-  dmsEnabled        Boolean @default(false)
+  documentsPerMonth  Int     @default(20)
+  recipientsPerMonth Int     @default(50)
+  directTemplates    Int     @default(5)
+  dmsEnabled         Boolean @default(false)
 
   // How many seats purchased at this tier
-  quantity  Int @default(1)
+  quantity Int @default(1)
   // How many are currently assigned
-  assigned  Int @default(0)
+  assigned Int @default(0)
+
+  // "month" | "year" — chosen once at first purchase, locked thereafter
+  // (a single Stripe subscription can't mix billing intervals).
+  billingInterval String @default("month")
 
   // Stripe
   stripePriceId String?
@@ -1686,7 +1696,7 @@ model DmsOrgPermission {
 model DmsRecycleBinItem {
   id String @id @default(cuid())
 
-  documentId String   @unique
+  documentId String      @unique
   document   DmsDocument @relation(fields: [documentId], references: [id])
 
   deletedById Int
@@ -1721,7 +1731,7 @@ model DmsSavedSearch {
 // ═══════════════════════════════════════════════════════════
 
 model DmsAiConversation {
-  id    String @id @default(cuid())
+  id    String  @id @default(cuid())
   title String?
 
   userId Int
@@ -1737,12 +1747,12 @@ model DmsAiConversation {
 }
 
 model DmsAiMessage {
-  id   String @id @default(cuid())
-  role String // user, assistant, system
+  id      String @id @default(cuid())
+  role    String // user, assistant, system
   content String @db.Text
-  
+
   // Token usage
-  promptTokens    Int @default(0)
+  promptTokens     Int @default(0)
   completionTokens Int @default(0)
 
   conversationId String
@@ -1755,8 +1765,8 @@ model DmsAiUsage {
   id    String @id @default(cuid())
   month String // YYYY-MM format
 
-  totalQueries      Int @default(0)
-  totalPromptTokens Int @default(0)
+  totalQueries          Int @default(0)
+  totalPromptTokens     Int @default(0)
   totalCompletionTokens Int @default(0)
 
   userId Int
@@ -1771,23 +1781,23 @@ model DmsAiUsage {
   @@unique([userId, month])
 }
 
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Firebase Cloud Messaging (FCM) push notifications
 // ─────────────────────────────────────────────────────────────────────────────
 
 model PushDeviceToken {
-  id        String   @id @default(cuid())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   // The FCM registration token issued to this device by the Firebase SDK.
-  token     String   @unique
+  token      String   @unique
   // Optional context: "web", "ios", "android"
-  platform  String?
+  platform   String?
   // Optional human-readable identifier (browser name, device model)
-  label     String?
-  createdAt DateTime @default(now())
+  label      String?
+  createdAt  DateTime @default(now())
   lastUsedAt DateTime @default(now())
+
   @@index([userId])
 }
 
@@ -1796,13 +1806,13 @@ model PushNotificationPreference {
   userId Int    @unique
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  documentSentToYou      Boolean @default(true)
-  documentSigned         Boolean @default(true)
-  documentCompleted      Boolean @default(true)
-  documentRejected       Boolean @default(true)
-  reminderReceived       Boolean @default(true)
+  documentSentToYou Boolean @default(true)
+  documentSigned    Boolean @default(true)
+  documentCompleted Boolean @default(true)
+  documentRejected  Boolean @default(true)
+  reminderReceived  Boolean @default(true)
+  inboxItemReceived Boolean @default(true)
 }
-
 
 // Premium per-user / per-team reusable stamps. Three construction kinds:
 // - UPLOADED: user uploaded a PNG/JPG/SVG; we store the asset key in
@@ -1894,11 +1904,11 @@ enum WorkflowRunStepStatus {
 }
 
 model Workflow {
-  id             String              @id @default(cuid())
+  id             String  @id @default(cuid())
   organizationId Int
   name           String
   description    String?
-  enabled        Boolean             @default(false)
+  enabled        Boolean @default(false)
 
   triggerType  WorkflowTriggerType @default(EVENT)
   triggerEvent String? /// Event key when triggerType=EVENT, e.g. "DOCUMENT_COMPLETED" or "DMS_DOCUMENT_FILED".
@@ -2183,8 +2193,8 @@ model ApprovalRoleMapping {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
-  @@index([organizationId])
   @@unique([organizationId, roleType, roleKey, approvalLevel])
+  @@index([organizationId])
 }
 
 model ApprovalValidationRule {
@@ -2288,8 +2298,9 @@ model SignatureInboxItem {
   ocrMeta       Json? /// Full OCR metadata (confidences, field_extractions, etc.).
 
   error     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  viewedAt  DateTime? /// Set when a user first opens the item. Null = unread (Outlook-style, shared across the org).
 
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
@@ -2315,4 +2326,162 @@ model MetadataRecord {
 
   @@unique([organizationId, category, key])
   @@index([organizationId, category])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Microsoft Teams integration
+//
+// Everything here is prefixed `MsTeams` to keep it distinct from HubSign's own
+// `Team` workspace models above — "team" is badly overloaded once Microsoft is
+// in the picture. `msTeamId` is a Microsoft Teams team; `teamId` elsewhere in
+// this schema is always a HubSign team.
+//
+// An org connects Teams once (MsTeamsConnection) and then attaches one or more
+// destinations (MsTeamsChannelLink). Two transports exist and render the same
+// Adaptive Cards:
+//
+//   WEBHOOK — a Power Automate "when a webhook request is received" URL. Zero
+//             setup, works for self-hosters, but fire-and-forget: a posted card
+//             can never be edited, so live trackers are unavailable.
+//   BOT     — Azure Bot Service. Requires app registration + a Teams admin to
+//             install the app, but unlocks in-place card updates (the live
+//             tracker) and Action.Execute buttons.
+//
+// Office 365 Connectors / the legacy MessageCard format are deliberately NOT
+// supported — Microsoft is retiring them.
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum MsTeamsTransport {
+  WEBHOOK
+  BOT
+}
+
+enum MsTeamsDeliveryStatus {
+  SUCCESS
+  FAILED
+}
+
+/// One Microsoft Teams connection per HubSign organization.
+model MsTeamsConnection {
+  id             String           @id @default(cuid())
+  organizationId Int              @unique
+  transport      MsTeamsTransport @default(WEBHOOK)
+  /// AAD tenant that installed the bot. Always null for WEBHOOK transport.
+  tenantId       String?
+  enabled        Boolean          @default(true)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  channels MsTeamsChannelLink[]
+}
+
+/// A destination a connection posts to — one Teams channel, or one webhook URL.
+model MsTeamsChannelLink {
+  id           String            @id @default(cuid())
+  connectionId String
+  connection   MsTeamsConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  /// Display label, e.g. "Acme Corp > #contracts".
+  name String
+
+  /// WEBHOOK transport: the Power Automate flow URL. Null for BOT transport.
+  webhookUrl String?
+
+  /// BOT transport: Bot Connector addressing captured at link time. `serviceUrl`
+  /// is only ever written from a signature-verified inbound activity.
+  conversationId String?
+  serviceUrl     String?
+  /// Microsoft Teams team id (NOT a HubSign Team.id).
+  msTeamId       String?
+  /// Microsoft Teams channel id.
+  msChannelId    String?
+
+  /// WorkflowEventKey values that post here. Empty array = every event.
+  events String[]
+
+  /// Post one live status card per document and edit it in place as recipients
+  /// act. Requires BOT transport; ignored on WEBHOOK.
+  tracker Boolean @default(false)
+
+  /// Post a recurring summary card. `digestCron` is a 5-field cron expression
+  /// evaluated by the same parser the scheduled workflows use.
+  digest          Boolean   @default(false)
+  digestCron      String?
+  digestTimezone  String    @default("UTC")
+  digestLastRunAt DateTime?
+
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cards      MsTeamsCardRef[]
+  deliveries MsTeamsDelivery[]
+
+  /// A conversation may only be linked once per connection. Postgres treats
+  /// NULLs as distinct, so WEBHOOK links (conversationId = null) are unaffected.
+  @@unique([connectionId, conversationId])
+  @@index([connectionId])
+}
+
+/// Pointer to a posted tracker card so later events can PUT an updated copy over
+/// it. One card per (channel, document). BOT transport only.
+model MsTeamsCardRef {
+  id            String             @id @default(cuid())
+  channelLinkId String
+  channelLink   MsTeamsChannelLink @relation(fields: [channelLinkId], references: [id], onDelete: Cascade)
+
+  documentId Int
+  /// Bot Connector activity id returned when the card was first posted.
+  activityId     String
+  conversationId String
+  serviceUrl     String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([channelLinkId, documentId])
+  @@index([documentId])
+}
+
+/// Delivery audit log — the Microsoft Teams analogue of WebhookCall.
+model MsTeamsDelivery {
+  id            String             @id @default(cuid())
+  channelLinkId String
+  channelLink   MsTeamsChannelLink @relation(fields: [channelLinkId], references: [id], onDelete: Cascade)
+
+  event        String
+  status       MsTeamsDeliveryStatus
+  transport    MsTeamsTransport
+  requestBody  Json
+  responseCode Int?
+  responseBody Json?
+  error        String?
+  createdAt    DateTime              @default(now())
+
+  @@index([channelLinkId, createdAt])
+}
+
+/// Short-lived, single-use handle binding a Teams conversation to a HubSign org.
+///
+/// The bot posts a card containing a deep link carrying this row's `id` as an
+/// opaque `state`. An org admin follows it while authenticated in HubSign and
+/// confirms the binding, at which point an MsTeamsChannelLink is created and the
+/// row is consumed. `id` is a 32-byte CSPRNG value, not a cuid.
+model MsTeamsLinkRequest {
+  id String @id
+
+  tenantId       String
+  conversationId String
+  serviceUrl     String
+  msTeamId       String?
+  msChannelId    String?
+  channelName    String?
+  /// Activity id of the prompt card, so it can be rewritten to "✅ Linked".
+  promptActivityId String?
+
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([expiresAt])
 }

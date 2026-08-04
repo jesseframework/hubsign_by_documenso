@@ -1,11 +1,27 @@
 import { createElement } from 'react';
 
 import { msg } from '@lingui/core/macro';
+import { SubscriptionStatus } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { getOrCreateOrgPrice } from '@documenso/ee/server-only/stripe/get-or-create-org-price';
+import { onOrgSubscriptionUpdated } from '@documenso/ee/server-only/stripe/webhook/on-org-subscription-updated';
+import { onSubscriptionDeleted } from '@documenso/ee/server-only/stripe/webhook/on-subscription-deleted';
+import {
+  getSubscriptionPeriodEndISO,
+  resolveOrgPlanNameAndPrice,
+} from '@documenso/ee/server-only/stripe/webhook/resolve-org-plan-price';
 import { IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 import { getI18nInstance } from '@documenso/lib/client-only/providers/i18n-server';
+import {
+  ORG_DMS_ADDON_PRICE_CENTS,
+  ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT,
+  ORG_SEAT_TIERS,
+  ORG_UNLIMITED_SENTINEL,
+  getOrgYearlyPriceCents,
+} from '@documenso/lib/constants/org-tiers';
+import type { OrgBillingInterval } from '@documenso/lib/constants/org-tiers';
 import { env } from '@documenso/lib/utils/env';
 import { renderEmailWithI18N } from '@documenso/lib/utils/render-email-with-i18n';
 import crypto from 'crypto';
@@ -14,10 +30,66 @@ import { mailer } from '@documenso/email/mailer';
 import { OrgMemberInviteEmailTemplate } from '@documenso/email/templates/org-member-invite';
 import { OrgMemberWelcomeEmailTemplate } from '@documenso/email/templates/org-member-welcome';
 import { ONE_DAY } from '@documenso/lib/constants/time';
+import { jobs } from '@documenso/lib/jobs/client';
 import { stripe } from '@documenso/lib/server-only/stripe';
 import { prisma } from '@documenso/prisma';
 
 import { authenticatedProcedure, router } from '../trpc';
+
+/**
+ * Resolves the human plan name/price for a Stripe price, expanding the product
+ * since `metadata`/`name` live there. Mirrors the same small helper duplicated
+ * in `handler.ts` and `run-due-renewal-reminders.ts` this session.
+ *
+ * A user can end up with more than one locally-`ACTIVE` `Subscription` row
+ * (e.g. leftover test data, or a live/test Stripe key mismatch leaving a row
+ * that no longer resolves in the current mode) — try each, newest first, and
+ * skip any that fail to resolve in Stripe instead of blindly using the first.
+ *
+ * The local `ACTIVE` flag can also just be stale (e.g. a webhook delivery
+ * failure meant a cancellation never synced back), so each candidate's actual
+ * Stripe status is re-verified here rather than trusted — anything Stripe no
+ * longer considers active gets corrected locally via `onSubscriptionDeleted`
+ * (the same correction the webhook would have made) and skipped.
+ */
+const resolveActivePersonalPlan = async (userId: number) => {
+  const subscriptions = await prisma.subscription.findMany({
+    where: { userId, status: SubscriptionStatus.ACTIVE },
+    orderBy: { updatedAt: 'desc' },
+  });
+
+  for (const subscription of subscriptions) {
+    const stripeSubscription = await stripe.subscriptions
+      .retrieve(subscription.planId)
+      .catch(() => null);
+
+    if (!stripeSubscription || !['active', 'trialing', 'past_due'].includes(stripeSubscription.status)) {
+      if (stripeSubscription) {
+        await onSubscriptionDeleted({ subscription: stripeSubscription }).catch(() => {});
+      }
+
+      continue;
+    }
+
+    const price = await stripe.prices
+      .retrieve(subscription.priceId, { expand: ['product'] })
+      .catch(() => null);
+
+    if (!price) {
+      continue;
+    }
+
+    const { product } = price;
+
+    const planName = typeof product === 'string' || product.deleted ? 'Plan' : product.name;
+    const unitAmount = price.unit_amount ?? 0;
+    const priceFormatted = `$${(unitAmount / 100).toFixed(2)}/month`;
+
+    return { subscription, planName, priceFormatted };
+  }
+
+  return null;
+};
 
 // ── Org Billing Helpers ──
 
@@ -397,11 +469,6 @@ export const orgRouter = router({
         console.error('[Org Invite] Failed to send invite email:', err);
       });
 
-      // Update org billing — add seat
-      await createOrUpdateOrgSubscription(membership.organizationId).catch((err) => {
-        console.error('[Org Billing] Failed to update seats after invite:', err);
-      });
-
       return newMember;
     }),
 
@@ -447,14 +514,15 @@ export const orgRouter = router({
         }
       }
 
-      const deleted = await prisma.organizationMember.delete({ where: { id: input.memberId } });
+      // If the removed member held a seat, free it in their org's seat plan.
+      if (target?.seatTier) {
+        await prisma.orgSeatPlan.updateMany({
+          where: { organizationId: myMembership.organizationId, tier: target.seatTier },
+          data: { assigned: { decrement: 1 } },
+        });
+      }
 
-      // Update org billing — remove seat
-      await createOrUpdateOrgSubscription(myMembership.organizationId).catch((err) => {
-        console.error('[Org Billing] Failed to update seats after removal:', err);
-      });
-
-      return deleted;
+      return await prisma.organizationMember.delete({ where: { id: input.memberId } });
     }),
 
   // ═══════════════════════════════════════════
@@ -573,9 +641,11 @@ export const orgRouter = router({
 
   purchaseSeats: authenticatedProcedure
     .input(z.object({
-      tier: z.enum(['STARTER', 'PRO', 'ENTERPRISE']),
+      tier: z.enum(['BUSINESS', 'ENTERPRISE']),
       quantity: z.number().min(1).max(100),
+      interval: z.enum(['month', 'year']).default('month'),
       dmsEnabled: z.boolean().optional(),
+      acknowledgeCancelPersonalPlan: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const membership = await prisma.organizationMember.findFirst({
@@ -587,148 +657,377 @@ export const orgRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN' });
       }
 
-      const tierConfig = {
-        STARTER: { documentsPerMonth: 20, recipientsPerMonth: 50, directTemplates: 5, dmsEnabled: false, price: 1500, minSeats: 2 },
-        PRO: { documentsPerMonth: 100, recipientsPerMonth: 500, directTemplates: 20, dmsEnabled: false, price: 2500, minSeats: 1 },
-        ENTERPRISE: { documentsPerMonth: 999999, recipientsPerMonth: 999999, directTemplates: 999999, dmsEnabled: true, price: 4500, minSeats: 5 },
+      const org = membership.organization;
+
+      // An org can hold more than one tier at once now (mixed licensing,
+      // like Business + Enterprise M365 seats in one tenant) — so the
+      // question isn't "does the org have a plan" but two separate ones:
+      // does *this* tier already exist (top-up vs. establishing it), and
+      // does the org have *any* subscription yet (modify it vs. first-ever
+      // Checkout). A brand-new tier added to an org that already has a
+      // subscription for a different tier still modifies that existing
+      // subscription (as a new item) rather than starting a second one.
+      const existingSeatPlan = await prisma.orgSeatPlan.findFirst({
+        where: { organizationId: membership.organizationId, tier: input.tier },
+      });
+
+      const hasExistingTierPlan = Boolean(existingSeatPlan);
+      const isTopUp = Boolean(org.stripeSubscriptionId);
+
+      const tierLimits = ORG_SEAT_TIERS[input.tier];
+
+      const config = {
+        documentsPerMonth: tierLimits.documents ?? ORG_UNLIMITED_SENTINEL,
+        recipientsPerMonth: tierLimits.recipients ?? ORG_UNLIMITED_SENTINEL,
+        directTemplates: tierLimits.directTemplates ?? ORG_UNLIMITED_SENTINEL,
+        dmsEnabled: tierLimits.dmsEnabled,
+        minSeats: tierLimits.minSeats,
       };
 
-      const config = tierConfig[input.tier];
       const dmsEnabled = input.dmsEnabled ?? config.dmsEnabled;
 
-      // Enforce minimum seat count per tier (org-mode only)
-      if (input.quantity < config.minSeats) {
+      // Interval is chosen once, at the org's first-ever seat purchase, and
+      // locked thereafter across *every* tier — a single Stripe subscription
+      // can't mix monthly and yearly items, so a second tier added later
+      // must reuse whichever interval any existing tier on this org already
+      // committed to, not just this specific tier's own plan (which may not
+      // exist yet if this is the org's first purchase of it).
+      const anyExistingSeatPlan = isTopUp
+        ? (existingSeatPlan ??
+          (await prisma.orgSeatPlan.findFirst({ where: { organizationId: membership.organizationId } })))
+        : null;
+
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      const interval: OrgBillingInterval = anyExistingSeatPlan
+        ? ((anyExistingSeatPlan.billingInterval as OrgBillingInterval | undefined) ?? 'month')
+        : input.interval;
+
+      const seatUnitAmountCents =
+        interval === 'year'
+          ? getOrgYearlyPriceCents(tierLimits.priceCents, tierLimits.yearlyDiscountPercent)
+          : tierLimits.priceCents;
+
+      const dmsUnitAmountCents =
+        interval === 'year'
+          ? getOrgYearlyPriceCents(ORG_DMS_ADDON_PRICE_CENTS, ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT)
+          : ORG_DMS_ADDON_PRICE_CENTS;
+
+      // The tier minimum only applies to establishing *that tier*, whether
+      // it's the org's first tier ever or a second one added alongside an
+      // existing one — once a tier already meets it, buying 1-2 more is fine.
+      if (!hasExistingTierPlan && input.quantity < config.minSeats) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: `${input.tier} plan requires a minimum of ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}.`,
         });
       }
 
-      // If billing is enabled, create a Stripe checkout session
-      if (IS_BILLING_ENABLED()) {
-        const org = membership.organization;
-        const customerId = await getOrCreateStripeCustomer(org, ctx.user.email);
-        const baseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
+      // The purchasing admin automatically consumes a seat if they don't
+      // already have one — check whether that would strand an active
+      // personal subscription (same check/cancel pattern as `assignSeat`).
+      const adminNeedsSeat = !membership.seatTier;
+      const adminActivePlan = adminNeedsSeat ? await resolveActivePersonalPlan(ctx.user.id) : null;
 
-        const lineItems: Array<{
-          price_data: {
-            currency: string;
-            product_data: { name: string; metadata: Record<string, string> };
-            unit_amount: number;
-            recurring: { interval: 'month' };
-          };
-          quantity: number;
-        }> = [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: `HubSign ${input.tier.charAt(0) + input.tier.slice(1).toLowerCase()} Seat`,
-                metadata: { type: 'org_seat', tier: input.tier },
-              },
-              unit_amount: config.price,
-              recurring: { interval: 'month' },
-            },
-            quantity: input.quantity,
-          },
-        ];
+      if (adminActivePlan && !input.acknowledgeCancelPersonalPlan) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'You have an active personal subscription that will be cancelled.',
+        });
+      }
 
-        // Add DMS add-on line item if enabled
-        if (dmsEnabled && input.tier !== 'ENTERPRISE') {
-          lineItems.push({
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: 'Document Manager (DMS) Add-On',
-                metadata: { type: 'org_dms', tier: input.tier },
-              },
-              unit_amount: 1500, // $15/seat/mo
-              recurring: { interval: 'month' },
-            },
-            quantity: input.quantity,
+      if (adminActivePlan) {
+        try {
+          const canceledSubscription = await stripe.subscriptions.cancel(adminActivePlan.subscription.planId, {
+            invoice_now: true,
+            prorate: true,
           });
+
+          await onSubscriptionDeleted({ subscription: canceledSubscription });
+        } catch (err) {
+          // See `assignSeat` for full rationale — Stripe may reject the
+          // cancel for reasons that still mean nothing is left to cancel.
+          console.warn('Failed to cancel personal subscription during seat purchase:', err);
+        }
+      }
+
+      if (!IS_BILLING_ENABLED()) {
+        // Billing not enabled — just track it locally, synchronously (no
+        // Stripe involved either way, so there's nothing to wait on).
+        const seatPlan = existingSeatPlan
+          ? await prisma.orgSeatPlan.update({
+              where: { id: existingSeatPlan.id },
+              data: { quantity: existingSeatPlan.quantity + input.quantity, dmsEnabled },
+            })
+          : await prisma.orgSeatPlan.create({
+              data: {
+                tier: input.tier,
+                quantity: input.quantity,
+                organizationId: membership.organizationId,
+                documentsPerMonth: config.documentsPerMonth,
+                recipientsPerMonth: config.recipientsPerMonth,
+                directTemplates: config.directTemplates,
+                dmsEnabled,
+                billingInterval: interval,
+              },
+            });
+
+        if (adminNeedsSeat) {
+          const updatedSeatPlan = await prisma.orgSeatPlan.update({
+            where: { id: seatPlan.id },
+            data: { assigned: { increment: 1 } },
+          });
+
+          await prisma.organizationMember.update({
+            where: { id: membership.id },
+            data: { seatTier: input.tier, dmsAddon: input.tier === 'ENTERPRISE' ? true : dmsEnabled },
+          });
+
+          return updatedSeatPlan;
         }
 
-        const session = await stripe.checkout.sessions.create({
-          customer: customerId,
-          mode: 'subscription',
-          line_items: lineItems,
-          subscription_data: {
-            metadata: {
-              organizationId: org.id.toString(),
-              type: 'organization',
-              tier: input.tier,
-              quantity: input.quantity.toString(),
-              dmsEnabled: dmsEnabled.toString(),
-            },
-          },
-          success_url: `${baseUrl}/org/billing?success=true&tier=${input.tier}&qty=${input.quantity}`,
-          cancel_url: `${baseUrl}/org/billing?canceled=true`,
+        return seatPlan;
+      }
+
+      const baseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
+
+      if (isTopUp) {
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        const subscriptionId = org.stripeSubscriptionId as string;
+        const newQuantity = (existingSeatPlan?.quantity ?? 0) + input.quantity;
+
+        const liveSubscription = await stripe.subscriptions.retrieve(subscriptionId, {
+          expand: ['items.data.price.product'],
         });
 
-        // Also create/update the seat plan record so it's tracked locally
-        const existing = await prisma.orgSeatPlan.findFirst({
-          where: { organizationId: membership.organizationId, tier: input.tier },
-        });
-
-        if (existing) {
-          await prisma.orgSeatPlan.update({
-            where: { id: existing.id },
-            data: {
-              quantity: existing.quantity + input.quantity,
-              dmsEnabled,
-            },
+        // Look up this *specific tier's* items — an org's subscription can
+        // now hold items for more than one tier at once (mixed licensing),
+        // so matching by cached price id first, falling back to scanning by
+        // product metadata `{ type, tier }` (the same self-healing pattern
+        // already used here for DMS) is what keeps this tier-correct instead
+        // of accidentally grabbing another tier's item.
+        const findTierItem = (type: 'org_seat' | 'org_dms', cachedPriceId?: string | null) =>
+          liveSubscription.items.data.find((item) => cachedPriceId && item.price.id === cachedPriceId) ??
+          liveSubscription.items.data.find((item) => {
+            const { product } = item.price;
+            return (
+              typeof product !== 'string' &&
+              !product.deleted &&
+              product.metadata?.type === type &&
+              product.metadata?.tier === input.tier
+            );
           });
+
+        const seatItem = findTierItem('org_seat', existingSeatPlan?.stripePriceId);
+
+        const items: Array<{ id?: string; price?: string; quantity: number }> = [];
+
+        if (seatItem) {
+          items.push({ id: seatItem.id, quantity: newQuantity });
         } else {
-          await prisma.orgSeatPlan.create({
-            data: {
-              tier: input.tier,
-              quantity: input.quantity,
-              organizationId: membership.organizationId,
-              documentsPerMonth: config.documentsPerMonth,
-              recipientsPerMonth: config.recipientsPerMonth,
-              directTemplates: config.directTemplates,
-              dmsEnabled,
-            },
+          // This tier doesn't exist on the subscription yet — adding it
+          // alongside whatever other tier(s) the org already has, rather
+          // than starting a second subscription.
+          const seatPriceId = await getOrCreateOrgPrice({
+            type: 'org_seat',
+            tier: input.tier,
+            interval,
+            unitAmountCents: seatUnitAmountCents,
+            productName: `HubSign ${input.tier.charAt(0) + input.tier.slice(1).toLowerCase()} Seat`,
           });
+
+          items.push({ price: seatPriceId, quantity: newQuantity });
         }
 
-        return { url: session.url };
-      }
+        const existingDmsItem = findTierItem('org_dms', null);
 
-      // Billing not enabled — just create the seat plan locally
-      const existing = await prisma.orgSeatPlan.findFirst({
-        where: { organizationId: membership.organizationId, tier: input.tier },
-      });
+        // Once enabled, DMS stays enabled even if this particular top-up
+        // didn't touch the checkbox (it defaults unchecked on every purchase).
+        const dmsNowEnabled = dmsEnabled || Boolean(existingDmsItem);
 
-      if (existing) {
-        return prisma.orgSeatPlan.update({
-          where: { id: existing.id },
-          data: {
-            quantity: existing.quantity + input.quantity,
-            dmsEnabled,
+        if (dmsNowEnabled) {
+          if (existingDmsItem) {
+            items.push({ id: existingDmsItem.id, quantity: newQuantity });
+          } else {
+            // Unlike Checkout Session line items, `subscriptions.update`
+            // doesn't accept an inline `price_data.product_data` — it needs
+            // a real product/price to reference, hence the get-or-create
+            // lookup (also reused by the first-purchase branch below, so DMS
+            // Prices are never spawned by more than one code path).
+            const dmsPriceId = await getOrCreateOrgPrice({
+              type: 'org_dms',
+              tier: input.tier,
+              interval,
+              unitAmountCents: dmsUnitAmountCents,
+              productName: 'Document Manager (DMS) Add-On',
+            });
+
+            items.push({ price: dmsPriceId, quantity: newQuantity });
+          }
+        }
+
+        // One atomic call for seat + DMS together: `always_invoice` charges
+        // the prorated amount to the card on file immediately (Stripe's
+        // default just queues it for the next billing cycle), matching the
+        // agreed "direct charge, no extra screen" behavior. `tier` is set to
+        // *this* purchase's tier every time (not spread from stale prior
+        // metadata) since it now means "which tier to auto-assign the
+        // purchasing member's seat to" — each item is self-describing via
+        // its own product metadata, so quantity/dmsEnabled no longer need to
+        // live in subscription-level metadata at all.
+        const updatedSubscription = await stripe.subscriptions.update(subscriptionId, {
+          items,
+          proration_behavior: 'always_invoice',
+          expand: ['items.data.price.product'],
+          metadata: {
+            ...liveSubscription.metadata,
+            organizationId: org.id.toString(),
+            type: 'organization',
+            tier: input.tier,
+            purchasingMemberId: membership.id,
           },
         });
+
+        // Sync immediately rather than waiting on the webhook (mirrors
+        // `update-subscription-plan.ts`) — `onOrgSubscriptionUpdated` is the
+        // single place `OrgSeatPlan`/seat assignment ever get written, so
+        // this reuses that instead of duplicating the logic here. The
+        // webhook will also fire from this same update and no-op on top.
+        await onOrgSubscriptionUpdated({
+          organizationId: membership.organizationId,
+          subscription: updatedSubscription,
+        });
+
+        // Only the purchase itself (this call) triggers a confirmation email
+        // — not `assignSeat`/`unassignSeat`, which don't change what's billed,
+        // and not the async webhook replay of this same update (it only syncs
+        // state, see `handler.ts`'s `customer.subscription.updated` branch).
+        const { planName, priceFormatted } = resolveOrgPlanNameAndPrice(updatedSubscription);
+
+        await jobs.triggerJob({
+          name: 'send.subscription.purchase-confirmation.email',
+          payload: {
+            email: ctx.user.email,
+            name: ctx.user.name || undefined,
+            planName,
+            priceFormatted,
+            periodEnd: getSubscriptionPeriodEndISO(updatedSubscription),
+            billingUrl: `${baseUrl}/org/billing`,
+          },
+        });
+
+        return { success: true };
       }
 
-      return prisma.orgSeatPlan.create({
-        data: {
-          tier: input.tier,
-          quantity: input.quantity,
-          organizationId: membership.organizationId,
-          documentsPerMonth: config.documentsPerMonth,
-          recipientsPerMonth: config.recipientsPerMonth,
-          directTemplates: config.directTemplates,
-          dmsEnabled,
-        },
+      // First purchase — create a Stripe checkout session. `OrgSeatPlan` and
+      // seat assignment are intentionally NOT written here — they're only
+      // ever written from confirmed Stripe state once the webhook fires
+      // (`onOrgSubscriptionUpdated`), including the purchase-confirmation
+      // email (`handler.ts`'s `checkout.session.completed` branch).
+      const customerId = await getOrCreateStripeCustomer(org, ctx.user.email);
+
+      // Resolved via `getOrCreateOrgPrice` (same as the top-up branch) rather
+      // than inline `price_data` — a real, reusable Price per (tier, interval)
+      // instead of a brand-new ephemeral one on every first purchase.
+      const seatPriceId = await getOrCreateOrgPrice({
+        type: 'org_seat',
+        tier: input.tier,
+        interval,
+        unitAmountCents: seatUnitAmountCents,
+        productName: `HubSign ${input.tier.charAt(0) + input.tier.slice(1).toLowerCase()} Seat`,
       });
+
+      const lineItems: Array<{ price: string; quantity: number }> = [
+        { price: seatPriceId, quantity: input.quantity },
+      ];
+
+      // Add DMS add-on line item if enabled
+      if (dmsEnabled && input.tier !== 'ENTERPRISE') {
+        const dmsPriceId = await getOrCreateOrgPrice({
+          type: 'org_dms',
+          tier: input.tier,
+          interval,
+          unitAmountCents: dmsUnitAmountCents,
+          productName: 'Document Manager (DMS) Add-On',
+        });
+
+        lineItems.push({ price: dmsPriceId, quantity: input.quantity });
+      }
+
+      const sessionParams = {
+        customer: customerId,
+        mode: 'subscription' as const,
+        line_items: lineItems,
+        subscription_data: {
+          metadata: {
+            organizationId: org.id.toString(),
+            type: 'organization',
+            // Which tier to auto-assign the purchasing member's seat to —
+            // each item is self-describing via its own product metadata, so
+            // quantity/dmsEnabled no longer need to live here too.
+            tier: input.tier,
+            purchasingMemberId: membership.id,
+          },
+        },
+        ui_mode: 'embedded',
+        return_url: `${baseUrl}/org/billing?success=true&tier=${input.tier}&qty=${input.quantity}&session_id={CHECKOUT_SESSION_ID}`,
+      };
+
+      const session = await stripe.checkout.sessions.create(
+        // `ui_mode`/`return_url` aren't declared in this SDK version's
+        // request types yet, though the account's live API supports
+        // Embedded Checkout (same pattern as get-checkout-session.ts).
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        sessionParams as unknown as Parameters<typeof stripe.checkout.sessions.create>[0],
+      );
+
+      // `client_secret` isn't declared on this SDK version's response type either.
+      // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+      const clientSecret = (session as unknown as { client_secret: string | null }).client_secret;
+
+      return { clientSecret };
+    }),
+
+  /**
+   * Checks whether assigning a seat to this member would strand an active
+   * personal subscription (org seat limits supersede personal ones — see
+   * `getServerLimits` — so the personal plan becomes wasted spend). Called by
+   * the client before `assignSeat` so it can show a confirmation dialog.
+   */
+  getMemberBillingConflict: authenticatedProcedure
+    .input(z.object({ memberId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const myMembership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id, role: { in: ['ORG_ADMIN', 'DMS_ADMIN'] } },
+      });
+
+      if (!myMembership) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+
+      const targetMember = await prisma.organizationMember.findUniqueOrThrow({
+        where: { id: input.memberId },
+      });
+
+      const activePlan = await resolveActivePersonalPlan(targetMember.userId);
+
+      if (!activePlan) {
+        return { hasActivePlan: false as const };
+      }
+
+      return {
+        hasActivePlan: true as const,
+        planName: activePlan.planName,
+        priceFormatted: activePlan.priceFormatted,
+      };
     }),
 
   assignSeat: authenticatedProcedure
     .input(z.object({
       memberId: z.string(),
-      tier: z.enum(['STARTER', 'PRO', 'ENTERPRISE']),
-      dmsAddon: z.boolean().optional(),
+      // An org can hold more than one tier at once now (mixed licensing) —
+      // the caller has to say which tier's seat to assign.
+      tier: z.enum(['BUSINESS', 'ENTERPRISE']),
+      acknowledgeCancelPersonalPlan: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const myMembership = await prisma.organizationMember.findFirst({
@@ -739,31 +1038,87 @@ export const orgRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN' });
       }
 
-      // Check available seats for this tier
       const seatPlan = await prisma.orgSeatPlan.findFirst({
         where: { organizationId: myMembership.organizationId, tier: input.tier },
       });
 
       if (!seatPlan) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: `No ${input.tier} seats purchased. Purchase seats first.` });
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No seats purchased for this tier. Purchase seats first.' });
       }
 
-      // Get the member's current tier to handle re-assignment
       const targetMember = await prisma.organizationMember.findUniqueOrThrow({
         where: { id: input.memberId },
       });
 
-      // If member already has a seat, free it
-      if (targetMember.seatTier) {
-        await prisma.orgSeatPlan.updateMany({
-          where: { organizationId: myMembership.organizationId, tier: targetMember.seatTier },
-          data: { assigned: { decrement: 1 } },
+      // Admins can't change their own seat — but only when there's someone
+      // else who actually could. Otherwise this would be a hard deadlock: a
+      // sole admin (or one whose only other admins lack the right role) would
+      // have nobody to ask. (Auto-consuming seat #1 on purchase is a separate
+      // mechanism in `purchaseSeats` and is unaffected by this either way.)
+      if (targetMember.id === myMembership.id) {
+        const otherEligibleAdmin = await prisma.organizationMember.findFirst({
+          where: {
+            organizationId: myMembership.organizationId,
+            role: { in: ['ORG_ADMIN', 'DMS_ADMIN'] },
+            id: { not: myMembership.id },
+          },
         });
+
+        if (otherEligibleAdmin) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: "You can't change your own seat assignment — ask another admin to do it.",
+          });
+        }
+      }
+
+      // Already seated — a member holds exactly one tier at a time (same as
+      // M365 licensing: a user has one SKU, even if the tenant offers
+      // several), so this is a no-op rather than stacking a second tier.
+      // Switching a member's tier would mean unassign-then-assign, not
+      // supported as a single action here.
+      if (targetMember.seatTier) {
+        return targetMember;
+      }
+
+      // Re-check server-side regardless of whether the client already called
+      // `getMemberBillingConflict` — this is the actual enforcement point.
+      const activePlan = await resolveActivePersonalPlan(targetMember.userId);
+
+      if (activePlan && !input.acknowledgeCancelPersonalPlan) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'This member has an active personal subscription that will be cancelled.',
+        });
+      }
+
+      if (activePlan) {
+        try {
+          // Cancel immediately with proration — unused time lands as a Stripe
+          // account-balance credit (applied to future invoices), not a card
+          // refund. Same pattern as `transfer-team-subscription.ts`.
+          const canceledSubscription = await stripe.subscriptions.cancel(activePlan.subscription.planId, {
+            invoice_now: true,
+            prorate: true,
+          });
+
+          // Sync locally immediately rather than waiting on the webhook (mirrors
+          // `update-subscription-plan.ts`) — the webhook will also fire and
+          // no-op harmlessly on top of this.
+          await onSubscriptionDeleted({ subscription: canceledSubscription });
+        } catch (err) {
+          // `resolveActivePersonalPlan` already re-verifies against Stripe, but
+          // Stripe can still reject the cancel itself (e.g. canceled between
+          // that check and here). Either way the goal — not leaving them
+          // double-billed — is already satisfied, so don't block the seat
+          // assignment over it.
+          console.warn('Failed to cancel personal subscription during seat assignment:', err);
+        }
       }
 
       // Check if seats are available
       if (seatPlan.assigned >= seatPlan.quantity) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: `All ${input.tier} seats are assigned. Purchase more seats.` });
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'All seats are assigned. Purchase more seats.' });
       }
 
       // Assign the seat
@@ -775,8 +1130,11 @@ export const orgRouter = router({
       return prisma.organizationMember.update({
         where: { id: input.memberId },
         data: {
-          seatTier: input.tier,
-          dmsAddon: input.dmsAddon ?? (input.tier === 'ENTERPRISE'),
+          seatTier: seatPlan.tier,
+          // Derived from the org's actual purchased seat plan, not client
+          // input — previously this trusted an arbitrary client-provided
+          // boolean, letting anyone grant themselves free DMS access.
+          dmsAddon: seatPlan.tier === 'ENTERPRISE' ? true : seatPlan.dmsEnabled,
         },
       });
     }),
@@ -793,6 +1151,26 @@ export const orgRouter = router({
       const member = await prisma.organizationMember.findUniqueOrThrow({
         where: { id: input.memberId },
       });
+
+      // Admins can't change their own seat — but only when another
+      // ORG_ADMIN (the role required to call this) actually exists to do it.
+      // See `assignSeat` for full rationale.
+      if (member.id === myMembership.id) {
+        const otherEligibleAdmin = await prisma.organizationMember.findFirst({
+          where: {
+            organizationId: myMembership.organizationId,
+            role: 'ORG_ADMIN',
+            id: { not: myMembership.id },
+          },
+        });
+
+        if (otherEligibleAdmin) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: "You can't change your own seat assignment — ask another admin to do it.",
+          });
+        }
+      }
 
       if (member.seatTier) {
         await prisma.orgSeatPlan.updateMany({

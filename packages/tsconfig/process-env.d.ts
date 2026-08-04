@@ -17,6 +17,7 @@ declare namespace NodeJS {
 
     NEXT_PRIVATE_STRIPE_API_KEY: string;
     NEXT_PRIVATE_STRIPE_WEBHOOK_SECRET: string;
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY?: string;
 
     NEXT_PUBLIC_UPLOAD_TRANSPORT?: 'database' | 's3';
     NEXT_PRIVATE_UPLOAD_ENDPOINT?: string;
@@ -78,6 +79,15 @@ declare namespace NodeJS {
     NEXT_PRIVATE_INNGEST_EVENT_KEY?: string;
 
     NEXT_PRIVATE_LOGGER_HONEY_BADGER_API_KEY?: string;
+
+    /**
+     * Microsoft Teams. Optional: when unset, the integration runs in WEBHOOK mode
+     * only — no live tracker card, no Action.Execute buttons.
+     */
+    NEXT_PRIVATE_MS_TEAMS_BOT_APP_ID?: string;
+    NEXT_PRIVATE_MS_TEAMS_BOT_APP_PASSWORD?: string;
+    /** Single-tenant bot registrations only; blank means multi-tenant. */
+    NEXT_PRIVATE_MS_TEAMS_BOT_TENANT_ID?: string;
 
     POSTGRES_URL?: string;
     DATABASE_URL?: string;

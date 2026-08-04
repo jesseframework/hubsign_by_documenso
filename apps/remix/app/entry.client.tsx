@@ -10,7 +10,7 @@ import { HydratedRouter } from 'react-router/dom';
 import { extractPostHogConfig } from '@documenso/lib/constants/feature-flags';
 import { dynamicActivate } from '@documenso/lib/utils/i18n';
 
-function PosthogInit() {
+function ClientApp() {
   const postHogConfig = extractPostHogConfig();
 
   useEffect(() => {
@@ -20,9 +20,14 @@ function PosthogInit() {
         capture_exceptions: true,
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return null;
+  return (
+    <I18nProvider i18n={i18n}>
+      <HydratedRouter />
+    </I18nProvider>
+  );
 }
 
 async function main() {
@@ -34,11 +39,7 @@ async function main() {
     hydrateRoot(
       document,
       <StrictMode>
-        <I18nProvider i18n={i18n}>
-          <HydratedRouter />
-        </I18nProvider>
-
-        <PosthogInit />
+        <ClientApp />
       </StrictMode>,
     );
   });

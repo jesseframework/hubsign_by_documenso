@@ -18,11 +18,31 @@ import type { Json } from '../../jobs/client/_internal/json';
 import type { JobRunIO } from '../../jobs/client/_internal/job';
 import type { TWorkflowDefinition, TWorkflowStep, TWorkflowVariables } from '../../types/workflow';
 import { ZWorkflowDefinitionSchema } from '../../types/workflow';
+import { publishInboxEvent } from '../inbox/inbox-events';
 import { runAction } from './actions';
 import { evaluateCondition, evaluateLogic } from './logic';
 
 /** Hard ceiling on steps per run to prevent runaway loops. */
 const MAX_STEPS = 1000;
+
+/**
+ * Mirror a run's state onto the Signature Inbox event stream so the queue's
+ * per-row workflow indicator moves live. Runs not triggered by an inbox item
+ * carry no `inboxItemId` in their context and are a no-op here.
+ */
+const publishRunToInbox = (
+  run: { context: unknown; workflow: { organizationId: number } },
+  status: WorkflowRunStatus,
+): void => {
+  const inboxItemId = (run.context as { payload?: { inboxItemId?: unknown } })?.payload
+    ?.inboxItemId;
+
+  if (typeof inboxItemId !== 'string') {
+    return;
+  }
+
+  publishInboxEvent(run.workflow.organizationId, { type: 'workflow', inboxItemId, status });
+};
 
 type StepOutcome = {
   next?: string;
@@ -212,6 +232,7 @@ export const executeWorkflowRun = async ({
       where: { id: runId },
       data: { status: WorkflowRunStatus.FAILED, error: message, finishedAt: new Date() },
     });
+    publishRunToInbox(run, WorkflowRunStatus.FAILED);
     return { status: WorkflowRunStatus.FAILED };
   }
 
@@ -219,6 +240,7 @@ export const executeWorkflowRun = async ({
     where: { id: runId },
     data: { status: WorkflowRunStatus.RUNNING, startedAt: run.startedAt ?? new Date() },
   });
+  publishRunToInbox(run, WorkflowRunStatus.RUNNING);
 
   const context = (run.context ?? {}) as Record<string, unknown>;
   let vars: TWorkflowVariables = (run.variables ?? {}) as TWorkflowVariables;
@@ -289,6 +311,7 @@ export const executeWorkflowRun = async ({
         finishedAt: new Date(),
       },
     });
+    publishRunToInbox(run, WorkflowRunStatus.COMPLETED);
 
     return { status: WorkflowRunStatus.COMPLETED };
   } catch (error) {
@@ -298,6 +321,7 @@ export const executeWorkflowRun = async ({
       where: { id: runId },
       data: { status: WorkflowRunStatus.FAILED, error: message, finishedAt: new Date() },
     });
+    publishRunToInbox(run, WorkflowRunStatus.FAILED);
 
     return { status: WorkflowRunStatus.FAILED };
   }

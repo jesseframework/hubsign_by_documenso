@@ -14,6 +14,7 @@ import { prisma } from '@documenso/prisma';
 import { jobs } from '../../jobs/client';
 import type { TWorkflowRunContext } from '../../types/workflow';
 import { WORKFLOW_EVENT_KEYS, ZWorkflowDefinitionSchema } from '../../types/workflow';
+import { dispatchMsTeamsEvent } from '../ms-teams/dispatch';
 import { evaluateCondition } from './logic';
 import { resolveOrganizationId } from './resolve-organization-id';
 
@@ -52,7 +53,13 @@ export const enqueueWorkflowRun = async ({
 };
 
 /**
- * Dispatch all matching EVENT workflows for an organization.
+ * Dispatch all matching EVENT workflows for an organization, and fan the event
+ * out to any other org-scoped subscribers.
+ *
+ * Despite the name, this is the organization event bus: every dispatch site
+ * (eSign via `triggerWorkflowEvent`, the two DMS sites, the two inbox sites)
+ * funnels through here, so subscribers other than the workflow engine hook in at
+ * this one point rather than at five.
  */
 export const triggerWorkflows = async ({
   event,
@@ -63,6 +70,11 @@ export const triggerWorkflows = async ({
   organizationId: number;
   data: Record<string, unknown>;
 }): Promise<void> => {
+  // MUST stay above the early return below: an organization can have Teams
+  // channels and zero workflows, and its notifications would silently never fire.
+  // Non-fatal by contract — dispatchMsTeamsEvent swallows its own errors.
+  await dispatchMsTeamsEvent({ event, organizationId, data });
+
   const workflows = await prisma.workflow.findMany({
     where: {
       organizationId,

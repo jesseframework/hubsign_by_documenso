@@ -73,6 +73,7 @@ export const pushRouter = router({
         documentCompleted: z.boolean().optional(),
         documentRejected: z.boolean().optional(),
         reminderReceived: z.boolean().optional(),
+        inboxItemReceived: z.boolean().optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {

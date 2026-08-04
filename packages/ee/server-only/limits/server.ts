@@ -2,6 +2,7 @@ import { DocumentSource, SubscriptionStatus } from '@prisma/client';
 import { DateTime } from 'luxon';
 
 import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
+import { ORG_SEAT_TIERS } from '@documenso/lib/constants/org-tiers';
 import { prisma } from '@documenso/prisma';
 
 import { getDocumentRelatedPrices } from '../stripe/get-document-related-prices.ts';
@@ -34,14 +35,18 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
     };
   }
 
-  // Map seat tier to limits
-  const tierLimits: Record<string, TLimitsSchema> = {
-    STARTER: { documents: 20, recipients: 50, directTemplates: 5, dmsEnabled: false },
-    PRO: { documents: 100, recipients: 500, directTemplates: 20, dmsEnabled: false },
-    ENTERPRISE: { documents: Infinity, recipients: Infinity, directTemplates: Infinity, dmsEnabled: true },
-  };
+  // Map seat tier to limits, resolving the canonical table's `null` ("unlimited")
+  // to `Infinity` for in-memory quota arithmetic.
+  const tierConfig = ORG_SEAT_TIERS[membership.seatTier];
 
-  const seatLimits = tierLimits[membership.seatTier] || FREE_PLAN_LIMITS;
+  const seatLimits: TLimitsSchema = tierConfig
+    ? {
+        documents: tierConfig.documents ?? Infinity,
+        recipients: tierConfig.recipients ?? Infinity,
+        directTemplates: tierConfig.directTemplates ?? Infinity,
+        dmsEnabled: tierConfig.dmsEnabled,
+      }
+    : structuredClone(FREE_PLAN_LIMITS);
 
   // DMS addon overrides dmsEnabled
   if (membership.dmsAddon) {

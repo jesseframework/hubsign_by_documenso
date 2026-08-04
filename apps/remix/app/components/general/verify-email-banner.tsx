@@ -18,11 +18,12 @@ import { useToast } from '@documenso/ui/primitives/use-toast';
 
 export type VerifyEmailBannerProps = {
   email: string;
+  isEmailVerified: boolean;
 };
 
 const RESEND_CONFIRMATION_EMAIL_TIMEOUT = 20 * ONE_SECOND;
 
-export const VerifyEmailBanner = ({ email }: VerifyEmailBannerProps) => {
+export const VerifyEmailBanner = ({ email, isEmailVerified }: VerifyEmailBannerProps) => {
   const { _ } = useLingui();
   const { toast } = useToast();
 
@@ -63,6 +64,10 @@ export const VerifyEmailBanner = ({ email }: VerifyEmailBannerProps) => {
   };
 
   useEffect(() => {
+    if (isEmailVerified) {
+      return;
+    }
+
     // Check localStorage to see if we've recently automatically displayed the dialog
     // if it was within the past 24 hours, don't show it again
     // otherwise, show it again and update the localStorage timestamp
@@ -81,34 +86,36 @@ export const VerifyEmailBanner = ({ email }: VerifyEmailBannerProps) => {
     setIsOpen(true);
 
     localStorage.setItem('emailVerificationDialogLastShown', Date.now().toString());
-  }, []);
+  }, [isEmailVerified]);
 
   return (
     <>
-      <div className="bg-yellow-200 dark:bg-yellow-400">
-        <div className="mx-auto flex max-w-screen-xl items-center justify-center gap-x-4 px-4 py-2 text-sm font-medium text-yellow-900">
-          <div className="flex items-center">
-            <AlertTriangle className="mr-2.5 h-5 w-5" />
-            <Trans>Verify your email address to unlock all features.</Trans>
-          </div>
+      {!isEmailVerified && (
+        <div className="bg-yellow-200 dark:bg-yellow-400">
+          <div className="mx-auto flex max-w-screen-xl items-center justify-center gap-x-4 px-4 py-2 text-sm font-medium text-yellow-900">
+            <div className="flex items-center">
+              <AlertTriangle className="mr-2.5 h-5 w-5" />
+              <Trans>Verify your email address to unlock all features.</Trans>
+            </div>
 
-          <div>
-            <Button
-              variant="ghost"
-              className="h-auto px-2.5 py-1.5 text-yellow-900 hover:bg-yellow-100 hover:text-yellow-900 dark:hover:bg-yellow-500"
-              disabled={isButtonDisabled}
-              onClick={() => setIsOpen(true)}
-              size="sm"
-            >
-              {isButtonDisabled ? (
-                <Trans>Verification Email Sent</Trans>
-              ) : (
-                <Trans>Verify Now</Trans>
-              )}
-            </Button>
+            <div>
+              <Button
+                variant="ghost"
+                className="h-auto px-2.5 py-1.5 text-yellow-900 hover:bg-yellow-100 hover:text-yellow-900 dark:hover:bg-yellow-500"
+                disabled={isButtonDisabled}
+                onClick={() => setIsOpen(true)}
+                size="sm"
+              >
+                {isButtonDisabled ? (
+                  <Trans>Verification Email Sent</Trans>
+                ) : (
+                  <Trans>Verify Now</Trans>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent>

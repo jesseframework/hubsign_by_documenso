@@ -38,6 +38,7 @@ import {
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { useInboxEvents } from '~/hooks/use-inbox-events';
+import { formatRelativeTime } from '~/utils/format-relative-time';
 import { appMetaTags } from '~/utils/meta';
 
 const runStatusColor = (status: string | null | undefined): string => {
@@ -600,13 +601,20 @@ export default function SignatureInboxPage() {
                 const f = invoiceFields(item);
                 const headline = f.invoiceNumber || item.document.title;
                 const hasAmounts = Boolean(f.total || f.tax || f.net);
+                const isUnread = !item.viewedAt;
                 return (
                   <tr key={item.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                     {/* Invoice info */}
-                    <td className="px-4 py-3 align-top">
+                    <td
+                      className={`border-l-[3px] px-4 py-3 align-top ${
+                        isUnread ? 'border-l-primary' : 'border-l-transparent'
+                      }`}
+                    >
                       <Link
                         to={`/org/inbox/${item.id}`}
-                        className="text-[13px] font-semibold hover:text-primary hover:underline"
+                        className={`text-[13px] hover:text-primary hover:underline ${
+                          isUnread ? 'font-bold' : 'font-medium text-foreground/80'
+                        }`}
                       >
                         {headline}
                       </Link>
@@ -697,8 +705,14 @@ export default function SignatureInboxPage() {
                           </div>
                         )}
                         <div className="flex items-baseline gap-2">
-                          <dt className="w-16 text-[10px] uppercase text-muted-foreground">Received</dt>
+                          <dt className="w-16 text-[10px] uppercase text-muted-foreground">Created</dt>
                           <dd className="tabular-nums text-muted-foreground">{fmtDate(item.createdAt)}</dd>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <dt className="w-16 text-[10px] uppercase text-muted-foreground">Updated</dt>
+                          <dd className="tabular-nums text-muted-foreground">
+                            {formatRelativeTime(item.updatedAt)}
+                          </dd>
                         </div>
                       </dl>
                     </td>

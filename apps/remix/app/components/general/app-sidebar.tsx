@@ -34,6 +34,7 @@ import {
   LockIcon,
   LogOutIcon,
   PenLineIcon,
+  PlugIcon,
   SettingsIcon,
   ShieldCheckIcon,
   ShieldIcon,
@@ -43,7 +44,6 @@ import {
   UploadCloudIcon,
   UserIcon,
   UsersIcon,
-  Wallet2Icon,
   WebhookIcon,
   WorkflowIcon,
   XIcon,
@@ -56,7 +56,10 @@ import { useLimits } from '@documenso/ee/server-only/limits/provider/client';
 import type { TGetTeamsResponse } from '@documenso/lib/server-only/team/get-teams';
 import { trpc } from '@documenso/trpc/react';
 
+import { useInboxEvents } from '~/hooks/use-inbox-events';
+
 import { BrandingLogo } from './branding-logo';
+import { SidebarUsageIndicator } from './sidebar-usage-indicator';
 
 export type AppSidebarProps = {
   user: SessionUser;
@@ -189,14 +192,37 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
 
   const { data: orgMembership } = trpc.org.getMyOrganization.useQuery();
 
+  // Unread Signature Inbox count — visible from anywhere in the app, not just
+  // the inbox page itself. Kept fresh by the inbox event stream below rather
+  // than a refetch interval, so the badge moves the moment mail lands.
+  const { data: unreadInboxCount } = trpc.inbox.unreadCount.useQuery(undefined, {
+    enabled: Boolean(orgMembership?.organization),
+  });
+
+  useInboxEvents(undefined, { enabled: Boolean(orgMembership?.organization) });
+
   // Expandable submenus (nested under their top-level item).
   const orgNav: SubNavItem[] = [
     { to: '/org/settings', icon: SettingsIcon, label: <Trans>Settings</Trans> },
     { to: '/org/members', icon: UsersIcon, label: <Trans>Members</Trans> },
-    { to: '/org/inbox', icon: InboxIcon, label: <Trans>Signature Inbox</Trans> },
+    {
+      to: '/org/inbox',
+      icon: InboxIcon,
+      label: (
+        <span className="flex w-full items-center justify-between gap-2">
+          <Trans>Signature Inbox</Trans>
+          {Boolean(unreadInboxCount) && (
+            <span className="flex h-4 min-w-4 flex-shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-none text-primary-foreground">
+              {unreadInboxCount}
+            </span>
+          )}
+        </span>
+      ),
+    },
     { to: '/org/permissions', icon: ShieldIcon, label: <Trans>DMS Permissions</Trans> },
     { to: '/org/workflows', icon: WorkflowIcon, label: <Trans>Workflows</Trans> },
     { to: '/org/metadata', icon: DatabaseIcon, label: <Trans>Metadata</Trans> },
+    { to: '/org/integrations', icon: PlugIcon, label: <Trans>Integrations</Trans> },
     { to: '/org/approvals', icon: ClipboardCheckIcon, label: <Trans>Approvals</Trans> },
     { to: '/org/approval-templates', icon: ListChecksIcon, label: <Trans>Approval Setup</Trans> },
     { to: '/org/stamps', icon: StampIcon, label: <Trans>Stamps</Trans> },
@@ -224,6 +250,12 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
     { to: '/settings/public-profile', icon: Globe2Icon, label: <Trans>Public Profile</Trans> },
     { to: '/settings/security', icon: LockIcon, label: <Trans>Security</Trans> },
     { to: '/settings/notifications', icon: BellIcon, label: <Trans>Notifications</Trans> },
+    // Org seat limits supersede personal billing entirely (see
+    // `getServerLimits`), so org members manage billing under Organization
+    // instead — this link only makes sense for accounts not in an org.
+    ...(!orgMembership?.organization
+      ? [{ to: '/settings/billing', icon: CreditCardIcon, label: <Trans>Billing</Trans> }]
+      : []),
     { to: '/settings/tokens', icon: BracesIcon, label: <Trans>API Tokens</Trans> },
     { to: '/settings/webhooks', icon: WebhookIcon, label: <Trans>Webhooks</Trans> },
   ];
@@ -231,7 +263,6 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
     { to: '/admin/stats', icon: BarChart3Icon, label: <Trans>Stats</Trans> },
     { to: '/admin/users', icon: UsersIcon, label: <Trans>Users</Trans> },
     { to: '/admin/documents', icon: FileStackIcon, label: <Trans>Documents</Trans> },
-    { to: '/admin/subscriptions', icon: Wallet2Icon, label: <Trans>Subscriptions</Trans> },
     { to: '/admin/leaderboard', icon: TrophyIcon, label: <Trans>Leaderboard</Trans> },
     { to: '/admin/site-settings', icon: SettingsIcon, label: <Trans>Site Settings</Trans>, match: '/admin/banner' },
   ];
@@ -260,6 +291,16 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
   const dividerStyle: React.CSSProperties | undefined = sidebarTextColor
     ? { background: `${sidebarTextColor}15` }
     : undefined;
+
+  // Org seat limits (when present) always supersede personal/team limits — see
+  // `getServerLimits`'s precedence — so the usage widget's upgrade link should
+  // point at org billing whenever the user belongs to an org, regardless of
+  // which route (personal or team) they're currently viewing.
+  const billingUrl = orgMembership?.organization
+    ? '/org/billing'
+    : teamUrl
+      ? `/t/${teamUrl}/settings/billing`
+      : '/settings/billing';
 
   const currentTeam = teams.find((t) => t.url === teamUrl);
   const displayName = orgMembership?.organization?.name
@@ -318,6 +359,11 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
           </button>
         </div>
 
+        {/* Scrollable middle: workspace switcher + nav groups. `min-h-0` lets a
+            flex child actually shrink and scroll instead of growing to fit
+            all content (a classic flexbox gotcha) — otherwise expanding every
+            nav group pushes content off-screen with no way to reach it. */}
+        <div className="min-h-0 flex-1 overflow-y-auto">
         {/* Workspace switcher */}
         <div
           className="mx-3 mt-3 mb-2 flex cursor-pointer items-center gap-2 rounded-md border px-2.5 py-2"
@@ -445,9 +491,14 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
             />
           )}
         </div>
+        </div>
+
+        <div className="mt-auto flex-shrink-0">
+          <SidebarUsageIndicator billingUrl={billingUrl} sidebarTextColor={sidebarTextColor} />
+        </div>
 
         {/* Footer */}
-        <div className="mt-auto border-t p-3" style={{ borderColor: sidebarTextColor ? `${sidebarTextColor}20` : 'hsl(var(--sidebar-border))' }}>
+        <div className="border-t p-3" style={{ borderColor: sidebarTextColor ? `${sidebarTextColor}20` : 'hsl(var(--sidebar-border))' }}>
           <div className="flex items-center gap-2">
             <Link
               to={getRootHref('/settings/profile')}

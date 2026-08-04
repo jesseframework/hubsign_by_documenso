@@ -35,6 +35,17 @@ export const mapStripeSubscriptionToPrismaUpsertAction = (
     .with('past_due', () => SubscriptionStatus.PAST_DUE)
     .otherwise(() => SubscriptionStatus.INACTIVE);
 
+  const subscriptionItem = subscription.items.data[0];
+
+  // Newer Stripe API versions return the billing period on the subscription
+  // item rather than the top-level subscription object. Prefer the item's
+  // value, falling back to the top-level field for older API versions.
+  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+  const itemPeriodEnd = (subscriptionItem as unknown as { current_period_end?: number })
+    .current_period_end;
+
+  const periodEnd = new Date((itemPeriodEnd ?? subscription.current_period_end) * 1000);
+
   return {
     where: {
       planId: subscription.id,
@@ -42,8 +53,8 @@ export const mapStripeSubscriptionToPrismaUpsertAction = (
     create: {
       status: status,
       planId: subscription.id,
-      priceId: subscription.items.data[0].price.id,
-      periodEnd: new Date(subscription.current_period_end * 1000),
+      priceId: subscriptionItem.price.id,
+      periodEnd,
       userId: userId ?? null,
       teamId: teamId ?? null,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
@@ -51,8 +62,8 @@ export const mapStripeSubscriptionToPrismaUpsertAction = (
     update: {
       status: status,
       planId: subscription.id,
-      priceId: subscription.items.data[0].price.id,
-      periodEnd: new Date(subscription.current_period_end * 1000),
+      priceId: subscriptionItem.price.id,
+      periodEnd,
       cancelAtPeriodEnd: subscription.cancel_at_period_end,
     },
   };

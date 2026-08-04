@@ -1,3 +1,5 @@
+import { getServerLimits } from '@documenso/ee/server-only/limits/server';
+import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import { completeDocumentWithToken } from '@documenso/lib/server-only/document/complete-document-with-token';
 import { rejectDocumentWithToken } from '@documenso/lib/server-only/document/reject-document-with-token';
 import { createDocumentRecipients } from '@documenso/lib/server-only/recipient/create-document-recipients';
@@ -9,6 +11,7 @@ import { setDocumentRecipients } from '@documenso/lib/server-only/recipient/set-
 import { setTemplateRecipients } from '@documenso/lib/server-only/recipient/set-template-recipients';
 import { updateDocumentRecipients } from '@documenso/lib/server-only/recipient/update-document-recipients';
 import { updateTemplateRecipients } from '@documenso/lib/server-only/recipient/update-template-recipients';
+import { prisma } from '@documenso/prisma';
 
 import { ZGenericSuccessResponse, ZSuccessResponseSchema } from '../document-router/schema';
 import { authenticatedProcedure, procedure, router } from '../trpc';
@@ -40,6 +43,34 @@ import {
   ZUpdateTemplateRecipientsRequestSchema,
   ZUpdateTemplateRecipientsResponseSchema,
 } from './schema';
+
+/**
+ * `createDocumentRecipient(s)` add to a document's existing recipients rather than
+ * replacing them, so the limit check needs the current count plus the incoming ones.
+ */
+const assertRecipientLimitNotExceeded = async ({
+  email,
+  teamId,
+  documentId,
+  additionalRecipients,
+}: {
+  email: string;
+  teamId?: number;
+  documentId: number;
+  additionalRecipients: number;
+}) => {
+  const [{ remaining }, existingCount] = await Promise.all([
+    getServerLimits({ email, teamId }),
+    prisma.recipient.count({ where: { documentId } }),
+  ]);
+
+  if (existingCount + additionalRecipients > remaining.recipients) {
+    throw new AppError(AppErrorCode.LIMIT_EXCEEDED, {
+      message: 'You have exceeded the number of recipients allowed per document on your plan.',
+      statusCode: 400,
+    });
+  }
+};
 
 export const recipientRouter = router({
   /**
@@ -88,6 +119,13 @@ export const recipientRouter = router({
       const { teamId } = ctx;
       const { documentId, recipient } = input;
 
+      await assertRecipientLimitNotExceeded({
+        email: ctx.user.email,
+        teamId,
+        documentId,
+        additionalRecipients: 1,
+      });
+
       const createdRecipients = await createDocumentRecipients({
         userId: ctx.user.id,
         teamId,
@@ -117,6 +155,13 @@ export const recipientRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { teamId } = ctx;
       const { documentId, recipients } = input;
+
+      await assertRecipientLimitNotExceeded({
+        email: ctx.user.email,
+        teamId,
+        documentId,
+        additionalRecipients: recipients.length,
+      });
 
       return await createDocumentRecipients({
         userId: ctx.user.id,
@@ -222,6 +267,15 @@ export const recipientRouter = router({
     .mutation(async ({ input, ctx }) => {
       const { teamId } = ctx;
       const { documentId, recipients } = input;
+
+      const { remaining } = await getServerLimits({ email: ctx.user.email, teamId });
+
+      if (recipients.length > remaining.recipients) {
+        throw new AppError(AppErrorCode.LIMIT_EXCEEDED, {
+          message: 'You have exceeded the number of recipients allowed per document on your plan.',
+          statusCode: 400,
+        });
+      }
 
       return await setDocumentRecipients({
         userId: ctx.user.id,

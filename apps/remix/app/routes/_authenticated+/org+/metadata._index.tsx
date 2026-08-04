@@ -1,10 +1,25 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import { DatabaseIcon, PencilIcon, PlusIcon, Trash2Icon, XIcon } from 'lucide-react';
+import {
+  DatabaseIcon,
+  DownloadIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+  UploadIcon,
+  XIcon,
+} from 'lucide-react';
+import Papa, { type ParseResult } from 'papaparse';
 
+import {
+  MAX_METADATA_IMPORT_ROWS,
+  METADATA_IMPORT_HEADER_ALIASES,
+  buildMetadataTemplateCsv,
+  parseKeywordsCell,
+} from '@documenso/lib/universal/metadata-import';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import { Input } from '@documenso/ui/primitives/input';
@@ -79,6 +94,169 @@ export default function MetadataPage() {
     onError: (e) => toast({ title: _(msg`Error`), description: e.message, variant: 'destructive' }),
   });
 
+  // ---------------------------------------------------------------- import --
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importErrors, setImportErrors] = useState<
+    { row?: number; label: string; message: string }[]
+  >([]);
+
+  const bulkUpsert = trpc.metadata.bulkUpsert.useMutation({
+    onSuccess: ({ created, updated, errors }) => {
+      void utils.metadata.list.invalidate();
+
+      // Append rather than replace — the parser's own row errors were recorded
+      // before this ever reached the server.
+      setImportErrors((previous) => [...previous, ...errors]);
+
+      const skipped = errors.length;
+      const nothingLanded = created === 0 && updated === 0;
+
+      toast({
+        title: _(msg`Import finished`),
+        description: skipped
+          ? _(msg`${created} added, ${updated} updated, ${skipped} skipped.`)
+          : _(msg`${created} added, ${updated} updated.`),
+        variant: nothingLanded ? 'destructive' : undefined,
+      });
+    },
+    onError: (e) => toast({ title: _(msg`Import failed`), description: e.message, variant: 'destructive' }),
+  });
+
+  const downloadTemplate = () => {
+    const blob = new Blob([buildMetadataTemplateCsv()], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+
+    anchor.href = url;
+    anchor.download = 'hubsign-metadata-template.csv';
+    anchor.click();
+
+    URL.revokeObjectURL(url);
+  };
+
+  const onImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    // Let the same file be re-picked after a failed attempt.
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    // Parsing the binary .xlsx container would mean pulling in a spreadsheet
+    // library; say so plainly instead of failing with a garbled parse error.
+    if (/\.xlsx?$/i.test(file.name)) {
+      toast({
+        title: _(msg`Save the file as CSV first`),
+        description: _(
+          msg`Excel workbooks (.xlsx) aren't supported. In Excel choose File → Save As → CSV UTF-8, then upload that file.`,
+        ),
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setImportErrors([]);
+
+    Papa.parse<Record<string, string>>(file, {
+      header: true,
+      skipEmptyLines: 'greedy',
+      // Map the sheet's headers onto our field names; unknown columns keep a
+      // normalized name and are simply never read.
+      transformHeader: (header) => {
+        const normalized = header.trim().toLowerCase();
+        return METADATA_IMPORT_HEADER_ALIASES[normalized] ?? normalized;
+      },
+      complete: (results: ParseResult<Record<string, string>>) => {
+        const records: {
+          category: string;
+          label: string;
+          email: string | null;
+          data?: Record<string, unknown>;
+          row: number;
+        }[] = [];
+        const localErrors: { row?: number; label: string; message: string }[] = [];
+
+        results.data.forEach((raw, index) => {
+          // +2: one for the header line, one to count from 1 like a spreadsheet.
+          const row = index + 2;
+
+          const value = (field: string) => (raw[field] ?? '').toString().trim();
+
+          const label = value('label');
+          const category = value('category').toLowerCase() || 'vendor';
+
+          if (!label) {
+            // A blank name on an otherwise-populated line is a mistake worth
+            // reporting; a fully blank line is just spreadsheet padding.
+            const hasAnyValue = ['contactName', 'email', 'role', 'phone', 'keywords'].some((f) =>
+              value(f),
+            );
+
+            if (hasAnyValue) {
+              localErrors.push({ row, label: '—', message: 'Name is required.' });
+            }
+            return;
+          }
+
+          const extra: Record<string, unknown> = {};
+          const contactNameValue = value('contactName');
+          const roleValue = value('role');
+          const phoneValue = value('phone');
+          const keywordValues = parseKeywordsCell(value('keywords'));
+
+          if (contactNameValue) extra.contactName = contactNameValue;
+          if (roleValue) extra.role = roleValue.toUpperCase();
+          if (phoneValue) extra.phone = phoneValue;
+          if (keywordValues.length) extra.keywords = keywordValues;
+
+          records.push({
+            category,
+            label,
+            email: value('email') || null,
+            data: Object.keys(extra).length ? extra : undefined,
+            row,
+          });
+        });
+
+        if (records.length === 0) {
+          setImportErrors(localErrors);
+          toast({
+            title: _(msg`Nothing to import`),
+            description: _(
+              msg`No rows with a Name were found. Download the template to check the expected columns.`,
+            ),
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        if (records.length > MAX_METADATA_IMPORT_ROWS) {
+          toast({
+            title: _(msg`Too many rows`),
+            description: _(
+              msg`This file has ${records.length} rows; the limit is ${MAX_METADATA_IMPORT_ROWS} per import. Split it into smaller files.`,
+            ),
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        setImportErrors(localErrors);
+        bulkUpsert.mutate({ records });
+      },
+      error: (err: Error) => {
+        toast({
+          title: _(msg`Could not read the file`),
+          description: err.message,
+          variant: 'destructive',
+        });
+      },
+    });
+  };
+
   const startEdit = (r: {
     id: string;
     category: string;
@@ -136,18 +314,74 @@ export default function MetadataPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold">
-          <Trans>Metadata</Trans>
-        </h2>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
-          <Trans>
-            A lookup directory that workflows resolve at runtime — e.g. a vendor → email, or a
-            signee/recipient (the person who will sign) → their email & role. Use the "Look up
-            metadata" workflow action to find a record by name, then notify or send it to sign.
-          </Trans>
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">
+            <Trans>Metadata</Trans>
+          </h2>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            <Trans>
+              A lookup directory that workflows resolve at runtime — e.g. a vendor → email, or a
+              signee/recipient (the person who will sign) → their email & role. Use the "Look up
+              metadata" workflow action to find a record by name, then notify or send it to sign.
+            </Trans>
+          </p>
+        </div>
+
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <Button size="sm" variant="outline" onClick={downloadTemplate}>
+            <DownloadIcon className="mr-1.5 h-3.5 w-3.5" />
+            <Trans>Download template</Trans>
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={bulkUpsert.isPending}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <UploadIcon className="mr-1.5 h-3.5 w-3.5" />
+            {bulkUpsert.isPending ? <Trans>Importing…</Trans> : <Trans>Import CSV</Trans>}
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={onImportFile}
+          />
+        </div>
       </div>
+
+      {importErrors.length > 0 && (
+        <div className="rounded-[var(--r)] border border-destructive/30 bg-destructive/5 p-3">
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[12px] font-medium text-destructive">
+              <Trans>{importErrors.length} row(s) were skipped</Trans>
+            </p>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 px-1.5"
+              onClick={() => setImportErrors([])}
+            >
+              <XIcon className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <ul className="mt-1.5 space-y-0.5">
+            {importErrors.slice(0, 10).map((error, index) => (
+              <li key={`${error.row ?? index}-${index}`} className="text-[11px] text-muted-foreground">
+                {error.row ? `Row ${error.row}` : 'Row ?'}
+                {error.label && error.label !== '—' ? ` (${error.label})` : ''} — {error.message}
+              </li>
+            ))}
+          </ul>
+          {importErrors.length > 10 && (
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              <Trans>…and {importErrors.length - 10} more.</Trans>
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Add / update form */}
       <div className="rounded-[var(--r)] border border-border bg-card p-4">
@@ -262,6 +496,13 @@ export default function MetadataPage() {
             Only Category + Name are required. Name match is case-insensitive. Keywords let a
             workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this
             record's signee/vendor is used (e.g. to trigger a sign request).
+          </Trans>
+        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          <Trans>
+            Adding a lot at once? Download the template, fill it in with Excel or Google Sheets,
+            save it as CSV, then use Import. Re-importing an edited file updates the matching
+            records instead of duplicating them.
           </Trans>
         </p>
       </div>

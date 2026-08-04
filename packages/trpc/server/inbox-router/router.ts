@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 import { jobs } from '@documenso/lib/jobs/client';
 import { sendDocument } from '@documenso/lib/server-only/document/send-document';
+import { publishInboxEvent } from '@documenso/lib/server-only/inbox/inbox-events';
 import { pollWorkHubInboxForOrg } from '@documenso/lib/server-only/inbox/poll-workhub-inbox';
 import { nanoid } from '@documenso/lib/universal/id';
 import { prisma } from '@documenso/prisma';
@@ -113,8 +114,35 @@ export const inboxRouter = router({
         },
       });
       if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'Inbox item not found.' });
+
+      // Mirrors Outlook: opening an item marks it read automatically. Shared
+      // across the org (this is a shared queue, not a per-user mailbox), so
+      // whoever opens it first marks it read for everyone.
+      if (!item.viewedAt) {
+        item.viewedAt = (
+          await prisma.signatureInboxItem.update({
+            where: { id: item.id },
+            data: { viewedAt: new Date() },
+            select: { viewedAt: true },
+          })
+        ).viewedAt;
+
+        // The org's unread count just dropped — push it to everyone else's
+        // sidebar. Only on the transition, so this can't loop with the
+        // refetch the event itself triggers.
+        publishInboxEvent(membership.organizationId, { type: 'viewed', inboxItemId: item.id });
+      }
+
       return item;
     }),
+
+  /** Count of unread items for the sidebar badge. */
+  unreadCount: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await requireOrgMember(ctx.user.id);
+    return prisma.signatureInboxItem.count({
+      where: { organizationId: membership.organizationId, viewedAt: null },
+    });
+  }),
 
   /** Add signer(s) (if provided) then send the document for signature. */
   sendForSignature: authenticatedProcedure
@@ -165,10 +193,18 @@ export const inboxRouter = router({
         requestMetadata: { requestMetadata: {}, source: 'app', auth: null },
       });
 
-      return prisma.signatureInboxItem.update({
+      const sent = await prisma.signatureInboxItem.update({
         where: { id: item.id },
         data: { status: 'SENT_FOR_SIGNATURE' },
       });
+
+      publishInboxEvent(membership.organizationId, {
+        type: 'update',
+        inboxItemId: sent.id,
+        status: sent.status,
+      });
+
+      return sent;
     }),
 
   /** Re-run OCR for an item. */
@@ -185,6 +221,15 @@ export const inboxRouter = router({
         where: { id: item.id },
         data: { status: 'OCR_PROCESSING', error: null },
       });
+
+      // Push the "processing" state now; `runInboxOcr` publishes again when it
+      // lands on READY / OCR_FAILED.
+      publishInboxEvent(membership.organizationId, {
+        type: 'update',
+        inboxItemId: item.id,
+        status: 'OCR_PROCESSING',
+      });
+
       await jobs.triggerJob({ name: 'internal.process-inbox-ocr', payload: { inboxItemId: item.id } });
       return { success: true };
     }),
@@ -197,10 +242,19 @@ export const inboxRouter = router({
         where: { id: input.id, organizationId: membership.organizationId },
       });
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' });
-      return prisma.signatureInboxItem.update({
+
+      const archived = await prisma.signatureInboxItem.update({
         where: { id: item.id },
         data: { status: 'ARCHIVED' },
       });
+
+      publishInboxEvent(membership.organizationId, {
+        type: 'update',
+        inboxItemId: archived.id,
+        status: archived.status,
+      });
+
+      return archived;
     }),
 
   /** Pull new messages from this org's WorkHub inbox now (also runs on the cron). */

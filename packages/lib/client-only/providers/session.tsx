@@ -70,6 +70,11 @@ export const SessionProvider = ({ children, initialSession }: SessionProviderPro
         const path = window.location.pathname;
         // Pages where this redirect should NOT fire:
         // - Auth pages (signin/signup/forgot/reset/verify) — already public
+        // - Unverified account page — reached after a signin attempt with an
+        //   unverified email; the user isn't authenticated yet so this check
+        //   would otherwise immediately bounce them back to signin
+        // - Check-email page — reached after submitting forgot-password; same
+        //   reasoning, the user isn't authenticated yet
         // - Recipient signing routes (/sign/...) — recipients aren't logged in
         // - Public share routes (/share/...) — public access
         // - Internal htmltopdf routes (/__htmltopdf/*) — server-side rendered
@@ -80,6 +85,8 @@ export const SessionProvider = ({ children, initialSession }: SessionProviderPro
           path.startsWith('/forgot-password') ||
           path.startsWith('/reset-password') ||
           path.startsWith('/verify-email') ||
+          path.startsWith('/unverified-account') ||
+          path.startsWith('/check-email') ||
           path.startsWith('/sign/') ||
           path.startsWith('/share/') ||
           path.startsWith('/__htmltopdf');

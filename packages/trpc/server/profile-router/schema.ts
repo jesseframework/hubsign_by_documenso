@@ -19,6 +19,11 @@ export const ZCreateCheckoutSessionRequestSchema = z.object({
   priceId: z.string().min(1),
 });
 
+export const ZToggleSubscriptionAddonRequestSchema = z.object({
+  priceId: z.string().min(1),
+  action: z.enum(['add', 'remove']),
+});
+
 export const ZUpdateProfileMutationSchema = z.object({
   name: z.string().min(1),
   signature: z.string(),

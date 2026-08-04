@@ -9,6 +9,7 @@ import { prisma } from '@documenso/prisma';
 import { IS_BILLING_ENABLED } from '../../constants/app';
 import { SALT_ROUNDS } from '../../constants/auth';
 import { AppError, AppErrorCode } from '../../errors/app-error';
+import { alphaid } from '../../universal/id';
 import { buildLogger } from '../../utils/logger';
 
 export interface CreateUserOptions {
@@ -32,18 +33,35 @@ export const createUser = async ({ name, email, password, signature, url }: Crea
     throw new AppError(AppErrorCode.ALREADY_EXISTS);
   }
 
-  if (url) {
-    const urlExists = await prisma.user.findFirst({
-      where: {
-        url,
-      },
-    });
+  // The url passed here is auto-generated (not user-chosen), so on collision we
+  // uniquify it with a random suffix rather than failing the whole signup.
+  let resolvedUrl = url;
 
-    if (urlExists) {
-      throw new AppError('PROFILE_URL_TAKEN', {
-        message: 'Profile username is taken',
-        userMessage: 'The profile username is already taken',
+  if (resolvedUrl) {
+    const baseUrl = resolvedUrl;
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const candidate: string = attempt === 0 ? baseUrl : `${baseUrl}-${alphaid(6)}`;
+
+      const urlExists = await prisma.user.findFirst({
+        where: {
+          url: candidate,
+        },
       });
+
+      if (!urlExists) {
+        // eslint-disable-next-line require-atomic-updates
+        resolvedUrl = candidate;
+        break;
+      }
+
+      if (attempt === 4) {
+        throw new AppError('PROFILE_URL_TAKEN', {
+          message: 'Profile username is taken',
+          userMessage: 'The profile username is already taken',
+          statusCode: 400,
+        });
+      }
     }
   }
 
@@ -54,7 +72,7 @@ export const createUser = async ({ name, email, password, signature, url }: Crea
         email: email.toLowerCase(),
         password: hashedPassword, // Todo: (RR7) Drop password.
         signature,
-        url,
+        url: resolvedUrl,
       },
     });
 

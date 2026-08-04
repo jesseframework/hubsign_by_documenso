@@ -17,7 +17,8 @@ type PreferenceKey =
   | 'documentSigned'
   | 'documentCompleted'
   | 'documentRejected'
-  | 'reminderReceived';
+  | 'reminderReceived'
+  | 'inboxItemReceived';
 
 const preferenceRows: { key: PreferenceKey; title: React.ReactNode; description: React.ReactNode }[] = [
   {
@@ -44,6 +45,11 @@ const preferenceRows: { key: PreferenceKey; title: React.ReactNode; description:
     key: 'reminderReceived',
     title: <Trans>Reminder received</Trans>,
     description: <Trans>A reminder email is sent to you about an unsigned document.</Trans>,
+  },
+  {
+    key: 'inboxItemReceived',
+    title: <Trans>New inbox item</Trans>,
+    description: <Trans>A new document arrives in your Signature Inbox from WorkHub.</Trans>,
   },
 ];
 

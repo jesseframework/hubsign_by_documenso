@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 
 import { createUser } from '@documenso/lib/server-only/user/create-user';
+import { alphaid } from '@documenso/lib/universal/id';
 import { env } from '@documenso/lib/utils/env';
 import { jobsClient } from '@documenso/lib/jobs/client';
 
@@ -146,12 +147,13 @@ externalSignupRoute.post('/signup', async (c) => {
 
   // ── 6. Create User ──
   try {
-    // Auto-generate profile URL from name
-    const url = name
+    // Auto-generate profile URL from name, suffixed with a random id to avoid
+    // colliding with other users who share a name.
+    const nameSlug = name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      || `user-${Date.now().toString(36)}`;
+      .replace(/^-|-$/g, '');
+    const url = `${nameSlug ? `${nameSlug}-` : 'user-'}${alphaid(8)}`;
 
     const user = await createUser({
       name: name.trim(),

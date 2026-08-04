@@ -14,6 +14,7 @@ import { Link, useRevalidator } from 'react-router';
 import { P, match } from 'ts-pattern';
 
 import { useLimits } from '@documenso/ee/server-only/limits/provider/client';
+import { isApproachingLimit } from '@documenso/ee/server-only/limits/thresholds';
 import { useCopyToClipboard } from '@documenso/lib/client-only/hooks/use-copy-to-clipboard';
 import { DIRECT_TEMPLATE_RECIPIENT_EMAIL } from '@documenso/lib/constants/direct-templates';
 import { RECIPIENT_ROLES_DESCRIPTION } from '@documenso/lib/constants/recipient-roles';
@@ -245,6 +246,31 @@ export const TemplateDirectLinkDialog = ({
                     </AlertDescription>
                   </Alert>
                 )}
+
+                {remaining.directTemplates !== 0 &&
+                  isApproachingLimit(quota.directTemplates, remaining.directTemplates) && (
+                    <Alert variant="secondary">
+                      <AlertTitle>
+                        <Trans>
+                          Approaching your direct template limit ({quota.directTemplates - remaining.directTemplates}/
+                          {quota.directTemplates})
+                        </Trans>
+                      </AlertTitle>
+                      <AlertDescription>
+                        <Trans>
+                          You have {remaining.directTemplates} direct template
+                          {remaining.directTemplates === 1 ? '' : 's'} remaining.{' '}
+                          <Link
+                            className="mt-1 block underline underline-offset-4"
+                            to="/settings/billing"
+                          >
+                            Upgrade your account
+                          </Link>{' '}
+                          to avoid interruptions.
+                        </Trans>
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
                 {remaining.directTemplates !== 0 && (
                   <DialogFooter className="mx-auto mt-4">
