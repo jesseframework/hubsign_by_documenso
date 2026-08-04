@@ -3,7 +3,11 @@ import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
 import { NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
-import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
+import {
+  AppError,
+  AppErrorCode,
+  genericErrorCodeToTrpcErrorCodeMap,
+} from '@documenso/lib/errors/app-error';
 import { extractRequestMetadata } from '@documenso/lib/universal/extract-request-metadata';
 
 import { setCsrfCookie } from './lib/session/session-cookies';
@@ -67,14 +71,21 @@ auth.onError((err, c) => {
 
   if (err instanceof AppError) {
     console.error('[auth] AppError:', c.req.method, c.req.path, err.code, err.message);
+
+    // Mirrors the tRPC errorFormatter's fallback (packages/trpc/server/trpc.ts): an
+    // explicit statusCode wins, then the generic code map, and only genuinely
+    // unmapped/unexpected codes fall back — to 400, not 500, since throwing an
+    // AppError means the failure was anticipated rather than a server fault.
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    const statusCode = (err.statusCode || 500) as ContentfulStatusCode;
+    const statusCode = (err.statusCode ??
+      genericErrorCodeToTrpcErrorCodeMap[err.code]?.status ??
+      400) as ContentfulStatusCode;
 
     return c.json(
       {
         code: err.code,
         message: err.message,
-        statusCode: err.statusCode,
+        statusCode,
       },
       statusCode,
     );
