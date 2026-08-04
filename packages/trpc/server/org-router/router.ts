@@ -45,6 +45,12 @@ import { authenticatedProcedure, router } from '../trpc';
  * (e.g. leftover test data, or a live/test Stripe key mismatch leaving a row
  * that no longer resolves in the current mode) — try each, newest first, and
  * skip any that fail to resolve in Stripe instead of blindly using the first.
+ *
+ * The local `ACTIVE` flag can also just be stale (e.g. a webhook delivery
+ * failure meant a cancellation never synced back), so each candidate's actual
+ * Stripe status is re-verified here rather than trusted — anything Stripe no
+ * longer considers active gets corrected locally via `onSubscriptionDeleted`
+ * (the same correction the webhook would have made) and skipped.
  */
 const resolveActivePersonalPlan = async (userId: number) => {
   const subscriptions = await prisma.subscription.findMany({
@@ -53,6 +59,18 @@ const resolveActivePersonalPlan = async (userId: number) => {
   });
 
   for (const subscription of subscriptions) {
+    const stripeSubscription = await stripe.subscriptions
+      .retrieve(subscription.planId)
+      .catch(() => null);
+
+    if (!stripeSubscription || !['active', 'trialing', 'past_due'].includes(stripeSubscription.status)) {
+      if (stripeSubscription) {
+        await onSubscriptionDeleted({ subscription: stripeSubscription }).catch(() => {});
+      }
+
+      continue;
+    }
+
     const price = await stripe.prices
       .retrieve(subscription.priceId, { expand: ['product'] })
       .catch(() => null);
@@ -718,12 +736,18 @@ export const orgRouter = router({
       }
 
       if (adminActivePlan) {
-        const canceledSubscription = await stripe.subscriptions.cancel(adminActivePlan.subscription.planId, {
-          invoice_now: true,
-          prorate: true,
-        });
+        try {
+          const canceledSubscription = await stripe.subscriptions.cancel(adminActivePlan.subscription.planId, {
+            invoice_now: true,
+            prorate: true,
+          });
 
-        await onSubscriptionDeleted({ subscription: canceledSubscription });
+          await onSubscriptionDeleted({ subscription: canceledSubscription });
+        } catch (err) {
+          // See `assignSeat` for full rationale — Stripe may reject the
+          // cancel for reasons that still mean nothing is left to cancel.
+          console.warn('Failed to cancel personal subscription during seat purchase:', err);
+        }
       }
 
       if (!IS_BILLING_ENABLED()) {
@@ -1069,18 +1093,27 @@ export const orgRouter = router({
       }
 
       if (activePlan) {
-        // Cancel immediately with proration — unused time lands as a Stripe
-        // account-balance credit (applied to future invoices), not a card
-        // refund. Same pattern as `transfer-team-subscription.ts`.
-        const canceledSubscription = await stripe.subscriptions.cancel(activePlan.subscription.planId, {
-          invoice_now: true,
-          prorate: true,
-        });
+        try {
+          // Cancel immediately with proration — unused time lands as a Stripe
+          // account-balance credit (applied to future invoices), not a card
+          // refund. Same pattern as `transfer-team-subscription.ts`.
+          const canceledSubscription = await stripe.subscriptions.cancel(activePlan.subscription.planId, {
+            invoice_now: true,
+            prorate: true,
+          });
 
-        // Sync locally immediately rather than waiting on the webhook (mirrors
-        // `update-subscription-plan.ts`) — the webhook will also fire and
-        // no-op harmlessly on top of this.
-        await onSubscriptionDeleted({ subscription: canceledSubscription });
+          // Sync locally immediately rather than waiting on the webhook (mirrors
+          // `update-subscription-plan.ts`) — the webhook will also fire and
+          // no-op harmlessly on top of this.
+          await onSubscriptionDeleted({ subscription: canceledSubscription });
+        } catch (err) {
+          // `resolveActivePersonalPlan` already re-verifies against Stripe, but
+          // Stripe can still reject the cancel itself (e.g. canceled between
+          // that check and here). Either way the goal — not leaving them
+          // double-billed — is already satisfied, so don't block the seat
+          // assignment over it.
+          console.warn('Failed to cancel personal subscription during seat assignment:', err);
+        }
       }
 
       // Check if seats are available

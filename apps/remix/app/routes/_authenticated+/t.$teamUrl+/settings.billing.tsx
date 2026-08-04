@@ -29,7 +29,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   let teamSubscription: Stripe.Subscription | null = null;
 
   if (team.subscription) {
-    teamSubscription = await stripe.subscriptions.retrieve(team.subscription.planId);
+    // Local state can drift from Stripe (e.g. a missed webhook delivery left
+    // a since-canceled subscription marked active locally) — fall back to
+    // "No payment required" rather than crashing the page on Stripe's error.
+    teamSubscription = await stripe.subscriptions
+      .retrieve(team.subscription.planId)
+      .catch(() => null);
   }
 
   return superLoaderJson({

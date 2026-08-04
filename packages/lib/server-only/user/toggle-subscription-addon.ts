@@ -1,5 +1,6 @@
 import { SubscriptionStatus } from '@prisma/client';
 
+import { onSubscriptionDeleted } from '@documenso/ee/server-only/stripe/webhook/on-subscription-deleted';
 import { onSubscriptionUpdated } from '@documenso/ee/server-only/stripe/webhook/on-subscription-updated';
 import { stripe } from '@documenso/lib/server-only/stripe';
 
@@ -32,7 +33,20 @@ export const toggleSubscriptionAddon = async ({
     throw new Error('No active subscription found');
   }
 
-  const stripeSubscription = await stripe.subscriptions.retrieve(activeSubscription.planId);
+  const stripeSubscription = await stripe.subscriptions
+    .retrieve(activeSubscription.planId)
+    .catch(() => null);
+
+  // Local state can drift from Stripe (e.g. a missed webhook delivery left a
+  // since-canceled subscription marked `ACTIVE`) — correct it instead of
+  // letting Stripe's raw error bubble up to the user.
+  if (!stripeSubscription || !['active', 'trialing', 'past_due'].includes(stripeSubscription.status)) {
+    if (stripeSubscription) {
+      await onSubscriptionDeleted({ subscription: stripeSubscription }).catch(() => {});
+    }
+
+    throw new Error('No active subscription found');
+  }
 
   const existingItem = stripeSubscription.items.data.find((item) => item.price.id === priceId);
 
