@@ -24,6 +24,7 @@ import {
   mapDocumentToWebhookDocumentPayload,
 } from '../../types/webhook-payload';
 import { getIsRecipientsTurnToSign } from '../recipient/get-is-recipient-turn';
+import { publishInboxEventForDocument } from '../inbox/publish-document-change';
 import { triggerWebhook } from '../webhooks/trigger/trigger-webhook';
 import { sendPendingEmail } from './send-pending-email';
 
@@ -291,4 +292,7 @@ export const completeDocumentWithToken = async ({
     userId: updatedDocument.userId,
     teamId: updatedDocument.teamId ?? undefined,
   });
+
+  // Move any open Signature Inbox view watching this document.
+  await publishInboxEventForDocument(document.id);
 };

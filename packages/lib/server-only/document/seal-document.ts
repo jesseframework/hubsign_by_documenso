@@ -28,6 +28,7 @@ import { insertFieldInPDF } from '../pdf/insert-field-in-pdf';
 import { legacy_insertFieldInPDF } from '../pdf/legacy-insert-field-in-pdf';
 import { normalizeSignatureAppearances } from '../pdf/normalize-signature-appearances';
 import { embedStampsOnPdf } from '../stamps/embed-stamp-on-pdf';
+import { publishInboxEventForDocument } from '../inbox/publish-document-change';
 import { triggerWebhook } from '../webhooks/trigger/trigger-webhook';
 import { sendCompletedEmail } from './send-completed-email';
 
@@ -325,6 +326,9 @@ export const sealDocument = async ({
     userId: document.userId,
     teamId: document.teamId ?? undefined,
   });
+
+  // Move any open Signature Inbox view watching this document.
+  await publishInboxEventForDocument(document.id);
 
   // Auto-file completed documents into DMS (if enabled)
   if (!isRejected && !isResealing) {

@@ -26,6 +26,11 @@ msgstr " Direktlink-Signierung aktivieren"
 msgid " The events that will trigger a webhook to be sent to your URL."
 msgstr " Die Ereignisse, die einen Webhook auslösen, der an Ihre URL gesendet wird."
 
+#. placeholder {0}: importErrors.length - 10
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "…and {0} more."
+msgstr ""
+
 #: apps/remix/app/components/embed/authoring/configure-document-upload.tsx
 msgid ".PDF documents accepted (max {APP_DOCUMENT_UPLOAD_SIZE_LIMIT}MB)"
 msgstr ""
@@ -212,9 +217,22 @@ msgstr ""
 msgid "{0} results found"
 msgstr ""
 
+#. placeholder {0}: importErrors.length
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "{0} row(s) were skipped"
+msgstr ""
+
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 msgid "{charactersRemaining, plural, one {1 character remaining} other {{charactersRemaining} characters remaining}}"
 msgstr "{charactersRemaining, plural, one {1 Zeichen verbleibend} other {{charactersRemaining} Zeichen verbleibend}}"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "{created} added, {updated} updated, {skipped} skipped."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "{created} added, {updated} updated."
+msgstr ""
 
 #: packages/email/templates/document-invite.tsx
 msgid "{inviterName} <0>({inviterEmail})</0>"
@@ -1022,6 +1040,10 @@ msgstr ""
 
 #: apps/remix/app/components/general/subscription-addons.tsx
 msgid "Add-ons"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Adding a lot at once? Download the template, fill it in with Excel or Google Sheets, save it as CSV, then use Import. Re-importing an edited file updates the matching records instead of duplicating them."
 msgstr ""
 
 #: apps/remix/app/components/dialogs/team-checkout-create-dialog.tsx
@@ -2487,6 +2509,10 @@ msgstr "Signierlinks kopieren"
 msgid "Copy token"
 msgstr "Token kopieren"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Could not read the file"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/doc-merge.tsx
 msgid "Couldn't create the merged document"
 msgstr ""
@@ -2735,8 +2761,8 @@ msgid "Customize your organization's appearance with your brand colors and logo.
 msgstr ""
 
 #: apps/remix/app/components/general/billing-plans.tsx
-msgid "Daily"
-msgstr "Täglich"
+#~ msgid "Daily"
+#~ msgstr "Täglich"
 
 #: apps/remix/app/components/general/app-topbar-preferences.tsx
 msgid "Dark"
@@ -3575,6 +3601,10 @@ msgstr "Zertifikat herunterladen"
 msgid "Download Original"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Download template"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/template-bulk-send-dialog.tsx
 msgid "Download Template CSV"
 msgstr "Vorlage CSV herunterladen"
@@ -4063,6 +4093,10 @@ msgstr "Alle haben unterschrieben! Sie werden eine E-Mail-Kopie des unterzeichne
 msgid "Exceeded timeout"
 msgstr "Zeitüberschreitung überschritten"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Excel workbooks (.xlsx) aren't supported. In Excel choose File → Save As → CSV UTF-8, then upload that file."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "Existing signers"
 msgstr ""
@@ -4513,10 +4547,26 @@ msgstr "Wenn Sie den Bestätigungslink nicht in Ihrem Posteingang finden, könne
 msgid "If your authenticator app does not support QR codes, you can use the following code instead:"
 msgstr "Wenn Ihre Authenticator-App keine QR-Codes unterstützt, können Sie stattdessen den folgenden Code verwenden:"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Import CSV"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Import failed"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Import finished"
+msgstr ""
+
 #. placeholder {0}: r.imported
 #. placeholder {1}: r.skipped
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "Imported {0}, skipped {1}"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Importing…"
 msgstr ""
 
 #: apps/remix/app/routes/_share+/verify.$token.tsx
@@ -5398,6 +5448,10 @@ msgstr "Keine Ergebnisse gefunden."
 msgid "No retrieval requests yet"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "No rows with a Name were found. Download the template to check the expected columns."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id.runs.tsx
 msgid "No runs yet."
 msgstr ""
@@ -5461,6 +5515,10 @@ msgstr "Nicht unterstützt"
 #: apps/remix/app/components/tables/documents-table-empty-state.tsx
 msgid "Nothing to do"
 msgstr "Nichts zu tun"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Nothing to import"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
 msgid "Nothing waiting on you right now."
@@ -6789,6 +6847,10 @@ msgstr ""
 #: packages/ui/primitives/template-flow/add-template-fields.tsx
 msgid "Save Template"
 msgstr "Vorlage speichern"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Save the file as CSV first"
+msgstr ""
 
 #: apps/remix/app/components/general/document/document-upload.tsx
 msgid "Save this password — once signed, the system discards it and you must share it with recipients yourself."
@@ -8405,6 +8467,11 @@ msgstr "Diese E-Mail wird an den Empfänger gesendet, der das Dokument gerade un
 msgid "This field cannot be modified or deleted. When you share this template's direct link or add it to your public profile, anyone who accesses it can input their name and email, and fill in the fields assigned to them."
 msgstr "Dieses Feld kann nicht geändert oder gelöscht werden. Wenn Sie den direkten Link dieser Vorlage teilen oder zu Ihrem öffentlichen Profil hinzufügen, kann jeder, der darauf zugreift, seinen Namen und seine E-Mail-Adresse eingeben und die ihm zugewiesenen Felder ausfüllen."
 
+#. placeholder {0}: records.length
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "This file has {0} rows; the limit is {MAX_METADATA_IMPORT_ROWS} per import. Split it into smaller files."
+msgstr ""
+
 #: apps/remix/app/components/dialogs/template-folder-create-dialog.tsx
 #: apps/remix/app/components/dialogs/folder-create-dialog.tsx
 msgid "This folder name is already taken."
@@ -8637,6 +8704,10 @@ msgstr "Das Token ist abgelaufen. Bitte versuchen Sie es erneut."
 #: apps/remix/app/components/forms/token.tsx
 msgid "Token name"
 msgstr "Token-Name"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Too many rows"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Total Documents"
@@ -9623,8 +9694,8 @@ msgid "Webhooks"
 msgstr "Webhooks"
 
 #: apps/remix/app/components/general/billing-plans.tsx
-msgid "Weekly"
-msgstr "Wöchentlich"
+#~ msgid "Weekly"
+#~ msgstr "Wöchentlich"
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Welcome"
