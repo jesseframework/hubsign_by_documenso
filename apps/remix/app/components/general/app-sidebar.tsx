@@ -56,6 +56,8 @@ import { useLimits } from '@documenso/ee/server-only/limits/provider/client';
 import type { TGetTeamsResponse } from '@documenso/lib/server-only/team/get-teams';
 import { trpc } from '@documenso/trpc/react';
 
+import { useInboxEvents } from '~/hooks/use-inbox-events';
+
 import { BrandingLogo } from './branding-logo';
 import { SidebarUsageIndicator } from './sidebar-usage-indicator';
 
@@ -190,12 +192,14 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
 
   const { data: orgMembership } = trpc.org.getMyOrganization.useQuery();
 
-  // Unread Signature Inbox count — visible from anywhere in the app, not
-  // just the inbox page itself, polled so it stays reasonably fresh.
+  // Unread Signature Inbox count — visible from anywhere in the app, not just
+  // the inbox page itself. Kept fresh by the inbox event stream below rather
+  // than a refetch interval, so the badge moves the moment mail lands.
   const { data: unreadInboxCount } = trpc.inbox.unreadCount.useQuery(undefined, {
     enabled: Boolean(orgMembership?.organization),
-    refetchInterval: 30_000,
   });
+
+  useInboxEvents(undefined, { enabled: Boolean(orgMembership?.organization) });
 
   // Expandable submenus (nested under their top-level item).
   const orgNav: SubNavItem[] = [
