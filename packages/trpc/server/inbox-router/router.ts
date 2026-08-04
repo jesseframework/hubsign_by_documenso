@@ -2,9 +2,11 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import { jobs } from '@documenso/lib/jobs/client';
+import { bmsMlGetTemplates } from '@documenso/lib/server-only/bms-ml/client';
 import { sendDocument } from '@documenso/lib/server-only/document/send-document';
 import { publishInboxEvent } from '@documenso/lib/server-only/inbox/inbox-events';
 import { pollWorkHubInboxForOrg } from '@documenso/lib/server-only/inbox/poll-workhub-inbox';
+import { rememberTemplateForSender } from '@documenso/lib/server-only/inbox/resolve-ocr-template';
 import { nanoid } from '@documenso/lib/universal/id';
 import { prisma } from '@documenso/prisma';
 
@@ -207,15 +209,77 @@ export const inboxRouter = router({
       return sent;
     }),
 
-  /** Re-run OCR for an item. */
+  /**
+   * BMS ML extraction templates available to this org, for the item's template
+   * picker. Returns [] when OCR isn't configured rather than erroring.
+   */
+  ocrTemplates: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await requireOrgMember(ctx.user.id);
+    const org = await prisma.organization.findUnique({
+      where: { id: membership.organizationId },
+      select: {
+        ocrApiUrl: true,
+        ocrApiKey: true,
+        ocrApiUsername: true,
+        ocrApiPassword: true,
+        ocrDefaultTemplateId: true,
+      },
+    });
+
+    if (!org?.ocrApiUrl) {
+      return { templates: [], defaultTemplateId: null };
+    }
+
+    // A slow or down ML service must not break the page it's rendered on.
+    const templates = await bmsMlGetTemplates({
+      apiUrl: org.ocrApiUrl,
+      apiKey: org.ocrApiKey,
+      apiUsername: org.ocrApiUsername,
+      apiPassword: org.ocrApiPassword,
+    }).catch(() => []);
+
+    return {
+      templates: templates
+        .filter((template) => template.is_active !== false)
+        .map((template) => ({
+          id: template.id,
+          name: template.name,
+          description: template.description,
+          isDefault: template.is_default,
+        })),
+      defaultTemplateId: org.ocrDefaultTemplateId,
+    };
+  }),
+
+  /** Re-run OCR for an item, optionally forcing a specific template. */
   reprocessOcr: authenticatedProcedure
-    .input(z.object({ id: z.string() }))
+    .input(
+      z.object({
+        id: z.string(),
+        templateId: z.number().int().positive().nullable().optional(),
+        /**
+         * Save the chosen template onto the sender's Metadata vendor record so
+         * their next invoice routes to it automatically.
+         */
+        rememberForSender: z.boolean().optional(),
+      }),
+    )
     .mutation(async ({ ctx, input }) => {
       const membership = await requireOrgMember(ctx.user.id);
       const item = await prisma.signatureInboxItem.findFirst({
         where: { id: input.id, organizationId: membership.organizationId },
       });
       if (!item) throw new TRPCError({ code: 'NOT_FOUND' });
+
+      let remembered: string | null = null;
+
+      if (input.rememberForSender && input.templateId && item.senderEmail) {
+        remembered = await rememberTemplateForSender({
+          organizationId: membership.organizationId,
+          senderEmail: item.senderEmail,
+          templateId: input.templateId,
+        }).catch(() => null);
+      }
 
       await prisma.signatureInboxItem.update({
         where: { id: item.id },
@@ -230,8 +294,12 @@ export const inboxRouter = router({
         status: 'OCR_PROCESSING',
       });
 
-      await jobs.triggerJob({ name: 'internal.process-inbox-ocr', payload: { inboxItemId: item.id } });
-      return { success: true };
+      await jobs.triggerJob({
+        name: 'internal.process-inbox-ocr',
+        payload: { inboxItemId: item.id, templateId: input.templateId ?? undefined },
+      });
+
+      return { success: true, remembered };
     }),
 
   archive: authenticatedProcedure

@@ -144,10 +144,15 @@ export type BmsMlTemplate = {
   name: string;
   description: string;
   is_default: boolean;
+  /** Absent on older deployments; treat undefined as active. */
+  is_active?: boolean;
+  /** Null for templates shared across organizations. */
+  organization_id?: number | null;
   fields: Record<string, { type: string; required: boolean; patterns?: string[]; ai_hint?: string }>;
   ai_model?: string;
   ai_fallback_threshold?: number;
   use_count?: number;
+  last_used_at?: string | null;
 };
 
 /**

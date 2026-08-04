@@ -1196,6 +1196,11 @@ msgstr "Already have a password? You can sign in at <0>{baseUrl}/signin</0>"
 msgid "Already have an account? <0>Sign in instead</0>"
 msgstr "Already have an account? <0>Sign in instead</0>"
 
+#. placeholder {0}: item.senderEmail
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Always use this template for {0}"
+msgstr "Always use this template for {0}"
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
 msgid "Amount"
@@ -1668,6 +1673,10 @@ msgstr "Authentication Level"
 msgid "Authentication required"
 msgstr "Authentication required"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Auto (match vendor by sender)"
+msgstr "Auto (match vendor by sender)"
+
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "Auto-File Signed Documents"
 msgstr "Auto-File Signed Documents"
@@ -2067,6 +2076,10 @@ msgstr "Choose which events should trigger a push notification."
 #: apps/remix/app/components/forms/token.tsx
 msgid "Choose..."
 msgstr "Choose..."
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "chosen manually"
+msgstr "chosen manually"
 
 #: apps/remix/app/components/general/claim-account.tsx
 msgid "Claim account"
@@ -4118,6 +4131,10 @@ msgstr "Extracted data (OCR)"
 msgid "Extracted fields"
 msgstr "Extracted fields"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Extraction template"
+msgstr "Extraction template"
+
 #: apps/remix/app/components/dialogs/template-folder-create-dialog.tsx
 #: apps/remix/app/components/dialogs/template-folder-create-dialog.tsx
 msgid "Failed to create folder"
@@ -4320,6 +4337,10 @@ msgstr "Full Name"
 msgid "Full-text search across document titles, OCR content, reference numbers, and file names."
 msgstr "Full-text search across document titles, OCR content, reference numbers, and file names."
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Future invoices from {remembered} will use this template."
+msgstr "Future invoices from {remembered} will use this template."
+
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-mobile.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-desktop.tsx
@@ -4353,6 +4374,10 @@ msgstr "Generating…"
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Generation failed"
 msgstr "Generation failed"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Generic extraction — accuracy is much lower without a template."
+msgstr "Generic extraction — accuracy is much lower without a template."
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 msgid "Give seat"
@@ -4717,6 +4742,14 @@ msgstr "Invoice"
 msgid "Invoice info"
 msgstr "Invoice info"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Invoices from this email extract with this template."
+msgstr "Invoices from this email extract with this template."
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Invoices from this vendor's email extract with this template."
+msgstr "Invoices from this vendor's email extract with this template."
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: apps/remix/app/components/tables/internal-audit-log-table.tsx
 msgid "IP Address"
@@ -5033,6 +5066,16 @@ msgstr "Mark as viewed"
 #: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
 msgid "Mark as Viewed"
 msgstr "Mark as Viewed"
+
+#. placeholder {0}: usedTemplate.vendor ?? 'vendor'
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "matched {0} by sender domain"
+msgstr "matched {0} by sender domain"
+
+#. placeholder {0}: usedTemplate.vendor ?? 'vendor'
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "matched {0} by sender email"
+msgstr "matched {0} by sender email"
 
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "MAU (created document)"
@@ -5471,6 +5514,14 @@ msgstr "No steps recorded."
 msgid "No tags defined yet"
 msgstr "No tags defined yet"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "No template"
+msgstr "No template"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "No templates available"
+msgstr "No templates available"
+
 #: apps/remix/app/components/dialogs/public-profile-template-manage-dialog.tsx
 msgid "No valid direct templates found"
 msgstr "No valid direct templates found"
@@ -5493,6 +5544,7 @@ msgstr "No workflows yet"
 msgid "No worries, it happens! Enter your email and we'll email you a special link to reset your password."
 msgstr "No worries, it happens! Enter your email and we'll email you a special link to reset your password."
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/components/embed/authoring/configure-document-advanced-settings.tsx
 #: packages/lib/constants/document.ts
 msgid "None"
@@ -5568,6 +5620,10 @@ msgstr "OCR ran but the template extracted no fields."
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "OCR results"
 msgstr "OCR results"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "OCR template"
+msgstr "OCR template"
 
 #. placeholder {0}: document.team?.name
 #: apps/remix/app/components/general/document-signing/document-signing-page-view.tsx
@@ -5718,6 +5774,10 @@ msgstr "Organization Branding"
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Organization created"
 msgstr "Organization created"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "organization default"
+msgstr "organization default"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Organization Details"
@@ -6790,6 +6850,10 @@ msgstr "Run"
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id.runs.tsx
 msgid "Run history"
 msgstr "Run history"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Running…"
+msgstr "Running…"
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 msgid "Runs"

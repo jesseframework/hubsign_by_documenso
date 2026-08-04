@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { bmsMlGetTemplates } from '@documenso/lib/server-only/bms-ml/client';
 import { normalizeMetadataKey } from '@documenso/lib/universal/metadata';
 import { MAX_METADATA_IMPORT_ROWS } from '@documenso/lib/universal/metadata-import';
 import { prisma } from '@documenso/prisma';
@@ -106,6 +107,12 @@ export const metadataRouter = router({
               label: z.string().min(1).max(300),
               email: z.string().max(320).nullable().optional(),
               data: z.record(z.unknown()).optional(),
+              /**
+               * BMS ML extraction template, given by NAME — the API itself
+               * takes a numeric id, so it's resolved here against the org's
+               * template list.
+               */
+              ocrTemplate: z.string().max(200).optional(),
               /** Source row number, echoed back so errors can name the line. */
               row: z.number().int().positive().optional(),
             }),
@@ -118,6 +125,38 @@ export const metadataRouter = router({
       const membership = await requireOrgWriteAccess(ctx.user.id);
 
       const errors: { row?: number; label: string; message: string }[] = [];
+
+      // Resolve template names → ids once for the whole file, and only when the
+      // file actually references one.
+      const templatesByName = new Map<string, { id: number; name: string }>();
+
+      if (input.records.some((record) => record.ocrTemplate?.trim())) {
+        const org = await prisma.organization.findUnique({
+          where: { id: membership.organizationId },
+          select: {
+            ocrApiUrl: true,
+            ocrApiKey: true,
+            ocrApiUsername: true,
+            ocrApiPassword: true,
+          },
+        });
+
+        const templates = org?.ocrApiUrl
+          ? await bmsMlGetTemplates({
+              apiUrl: org.ocrApiUrl,
+              apiKey: org.ocrApiKey,
+              apiUsername: org.ocrApiUsername,
+              apiPassword: org.ocrApiPassword,
+            }).catch(() => [])
+          : [];
+
+        for (const template of templates) {
+          templatesByName.set(template.name.trim().toLowerCase(), {
+            id: template.id,
+            name: template.name,
+          });
+        }
+      }
 
       // A sheet can repeat the same vendor; later rows win, matching how the
       // file reads top to bottom.
@@ -142,12 +181,30 @@ export const metadataRouter = router({
           continue;
         }
 
+        let data = record.data;
+        const templateName = record.ocrTemplate?.trim();
+
+        if (templateName) {
+          const template = templatesByName.get(templateName.toLowerCase());
+
+          if (!template) {
+            errors.push({
+              row: record.row,
+              label: record.label,
+              message: `Unknown OCR template "${templateName}".`,
+            });
+            continue;
+          }
+
+          data = { ...(data ?? {}), ocrTemplateId: template.id, ocrTemplateName: template.name };
+        }
+
         pending.set(`${category}::${key}`, {
           category,
           key,
           label: record.label.trim(),
           email,
-          data: record.data,
+          data,
           row: record.row,
         });
       }

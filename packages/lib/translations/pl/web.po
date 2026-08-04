@@ -1201,6 +1201,11 @@ msgstr ""
 msgid "Already have an account? <0>Sign in instead</0>"
 msgstr "Masz już konto? <0>Zaloguj się zamiast tego</0>"
 
+#. placeholder {0}: item.senderEmail
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Always use this template for {0}"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
 msgid "Amount"
@@ -1673,6 +1678,10 @@ msgstr "Poziom autoryzacji"
 msgid "Authentication required"
 msgstr "Wymagana autoryzacja"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Auto (match vendor by sender)"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "Auto-File Signed Documents"
 msgstr ""
@@ -2072,6 +2081,10 @@ msgstr ""
 #: apps/remix/app/components/forms/token.tsx
 msgid "Choose..."
 msgstr "Wybierz..."
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "chosen manually"
+msgstr ""
 
 #: apps/remix/app/components/general/claim-account.tsx
 msgid "Claim account"
@@ -4123,6 +4136,10 @@ msgstr ""
 msgid "Extracted fields"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Extraction template"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/template-folder-create-dialog.tsx
 #: apps/remix/app/components/dialogs/template-folder-create-dialog.tsx
 msgid "Failed to create folder"
@@ -4325,6 +4342,10 @@ msgstr "Imię i nazwisko"
 msgid "Full-text search across document titles, OCR content, reference numbers, and file names."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Future invoices from {remembered} will use this template."
+msgstr ""
+
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-mobile.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-desktop.tsx
@@ -4357,6 +4378,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Generation failed"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Generic extraction — accuracy is much lower without a template."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
@@ -4722,6 +4747,14 @@ msgstr "Faktura"
 msgid "Invoice info"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Invoices from this email extract with this template."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Invoices from this vendor's email extract with this template."
+msgstr ""
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: apps/remix/app/components/tables/internal-audit-log-table.tsx
 msgid "IP Address"
@@ -5038,6 +5071,16 @@ msgstr "Oznaczono jako obejrzane"
 #: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
 msgid "Mark as Viewed"
 msgstr "Oznacz jako wyświetlone"
+
+#. placeholder {0}: usedTemplate.vendor ?? 'vendor'
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "matched {0} by sender domain"
+msgstr ""
+
+#. placeholder {0}: usedTemplate.vendor ?? 'vendor'
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "matched {0} by sender email"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "MAU (created document)"
@@ -5476,6 +5519,14 @@ msgstr ""
 msgid "No tags defined yet"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "No template"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "No templates available"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/public-profile-template-manage-dialog.tsx
 msgid "No valid direct templates found"
 msgstr "Nie znaleziono ważnych szablonów bezpośrednich"
@@ -5498,6 +5549,7 @@ msgstr ""
 msgid "No worries, it happens! Enter your email and we'll email you a special link to reset your password."
 msgstr "Nie martw się, to się zdarza! Wprowadź swój e-mail, a my wyślemy Ci specjalny link do zresetowania hasła."
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/components/embed/authoring/configure-document-advanced-settings.tsx
 #: packages/lib/constants/document.ts
 msgid "None"
@@ -5572,6 +5624,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "OCR results"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "OCR template"
 msgstr ""
 
 #. placeholder {0}: document.team?.name
@@ -5722,6 +5778,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Organization created"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "organization default"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
@@ -6794,6 +6854,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id.runs.tsx
 msgid "Run history"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Running…"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
