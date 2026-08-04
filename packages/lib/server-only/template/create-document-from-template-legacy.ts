@@ -3,6 +3,8 @@ import { DocumentSource, type RecipientRole } from '@prisma/client';
 import { nanoid, prefixedId } from '@documenso/lib/universal/id';
 import { prisma } from '@documenso/prisma';
 
+import { resolveOrganizationId } from '../workflow/resolve-organization-id';
+
 export type CreateDocumentFromTemplateLegacyOptions = {
   templateId: number;
   userId: number;
@@ -68,6 +70,10 @@ export const createDocumentFromTemplateLegacy = async ({
     },
   });
 
+  // Stamp the owning org at creation so dashboards and other org-scoped reads
+  // never have to infer it from the author's memberships.
+  const organizationId = await resolveOrganizationId({ teamId: template.teamId, userId });
+
   const document = await prisma.document.create({
     data: {
       qrToken: prefixedId('qr'),
@@ -75,6 +81,7 @@ export const createDocumentFromTemplateLegacy = async ({
       templateId: template.id,
       userId,
       teamId: template.teamId,
+      organizationId,
       title: template.title,
       visibility: template.team?.teamGlobalSettings?.documentVisibility,
       documentDataId: documentData.id,

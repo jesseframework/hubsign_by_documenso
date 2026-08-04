@@ -47,6 +47,7 @@ import {
   extractDocumentAuthMethods,
 } from '../../utils/document-auth';
 import { triggerWebhook } from '../webhooks/trigger/trigger-webhook';
+import { resolveOrganizationId } from '../workflow/resolve-organization-id';
 
 type FinalRecipient = Pick<
   Recipient,
@@ -371,6 +372,10 @@ export const createDocumentFromTemplate = async ({
     },
   });
 
+  // Stamp the owning org at creation so dashboards and other org-scoped reads
+  // never have to infer it from the author's memberships.
+  const organizationId = await resolveOrganizationId({ teamId: template.teamId, userId });
+
   return await prisma.$transaction(async (tx) => {
     const document = await tx.document.create({
       data: {
@@ -380,6 +385,7 @@ export const createDocumentFromTemplate = async ({
         templateId: template.id,
         userId,
         teamId: template.teamId,
+        organizationId,
         title: override?.title || template.title,
         documentDataId: documentData.id,
         authOptions: createDocumentAuthOptions({

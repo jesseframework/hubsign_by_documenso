@@ -186,6 +186,8 @@ export const action = async ({ request }: Route.ActionArgs) => {
       qrToken: prefixedId('qr'),
       documentDataId: documentData.id,
       userId: member.userId,
+      // The receiving org is already resolved above; stamp it directly.
+      organizationId: member.organizationId,
       source: DocumentSource.DOCUMENT,
       documentMeta: {
         create: {

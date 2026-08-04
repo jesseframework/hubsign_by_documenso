@@ -33,6 +33,7 @@ export const duplicateDocument = async ({
     select: {
       title: true,
       userId: true,
+      organizationId: true,
       documentData: {
         select: {
           data: true,
@@ -79,6 +80,12 @@ export const duplicateDocument = async ({
           ...document.documentMeta,
         },
       },
+      // A duplicate belongs to the same organization as its source — inheriting
+      // it directly is more faithful than re-deriving from the author, whose
+      // memberships may have changed since the original was created.
+      ...(document.organizationId !== null && {
+        organization: { connect: { id: document.organizationId } },
+      }),
       source: DocumentSource.DOCUMENT,
     },
   };

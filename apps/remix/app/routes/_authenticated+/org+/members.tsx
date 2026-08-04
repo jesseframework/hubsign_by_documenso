@@ -11,6 +11,7 @@ import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { appMetaTags } from '~/utils/meta';
+import { OrgAdminGuard } from '~/components/general/org-admin-guard';
 
 export function meta() {
   return appMetaTags('Organization Members');
@@ -24,7 +25,7 @@ const roleColors: Record<string, string> = {
   MEMBER: 'bg-muted text-muted-foreground',
 };
 
-export default function OrgMembersPage() {
+function OrgMembersPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const utils = trpc.useUtils();
@@ -236,5 +237,17 @@ export default function OrgMembersPage() {
         </table>
       </div>
     </div>
+  );
+}
+
+/**
+ * Administrative screen: withheld from ordinary members. The sidebar also
+ * hides the link, but that alone would leave the URL directly reachable.
+ */
+export default function OrgMembersPageRoute() {
+  return (
+    <OrgAdminGuard>
+      <OrgMembersPage />
+    </OrgAdminGuard>
   );
 }

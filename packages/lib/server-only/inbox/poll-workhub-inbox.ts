@@ -181,6 +181,9 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
           qrToken: prefixedId('qr'),
           documentDataId: documentData.id,
           userId: ownerUserId,
+          // The polling org is already known here, so use it directly rather
+          // than re-deriving it from the owner's memberships.
+          organizationId: org.id,
           source: DocumentSource.DOCUMENT,
           documentMeta: { create: { subject: msg.subject || undefined } },
         },

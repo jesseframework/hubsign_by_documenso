@@ -52,7 +52,13 @@ export const moveDocumentToTeam = async ({
 
     const updatedDocument = await tx.document.update({
       where: { id: documentId },
-      data: { teamId },
+      data: {
+        teamId,
+        // Moving into a team can change the owning organization, so re-stamp it
+        // rather than leaving the value resolved from the personal account.
+        // Only when the team actually has one — never clear an existing org.
+        ...(team.organizationId !== null && { organizationId: team.organizationId }),
+      },
     });
 
     await tx.documentAuditLog.create({

@@ -150,10 +150,32 @@ export const workflowRouter = router({
           `prefer keyword mode — omit "key" — when records have keywords):\n${lines.join('\n')}`;
       }
 
+      // Give the model the org's real template keys. Without this it would
+      // either inline HTML it invented or guess a key, and a key that resolves
+      // to nothing makes the step skip instead of send.
+      const emailTemplates = await prisma.emailTemplate.findMany({
+        where: { organizationId: membership.organizationId },
+        select: { key: true, name: true, description: true, subject: true },
+        orderBy: { name: 'asc' },
+        take: 40,
+      });
+
+      const emailTemplateContext =
+        emailTemplates.length > 0
+          ? `AVAILABLE EMAIL TEMPLATES (use one of these exact keys as "templateKey" on a SEND_EMAIL step when it fits; otherwise write the body inline):\n` +
+            emailTemplates
+              .map(
+                (t) =>
+                  `- "${t.key}" — ${t.name}${t.description ? `: ${t.description}` : ''} (subject: ${t.subject})`,
+              )
+              .join('\n')
+          : undefined;
+
       const generated = await generateWorkflowFromPrompt({
         prompt: input.prompt,
         organizationName: organization?.name ?? undefined,
         metadataContext,
+        emailTemplateContext,
       });
 
       // Defensive: ensure the generated trigger is still well-formed (e.g. cron).

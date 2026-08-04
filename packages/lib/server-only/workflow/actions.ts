@@ -48,9 +48,45 @@ const sendEmail: WorkflowActionHandler<Extract<TWorkflowAction, { action: 'SEND_
     return { skipped: true, reason: 'no-recipients' };
   }
 
-  const subject = renderTemplate(config.subject, data);
-  const html = renderTemplate(config.html, data);
-  const text = config.text ? renderTemplate(config.text, data) : html.replace(/<[^>]+>/g, '');
+  // A saved template supplies the body; anything set explicitly on the step
+  // still wins, so one template can be reused under a different subject.
+  let source = { subject: config.subject, html: config.html, text: config.text };
+  let usedTemplate: string | undefined;
+
+  if (config.templateKey) {
+    const organizationId = Number((data as { organization?: { id?: unknown } })?.organization?.id);
+
+    if (!organizationId) {
+      logger.warn('[workflow:SEND_EMAIL] templateKey set but run has no organization — skipping');
+      return { skipped: true, reason: 'no-organization' };
+    }
+
+    const { prisma } = await import('@documenso/prisma');
+    const template = await prisma.emailTemplate.findUnique({
+      where: { organizationId_key: { organizationId, key: config.templateKey } },
+    });
+
+    // Deliberately a skip, not a silent fall-through to the inline fields: a
+    // renamed or deleted template would otherwise send a blank email, and a
+    // blank email that looks delivered is worse than an obvious no-send.
+    if (!template) {
+      logger.warn(
+        `[workflow:SEND_EMAIL] email template "${config.templateKey}" not found in org ${organizationId} — skipping`,
+      );
+      return { skipped: true, reason: 'template-not-found', templateKey: config.templateKey };
+    }
+
+    usedTemplate = template.key;
+    source = {
+      subject: config.subject || template.subject,
+      html: config.html || template.html,
+      text: config.text ?? template.text ?? undefined,
+    };
+  }
+
+  const subject = renderTemplate(source.subject, data);
+  const html = renderTemplate(source.html, data);
+  const text = source.text ? renderTemplate(source.text, data) : html.replace(/<[^>]+>/g, '');
 
   const { mailer } = await import('@documenso/email/mailer');
   const { FROM_ADDRESS, FROM_NAME } = await import('../../constants/email');
@@ -63,7 +99,7 @@ const sendEmail: WorkflowActionHandler<Extract<TWorkflowAction, { action: 'SEND_
     text,
   });
 
-  return { sent: true, to, subject };
+  return { sent: true, to, subject, ...(usedTemplate && { templateKey: usedTemplate }) };
 };
 
 const httpRequest: WorkflowActionHandler<

@@ -19,6 +19,7 @@ import { getFileServerSide } from '../../universal/upload/get-file.server';
 import { putPdfFileServerSide } from '../../universal/upload/put-file.server';
 import { determineDocumentVisibility } from '../../utils/document-visibility';
 import { triggerWebhook } from '../webhooks/trigger/trigger-webhook';
+import { resolveOrganizationId } from '../workflow/resolve-organization-id';
 
 export type CreateDocumentOptions = {
   title: string;
@@ -145,6 +146,10 @@ export const createDocument = async ({
     }
   }
 
+  // Stamp the owning org at creation so dashboards and other org-scoped reads
+  // never have to infer it from the author's memberships.
+  const organizationId = await resolveOrganizationId({ teamId, userId });
+
   return await prisma.$transaction(async (tx) => {
     const encryptedPdfPassword =
       pdfPassword && pdfPassword.length > 0
@@ -159,6 +164,7 @@ export const createDocument = async ({
         documentDataId,
         userId,
         teamId,
+        organizationId,
         folderId,
         visibility:
           folderVisibility ??

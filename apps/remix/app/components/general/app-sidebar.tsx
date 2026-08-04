@@ -3,6 +3,7 @@ import { version as APP_VERSION } from '../../../../../package.json';
 import { useState } from 'react';
 
 import { Trans } from '@lingui/react/macro';
+import type { OrganizationRole } from '@prisma/client';
 import {
   ActivityIcon,
   ArchiveIcon,
@@ -29,6 +30,7 @@ import {
   Globe2Icon,
   HeartIcon,
   InboxIcon,
+  MailIcon,
   LayoutDashboardIcon,
   ListChecksIcon,
   LockIcon,
@@ -76,6 +78,12 @@ type SubNavItem = {
   exact?: boolean;
   /** Also treat this prefix as active (for aliased routes). */
   match?: string;
+  /**
+   * Org roles allowed to see this item. Omit for items every member may use.
+   * This is presentation only — the page itself must still refuse the data,
+   * since a hidden link is not an access control.
+   */
+  roles?: OrganizationRole[];
 };
 
 /**
@@ -191,6 +199,7 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
   };
 
   const { data: orgMembership } = trpc.org.getMyOrganization.useQuery();
+  const myOrgRole = orgMembership?.role;
 
   // Unread Signature Inbox count — visible from anywhere in the app, not just
   // the inbox page itself. Kept fresh by the inbox event stream below rather
@@ -202,9 +211,17 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
   useInboxEvents(undefined, { enabled: Boolean(orgMembership?.organization) });
 
   // Expandable submenus (nested under their top-level item).
+  // Administrative sections. Kept out of the nav for ordinary members so the
+  // menu reflects what they can actually do. `DMS Permissions` additionally
+  // admits DMS_ADMIN, matching the check the page itself already performs —
+  // gating it to ORG_ADMIN alone would lock DMS admins out of their own screen.
+  const ORG_ADMIN_ONLY: OrganizationRole[] = ['ORG_ADMIN'];
+  const DMS_ADMIN_TOO: OrganizationRole[] = ['ORG_ADMIN', 'DMS_ADMIN'];
+
   const orgNav: SubNavItem[] = [
-    { to: '/org/settings', icon: SettingsIcon, label: <Trans>Settings</Trans> },
-    { to: '/org/members', icon: UsersIcon, label: <Trans>Members</Trans> },
+    { to: '/org', icon: LayoutDashboardIcon, label: <Trans>Dashboard</Trans>, exact: true },
+    { to: '/org/settings', icon: SettingsIcon, label: <Trans>Settings</Trans>, roles: ORG_ADMIN_ONLY },
+    { to: '/org/members', icon: UsersIcon, label: <Trans>Members</Trans>, roles: ORG_ADMIN_ONLY },
     {
       to: '/org/inbox',
       icon: InboxIcon,
@@ -219,16 +236,17 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
         </span>
       ),
     },
-    { to: '/org/permissions', icon: ShieldIcon, label: <Trans>DMS Permissions</Trans> },
-    { to: '/org/workflows', icon: WorkflowIcon, label: <Trans>Workflows</Trans> },
+    { to: '/org/permissions', icon: ShieldIcon, label: <Trans>DMS Permissions</Trans>, roles: DMS_ADMIN_TOO },
+    { to: '/org/workflows', icon: WorkflowIcon, label: <Trans>Workflows</Trans>, roles: ORG_ADMIN_ONLY },
+    { to: '/org/email-templates', icon: MailIcon, label: <Trans>Email Templates</Trans>, roles: ORG_ADMIN_ONLY },
     { to: '/org/metadata', icon: DatabaseIcon, label: <Trans>Metadata</Trans> },
-    { to: '/org/integrations', icon: PlugIcon, label: <Trans>Integrations</Trans> },
+    { to: '/org/integrations', icon: PlugIcon, label: <Trans>Integrations</Trans>, roles: ORG_ADMIN_ONLY },
     { to: '/org/approvals', icon: ClipboardCheckIcon, label: <Trans>Approvals</Trans> },
     { to: '/org/approval-templates', icon: ListChecksIcon, label: <Trans>Approval Setup</Trans> },
     { to: '/org/stamps', icon: StampIcon, label: <Trans>Stamps</Trans> },
-    { to: '/org/billing', icon: CreditCardIcon, label: <Trans>Billing</Trans> },
+    { to: '/org/billing', icon: CreditCardIcon, label: <Trans>Billing</Trans>, roles: ORG_ADMIN_ONLY },
     { to: '/org/recycle-bin', icon: Trash2Icon, label: <Trans>Recycle Bin</Trans> },
-  ];
+  ].filter((item) => !item.roles || (myOrgRole !== undefined && item.roles.includes(myOrgRole)));
   const dmsNav: SubNavItem[] = [
     { to: '/dms', icon: LayoutDashboardIcon, label: <Trans>Dashboard</Trans>, exact: true },
     { to: '/dms/documents', icon: ArchiveIcon, label: <Trans>Documents</Trans> },

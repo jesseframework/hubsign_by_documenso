@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { msg } from '@lingui/core/macro';
 import { SubscriptionStatus } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
+import { DateTime } from 'luxon';
 import { z } from 'zod';
 
 import { getOrCreateOrgPrice } from '@documenso/ee/server-only/stripe/get-or-create-org-price';
@@ -201,6 +202,10 @@ export const orgRouter = router({
     .query(async ({ ctx, input }) => {
       const myMembership = await prisma.organizationMember.findFirst({
         where: { userId: ctx.user.id },
+        // A user can belong to several orgs, and an unordered findFirst leaves
+        // the choice to Postgres heap order — a plain row UPDATE elsewhere can
+        // flip which directory this searches. Match `resolveOrganizationId`.
+        orderBy: { joinedAt: 'asc' },
       });
 
       if (!myMembership) return [];
@@ -239,6 +244,10 @@ export const orgRouter = router({
   getMyOrganization: authenticatedProcedure.query(async ({ ctx }) => {
     const membership = await prisma.organizationMember.findFirst({
       where: { userId: ctx.user.id },
+      // Must agree with every other org resolution (`getDashboardStats`,
+      // `searchMembers`, `resolveOrganizationId`) — otherwise the header can
+      // name one organization while the numbers below describe another.
+      orderBy: { joinedAt: 'asc' },
       include: {
         organization: {
           include: {
@@ -1394,4 +1403,263 @@ export const orgRouter = router({
 
       return { success: true };
     }),
+
+  /**
+   * Aggregates for the organization dashboard (`/org`).
+   *
+   * Every eSign figure is scoped on `Document.organizationId`, stamped at
+   * creation. It used to be derived from the member user-id set, which meant a
+   * user belonging to several organizations caused each of them to report that
+   * user's documents as its own. Approvals, inbox items and workflows are
+   * natively org-scoped and filter directly.
+   */
+  getDashboardStats: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await prisma.organizationMember.findFirst({
+      where: { userId: ctx.user.id },
+      // A user can belong to several orgs; without an explicit order Postgres
+      // heap order decides which one this describes, and an unrelated row
+      // UPDATE can silently switch it. Matches `resolveOrganizationId`.
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    if (!membership) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'You are not a member of an organization.',
+      });
+    }
+
+    const { organizationId } = membership;
+
+    const documentWhere = { organizationId, deletedAt: null };
+
+    // Twelve whole months ending with the current one, oldest first. Buckets are
+    // pre-seeded so months with no activity still plot as zero rather than
+    // collapsing the x-axis.
+    const now = DateTime.utc().startOf('month');
+    const windowStart = now.minus({ months: 11 });
+    const windowEnd = now.plus({ months: 1 });
+    const monthKeys = Array.from({ length: 12 }, (_, i) =>
+      windowStart.plus({ months: i }).toFormat('yyyy-MM'),
+    );
+
+    // Only these statuses have actually left the building. DRAFT documents have
+    // never been sent to anyone, so they must not count toward "sent" figures.
+    const SENT_STATUSES = ['PENDING', 'COMPLETED', 'REJECTED'] as const;
+
+    const [
+      byStatus,
+      approvalsByStatus,
+      totalDocuments,
+      inboxSourced,
+      pendingDocuments,
+      documentsByMonth,
+      approvalsByMonth,
+      topSenders,
+      activeWorkflows,
+    ] = await Promise.all([
+      prisma.document.groupBy({
+        by: ['status'],
+        where: documentWhere,
+        _count: { _all: true },
+      }),
+      prisma.approvalRequest.groupBy({
+        by: ['status'],
+        where: { organizationId },
+        _count: { _all: true },
+      }),
+      prisma.document.count({ where: documentWhere }),
+      // Counted over the SAME row set as totalDocuments, via the relation, so
+      // the two slices always partition one population. Counting
+      // SignatureInboxItem directly mixed org-scoped inbox rows with
+      // member-scoped documents and needed a clamp to stay non-negative.
+      prisma.document.count({ where: { ...documentWhere, inboxItem: { isNot: null } } }),
+      // Aging needs each pending document's send time, which lives in the audit
+      // log; `createdAt` is the fallback for documents sent before that log
+      // existed (or never logged).
+      prisma.document.findMany({
+        where: { ...documentWhere, status: 'PENDING' },
+        select: {
+          createdAt: true,
+          auditLogs: {
+            where: { type: 'DOCUMENT_SENT' },
+            select: { createdAt: true },
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+          },
+        },
+      }),
+      prisma.$queryRaw<Array<{ month: Date; count: bigint }>>`
+        SELECT DATE_TRUNC('month', "createdAt") AS month, COUNT(*) AS count
+        FROM "Document"
+        WHERE "organizationId" = ${organizationId}
+          AND "deletedAt" IS NULL
+          AND "createdAt" >= ${windowStart.toJSDate()}::timestamp
+          AND "createdAt" <  ${windowEnd.toJSDate()}::timestamp
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `,
+      prisma.$queryRaw<Array<{ month: Date; count: bigint }>>`
+        SELECT DATE_TRUNC('month', "createdAt") AS month, COUNT(*) AS count
+        FROM "ApprovalRequest"
+        WHERE "organizationId" = ${organizationId}
+          AND "createdAt" >= ${windowStart.toJSDate()}::timestamp
+          AND "createdAt" <  ${windowEnd.toJSDate()}::timestamp
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `,
+      // "Senders", so drafts that were never dispatched are excluded — counting
+      // them overstated the leaders and listed people who had sent nothing.
+      prisma.document.groupBy({
+        by: ['userId'],
+        where: { ...documentWhere, status: { in: [...SENT_STATUSES] } },
+        _count: { _all: true },
+        orderBy: { _count: { userId: 'desc' } },
+        take: 5,
+      }),
+      prisma.workflow.count({ where: { organizationId, enabled: true } }),
+    ]);
+
+    // How many distinct people have sent anything, so the card can say "top 5
+    // of N" instead of reporting the length of a capped list as a metric.
+    const distinctSenders = await prisma.document
+      .groupBy({
+        by: ['userId'],
+        where: { ...documentWhere, status: { in: [...SENT_STATUSES] } },
+      })
+      .then((rows) => rows.length);
+
+    const countOf = <T extends string>(
+      rows: Array<{ status: T; _count: { _all: number } }>,
+      value: T,
+    ) => rows.find((r) => r.status === value)?._count._all ?? 0;
+
+    const senderProfiles = await prisma.user.findMany({
+      where: { id: { in: topSenders.map((s) => s.userId) } },
+      select: { id: true, name: true, email: true },
+    });
+
+    const toSeries = (rows: Array<{ month: Date; count: bigint }>) => {
+      const found = new Map(
+        rows.map((r) => [DateTime.fromJSDate(r.month).toUTC().toFormat('yyyy-MM'), Number(r.count)]),
+      );
+
+      return monthKeys.map((key) => ({
+        month: key,
+        label: DateTime.fromFormat(key, 'yyyy-MM').toFormat('MMM yyyy'),
+        count: found.get(key) ?? 0,
+      }));
+    };
+
+    // Aging is measured on documents still awaiting signature — how long each
+    // has been outstanding since it was SENT, which is what the card claims.
+    // Inbox-sourced documents are created when the email lands and sent much
+    // later, so createdAt would have aged them from the wrong instant.
+    const ageBuckets = [
+      { key: 'current', label: 'Current', min: 0, max: 1, count: 0 },
+      { key: '1-30', label: '1-30 days', min: 1, max: 31, count: 0 },
+      { key: '31-60', label: '31-60 days', min: 31, max: 61, count: 0 },
+      { key: '61-90', label: '61-90 days', min: 61, max: 91, count: 0 },
+      { key: '90+', label: '90+ days', min: 91, max: Infinity, count: 0 },
+    ];
+
+    for (const doc of pendingDocuments) {
+      const sentAt = doc.auditLogs[0]?.createdAt ?? doc.createdAt;
+      // Clamp at zero so a clock-skewed or future-dated row lands in "Current"
+      // rather than matching no bucket and vanishing from a donut that is
+      // supposed to sum to the headline.
+      const days = Math.max(
+        0,
+        Math.floor(DateTime.utc().diff(DateTime.fromJSDate(sentAt), 'days').days),
+      );
+      const bucket = ageBuckets.find((b) => days >= b.min && days < b.max);
+      if (bucket) bucket.count += 1;
+    }
+
+    const documentTrend = toSeries(documentsByMonth);
+    const approvalTrend = toSeries(approvalsByMonth);
+
+    // The last bucket is the current, in-flight month, so both sides of this
+    // comparison cover the SAME elapsed portion of their month — otherwise a
+    // month-to-date figure gets divided by a complete month and the card
+    // reports a collapse every time a month rolls over.
+    //
+    // Both the percentage AND the bars are built from this one basis. An earlier
+    // version charted full months while computing the percentage like-for-like,
+    // which rendered "+900%" above two visually equal bars.
+    const nowUtc = DateTime.utc();
+    const elapsed = nowUtc.diff(now);
+    const throughDay = nowUtc.day;
+    const currentMonthCount = documentTrend[documentTrend.length - 1]?.count ?? 0;
+
+    const previousMonthStart = now.minus({ months: 1 });
+    // Clamp so a long elapsed span can't spill past the end of a shorter
+    // previous month (e.g. 30 days elapsed in March reaching into February).
+    const previousWindowEnd = DateTime.min(previousMonthStart.plus(elapsed), now);
+
+    const previousToDate = await prisma.document.count({
+      where: {
+        ...documentWhere,
+        createdAt: { gte: previousMonthStart.toJSDate(), lt: previousWindowEnd.toJSDate() },
+      },
+    });
+
+    return {
+      totalDocuments,
+      draft: countOf(byStatus, 'DRAFT'),
+      pending: countOf(byStatus, 'PENDING'),
+      completed: countOf(byStatus, 'COMPLETED'),
+      rejected: countOf(byStatus, 'REJECTED'),
+
+      // PENDING and IN_PROGRESS are both "not yet decided" — surfaced as one
+      // figure, but labelled "open" rather than "pending" so the name matches
+      // what it counts.
+      approvalsOpen: countOf(approvalsByStatus, 'PENDING') + countOf(approvalsByStatus, 'IN_PROGRESS'),
+      approvalsApproved: countOf(approvalsByStatus, 'APPROVED'),
+      approvalsRejected: countOf(approvalsByStatus, 'REJECTED'),
+      approvalsCancelled: countOf(approvalsByStatus, 'CANCELLED'),
+
+      inboxSourced,
+      // Both operands come from the same row set now, so the residual can never
+      // go negative and needs no clamp.
+      manualSourced: totalDocuments - inboxSourced,
+      activeWorkflows,
+
+      documentTrend,
+      approvalTrend,
+      // Charted totals, for headlines that sit above a 12-month chart. Distinct
+      // from the all-time totals above, which are not windowed.
+      documentsCharted: documentTrend.reduce((sum, point) => sum + point.count, 0),
+      approvalsCharted: approvalTrend.reduce((sum, point) => sum + point.count, 0),
+
+      ageBuckets: ageBuckets.map(({ key, label, count }) => ({ key, label, count })),
+
+      monthOverMonth: {
+        current: currentMonthCount,
+        previousToDate,
+        // Labels name the exact windows being compared, so the percentage is
+        // self-evidently explained by the two bars beneath it.
+        currentLabel: `${now.toFormat('MMM')} 1–${throughDay}`,
+        previousLabel: `${previousMonthStart.toFormat('MMM')} 1–${throughDay}`,
+        throughDay,
+        // Null, not 100: percent change from a zero base is undefined, and
+        // printing "100%" made 0→1 and a genuine doubling look identical. The
+        // UI renders this as "New activity" instead of a number.
+        percentChange:
+          previousToDate === 0 ? null : ((currentMonthCount - previousToDate) / previousToDate) * 100,
+      },
+
+      distinctSenders,
+      topSenders: topSenders.map((s) => {
+        const profile = senderProfiles.find((p) => p.id === s.userId);
+
+        return {
+          userId: s.userId,
+          name: profile?.name || profile?.email || 'Unknown',
+          email: profile?.email ?? '',
+          count: s._count._all,
+        };
+      }),
+    };
+  }),
 });
