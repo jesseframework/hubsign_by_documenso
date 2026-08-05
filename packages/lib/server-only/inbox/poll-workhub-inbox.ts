@@ -122,15 +122,20 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
         continue;
       }
 
+      // LEGACY GUARD — do not remove.
+      //
+      // Items imported before multi-attachment support stored the BARE message
+      // id. New items store `${messageId}:${attachmentId}`. Without this check
+      // every previously-imported email would look unseen under the new scheme
+      // and be re-imported as a duplicate on the next poll.
+      //
+      // It also preserves the original saving: the first import already called
+      // mark-read, so re-encountering the message costs no further API quota.
       const existing = await prisma.signatureInboxItem.findFirst({
         where: { externalMessageId: msg.id, organizationId: org.id },
         select: { id: true },
       });
       if (existing) {
-        // Already imported (matched via externalMessageId) — the original import
-        // already called mark-read once on success, so retrying it here on every
-        // subsequent fetch that re-encounters this message is wasted quota with no
-        // effect on local state.
         skipped += 1;
         continue;
       }
@@ -152,67 +157,117 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
       }
 
       const attachments = await workhubListAttachments(config, msg.id);
-      const pdf = attachments.find(
+
+      // EVERY PDF becomes its own document. One email routinely carries several
+      // unrelated invoices, potentially for different vendors, so they cannot be
+      // merged — each needs its own OCR pass, queue row and workflow run. This
+      // previously took `.find()`, imported the first PDF and discarded the rest
+      // without a trace while still reporting success.
+      const pdfs = attachments.filter(
         (a) =>
           !a.isInline &&
           (a.contentType === 'application/pdf' || a.name.toLowerCase().endsWith('.pdf')),
       );
-      if (!pdf) {
+
+      const nonPdfCount = attachments.filter((a) => !a.isInline).length - pdfs.length;
+
+      if (nonPdfCount > 0) {
+        // Still not handled — but say so, rather than dropping them in silence.
+        console.warn(
+          `[workhub-poll] message ${msg.id}: ignoring ${nonPdfCount} non-PDF attachment(s)`,
+        );
+      }
+
+      if (pdfs.length === 0) {
         skipped += 1;
         continue;
       }
 
-      const fetched = await workhubFetchAttachment(config, msg.id, pdf.id);
-      if (!fetched) {
-        skipped += 1;
-        continue;
-      }
+      let importedFromMessage = 0;
 
-      const arrayBuffer = base64ToArrayBuffer(fetched.contentBase64);
-      const documentData = await putPdfFileServerSide({
-        name: pdf.name,
-        type: 'application/pdf',
-        arrayBuffer: async () => arrayBuffer,
-      });
+      for (const pdf of pdfs) {
+        // Dedup is per ATTACHMENT, not per message. A message-level key meant a
+        // run that died halfway through a multi-attachment email would find the
+        // message "already imported" on retry and abandon the remainder.
+        const externalMessageId = `${msg.id}:${pdf.id}`;
 
-      const document = await prisma.document.create({
-        data: {
-          title: msg.subject || pdf.name,
-          qrToken: prefixedId('qr'),
-          documentDataId: documentData.id,
-          userId: ownerUserId,
-          // The polling org is already known here, so use it directly rather
-          // than re-deriving it from the owner's memberships.
+        const alreadyImported = await prisma.signatureInboxItem.findFirst({
+          where: { externalMessageId, organizationId: org.id },
+          select: { id: true },
+        });
+
+        if (alreadyImported) {
+          continue;
+        }
+
+        const fetched = await workhubFetchAttachment(config, msg.id, pdf.id);
+        if (!fetched) {
+          console.error(`[workhub-poll] could not fetch attachment ${pdf.id} of ${msg.id}`);
+          continue;
+        }
+
+        const arrayBuffer = base64ToArrayBuffer(fetched.contentBase64);
+        const documentData = await putPdfFileServerSide({
+          name: pdf.name,
+          type: 'application/pdf',
+          arrayBuffer: async () => arrayBuffer,
+        });
+
+        // With several documents from one email, the subject alone no longer
+        // identifies them — qualify with the file name so the queue is readable.
+        const title =
+          pdfs.length > 1 && msg.subject ? `${msg.subject} — ${pdf.name}` : msg.subject || pdf.name;
+
+        const document = await prisma.document.create({
+          data: {
+            title,
+            qrToken: prefixedId('qr'),
+            documentDataId: documentData.id,
+            userId: ownerUserId,
+            // The polling org is already known here, so use it directly rather
+            // than re-deriving it from the owner's memberships.
+            organizationId: org.id,
+            source: DocumentSource.DOCUMENT,
+            documentMeta: { create: { subject: msg.subject || undefined } },
+          },
+        });
+
+        await createInboxItem({
           organizationId: org.id,
-          source: DocumentSource.DOCUMENT,
-          documentMeta: { create: { subject: msg.subject || undefined } },
-        },
-      });
-
-      await createInboxItem({
-        organizationId: org.id,
-        documentId: document.id,
-        senderEmail: msg.from,
-        subject: msg.subject,
-        receivedById: ownerUserId,
-        externalMessageId: msg.id,
-      });
-
-      await triggerWorkflows({
-        event: 'INBOX_EMAIL_RECEIVED',
-        organizationId: org.id,
-        data: {
           documentId: document.id,
-          title: document.title,
-          sender: msg.from,
+          senderEmail: msg.from,
           subject: msg.subject,
-        },
-      }).catch((err) => console.error('[workhub-poll] INBOX_EMAIL_RECEIVED dispatch failed:', err));
+          receivedById: ownerUserId,
+          externalMessageId,
+        });
 
+        await triggerWorkflows({
+          event: 'INBOX_EMAIL_RECEIVED',
+          organizationId: org.id,
+          data: {
+            documentId: document.id,
+            title: document.title,
+            sender: msg.from,
+            subject: msg.subject,
+          },
+        }).catch((err) =>
+          console.error('[workhub-poll] INBOX_EMAIL_RECEIVED dispatch failed:', err),
+        );
+
+        importedFromMessage += 1;
+        imported += 1;
+      }
+
+      if (importedFromMessage === 0) {
+        skipped += 1;
+        continue;
+      }
+
+      // Only once every attachment landed — marking read after a partial import
+      // would hide the message from the next poll with documents still missing.
       await workhubMarkRead(config, msg.id).catch((err) =>
         console.error('[workhub-poll] mark-read failed:', err),
       );
-      imported += 1;
     } catch (err) {
       console.error('[workhub-poll] failed to import message:', err);
       skipped += 1;
