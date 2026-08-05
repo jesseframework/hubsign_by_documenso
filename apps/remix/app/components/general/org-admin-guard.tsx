@@ -1,6 +1,7 @@
 import { Trans } from '@lingui/react/macro';
 import type { OrganizationRole } from '@prisma/client';
-import { ShieldAlertIcon } from 'lucide-react';
+import { BuildingIcon, ShieldAlertIcon } from 'lucide-react';
+import { Link } from 'react-router';
 
 import { trpc } from '@documenso/trpc/react';
 
@@ -21,9 +22,19 @@ const DEFAULT_ROLES: OrganizationRole[] = ['ORG_ADMIN'];
  */
 export const OrgAdminGuard = ({
   roles = DEFAULT_ROLES,
+  allowWithoutOrg = false,
   children,
 }: {
   roles?: OrganizationRole[];
+  /**
+   * Render `children` for a user who belongs to no organization at all.
+   *
+   * Needed by the settings page, which is where an organization gets *created*.
+   * Guarding it unconditionally locked people out of the one screen that would
+   * have given them a role in the first place — you had to already be an admin
+   * to reach the form that makes you one.
+   */
+  allowWithoutOrg?: boolean;
   children: React.ReactNode;
 }) => {
   const { data: membership, isLoading } = trpc.org.getMyOrganization.useQuery();
@@ -36,9 +47,37 @@ export const OrgAdminGuard = ({
     );
   }
 
-  // No membership is treated the same as an insufficient one — never fall
-  // through to the page while the role is unknown.
-  if (!membership || !roles.includes(membership.role)) {
+  if (!membership) {
+    if (allowWithoutOrg) {
+      return <>{children}</>;
+    }
+
+    // Distinct from the admin refusal below: "administrators only" would be
+    // actively misleading here, since the problem is having no organization
+    // rather than the wrong role in one.
+    return (
+      <div className="flex flex-col items-center justify-center rounded-[var(--r)] border border-border bg-card py-20 text-center">
+        <BuildingIcon className="mb-3 h-9 w-9 text-muted-foreground opacity-50" />
+        <p className="text-[14px] font-medium text-foreground">
+          <Trans>You're not part of an organization</Trans>
+        </p>
+        <p className="mt-1 max-w-sm text-[12px] text-muted-foreground">
+          <Trans>
+            Create one to use organization features, or ask an admin to invite you to an existing
+            organization.
+          </Trans>
+        </p>
+        <Link
+          to="/org/settings"
+          className="mt-4 rounded-[var(--r-sm)] bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground hover:opacity-90"
+        >
+          <Trans>Create an organization</Trans>
+        </Link>
+      </div>
+    );
+  }
+
+  if (!roles.includes(membership.role)) {
     return (
       <div className="flex flex-col items-center justify-center rounded-[var(--r)] border border-border bg-card py-20 text-center">
         <ShieldAlertIcon className="mb-3 h-9 w-9 text-muted-foreground opacity-50" />

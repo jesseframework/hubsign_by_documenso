@@ -2664,6 +2664,10 @@ msgstr "Konto erstellen"
 msgid "Create Account"
 msgstr ""
 
+#: apps/remix/app/components/general/org-admin-guard.tsx
+msgid "Create an organization"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Create an Organization"
 msgstr ""
@@ -2708,6 +2712,10 @@ msgstr "Einen automatisch erstellen"
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates._index.tsx
 msgid "Create one to move email markup out of your workflow JSON. Editing it here updates every workflow that references it."
+msgstr ""
+
+#: apps/remix/app/components/general/org-admin-guard.tsx
+msgid "Create one to use organization features, or ask an admin to invite you to an existing organization."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
@@ -10483,6 +10491,7 @@ msgid "You're all caught up!"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
+#: apps/remix/app/components/general/org-admin-guard.tsx
 msgid "You're not part of an organization"
 msgstr ""
 

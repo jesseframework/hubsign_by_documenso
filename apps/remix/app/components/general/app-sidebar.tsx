@@ -84,6 +84,12 @@ type SubNavItem = {
    * since a hidden link is not an access control.
    */
   roles?: OrganizationRole[];
+  /**
+   * Also show to a user who belongs to NO organization. Only for the entry
+   * point that lets them create one — hiding it made org creation unreachable,
+   * since the role filter treats "no org" as "no permission".
+   */
+  alsoWithoutOrg?: boolean;
 };
 
 /**
@@ -220,7 +226,15 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
 
   const orgNav: SubNavItem[] = [
     { to: '/org', icon: LayoutDashboardIcon, label: <Trans>Dashboard</Trans>, exact: true },
-    { to: '/org/settings', icon: SettingsIcon, label: <Trans>Settings</Trans>, roles: ORG_ADMIN_ONLY },
+    // `alsoWithoutOrg`: this is the only route to the "Create Organization"
+    // form, so it has to stay reachable for someone who isn't in an org yet.
+    {
+      to: '/org/settings',
+      icon: SettingsIcon,
+      label: <Trans>Settings</Trans>,
+      roles: ORG_ADMIN_ONLY,
+      alsoWithoutOrg: true,
+    },
     { to: '/org/members', icon: UsersIcon, label: <Trans>Members</Trans>, roles: ORG_ADMIN_ONLY },
     {
       to: '/org/inbox',
@@ -246,7 +260,16 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
     { to: '/org/stamps', icon: StampIcon, label: <Trans>Stamps</Trans> },
     { to: '/org/billing', icon: CreditCardIcon, label: <Trans>Billing</Trans>, roles: ORG_ADMIN_ONLY },
     { to: '/org/recycle-bin', icon: Trash2Icon, label: <Trans>Recycle Bin</Trans> },
-  ].filter((item) => !item.roles || (myOrgRole !== undefined && item.roles.includes(myOrgRole)));
+  ].filter((item) => {
+    // Open to every member.
+    if (!item.roles) return true;
+
+    // Not in an org: only the item that leads to creating one. Everything else
+    // would 'Administrators only' at them, which is not the real problem.
+    if (myOrgRole === undefined) return item.alsoWithoutOrg === true;
+
+    return item.roles.includes(myOrgRole);
+  });
   const dmsNav: SubNavItem[] = [
     { to: '/dms', icon: LayoutDashboardIcon, label: <Trans>Dashboard</Trans>, exact: true },
     { to: '/dms/documents', icon: ArchiveIcon, label: <Trans>Documents</Trans> },

@@ -1161,12 +1161,16 @@ function OrgSettingsPage() {
 }
 
 /**
- * Administrative screen: withheld from ordinary members. The sidebar also
- * hides the link, but that alone would leave the URL directly reachable.
+ * Administrative screen: withheld from ordinary MEMBERS of an organization.
+ *
+ * `allowWithoutOrg` is deliberate — this page is also where an organization is
+ * created, and the page renders its own "Create Organization" form when the
+ * viewer has no membership. Guarding that away meant you had to already be an
+ * admin to reach the form that would have made you one.
  */
 export default function OrgSettingsPageRoute() {
   return (
-    <OrgAdminGuard>
+    <OrgAdminGuard allowWithoutOrg>
       <OrgSettingsPage />
     </OrgAdminGuard>
   );
