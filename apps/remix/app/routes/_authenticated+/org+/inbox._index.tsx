@@ -150,6 +150,10 @@ const ocrBadge = (status: string): string => {
       return 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300';
     case 'COMPLETED':
       return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300';
+    // Terminal but unsuccessful — must not inherit the amber "in progress"
+    // default, which would read as still-pending.
+    case 'REJECTED':
+      return 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300';
     case 'ARCHIVED':
       return 'bg-muted text-muted-foreground';
     default:
@@ -215,6 +219,7 @@ const STATUS_FILTERS = [
   { key: 'SENT_FOR_SIGNATURE', label: 'Sent to sign', icon: SendIcon },
   { key: 'OCR_FAILED', label: 'OCR failed', icon: XCircleIcon },
   { key: 'COMPLETED', label: 'Completed', icon: CheckCheckIcon },
+  { key: 'REJECTED', label: 'Rejected', icon: XCircleIcon },
   { key: 'ARCHIVED', label: 'Archived', icon: ArchiveIcon },
 ] as const;
 

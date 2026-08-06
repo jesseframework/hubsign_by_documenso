@@ -17,6 +17,20 @@ export function meta() {
   return appMetaTags('Organization Settings');
 }
 
+/**
+ * Newline-delimited textarea → the string[] the DB stores.
+ *
+ * Blank lines are dropped deliberately: an empty pattern is a substring of every
+ * value, so one stray newline would match all inbound mail and silently switch
+ * the whole inbox off. The server-side matcher skips blanks too — this is the
+ * belt to that braces.
+ */
+const toPatternList = (value: string): string[] =>
+  value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
 function OrgSettingsPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
@@ -66,6 +80,10 @@ function OrgSettingsPage() {
   // Per-org WorkHub signature-inbox (receive) config
   const [inboxEmail, setInboxEmail] = useState('');
   const [workhubApiKey, setWorkhubApiKey] = useState('');
+  // Kept as raw newline-delimited text while editing so a half-typed line
+  // isn't destroyed by round-tripping through an array on every keystroke.
+  const [inboxBlockedSenders, setInboxBlockedSenders] = useState('');
+  const [inboxBlockedSubjects, setInboxBlockedSubjects] = useState('');
   const [workhubUsername, setWorkhubUsername] = useState('');
   const [workhubPassword, setWorkhubPassword] = useState('');
   const [workhubMailboxId, setWorkhubMailboxId] = useState('');
@@ -195,6 +213,8 @@ function OrgSettingsPage() {
     setEmailToSignEnabled(Boolean(o.emailToSignEnabled));
     setInboxEmail((o.inboxEmail as string) ?? '');
     setWorkhubApiKey((o.workhubApiKey as string) ?? '');
+    setInboxBlockedSenders(((o.inboxBlockedSenders as string[]) ?? []).join('\n'));
+    setInboxBlockedSubjects(((o.inboxBlockedSubjects as string[]) ?? []).join('\n'));
     setWorkhubUsername((o.workhubUsername as string) ?? '');
     setWorkhubPassword((o.workhubPassword as string) ?? '');
     setWorkhubMailboxId((o.workhubMailboxId as string) ?? '');
@@ -1029,6 +1049,51 @@ function OrgSettingsPage() {
                 the Signature Inbox after OCR. The BulkSender fields are an optional fallback.
               </Trans>
             </p>
+
+            {/*
+              Loop prevention. Mail from HubSign's own address and from this org's
+              own inbox address is always refused in code — these are the extra
+              org-specific rules on top.
+            */}
+            <div className="mt-4 border-t border-border pt-4">
+              <h3 className="text-[13px] font-semibold">
+                <Trans>Inbound filtering</Trans>
+              </h3>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                <Trans>
+                  One rule per line, matched anywhere in the value and case-insensitively. Mail sent
+                  by HubSign itself, or from this org's own inbox address, is always ignored — you
+                  don't need to list those.
+                </Trans>
+              </p>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Blocked senders</Trans>
+                  </label>
+                  <textarea
+                    className="mt-1 block h-24 w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] outline-none focus:border-primary"
+                    value={inboxBlockedSenders}
+                    onChange={(e) => setInboxBlockedSenders(e.target.value)}
+                    placeholder={'no-reply@\nnotifications@'}
+                    spellCheck={false}
+                  />
+                </div>
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Blocked subjects</Trans>
+                  </label>
+                  <textarea
+                    className="mt-1 block h-24 w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] outline-none focus:border-primary"
+                    value={inboxBlockedSubjects}
+                    onChange={(e) => setInboxBlockedSubjects(e.target.value)}
+                    placeholder={'Signing Complete\nOut of office'}
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mt-4 flex justify-end">
@@ -1042,6 +1107,8 @@ function OrgSettingsPage() {
                   workhubPassword: workhubPassword || null,
                   workhubMailboxId: workhubMailboxId || null,
                   workhubApiBase: workhubApiBase || null,
+                  inboxBlockedSenders: toPatternList(inboxBlockedSenders),
+                  inboxBlockedSubjects: toPatternList(inboxBlockedSubjects),
                 })
               }
               loading={updateOrg.isPending}

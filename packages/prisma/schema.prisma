@@ -1603,6 +1603,17 @@ model Organization {
   workhubMailboxId String? /// Optional mailbox override (?mailboxId=).
   workhubApiBase   String? /// Optional per-org WorkHub API base override.
 
+  /// Inbound filtering, to stop the inbox re-ingesting mail the platform itself
+  /// produced. A completed document is emailed to every recipient WITH the
+  /// signed PDF attached, so any document sent to this org's own inbox address
+  /// comes straight back as a new "invoice" — and OCR + workflows fire again.
+  ///
+  /// Self-sent and self-addressed mail is refused unconditionally in code; these
+  /// are the additional, org-configurable rules. Matched case-insensitively as
+  /// substrings, so "no-reply@" or "Signing Complete" both work.
+  inboxBlockedSenders  String[] @default([])
+  inboxBlockedSubjects String[] @default([])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2285,6 +2296,10 @@ enum InboxItemStatus {
   READY
   SENT_FOR_SIGNATURE
   COMPLETED
+  /// Terminal, distinct from COMPLETED: every recipient finished but the
+  /// document was refused. Mapping a rejection onto COMPLETED would report a
+  /// refused invoice as signed.
+  REJECTED
   ARCHIVED
 }
 

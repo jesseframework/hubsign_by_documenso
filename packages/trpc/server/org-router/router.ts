@@ -313,6 +313,10 @@ export const orgRouter = router({
       workhubPassword: z.string().nullable().optional(),
       workhubMailboxId: z.string().nullable().optional(),
       workhubApiBase: z.string().nullable().optional(),
+      // Inbound filter rules. Entries are trimmed and blanks dropped server-side
+      // too — a blank pattern matches every value and would disable the inbox.
+      inboxBlockedSenders: z.array(z.string().max(320)).max(200).optional(),
+      inboxBlockedSubjects: z.array(z.string().max(500)).max(200).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const membership = await prisma.organizationMember.findFirst({
@@ -323,9 +327,23 @@ export const orgRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only Org Admins can update the organization' });
       }
 
+      // Normalise the filter lists here rather than trusting the client: a blank
+      // pattern is a substring of everything, so one stray empty entry would
+      // block all inbound mail.
+      const sanitize = (list?: string[]) =>
+        list?.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+
       return prisma.organization.update({
         where: { id: membership.organizationId },
-        data: input,
+        data: {
+          ...input,
+          ...(input.inboxBlockedSenders && {
+            inboxBlockedSenders: sanitize(input.inboxBlockedSenders),
+          }),
+          ...(input.inboxBlockedSubjects && {
+            inboxBlockedSubjects: sanitize(input.inboxBlockedSubjects),
+          }),
+        },
       });
     }),
 

@@ -1819,6 +1819,14 @@ msgstr ""
 msgid "Black"
 msgstr "Negro"
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Blocked senders"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Blocked subjects"
+msgstr ""
+
 #: packages/ui/primitives/signature-pad/signature-pad-color-picker.tsx
 msgid "Blue"
 msgstr "Azul"
@@ -4731,6 +4739,10 @@ msgstr ""
 msgid "Inactive"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Inbound filtering"
+msgstr ""
+
 #: apps/remix/app/components/general/app-bottom-nav.tsx
 #: apps/remix/app/components/general/document/document-status.tsx
 msgid "Inbox"
@@ -5887,6 +5899,10 @@ msgstr "Una vez que su plantilla esté configurada, comparta el enlace donde des
 
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 msgid "One connection per organization. Add channels below."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "One rule per line, matched anywhere in the value and case-insensitively. Mail sent by HubSign itself, or from this org's own inbox address, is always ignored — you don't need to list those."
 msgstr ""
 
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
