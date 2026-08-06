@@ -4968,8 +4968,8 @@ msgstr "Język"
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
-msgid "Last 12 months"
-msgstr ""
+#~ msgid "Last 12 months"
+#~ msgstr ""
 
 #: apps/remix/app/components/general/period-selector.tsx
 msgid "Last 14 days"
@@ -5343,8 +5343,8 @@ msgid "Monthly Active Users: Users that had at least one of their documents comp
 msgstr "Miesięczni aktywni użytkownicy: Użytkownicy, którzy mieli przynajmniej jeden z ukończonych dokumentów"
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
-msgid "Monthly Document Trend"
-msgstr ""
+#~ msgid "Monthly Document Trend"
+#~ msgstr ""
 
 #: apps/remix/app/components/dialogs/template-move-to-folder-dialog.tsx
 #: apps/remix/app/components/dialogs/template-move-dialog.tsx
@@ -5755,6 +5755,10 @@ msgstr "Nie martw się, to się zdarza! Wprowadź swój e-mail, a my wyślemy Ci
 #: packages/lib/constants/document.ts
 msgid "None"
 msgstr "Brak"
+
+#: apps/remix/app/routes/_authenticated+/org+/_index.tsx
+msgid "Not affected by the selected date range"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 msgid "Not connected yet."
@@ -6743,6 +6747,7 @@ msgid "Redirect URL"
 msgstr "Adres URL przekierowania"
 
 #: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
+#: apps/remix/app/components/general/org-dashboard/dashboard-toolbar.tsx
 msgid "Refresh"
 msgstr ""
 
@@ -9334,6 +9339,10 @@ msgstr "Zaktualizuj webhook"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "Updated"
+msgstr ""
+
+#: apps/remix/app/components/general/org-dashboard/dashboard-toolbar.tsx
+msgid "Updated {updatedAgo}"
 msgstr ""
 
 #: apps/remix/app/components/forms/password.tsx

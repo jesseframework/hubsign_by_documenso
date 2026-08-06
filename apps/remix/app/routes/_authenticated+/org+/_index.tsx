@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'react';
+
 import { Trans } from '@lingui/react/macro';
 import {
   AlertTriangleIcon,
@@ -21,6 +23,11 @@ import { trpc } from '@documenso/trpc/react';
 
 import { CardMetric } from '~/components/general/metric-card';
 import { ChartCard } from '~/components/general/org-dashboard/chart-card';
+import type { DashboardRange } from '~/components/general/org-dashboard/dashboard-toolbar';
+import {
+  DashboardToolbar,
+  readStoredRefreshMs,
+} from '~/components/general/org-dashboard/dashboard-toolbar';
 import { AGING_RAMP, BRAND, STATUS_COLORS } from '~/components/general/org-dashboard/chart-tokens';
 import { DonutChart } from '~/components/general/org-dashboard/donut-chart';
 import {
@@ -40,7 +47,36 @@ export default function OrgDashboard() {
   const aging = AGING_RAMP[mode];
 
   const { data: org } = trpc.org.getMyOrganization.useQuery();
-  const { data: stats, isLoading, isError, error } = trpc.org.getDashboardStats.useQuery();
+
+  const [range, setRange] = useState<DashboardRange>({});
+  // Initialised from localStorage in an effect rather than at useState time, so
+  // the server render and the first client render agree (no hydration mismatch).
+  const [refreshMs, setRefreshMs] = useState(0);
+
+  useEffect(() => setRefreshMs(readStoredRefreshMs()), []);
+
+  const {
+    data: stats,
+    isLoading,
+    isError,
+    error,
+    isFetching,
+    refetch,
+  } = trpc.org.getDashboardStats.useQuery(range, {
+    refetchInterval: refreshMs > 0 ? refreshMs : false,
+    // Keep polling while the tab is backgrounded off: a dashboard left open on a
+    // wall display should stay current, but there's no reason to poll a tab
+    // nobody is looking at.
+    refetchIntervalInBackground: false,
+    // Show the previous numbers while a refetch is in flight instead of dropping
+    // to the loading state on every poll.
+    placeholderData: (previous) => previous,
+  });
+
+  const onRefreshMsChange = (ms: number) => {
+    setRefreshMs(ms);
+    window.localStorage.setItem('hubsign.org-dashboard.refresh-ms', String(ms));
+  };
 
   if (isLoading) {
     return (
@@ -95,6 +131,16 @@ export default function OrgDashboard() {
         ? ArrowUpRightIcon
         : ArrowDownRightIcon;
 
+  // Labels must describe the period the server actually used, or a selected
+  // range leaves every caption claiming "All time" / "Last 12 months".
+  const periodLabel = stats.range.active
+    ? `${stats.range.from ?? 'earliest'} to ${stats.range.to ?? 'today'}`
+    : 'All time';
+  const trendLabel = stats.range.active ? periodLabel : 'Last 12 months';
+  // The chart buckets by day on short ranges, so "Monthly" would be wrong.
+  const trendTitle =
+    stats.range.grain === 'day' ? 'Daily Document Trend' : 'Monthly Document Trend';
+
   const inboxSourced = stats.inboxSourced;
   const activeWorkflows = stats.activeWorkflows;
   const approvalsTotal =
@@ -118,13 +164,23 @@ export default function OrgDashboard() {
         </p>
       </div>
 
+      <DashboardToolbar
+        range={range}
+        onRangeChange={setRange}
+        refreshMs={refreshMs}
+        onRefreshMsChange={onRefreshMsChange}
+        onRefreshNow={() => void refetch()}
+        isFetching={isFetching}
+        generatedAt={stats.generatedAt}
+      />
+
       {/* ── Headline counters ── */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <CardMetric
           icon={FileTextIcon}
           title="Total Documents"
           value={stats.totalDocuments}
-          subtitle="All time"
+          subtitle={periodLabel}
           accentColor={BRAND.primary}
           iconBgColor={BRAND.primaryTint}
           href="/documents"
@@ -179,14 +235,14 @@ export default function OrgDashboard() {
         </ChartCard>
 
         <ChartCard
-          title={<Trans>Monthly Document Trend</Trans>}
+          title={trendTitle}
           // The charted total, not the all-time one — this headline sits above
           // a 12-month chart and a "Last 12 months" caption.
           value={stats.documentsCharted}
           icon={BarChart3Icon}
           iconBgColor={BRAND.primaryTint}
           iconColor={BRAND.primary}
-          footer={<Trans>Last 12 months</Trans>}
+          footer={trendLabel}
         >
           <TrendAreaChart data={stats.documentTrend} seriesName="Documents" />
         </ChartCard>
@@ -242,9 +298,21 @@ export default function OrgDashboard() {
           iconBgColor={BRAND.primaryTint}
           iconColor={BRAND.primary}
           footer={
-            <Trans>
-              Month to date vs the same first {stats.monthOverMonth.throughDay} days last month
-            </Trans>
+            <>
+              <Trans>
+                Month to date vs the same first {stats.monthOverMonth.throughDay} days last month
+              </Trans>
+              {/*
+                This card is defined by calendar months, so it deliberately does
+                not follow the selected range. Saying so beats letting it look
+                like part of the filtered period.
+              */}
+              {stats.range.active && (
+                <span className="mt-0.5 block italic">
+                  <Trans>Not affected by the selected date range</Trans>
+                </span>
+              )}
+            </>
           }
         >
           <div className="mb-1 flex items-center gap-1.5">
@@ -311,7 +379,7 @@ export default function OrgDashboard() {
           icon={WorkflowIcon}
           iconBgColor={BRAND.primaryTint}
           iconColor={BRAND.primary}
-          footer={<Trans>Last 12 months</Trans>}
+          footer={trendLabel}
         >
           <TrendAreaChart data={stats.approvalTrend} seriesName="Approvals" />
         </ChartCard>

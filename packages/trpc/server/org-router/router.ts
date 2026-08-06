@@ -1431,7 +1431,18 @@ export const orgRouter = router({
    * user's documents as its own. Approvals, inbox items and workflows are
    * natively org-scoped and filter directly.
    */
-  getDashboardStats: authenticatedProcedure.query(async ({ ctx }) => {
+  getDashboardStats: authenticatedProcedure
+    .input(
+      z
+        .object({
+          /** Inclusive start, `yyyy-MM-dd`. Omit for no lower bound. */
+          from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          /** Inclusive end, `yyyy-MM-dd`. The whole day is included. */
+          to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
     const membership = await prisma.organizationMember.findFirst({
       where: { userId: ctx.user.id },
       // A user can belong to several orgs; without an explicit order Postgres
@@ -1449,17 +1460,60 @@ export const orgRouter = router({
 
     const { organizationId } = membership;
 
-    const documentWhere = { organizationId, deletedAt: null };
+    // Selected range. `to` covers the whole day, so it's stored as an exclusive
+    // upper bound at the start of the following day — a `<= 2026-08-06` filter
+    // would otherwise drop everything created after midnight on the 6th.
+    const rangeFrom = input?.from ? DateTime.fromISO(input.from, { zone: 'utc' }).startOf('day') : null;
+    const rangeToExclusive = input?.to
+      ? DateTime.fromISO(input.to, { zone: 'utc' }).startOf('day').plus({ days: 1 })
+      : null;
 
-    // Twelve whole months ending with the current one, oldest first. Buckets are
-    // pre-seeded so months with no activity still plot as zero rather than
-    // collapsing the x-axis.
+    const hasRange = Boolean(rangeFrom || rangeToExclusive);
+
+    const createdAtFilter =
+      rangeFrom || rangeToExclusive
+        ? {
+            createdAt: {
+              ...(rangeFrom && { gte: rangeFrom.toJSDate() }),
+              ...(rangeToExclusive && { lt: rangeToExclusive.toJSDate() }),
+            },
+          }
+        : {};
+
+    const documentWhere = { organizationId, deletedAt: null, ...createdAtFilter };
+
     const now = DateTime.utc().startOf('month');
-    const windowStart = now.minus({ months: 11 });
-    const windowEnd = now.plus({ months: 1 });
-    const monthKeys = Array.from({ length: 12 }, (_, i) =>
-      windowStart.plus({ months: i }).toFormat('yyyy-MM'),
-    );
+
+    // Trend window. With no range selected this is twelve whole months ending
+    // with the current one — the previous fixed behaviour. With a range, the
+    // chart must follow it, or the headline and the chart beneath it would be
+    // describing different periods.
+    const trendStart = (rangeFrom ?? now.minus({ months: 11 })).startOf('day');
+    const trendEnd = rangeToExclusive ?? now.plus({ months: 1 });
+
+    // Bucket granularity is chosen from the span, not fixed. Monthly buckets
+    // over a 7-day range would collapse the whole chart into one bar.
+    const spanDays = trendEnd.diff(trendStart, 'days').days;
+    const grain: 'day' | 'month' = spanDays <= 62 ? 'day' : 'month';
+
+    const bucketFormat = grain === 'day' ? 'yyyy-MM-dd' : 'yyyy-MM';
+    const bucketLabel = grain === 'day' ? 'd MMM' : 'MMM yyyy';
+
+    // Pre-seeded so quiet periods plot as zero rather than collapsing the axis.
+    const bucketKeys: string[] = [];
+    for (
+      let cursor = trendStart.startOf(grain);
+      cursor < trendEnd;
+      cursor = cursor.plus(grain === 'day' ? { days: 1 } : { months: 1 })
+    ) {
+      bucketKeys.push(cursor.toFormat(bucketFormat));
+
+      // Guard against a pathological range producing an unbounded series.
+      if (bucketKeys.length >= 400) break;
+    }
+
+    const windowStart = trendStart;
+    const windowEnd = trendEnd;
 
     // Only these statuses have actually left the building. DRAFT documents have
     // never been sent to anyone, so they must not count toward "sent" figures.
@@ -1483,7 +1537,7 @@ export const orgRouter = router({
       }),
       prisma.approvalRequest.groupBy({
         by: ['status'],
-        where: { organizationId },
+        where: { organizationId, ...createdAtFilter },
         _count: { _all: true },
       }),
       prisma.document.count({ where: documentWhere }),
@@ -1507,8 +1561,11 @@ export const orgRouter = router({
           },
         },
       }),
-      prisma.$queryRaw<Array<{ month: Date; count: bigint }>>`
-        SELECT DATE_TRUNC('month', "createdAt") AS month, COUNT(*) AS count
+      // `grain` is a literal from a two-value union, never user text, so it is
+      // safe to interpolate into DATE_TRUNC — which cannot take a bound
+      // parameter for its field argument.
+      prisma.$queryRaw<Array<{ bucket: Date; count: bigint }>>`
+        SELECT DATE_TRUNC(${grain}, "createdAt") AS bucket, COUNT(*) AS count
         FROM "Document"
         WHERE "organizationId" = ${organizationId}
           AND "deletedAt" IS NULL
@@ -1517,8 +1574,8 @@ export const orgRouter = router({
         GROUP BY 1
         ORDER BY 1 ASC
       `,
-      prisma.$queryRaw<Array<{ month: Date; count: bigint }>>`
-        SELECT DATE_TRUNC('month', "createdAt") AS month, COUNT(*) AS count
+      prisma.$queryRaw<Array<{ bucket: Date; count: bigint }>>`
+        SELECT DATE_TRUNC(${grain}, "createdAt") AS bucket, COUNT(*) AS count
         FROM "ApprovalRequest"
         WHERE "organizationId" = ${organizationId}
           AND "createdAt" >= ${windowStart.toJSDate()}::timestamp
@@ -1557,14 +1614,17 @@ export const orgRouter = router({
       select: { id: true, name: true, email: true },
     });
 
-    const toSeries = (rows: Array<{ month: Date; count: bigint }>) => {
+    const toSeries = (rows: Array<{ bucket: Date; count: bigint }>) => {
       const found = new Map(
-        rows.map((r) => [DateTime.fromJSDate(r.month).toUTC().toFormat('yyyy-MM'), Number(r.count)]),
+        rows.map((r) => [
+          DateTime.fromJSDate(r.bucket).toUTC().toFormat(bucketFormat),
+          Number(r.count),
+        ]),
       );
 
-      return monthKeys.map((key) => ({
+      return bucketKeys.map((key) => ({
         month: key,
-        label: DateTime.fromFormat(key, 'yyyy-MM').toFormat('MMM yyyy'),
+        label: DateTime.fromFormat(key, bucketFormat, { zone: 'utc' }).toFormat(bucketLabel),
         count: found.get(key) ?? 0,
       }));
     };
@@ -1678,6 +1738,21 @@ export const orgRouter = router({
           count: s._count._all,
         };
       }),
+
+      // Echoed back so the UI can state the period it is showing rather than
+      // implying "all time", and so it knows whether month-over-month (which
+      // always describes calendar months) is comparable to the rest of the page.
+      range: {
+        from: rangeFrom?.toFormat('yyyy-MM-dd') ?? null,
+        to: rangeToExclusive?.minus({ days: 1 }).toFormat('yyyy-MM-dd') ?? null,
+        active: hasRange,
+        grain,
+        trendFrom: trendStart.toFormat('yyyy-MM-dd'),
+        trendTo: trendEnd.minus({ days: 1 }).toFormat('yyyy-MM-dd'),
+      },
+
+      /** Server clock at query time, so the UI can show a truthful "updated" age. */
+      generatedAt: DateTime.utc().toISO(),
     };
-  }),
+    }),
 });
