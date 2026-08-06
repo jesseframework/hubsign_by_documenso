@@ -19,6 +19,7 @@ import { prefixedId } from '../../universal/id';
 import { putPdfFileServerSide } from '../../universal/upload/put-file.server';
 import { triggerWorkflows } from '../workflow/trigger-workflows';
 import { createInboxItem } from './create-inbox-item';
+import { resolveInboxOwnerUserId } from './resolve-inbox-owner';
 import type { WorkHubInboxConfig } from './workhub-inbox-client';
 import {
   isWorkHubInboxConfigured,
@@ -97,14 +98,11 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
     });
   }
 
-  // The org owns this mailbox, so trust what lands in it. Documents are owned by
-  // the matching member when the sender is one, otherwise by a default org owner
-  // (first admin) — external senders are expected on a shared mailbox.
-  const defaultOwner = await prisma.organizationMember.findFirst({
-    where: { organizationId: org.id },
-    orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
-    select: { userId: true },
-  });
+  // The org owns this mailbox, so trust what lands in it. Every document it
+  // produces is owned by ONE account — the org's inbox owner — regardless of who
+  // emailed it; external senders are expected on a shared mailbox anyway.
+  const inboxOwnerUserId = await resolveInboxOwnerUserId(org.id);
+  const defaultOwner = inboxOwnerUserId ? { userId: inboxOwnerUserId } : null;
 
   const messages = await workhubListInbox(config, {
     isRead: false,
@@ -140,7 +138,10 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
         continue;
       }
 
-      // Attribute to the sender if they're a member, else to the default owner.
+      // The sender is recorded for attribution, but does NOT own the document.
+      // The inbox is a shared org queue while document access is owner-scoped,
+      // so attributing ownership to the sender hid the document from whoever was
+      // operating the inbox — see `resolveInboxOwnerUserId`.
       const member = msg.from
         ? await prisma.organizationMember.findFirst({
             where: {
@@ -150,11 +151,15 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
             select: { userId: true },
           })
         : null;
-      const ownerUserId = member?.userId ?? defaultOwner?.userId;
+
+      const ownerUserId = defaultOwner?.userId;
       if (!ownerUserId) {
         skipped += 1;
         continue;
       }
+
+      // Who it came from, kept separate from who owns it.
+      const receivedById = member?.userId ?? ownerUserId;
 
       const attachments = await workhubListAttachments(config, msg.id);
 
@@ -237,7 +242,7 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
           documentId: document.id,
           senderEmail: msg.from,
           subject: msg.subject,
-          receivedById: ownerUserId,
+          receivedById,
           externalMessageId,
         });
 

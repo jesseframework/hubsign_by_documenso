@@ -196,6 +196,16 @@ export const action = async ({ request }: Route.ActionArgs) => {
     );
   }
 
+  // The sender must be a member (checked above, anti-spoofing) but does not own
+  // the document: the inbox is a shared queue and document access is
+  // owner-scoped, so sender-ownership hid inbound documents from whoever was
+  // operating the inbox. See `resolveInboxOwnerUserId`.
+  const { resolveInboxOwnerUserId } = await import(
+    '@documenso/lib/server-only/inbox/resolve-inbox-owner'
+  );
+
+  const ownerUserId = (await resolveInboxOwnerUserId(member.organizationId)) ?? member.userId;
+
   const { createInboxItem } = await import('@documenso/lib/server-only/inbox/create-inbox-item');
   const { triggerWorkflows } = await import(
     '@documenso/lib/server-only/workflow/trigger-workflows'
@@ -238,7 +248,7 @@ export const action = async ({ request }: Route.ActionArgs) => {
           title,
           qrToken: prefixedId('qr'),
           documentDataId: documentData.id,
-          userId: member.userId,
+          userId: ownerUserId,
           // The receiving org is already resolved above; stamp it directly.
           organizationId: member.organizationId,
           source: DocumentSource.DOCUMENT,
