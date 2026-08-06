@@ -134,6 +134,21 @@ msgstr "{0, plural, one {In attesa di 1 destinatario} other {In attesa di # dest
 msgid "{0}"
 msgstr ""
 
+#. placeholder {0}: result.email
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "{0} added to the organization"
+msgstr ""
+
+#. placeholder {0}: result.email
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "{0} added with a {tier} seat"
+msgstr ""
+
+#. placeholder {0}: result.email
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "{0} added, but no seat was assigned"
+msgstr ""
+
 #. placeholder {0}: pendingConflict.kind === 'purchase' ? 'You have' : 'This member has'
 #. placeholder {1}: pendingConflict.planName
 #. placeholder {2}: pendingConflict.priceFormatted
@@ -2539,6 +2554,10 @@ msgstr "Controlla se il certificato di firma sarà incluso nel documento quando 
 msgid "Controls which signatures are allowed to be used when signing a document."
 msgstr "Controlla quali firme sono consentite per firmare un documento."
 
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Convert"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/components/general/document/document-recipient-link-copy-dialog.tsx
 #: packages/ui/primitives/document-flow/add-subject.tsx
@@ -4235,6 +4254,11 @@ msgstr "Tempo scaduto"
 msgid "Excel workbooks (.xlsx) aren't supported. In Excel choose File → Save As → CSV UTF-8, then upload that file."
 msgstr ""
 
+#. placeholder {0}: data.domains.join(', ')
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Existing HubSign accounts on {0} that aren't in an organization yet."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "Existing signers"
 msgstr ""
@@ -4556,6 +4580,10 @@ msgstr "Vai alle tue <0>impostazioni del profilo pubblico</0> per aggiungere doc
 msgid "Green"
 msgstr "Verde"
 
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Has a personal subscription — assigning a seat cancels it (prorated credit)."
+msgstr ""
+
 #: apps/remix/app/components/general/document-signing/document-signing-page-view.tsx
 msgid "has invited you to approve this document"
 msgstr "ti ha invitato ad approvare questo documento"
@@ -4700,6 +4728,11 @@ msgstr "Se non trovi il link di conferma nella tua casella di posta, puoi richie
 #: apps/remix/app/components/forms/2fa/enable-authenticator-app-dialog.tsx
 msgid "If your authenticator app does not support QR codes, you can use the following code instead:"
 msgstr "Se la tua app autenticatrice non supporta i codici QR, puoi usare il seguente codice:"
+
+#. placeholder {0}: data.ignoredPublicDomains.join(', ')
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Ignoring {0} — shared mailbox providers can't be claimed, since they identify no single organization."
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "Import CSV"
@@ -5563,6 +5596,10 @@ msgstr ""
 msgid "No channels yet."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "No claimable domains are configured."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "No classifications defined yet"
 msgstr ""
@@ -5726,6 +5763,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "No templates available"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "No unaffiliated accounts found on these domains."
 msgstr ""
 
 #: apps/remix/app/components/dialogs/public-profile-template-manage-dialog.tsx
@@ -6166,6 +6207,7 @@ msgid "Payment successful! Your seats have been activated."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.members.tsx
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
 #: apps/remix/app/components/tables/user-settings-teams-page-table.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/general/document/document-status.tsx
@@ -6190,6 +6232,10 @@ msgstr "Documenti in sospeso"
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Pending Documents"
 msgstr "Documenti in sospeso"
+
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Pending from your domains"
+msgstr ""
 
 #: apps/remix/app/components/general/teams/team-invitations.tsx
 msgid "Pending invitations"

@@ -14,6 +14,8 @@ import {
   resolveOrgPlanNameAndPrice,
 } from '@documenso/ee/server-only/stripe/webhook/resolve-org-plan-price';
 import { IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
+import { normalizeClaimableDomains } from '@documenso/lib/constants/public-email-domains';
+import { PUBLIC_EMAIL_DOMAINS } from '@documenso/lib/constants/public-email-domains';
 import { getI18nInstance } from '@documenso/lib/client-only/providers/i18n-server';
 import {
   ORG_DMS_ADDON_PRICE_CENTS,
@@ -91,6 +93,103 @@ const resolveActivePersonalPlan = async (userId: number) => {
 
   return null;
 };
+
+/**
+ * Puts a member onto a purchased seat: capacity check, personal-plan takeover,
+ * counter increment, tier + DMS entitlement.
+ *
+ * Extracted so `assignSeat` and `convertDomainCandidate` cannot drift. The
+ * personal-plan cancellation especially must not be duplicated — a second copy
+ * that forgot it would leave a converted user double-billed (their own
+ * subscription plus the org's seat).
+ */
+const assignSeatToMember = async ({
+  organizationId,
+  memberId,
+  tier,
+  acknowledgeCancelPersonalPlan,
+}: {
+  organizationId: number;
+  memberId: string;
+  tier: 'BUSINESS' | 'ENTERPRISE';
+  acknowledgeCancelPersonalPlan?: boolean;
+}) => {
+  const seatPlan = await prisma.orgSeatPlan.findFirst({
+    where: { organizationId, tier },
+  });
+
+  if (!seatPlan) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'No seats purchased for this tier. Purchase seats first.',
+    });
+  }
+
+  const targetMember = await prisma.organizationMember.findUniqueOrThrow({
+    where: { id: memberId },
+  });
+
+  // A member holds exactly one tier at a time (same as M365 licensing: a user
+  // has one SKU even if the tenant offers several), so this is a no-op rather
+  // than stacking a second tier. Switching tiers means unassign-then-assign.
+  if (targetMember.seatTier) {
+    return targetMember;
+  }
+
+  // Re-checked server-side regardless of whether the client already called
+  // `getMemberBillingConflict` — this is the actual enforcement point.
+  const activePlan = await resolveActivePersonalPlan(targetMember.userId);
+
+  if (activePlan && !acknowledgeCancelPersonalPlan) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'This member has an active personal subscription that will be cancelled.',
+    });
+  }
+
+  if (activePlan) {
+    try {
+      // Cancel immediately with proration — unused time lands as a Stripe
+      // account-balance credit (applied to future invoices), not a card refund.
+      // Same pattern as `transfer-team-subscription.ts`.
+      const canceledSubscription = await stripe.subscriptions.cancel(
+        activePlan.subscription.planId,
+        { invoice_now: true, prorate: true },
+      );
+
+      // Sync locally immediately rather than waiting on the webhook (mirrors
+      // `update-subscription-plan.ts`); the webhook fires later and no-ops.
+      await onSubscriptionDeleted({ subscription: canceledSubscription });
+    } catch (err) {
+      // `resolveActivePersonalPlan` re-verifies against Stripe, but Stripe can
+      // still reject the cancel (e.g. cancelled in between). Either way the
+      // goal — not double-billing — already holds, so don't block the seat.
+      console.warn('Failed to cancel personal subscription during seat assignment:', err);
+    }
+  }
+
+  if (seatPlan.assigned >= seatPlan.quantity) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'All seats are assigned. Purchase more seats.',
+    });
+  }
+
+  await prisma.orgSeatPlan.update({
+    where: { id: seatPlan.id },
+    data: { assigned: { increment: 1 } },
+  });
+
+  return prisma.organizationMember.update({
+    where: { id: memberId },
+    data: {
+      seatTier: seatPlan.tier,
+      // Derived from the org's purchased plan, never client input.
+      dmsAddon: seatPlan.tier === 'ENTERPRISE' ? true : seatPlan.dmsEnabled,
+    },
+  });
+};
+
 
 // ── Org Billing Helpers ──
 
@@ -1065,24 +1164,15 @@ export const orgRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN' });
       }
 
-      const seatPlan = await prisma.orgSeatPlan.findFirst({
-        where: { organizationId: myMembership.organizationId, tier: input.tier },
-      });
-
-      if (!seatPlan) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No seats purchased for this tier. Purchase seats first.' });
-      }
-
-      const targetMember = await prisma.organizationMember.findUniqueOrThrow({
-        where: { id: input.memberId },
-      });
-
-      // Admins can't change their own seat — but only when there's someone
-      // else who actually could. Otherwise this would be a hard deadlock: a
-      // sole admin (or one whose only other admins lack the right role) would
-      // have nobody to ask. (Auto-consuming seat #1 on purchase is a separate
-      // mechanism in `purchaseSeats` and is unaffected by this either way.)
-      if (targetMember.id === myMembership.id) {
+      // Admins can't seat themselves — but only when somebody else actually
+      // could. Otherwise a sole admin would deadlock with nobody to ask.
+      // (Auto-consuming seat #1 on purchase is a separate mechanism in
+      // `purchaseSeats` and is unaffected either way.)
+      //
+      // Lives here rather than in `assignSeatToMember` deliberately: it guards
+      // self-service, and has no meaning when an admin seats a brand-new member
+      // during conversion.
+      if (input.memberId === myMembership.id) {
         const otherEligibleAdmin = await prisma.organizationMember.findFirst({
           where: {
             organizationId: myMembership.organizationId,
@@ -1099,70 +1189,11 @@ export const orgRouter = router({
         }
       }
 
-      // Already seated — a member holds exactly one tier at a time (same as
-      // M365 licensing: a user has one SKU, even if the tenant offers
-      // several), so this is a no-op rather than stacking a second tier.
-      // Switching a member's tier would mean unassign-then-assign, not
-      // supported as a single action here.
-      if (targetMember.seatTier) {
-        return targetMember;
-      }
-
-      // Re-check server-side regardless of whether the client already called
-      // `getMemberBillingConflict` — this is the actual enforcement point.
-      const activePlan = await resolveActivePersonalPlan(targetMember.userId);
-
-      if (activePlan && !input.acknowledgeCancelPersonalPlan) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'This member has an active personal subscription that will be cancelled.',
-        });
-      }
-
-      if (activePlan) {
-        try {
-          // Cancel immediately with proration — unused time lands as a Stripe
-          // account-balance credit (applied to future invoices), not a card
-          // refund. Same pattern as `transfer-team-subscription.ts`.
-          const canceledSubscription = await stripe.subscriptions.cancel(activePlan.subscription.planId, {
-            invoice_now: true,
-            prorate: true,
-          });
-
-          // Sync locally immediately rather than waiting on the webhook (mirrors
-          // `update-subscription-plan.ts`) — the webhook will also fire and
-          // no-op harmlessly on top of this.
-          await onSubscriptionDeleted({ subscription: canceledSubscription });
-        } catch (err) {
-          // `resolveActivePersonalPlan` already re-verifies against Stripe, but
-          // Stripe can still reject the cancel itself (e.g. canceled between
-          // that check and here). Either way the goal — not leaving them
-          // double-billed — is already satisfied, so don't block the seat
-          // assignment over it.
-          console.warn('Failed to cancel personal subscription during seat assignment:', err);
-        }
-      }
-
-      // Check if seats are available
-      if (seatPlan.assigned >= seatPlan.quantity) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'All seats are assigned. Purchase more seats.' });
-      }
-
-      // Assign the seat
-      await prisma.orgSeatPlan.update({
-        where: { id: seatPlan.id },
-        data: { assigned: { increment: 1 } },
-      });
-
-      return prisma.organizationMember.update({
-        where: { id: input.memberId },
-        data: {
-          seatTier: seatPlan.tier,
-          // Derived from the org's actual purchased seat plan, not client
-          // input — previously this trusted an arbitrary client-provided
-          // boolean, letting anyone grant themselves free DMS access.
-          dmsAddon: seatPlan.tier === 'ENTERPRISE' ? true : seatPlan.dmsEnabled,
-        },
+      return assignSeatToMember({
+        organizationId: myMembership.organizationId,
+        memberId: input.memberId,
+        tier: input.tier,
+        acknowledgeCancelPersonalPlan: input.acknowledgeCancelPersonalPlan,
       });
     }),
 
@@ -1420,6 +1451,210 @@ export const orgRouter = router({
       });
 
       return { success: true };
+    }),
+
+  /**
+   * Existing HubSign accounts whose email domain matches this org's allow-list
+   * but who are not members yet — surfaced so an admin can adopt them instead of
+   * re-inviting someone who already has an account.
+   *
+   * PRIVACY CONSTRAINTS, and why they are not optional
+   *
+   * `allowedEmailDomains` is free text and is NOT verified. Without limits an
+   * admin could type `gmail.com` and read back a directory of every Gmail user
+   * on the platform. Two rules contain that:
+   *
+   *   1. Public mailbox providers never match — they identify no organization.
+   *   2. Only accounts belonging to NO organization are listed, so one tenant can
+   *      never enumerate or poach another tenant's members.
+   *
+   * Even so this is "unaffiliated accounts on a domain you claim", not "your
+   * staff". Real domain verification (DNS TXT) is the proper fix and does not
+   * exist yet.
+   */
+  listDomainCandidates: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await prisma.organizationMember.findFirst({
+      where: { userId: ctx.user.id, role: 'ORG_ADMIN' },
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    if (!membership) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Only Org Admins can view domain candidates.',
+      });
+    }
+
+    const org = await prisma.organization.findUniqueOrThrow({
+      where: { id: membership.organizationId },
+      select: { allowedEmailDomains: true },
+    });
+
+    const domains = normalizeClaimableDomains(org.allowedEmailDomains);
+
+    if (domains.length === 0) {
+      return { candidates: [], domains: [], ignoredPublicDomains: [] };
+    }
+
+    const candidates = await prisma.user.findMany({
+      where: {
+        disabled: false,
+        // Unaffiliated only — see the privacy note above.
+        organizationMemberships: { none: {} },
+        OR: domains.map((domain) => ({ email: { endsWith: `@${domain}`, mode: 'insensitive' } })),
+      },
+      select: { id: true, name: true, email: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    // Seat availability, so the admin sees what licensing is possible before
+    // clicking rather than discovering "all seats assigned" afterwards.
+    const seatPlans = await prisma.orgSeatPlan.findMany({
+      where: { organizationId: membership.organizationId },
+      select: { tier: true, quantity: true, assigned: true, dmsEnabled: true },
+    });
+
+    // Flagged per candidate: seating them cancels their own subscription, which
+    // is a billing consequence the admin must see in advance.
+    const withPersonalPlan = new Set<number>();
+
+    if (IS_BILLING_ENABLED()) {
+      for (const candidate of candidates) {
+        const plan = await resolveActivePersonalPlan(candidate.id);
+        if (plan) withPersonalPlan.add(candidate.id);
+      }
+    }
+
+    return {
+      candidates: candidates.map((c) => ({
+        ...c,
+        hasPersonalPlan: withPersonalPlan.has(c.id),
+      })),
+      seatPlans: seatPlans.map((p) => ({
+        tier: p.tier,
+        quantity: p.quantity,
+        assigned: p.assigned,
+        available: Math.max(p.quantity - p.assigned, 0),
+        dmsEnabled: p.dmsEnabled,
+      })),
+      domains,
+      // Reported so the UI can explain why a configured domain matched nothing,
+      // rather than looking broken.
+      ignoredPublicDomains: (org.allowedEmailDomains ?? [])
+        .map((d) => d.trim().toLowerCase())
+        .filter((d) => d && PUBLIC_EMAIL_DOMAINS.has(d)),
+    };
+  }),
+
+  /** Adopt a domain-matched account as a member. */
+  convertDomainCandidate: authenticatedProcedure
+    .input(
+      z.object({
+        userId: z.number(),
+        role: z.enum(['ORG_ADMIN', 'DMS_ADMIN', 'TEAM_ADMIN', 'MANAGER', 'MEMBER']).default('MEMBER'),
+        /**
+         * Consume one of the org's purchased seats as part of the conversion.
+         * Omit to add them unlicensed — membership and licensing are separate,
+         * and an org may not have seats to spare.
+         */
+        seatTier: z.enum(['BUSINESS', 'ENTERPRISE']).optional(),
+        /** Required when the user holds a personal plan the seat will cancel. */
+        acknowledgeCancelPersonalPlan: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id, role: 'ORG_ADMIN' },
+        orderBy: { joinedAt: 'asc' },
+      });
+
+      if (!membership) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only Org Admins can add members.',
+        });
+      }
+
+      const org = await prisma.organization.findUniqueOrThrow({
+        where: { id: membership.organizationId },
+        select: { allowedEmailDomains: true },
+      });
+
+      const target = await prisma.user.findUnique({
+        where: { id: input.userId },
+        select: { id: true, email: true, name: true, disabled: true },
+      });
+
+      if (!target || target.disabled) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found.' });
+      }
+
+      // Re-checked server-side rather than trusting the id the client sent: the
+      // list endpoint's filters are the security boundary, so this mutation has
+      // to reapply every one of them or it becomes a way to add ANY user by id.
+      const domains = normalizeClaimableDomains(org.allowedEmailDomains);
+      const targetDomain = target.email.split('@')[1]?.toLowerCase() ?? '';
+
+      if (!domains.includes(targetDomain)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `${target.email} does not match a claimable domain for this organization.`,
+        });
+      }
+
+      const existingAnywhere = await prisma.organizationMember.findFirst({
+        where: { userId: target.id },
+        select: { organizationId: true },
+      });
+
+      if (existingAnywhere) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            existingAnywhere.organizationId === membership.organizationId
+              ? `${target.email} is already a member.`
+              : `${target.email} already belongs to another organization.`,
+        });
+      }
+
+      const created = await prisma.organizationMember.create({
+        data: {
+          organizationId: membership.organizationId,
+          userId: target.id,
+          role: input.role,
+        },
+      });
+
+      // Licensing, if asked for. Runs AFTER the membership exists because a seat
+      // is assigned to a member row, not to a user.
+      //
+      // A throw here (no seats left, or an unacknowledged personal plan) leaves
+      // the member created but unlicensed rather than rolling back — deliberate:
+      // the admin's primary intent was to add the person, and an unlicensed
+      // member is a state the UI already handles and can fix with one click.
+      // Undoing the membership would discard the successful half of the action.
+      let seat: { assigned: boolean; tier?: string; error?: string } = { assigned: false };
+
+      if (input.seatTier) {
+        try {
+          const seated = await assignSeatToMember({
+            organizationId: membership.organizationId,
+            memberId: created.id,
+            tier: input.seatTier,
+            acknowledgeCancelPersonalPlan: input.acknowledgeCancelPersonalPlan,
+          });
+
+          seat = { assigned: Boolean(seated.seatTier), tier: seated.seatTier ?? undefined };
+        } catch (err) {
+          seat = {
+            assigned: false,
+            error: err instanceof TRPCError ? err.message : 'Seat assignment failed.',
+          };
+        }
+      }
+
+      return { success: true, email: target.email, name: target.name, seat };
     }),
 
   /**

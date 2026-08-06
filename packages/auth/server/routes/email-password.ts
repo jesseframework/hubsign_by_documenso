@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
 import { EMAIL_VERIFICATION_STATE } from '@documenso/lib/constants/email';
+import { isPublicEmailDomain } from '@documenso/lib/constants/public-email-domains';
 import { AppError } from '@documenso/lib/errors/app-error';
 import { jobsClient } from '@documenso/lib/jobs/client';
 import { disableTwoFactorAuthentication } from '@documenso/lib/server-only/2fa/disable-2fa';
@@ -150,22 +151,33 @@ export const emailPasswordRoute = new Hono<HonoAuthContext>()
 
     const { name, email, password, signature, url, turnstileToken } = c.req.valid('json');
 
-    // Block self-signup if the email belongs to an org that has it disabled.
-    // We match against the org's allowedEmailDomains so we don't accidentally
-    // block unrelated emails when an org sets disableSelfSignup=true but
-    // hasn't restricted any domains.
+    // A domain in an org's restriction list is a claim on that domain: accounts
+    // there belong to the organization, so they are added by an admin rather
+    // than self-created. Restricting a domain is therefore sufficient on its own
+    // to block public signup — `disableSelfSignup` is no longer required, since
+    // an org that restricted its domain and still got shadow accounts had no way
+    // to express what it plainly meant.
+    //
+    // Shared mailbox providers are exempt. `allowedEmailDomains` is unverified
+    // free text, so without that exemption one org entering `gmail.com` would
+    // stop every Gmail user on the platform from signing up.
     const emailDomain = email.split('@')[1]?.toLowerCase();
-    if (emailDomain) {
-      const blockingOrg = await prisma.organization.findFirst({
-        where: {
-          disableSelfSignup: true,
-          allowedEmailDomains: { has: emailDomain },
-        },
-        select: { name: true },
+
+    if (emailDomain && !isPublicEmailDomain(emailDomain)) {
+      const claimingOrg = await prisma.organization.findFirst({
+        where: { allowedEmailDomains: { has: emailDomain } },
+        select: { name: true, disableSelfSignup: true, oidcEnabled: true },
       });
-      if (blockingOrg) {
+
+      if (claimingOrg) {
+        // Named so the person knows who to contact; SSO is only mentioned when
+        // it actually exists, so the message never suggests a dead end.
+        const ssoHint = claimingOrg.oidcEnabled ? ' or sign in with your organization SSO' : '';
+
         throw new AppError('SIGNUP_DISABLED', {
-          message: `Self-signup is disabled for ${blockingOrg.name}. Please ask an administrator to invite you, or sign in via SSO.`,
+          message:
+            `An organization for ${emailDomain} (${claimingOrg.name}) already exists on HubSign. ` +
+            `Ask an administrator there to add you${ssoHint}.`,
         });
       }
     }

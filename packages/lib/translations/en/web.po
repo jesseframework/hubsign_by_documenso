@@ -129,6 +129,21 @@ msgstr "{0, plural, one {Waiting on 1 recipient} other {Waiting on # recipients}
 msgid "{0}"
 msgstr "{0}"
 
+#. placeholder {0}: result.email
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "{0} added to the organization"
+msgstr "{0} added to the organization"
+
+#. placeholder {0}: result.email
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "{0} added with a {tier} seat"
+msgstr "{0} added with a {tier} seat"
+
+#. placeholder {0}: result.email
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "{0} added, but no seat was assigned"
+msgstr "{0} added, but no seat was assigned"
+
 #. placeholder {0}: pendingConflict.kind === 'purchase' ? 'You have' : 'This member has'
 #. placeholder {1}: pendingConflict.planName
 #. placeholder {2}: pendingConflict.priceFormatted
@@ -2534,6 +2549,10 @@ msgstr "Controls whether the signing certificate will be included in the documen
 msgid "Controls which signatures are allowed to be used when signing a document."
 msgstr "Controls which signatures are allowed to be used when signing a document."
 
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Convert"
+msgstr "Convert"
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/components/general/document/document-recipient-link-copy-dialog.tsx
 #: packages/ui/primitives/document-flow/add-subject.tsx
@@ -4230,6 +4249,11 @@ msgstr "Exceeded timeout"
 msgid "Excel workbooks (.xlsx) aren't supported. In Excel choose File → Save As → CSV UTF-8, then upload that file."
 msgstr "Excel workbooks (.xlsx) aren't supported. In Excel choose File → Save As → CSV UTF-8, then upload that file."
 
+#. placeholder {0}: data.domains.join(', ')
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Existing HubSign accounts on {0} that aren't in an organization yet."
+msgstr "Existing HubSign accounts on {0} that aren't in an organization yet."
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "Existing signers"
 msgstr "Existing signers"
@@ -4551,6 +4575,10 @@ msgstr "Go to your <0>public profile settings</0> to add documents."
 msgid "Green"
 msgstr "Green"
 
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Has a personal subscription — assigning a seat cancels it (prorated credit)."
+msgstr "Has a personal subscription — assigning a seat cancels it (prorated credit)."
+
 #: apps/remix/app/components/general/document-signing/document-signing-page-view.tsx
 msgid "has invited you to approve this document"
 msgstr "has invited you to approve this document"
@@ -4695,6 +4723,11 @@ msgstr "If you don't find the confirmation link in your inbox, you can request a
 #: apps/remix/app/components/forms/2fa/enable-authenticator-app-dialog.tsx
 msgid "If your authenticator app does not support QR codes, you can use the following code instead:"
 msgstr "If your authenticator app does not support QR codes, you can use the following code instead:"
+
+#. placeholder {0}: data.ignoredPublicDomains.join(', ')
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Ignoring {0} — shared mailbox providers can't be claimed, since they identify no single organization."
+msgstr "Ignoring {0} — shared mailbox providers can't be claimed, since they identify no single organization."
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "Import CSV"
@@ -5558,6 +5591,10 @@ msgstr "No approval templates yet"
 msgid "No channels yet."
 msgstr "No channels yet."
 
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "No claimable domains are configured."
+msgstr "No claimable domains are configured."
+
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "No classifications defined yet"
 msgstr "No classifications defined yet"
@@ -5722,6 +5759,10 @@ msgstr "No template"
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "No templates available"
 msgstr "No templates available"
+
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "No unaffiliated accounts found on these domains."
+msgstr "No unaffiliated accounts found on these domains."
 
 #: apps/remix/app/components/dialogs/public-profile-template-manage-dialog.tsx
 msgid "No valid direct templates found"
@@ -6161,6 +6202,7 @@ msgid "Payment successful! Your seats have been activated."
 msgstr "Payment successful! Your seats have been activated."
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.members.tsx
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
 #: apps/remix/app/components/tables/user-settings-teams-page-table.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/general/document/document-status.tsx
@@ -6185,6 +6227,10 @@ msgstr "Pending documents"
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Pending Documents"
 msgstr "Pending Documents"
+
+#: apps/remix/app/routes/_authenticated+/org+/members.tsx
+msgid "Pending from your domains"
+msgstr "Pending from your domains"
 
 #: apps/remix/app/components/general/teams/team-invitations.tsx
 msgid "Pending invitations"
