@@ -31,12 +31,28 @@ import type { Route } from './+types/inbound.email-to-sign';
  * Adapt the field names if you use a different provider.
  */
 
+type InboundPdf = { name: string; arrayBuffer: () => Promise<ArrayBuffer>; type: string };
+
 type InboundProviderPayload = {
   to: string;
   from: string;
   subject?: string;
-  pdfFile: { name: string; arrayBuffer: () => Promise<ArrayBuffer>; type: string };
+  /**
+   * EVERY PDF on the email, in the order the provider sent them.
+   *
+   * One email routinely carries several unrelated invoices — potentially for
+   * different vendors — so they cannot be merged into a single document. Each
+   * needs its own OCR pass, queue row and workflow run. This used to be a
+   * single `pdfFile`: the first attachment was imported and the rest were
+   * discarded silently while the caller still received a 200.
+   */
+  pdfFiles: InboundPdf[];
+  /** Attachments that were not PDFs, so the response can admit to skipping them. */
+  ignoredAttachments: string[];
 };
+
+const isPdf = (name: string, mime: string) =>
+  mime === 'application/pdf' || name.toLowerCase().endsWith('.pdf');
 
 const parseMailgunPayload = async (request: Request): Promise<InboundProviderPayload | null> => {
   const form = await request.formData();
@@ -44,25 +60,30 @@ const parseMailgunPayload = async (request: Request): Promise<InboundProviderPay
   const from = String(form.get('sender') ?? form.get('From') ?? '');
   const subject = String(form.get('subject') ?? form.get('Subject') ?? '');
 
-  // Find the first PDF attachment.
+  const pdfFiles: InboundPdf[] = [];
+  const ignoredAttachments: string[] = [];
+
   for (const [key, value] of form.entries()) {
-    if (key.startsWith('attachment-') && value instanceof File) {
-      if (value.type === 'application/pdf' || value.name.toLowerCase().endsWith('.pdf')) {
-        return {
-          to,
-          from,
-          subject,
-          pdfFile: {
-            name: value.name,
-            type: 'application/pdf',
-            arrayBuffer: async () => value.arrayBuffer(),
-          },
-        };
-      }
+    if (!key.startsWith('attachment-') || !(value instanceof File)) {
+      continue;
+    }
+
+    if (isPdf(value.name, value.type)) {
+      pdfFiles.push({
+        name: value.name,
+        type: 'application/pdf',
+        arrayBuffer: async () => value.arrayBuffer(),
+      });
+    } else {
+      ignoredAttachments.push(value.name);
     }
   }
 
-  return null;
+  if (pdfFiles.length === 0) {
+    return null;
+  }
+
+  return { to, from, subject, pdfFiles, ignoredAttachments };
 };
 
 const base64ToArrayBuffer = (b64: string): ArrayBuffer => {
@@ -85,25 +106,29 @@ const parseJsonPayload = async (request: Request): Promise<InboundProviderPayloa
   const subject = String(body.subject ?? body.Subject ?? '');
   const attachments = body.attachments ?? body.Attachments ?? [];
 
+  const pdfFiles: InboundPdf[] = [];
+  const ignoredAttachments: string[] = [];
+
   if (Array.isArray(attachments)) {
     for (const att of attachments) {
       const name = String(att.fileName ?? att.filename ?? att.name ?? 'attachment.pdf');
       const mime = String(att.mimeType ?? att.contentType ?? att.type ?? '');
       const b64 = att.contentBase64 ?? att.content ?? att.contentBytes ?? att.data;
-      const isPdf = mime === 'application/pdf' || name.toLowerCase().endsWith('.pdf');
-      if (isPdf && typeof b64 === 'string') {
+
+      if (isPdf(name, mime) && typeof b64 === 'string') {
         const arrayBuffer = base64ToArrayBuffer(b64);
-        return {
-          to,
-          from,
-          subject,
-          pdfFile: { name, type: 'application/pdf', arrayBuffer: async () => arrayBuffer },
-        };
+        pdfFiles.push({ name, type: 'application/pdf', arrayBuffer: async () => arrayBuffer });
+      } else {
+        ignoredAttachments.push(name);
       }
     }
   }
 
-  return null;
+  if (pdfFiles.length === 0) {
+    return null;
+  }
+
+  return { to, from, subject, pdfFiles, ignoredAttachments };
 };
 
 const parseInboundPayload = async (request: Request): Promise<InboundProviderPayload | null> => {
@@ -143,7 +168,14 @@ export const action = async ({ request }: Route.ActionArgs) => {
 
   const org = await prisma.organization.findUnique({
     where: { slug: localPart },
-    select: { id: true, slug: true, emailToSignEnabled: true },
+    select: {
+      id: true,
+      slug: true,
+      emailToSignEnabled: true,
+      inboxEmail: true,
+      inboxBlockedSenders: true,
+      inboxBlockedSubjects: true,
+    },
   });
 
   if (!org) {
@@ -171,93 +203,180 @@ export const action = async ({ request }: Route.ActionArgs) => {
     );
   }
 
-  // Upload the PDF.
-  const documentData = await putPdfFileServerSide({
-    name: payload.pdfFile.name,
-    type: 'application/pdf',
-    arrayBuffer: payload.pdfFile.arrayBuffer,
-  });
+  // Refuse mail the platform itself produced. A completed document is emailed to
+  // every recipient WITH the signed PDF attached, so a document sent to this
+  // org's own inbox address comes straight back here as a new "invoice" and
+  // re-fires the workflow that produced it. 200 rather than an error: the
+  // provider did nothing wrong and must not retry.
+  const { shouldIngestInboundEmail } = await import(
+    '@documenso/lib/server-only/inbox/should-ingest-email'
+  );
 
-  // Create a DRAFT document. No recipients yet — the sender (or anyone in
-  // the org) finishes setup in the HubSign UI.
-  const document = await prisma.document.create({
-    data: {
-      title: payload.subject || payload.pdfFile.name,
-      qrToken: prefixedId('qr'),
-      documentDataId: documentData.id,
-      userId: member.userId,
-      source: DocumentSource.DOCUMENT,
-      documentMeta: {
-        create: {
-          // Use the inbound subject as the email subject, if any.
-          subject: payload.subject || undefined,
-        },
-      },
+  const decision = shouldIngestInboundEmail(
+    { from: senderEmail, subject: payload.subject },
+    {
+      orgInboxEmail: org.inboxEmail,
+      blockedSenders: org.inboxBlockedSenders,
+      blockedSubjects: org.inboxBlockedSubjects,
     },
-  });
+  );
 
-  const editUrl = `${NEXT_PUBLIC_WEBAPP_URL()}/documents/${document.id}/edit`;
+  if (!decision.ingest) {
+    console.log(`[email-to-sign] refused inbound email: ${decision.detail}`);
 
-  // Signature inbox: queue the inbound document and kick off OCR (BMS ML). The
-  // OCR job fires the INBOX_OCR_COMPLETED workflow event when it finishes.
-  let inboxItemId: string | undefined;
-  try {
-    const { createInboxItem } = await import('@documenso/lib/server-only/inbox/create-inbox-item');
-    inboxItemId = await createInboxItem({
-      organizationId: member.organizationId,
-      documentId: document.id,
-      senderEmail,
-      subject: payload.subject || null,
-      receivedById: member.userId,
+    return Response.json({
+      ok: true,
+      skipped: true,
+      reason: decision.reason,
+      message: `Email not ingested: ${decision.detail}`,
     });
-  } catch (err) {
-    console.error('[email-to-sign] inbox/OCR dispatch failed (non-fatal):', err);
   }
 
-  // Fire the pre-OCR "email received" workflow event.
-  try {
-    const { triggerWorkflows } = await import(
-      '@documenso/lib/server-only/workflow/trigger-workflows'
-    );
-    await triggerWorkflows({
-      event: 'INBOX_EMAIL_RECEIVED',
-      organizationId: member.organizationId,
-      data: {
+  // The sender must be a member (checked above, anti-spoofing) but does not own
+  // the document: the inbox is a shared queue and document access is
+  // owner-scoped, so sender-ownership hid inbound documents from whoever was
+  // operating the inbox. See `resolveInboxOwnerUserId`.
+  const { resolveInboxOwnerUserId } = await import(
+    '@documenso/lib/server-only/inbox/resolve-inbox-owner'
+  );
+
+  const ownerUserId = (await resolveInboxOwnerUserId(member.organizationId)) ?? member.userId;
+
+  const { createInboxItem } = await import('@documenso/lib/server-only/inbox/create-inbox-item');
+  const { triggerWorkflows } = await import(
+    '@documenso/lib/server-only/workflow/trigger-workflows'
+  );
+  const { startApprovalRequest } = await import(
+    '@documenso/lib/server-only/approval/approval-execution'
+  );
+
+  const created: Array<{
+    documentId: number;
+    title: string;
+    editUrl: string;
+    inboxItemId?: string;
+    approval: { requestId?: string; skipped?: string };
+  }> = [];
+
+  const failed: Array<{ name: string; error: string }> = [];
+
+  // One document per attachment — they may be invoices for entirely different
+  // vendors, so each gets its own OCR pass, queue row and workflow run.
+  for (const pdf of payload.pdfFiles) {
+    try {
+      const documentData = await putPdfFileServerSide({
+        name: pdf.name,
+        type: 'application/pdf',
+        arrayBuffer: pdf.arrayBuffer,
+      });
+
+      // With several documents from one email the subject alone no longer
+      // identifies them, so qualify with the file name.
+      const title =
+        payload.pdfFiles.length > 1 && payload.subject
+          ? `${payload.subject} — ${pdf.name}`
+          : payload.subject || pdf.name;
+
+      // A DRAFT document. No recipients yet — the sender (or anyone in the org)
+      // finishes setup in the HubSign UI.
+      const document = await prisma.document.create({
+        data: {
+          title,
+          qrToken: prefixedId('qr'),
+          documentDataId: documentData.id,
+          userId: ownerUserId,
+          // The receiving org is already resolved above; stamp it directly.
+          organizationId: member.organizationId,
+          source: DocumentSource.DOCUMENT,
+          documentMeta: {
+            create: { subject: payload.subject || undefined },
+          },
+        },
+      });
+
+      // Signature inbox: queue the document and kick off OCR (BMS ML). The OCR
+      // job fires INBOX_OCR_COMPLETED when it finishes.
+      let inboxItemId: string | undefined;
+      try {
+        inboxItemId = await createInboxItem({
+          organizationId: member.organizationId,
+          documentId: document.id,
+          senderEmail,
+          subject: payload.subject || null,
+          receivedById: member.userId,
+        });
+      } catch (err) {
+        console.error('[email-to-sign] inbox/OCR dispatch failed (non-fatal):', err);
+      }
+
+      // Pre-OCR "email received" workflow event, once per document.
+      try {
+        await triggerWorkflows({
+          event: 'INBOX_EMAIL_RECEIVED',
+          organizationId: member.organizationId,
+          data: {
+            documentId: document.id,
+            title: document.title,
+            sender: senderEmail,
+            subject: payload.subject || null,
+          },
+        });
+      } catch (err) {
+        console.error('[email-to-sign] INBOX_EMAIL_RECEIVED dispatch failed (non-fatal):', err);
+      }
+
+      // Route through an approval chain if the org has one configured for
+      // documents. Non-fatal: a missing template just skips.
+      let approval: { requestId?: string; skipped?: string } = {};
+      try {
+        const result = await startApprovalRequest({
+          organizationId: member.organizationId,
+          entityType: 'Document',
+          entityId: String(document.id),
+          requesterUserId: member.userId,
+        });
+        approval =
+          'skipped' in result ? { skipped: result.reason } : { requestId: result.requestId };
+      } catch (err) {
+        console.error('[email-to-sign] approval dispatch failed (non-fatal):', err);
+      }
+
+      created.push({
         documentId: document.id,
         title: document.title,
-        sender: senderEmail,
-        subject: payload.subject || null,
-      },
-    });
-  } catch (err) {
-    console.error('[email-to-sign] INBOX_EMAIL_RECEIVED dispatch failed (non-fatal):', err);
+        editUrl: `${NEXT_PUBLIC_WEBAPP_URL()}/documents/${document.id}/edit`,
+        inboxItemId,
+        approval,
+      });
+    } catch (err) {
+      // One bad attachment must not lose the others — record it and continue.
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      console.error(`[email-to-sign] failed to import attachment "${pdf.name}":`, err);
+      failed.push({ name: pdf.name, error: message });
+    }
   }
 
-  // Route the inbound document through an approval chain if the org has one
-  // configured for documents. Non-fatal: a missing template just skips.
-  let approval: { requestId?: string; skipped?: string } = {};
-  try {
-    const { startApprovalRequest } = await import(
-      '@documenso/lib/server-only/approval/approval-execution'
+  if (created.length === 0) {
+    return Response.json(
+      { ok: false, error: 'Every PDF attachment failed to import.', failed },
+      { status: 500 },
     );
-    const result = await startApprovalRequest({
-      organizationId: member.organizationId,
-      entityType: 'Document',
-      entityId: String(document.id),
-      requesterUserId: member.userId,
-    });
-    approval = 'skipped' in result ? { skipped: result.reason } : { requestId: result.requestId };
-  } catch (err) {
-    console.error('[email-to-sign] approval dispatch failed (non-fatal):', err);
   }
 
   return Response.json({
     ok: true,
-    documentId: document.id,
-    editUrl,
-    inboxItemId,
-    approval,
-    message: `Created DRAFT document "${document.title}" for ${member.user.email}.`,
+    documents: created,
+    // Anything not imported is reported rather than dropped in silence — the
+    // old handler returned a plain success while discarding extra attachments.
+    failed,
+    ignoredAttachments: payload.ignoredAttachments,
+    // Kept so existing integrations reading the single-document shape keep
+    // working; they now see the first of several rather than the only one.
+    documentId: created[0].documentId,
+    editUrl: created[0].editUrl,
+    inboxItemId: created[0].inboxItemId,
+    approval: created[0].approval,
+    message: `Created ${created.length} DRAFT document(s) for ${member.user.email}.`,
   });
 };
 

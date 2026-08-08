@@ -9,6 +9,7 @@ import { Button } from '@documenso/ui/primitives/button';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { appMetaTags } from '~/utils/meta';
+import { OrgAdminGuard } from '~/components/general/org-admin-guard';
 
 export function meta() {
   return appMetaTags('Workflows');
@@ -24,7 +25,7 @@ const triggerSummary = (wf: {
   return 'Manual';
 };
 
-export default function OrgWorkflowsPage() {
+function OrgWorkflowsPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -205,5 +206,17 @@ export default function OrgWorkflowsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Administrative screen: withheld from ordinary members. The sidebar also
+ * hides the link, but that alone would leave the URL directly reachable.
+ */
+export default function OrgWorkflowsPageRoute() {
+  return (
+    <OrgAdminGuard>
+      <OrgWorkflowsPage />
+    </OrgAdminGuard>
   );
 }

@@ -55,7 +55,8 @@ STEP TYPES (each step has "id", "type", optional "name", optional "onError"):
 - SET_VARIABLE: { "type":"SET_VARIABLE", "config": { "assignments": { "name": <jsonlogic> } }, "next"?: "<id>" }
 
 ACTIONS (the "config" of an ACTION step; allowed action values: ${WORKFLOW_ACTION_TYPES.join(', ')}):
-- SEND_EMAIL:          { "action":"SEND_EMAIL", "to": "a@b.com" | ["x","y"], "subject": "...", "html": "...", "text"?: "..." }
+- SEND_EMAIL:          { "action":"SEND_EMAIL", "to": "a@b.com" | ["x","y"], "templateKey"?: "<saved-template-key>", "subject"?: "...", "html"?: "...", "text"?: "..." }
+  (PREFER "templateKey" when the org has a saved email template that fits the request — the body is then maintained in the app instead of inlined here, and one edit updates every workflow. Only use it with a key listed under AVAILABLE EMAIL TEMPLATES below; never invent one, because an unresolvable key makes the step skip rather than send. With no suitable template, write "subject" + "html" inline as before. Setting "subject" alongside "templateKey" overrides just the heading.)
 - HTTP_REQUEST:        { "action":"HTTP_REQUEST", "method"?: "POST", "url": "https://...", "headers"?: {...}, "body"?: {...}|"...", "timeoutMs"?: n, "saveResponseAs"?: "var" }
 - NOTIFY:              { "action":"NOTIFY", "userId": "OWNER" | "<id>", "title": "...", "message": "..." }
 - SEND_FOR_SIGNATURE:  { "action":"SEND_FOR_SIGNATURE", "documentId"?: "<defaults to the event's document>", "recipients": [ { "email": "a@b.com", "name"?: "...", "role"?: "SIGNER" } ] }
@@ -236,11 +237,14 @@ export const generateWorkflowFromPrompt = async ({
   prompt,
   organizationName,
   metadataContext,
+  emailTemplateContext,
 }: {
   prompt: string;
   organizationName?: string;
   /** Summary of the org's metadata directory so lookups target real categories/keywords. */
   metadataContext?: string;
+  /** The org's saved email templates, so SEND_EMAIL steps reference real keys. */
+  emailTemplateContext?: string;
 }): Promise<GeneratedWorkflow> => {
   const providers = resolveProviders();
   if (providers.length === 0) {
@@ -253,7 +257,8 @@ export const generateWorkflowFromPrompt = async ({
   const base =
     `Create a workflow for this request:\n"${prompt}"` +
     (organizationName ? `\n\nOrganization: "${organizationName}".` : '') +
-    (metadataContext ? `\n\n${metadataContext}` : '');
+    (metadataContext ? `\n\n${metadataContext}` : '') +
+    (emailTemplateContext ? `\n\n${emailTemplateContext}` : '');
 
   let lastError: unknown;
   for (const provider of providers) {

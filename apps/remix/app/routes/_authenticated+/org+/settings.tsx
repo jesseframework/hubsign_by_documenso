@@ -11,12 +11,27 @@ import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { appMetaTags } from '~/utils/meta';
+import { OrgAdminGuard } from '~/components/general/org-admin-guard';
 
 export function meta() {
   return appMetaTags('Organization Settings');
 }
 
-export default function OrgSettingsPage() {
+/**
+ * Newline-delimited textarea → the string[] the DB stores.
+ *
+ * Blank lines are dropped deliberately: an empty pattern is a substring of every
+ * value, so one stray newline would match all inbound mail and silently switch
+ * the whole inbox off. The server-side matcher skips blanks too — this is the
+ * belt to that braces.
+ */
+const toPatternList = (value: string): string[] =>
+  value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+function OrgSettingsPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const utils = trpc.useUtils();
@@ -50,6 +65,9 @@ export default function OrgSettingsPage() {
   const [reminderMaxCount, setReminderMaxCount] = useState(3);
   const [remindersInitialized, setRemindersInitialized] = useState(false);
 
+  const [includeCertificate, setIncludeCertificate] = useState(true);
+  const [certificateInitialized, setCertificateInitialized] = useState(false);
+
   // SSO / OIDC
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [oidcClientId, setOidcClientId] = useState('');
@@ -65,6 +83,10 @@ export default function OrgSettingsPage() {
   // Per-org WorkHub signature-inbox (receive) config
   const [inboxEmail, setInboxEmail] = useState('');
   const [workhubApiKey, setWorkhubApiKey] = useState('');
+  // Kept as raw newline-delimited text while editing so a half-typed line
+  // isn't destroyed by round-tripping through an array on every keystroke.
+  const [inboxBlockedSenders, setInboxBlockedSenders] = useState('');
+  const [inboxBlockedSubjects, setInboxBlockedSubjects] = useState('');
   const [workhubUsername, setWorkhubUsername] = useState('');
   const [workhubPassword, setWorkhubPassword] = useState('');
   const [workhubMailboxId, setWorkhubMailboxId] = useState('');
@@ -178,6 +200,14 @@ export default function OrgSettingsPage() {
     setRemindersInitialized(true);
   }
 
+  if (!certificateInitialized && org) {
+    const orgRec = org as Record<string, unknown>;
+    // Default on when the column is absent, matching the server-side default —
+    // an unset value must not read as "turned off".
+    setIncludeCertificate(orgRec.includeSigningCertificate !== false);
+    setCertificateInitialized(true);
+  }
+
   if (!ssoInitialized && org) {
     const orgRec = org as Record<string, unknown>;
     setOidcEnabled(Boolean(orgRec.oidcEnabled));
@@ -194,6 +224,8 @@ export default function OrgSettingsPage() {
     setEmailToSignEnabled(Boolean(o.emailToSignEnabled));
     setInboxEmail((o.inboxEmail as string) ?? '');
     setWorkhubApiKey((o.workhubApiKey as string) ?? '');
+    setInboxBlockedSenders(((o.inboxBlockedSenders as string[]) ?? []).join('\n'));
+    setInboxBlockedSubjects(((o.inboxBlockedSubjects as string[]) ?? []).join('\n'));
     setWorkhubUsername((o.workhubUsername as string) ?? '');
     setWorkhubPassword((o.workhubPassword as string) ?? '');
     setWorkhubMailboxId((o.workhubMailboxId as string) ?? '');
@@ -677,6 +709,68 @@ export default function OrgSettingsPage() {
         </div>
       )}
 
+      {/* Signed documents — audit certificate */}
+      {isAdmin && (
+        <div className="rounded-[var(--r)] border border-border bg-card p-5">
+          <h2 className="text-[15px] font-semibold">
+            <Trans>Signed Documents</Trans>
+          </h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            <Trans>
+              Controls the Final Audit Report page appended to completed documents.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+            <div className="flex-1 pr-4">
+              <label className="text-[13px] font-medium">
+                <Trans>Attach the audit certificate to signed documents</Trans>
+              </label>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                <Trans>
+                  The certificate is the signing audit trail, so it is normally kept. Turn this
+                  off only if your documents are circulated externally and the extra page is
+                  unwanted — recipients can still download either version.
+                </Trans>
+              </p>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={includeCertificate}
+                onChange={(e) => setIncludeCertificate(e.target.checked)}
+              />
+              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+            </label>
+          </div>
+
+          {/*
+            Stated plainly because it is the one thing that surprises people: the
+            certificate is baked into the PDF when the document is sealed, so this
+            setting cannot retroactively add or remove it.
+          */}
+          <p className="mt-3 text-[12px] text-muted-foreground">
+            <Trans>
+              Applies to documents completed from now on. Documents already signed keep the
+              pages they were sealed with — use the Download menu on those to get a copy
+              without the certificate.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() =>
+                void updateOrg.mutateAsync({ includeSigningCertificate: includeCertificate })
+              }
+              loading={updateOrg.isPending}
+            >
+              <Trans>Save Document Settings</Trans>
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Sign Reminders */}
       {isAdmin && (
         <div className="rounded-[var(--r)] border border-border bg-card p-5">
@@ -1028,6 +1122,51 @@ export default function OrgSettingsPage() {
                 the Signature Inbox after OCR. The BulkSender fields are an optional fallback.
               </Trans>
             </p>
+
+            {/*
+              Loop prevention. Mail from HubSign's own address and from this org's
+              own inbox address is always refused in code — these are the extra
+              org-specific rules on top.
+            */}
+            <div className="mt-4 border-t border-border pt-4">
+              <h3 className="text-[13px] font-semibold">
+                <Trans>Inbound filtering</Trans>
+              </h3>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                <Trans>
+                  One rule per line, matched anywhere in the value and case-insensitively. Mail sent
+                  by HubSign itself, or from this org's own inbox address, is always ignored — you
+                  don't need to list those.
+                </Trans>
+              </p>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Blocked senders</Trans>
+                  </label>
+                  <textarea
+                    className="mt-1 block h-24 w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] outline-none focus:border-primary"
+                    value={inboxBlockedSenders}
+                    onChange={(e) => setInboxBlockedSenders(e.target.value)}
+                    placeholder={'no-reply@\nnotifications@'}
+                    spellCheck={false}
+                  />
+                </div>
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Blocked subjects</Trans>
+                  </label>
+                  <textarea
+                    className="mt-1 block h-24 w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] outline-none focus:border-primary"
+                    value={inboxBlockedSubjects}
+                    onChange={(e) => setInboxBlockedSubjects(e.target.value)}
+                    placeholder={'Signing Complete\nOut of office'}
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mt-4 flex justify-end">
@@ -1041,6 +1180,8 @@ export default function OrgSettingsPage() {
                   workhubPassword: workhubPassword || null,
                   workhubMailboxId: workhubMailboxId || null,
                   workhubApiBase: workhubApiBase || null,
+                  inboxBlockedSenders: toPatternList(inboxBlockedSenders),
+                  inboxBlockedSubjects: toPatternList(inboxBlockedSubjects),
                 })
               }
               loading={updateOrg.isPending}
@@ -1156,5 +1297,21 @@ export default function OrgSettingsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Administrative screen: withheld from ordinary MEMBERS of an organization.
+ *
+ * `allowWithoutOrg` is deliberate — this page is also where an organization is
+ * created, and the page renders its own "Create Organization" form when the
+ * viewer has no membership. Guarding that away meant you had to already be an
+ * admin to reach the form that would have made you one.
+ */
+export default function OrgSettingsPageRoute() {
+  return (
+    <OrgAdminGuard allowWithoutOrg>
+      <OrgSettingsPage />
+    </OrgAdminGuard>
   );
 }

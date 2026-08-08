@@ -21,6 +21,7 @@ import { PDFViewer } from '@documenso/ui/primitives/pdf-viewer';
 
 import { DocumentHistorySheet } from '~/components/general/document/document-history-sheet';
 import { DocumentPageViewButton } from '~/components/general/document/document-page-view-button';
+import { DocumentSupportingFiles } from '~/components/general/document/document-supporting-files';
 import { DocumentPageViewDropdown } from '~/components/general/document/document-page-view-dropdown';
 import { DocumentPageViewInformation } from '~/components/general/document/document-page-view-information';
 import { DocumentPageViewRecentActivity } from '~/components/general/document/document-page-view-recent-activity';
@@ -254,6 +255,9 @@ export default function DocumentPage() {
               <div className="mt-4 border-t px-4 pt-4">
                 <DocumentPageViewButton document={document} />
               </div>
+
+              {/* Signer attachments, downloadable individually. */}
+              <DocumentSupportingFiles documentId={document.id} />
             </section>
 
             {/* Document information section. */}

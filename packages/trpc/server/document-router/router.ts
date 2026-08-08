@@ -1,6 +1,7 @@
 import { DocumentDataType } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import { DateTime } from 'luxon';
+import { z } from 'zod';
 
 import { getServerLimits } from '@documenso/ee/server-only/limits/server';
 import { NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
@@ -14,7 +15,10 @@ import { deleteDocument } from '@documenso/lib/server-only/document/delete-docum
 import { duplicateDocument } from '@documenso/lib/server-only/document/duplicate-document-by-id';
 import { findDocumentAuditLogs } from '@documenso/lib/server-only/document/find-document-audit-logs';
 import { findDocuments } from '@documenso/lib/server-only/document/find-documents';
-import { getDocumentById } from '@documenso/lib/server-only/document/get-document-by-id';
+import {
+  getDocumentById,
+  getDocumentWhereInput,
+} from '@documenso/lib/server-only/document/get-document-by-id';
 import { getDocumentAndSenderByToken } from '@documenso/lib/server-only/document/get-document-by-token';
 import { getDocumentWithDetailsById } from '@documenso/lib/server-only/document/get-document-with-details-by-id';
 import type { GetStatsInput } from '@documenso/lib/server-only/document/get-stats';
@@ -26,6 +30,7 @@ import { sendDocument } from '@documenso/lib/server-only/document/send-document'
 import { getTeamById } from '@documenso/lib/server-only/team/get-team';
 import { getPresignPostUrl } from '@documenso/lib/universal/upload/server-actions';
 import { isDocumentCompleted } from '@documenso/lib/utils/document';
+import { prisma } from '@documenso/prisma';
 
 import { authenticatedProcedure, procedure, router } from '../trpc';
 import {
@@ -204,6 +209,42 @@ export const documentRouter = router({
         ...documents,
         stats,
       };
+    }),
+
+  /**
+   * Supporting files attached to a document — by signers while signing, or by an
+   * owner directly. Metadata only; the bytes come from
+   * `GET /api/files/supporting/:id`, which re-checks access itself.
+   */
+  listSupportingFiles: authenticatedProcedure
+    .input(z.object({ documentId: z.number() }))
+    .query(async ({ input, ctx }) => {
+      // Gated by the document's own access rule rather than a second one of its
+      // own, so attachments are never visible more widely than their document.
+      const where = await getDocumentWhereInput({
+        documentId: input.documentId,
+        userId: ctx.user.id,
+        teamId: ctx.teamId ?? undefined,
+      });
+
+      const document = await prisma.document.findFirst({ where, select: { id: true } });
+
+      if (!document) {
+        throw new AppError(AppErrorCode.NOT_FOUND, { message: 'Document not found' });
+      }
+
+      return prisma.documentSupportingFile.findMany({
+        where: { documentId: input.documentId },
+        select: {
+          id: true,
+          fileName: true,
+          contentType: true,
+          sizeBytes: true,
+          createdAt: true,
+          recipient: { select: { name: true, email: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
     }),
 
   /**

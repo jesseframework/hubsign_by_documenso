@@ -8,7 +8,7 @@ import { Link, useParams } from 'react-router';
 
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
-import { Input } from '@documenso/ui/primitives/input';
+import { RecipientEmailAutocomplete } from '@documenso/ui/primitives/recipient-email-autocomplete';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { useInboxEvents } from '~/hooks/use-inbox-events';
@@ -414,20 +414,47 @@ export default function InboxItemPage() {
               <div className="space-y-2">
                 {rows.map((row, i) => (
                   <div key={i} className="flex gap-2">
-                    <Input
-                      className="h-8 flex-1 text-[13px]"
+                    {/*
+                      Both halves search the same org directory, so a signer can
+                      be found by whichever identifier the sender happens to
+                      know. Picking a member from either side fills the whole
+                      row, and typing a non-member still works — these stay free
+                      text so external signers are not locked out.
+                    */}
+                    <RecipientEmailAutocomplete
+                      field="name"
+                      className="flex-1"
+                      inputClassName="h-8 text-[13px]"
                       placeholder="Name"
                       value={row.name}
-                      onChange={(e) =>
-                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, name: e.target.value } : r)))
+                      onChange={(value) =>
+                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, name: value } : r)))
+                      }
+                      onSelectMember={(m) =>
+                        setRows((prev) =>
+                          prev.map((r, idx) =>
+                            idx === i ? { ...r, name: m.name || m.email, email: m.email } : r,
+                          ),
+                        )
                       }
                     />
-                    <Input
-                      className="h-8 flex-1 text-[13px]"
+                    <RecipientEmailAutocomplete
+                      className="flex-1"
+                      inputClassName="h-8 text-[13px]"
                       placeholder="email@company.com"
                       value={row.email}
-                      onChange={(e) =>
-                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, email: e.target.value } : r)))
+                      onChange={(value) =>
+                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, email: value } : r)))
+                      }
+                      onSelectMember={(m) =>
+                        setRows((prev) =>
+                          prev.map((r, idx) =>
+                            // Don't clobber a name the sender already typed.
+                            idx === i
+                              ? { ...r, email: m.email, name: r.name || m.name || '' }
+                              : r,
+                          ),
+                        )
                       }
                     />
                     {rows.length > 1 && (

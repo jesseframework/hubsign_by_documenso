@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 
+import { Theme, useTheme } from 'remix-themes';
+
 import { trpc } from '@documenso/trpc/react';
 
 /**
@@ -17,7 +19,9 @@ import { trpc } from '@documenso/trpc/react';
  */
 export const OrgBrandingProvider = () => {
   const { data: orgMembership } = trpc.org.getMyOrganization.useQuery();
+  const [theme] = useTheme();
   const brand = orgMembership?.organization;
+  const isDark = theme === Theme.DARK;
 
   useEffect(() => {
     const root = document.documentElement;
@@ -32,11 +36,26 @@ export const OrgBrandingProvider = () => {
       [brand?.brandingButtonColor ?? brand?.brandingPrimaryColor, '--ring'],
       // Accent for hover backgrounds, secondary CTAs.
       [brand?.brandingAccentColor, '--accent'],
+      // Data-visualisation marks. Deliberately sourced from the *brand* colour
+      // rather than the button colour: `--primary` above prefers
+      // `brandingButtonColor`, so an org whose buttons are purple but whose
+      // brand is blue would otherwise get purple charts. Charts should read the
+      // brand, so they get their own variable.
+      [brand?.brandingPrimaryColor ?? brand?.brandingButtonColor, '--brand-chart'],
     ];
 
     const applied: string[] = [];
     for (const [hex, varName] of map) {
-      const hsl = hex ? hexToHslString(hex) : null;
+      let hsl = hex ? hexToHslString(hex) : null;
+
+      // Chart marks sit on the dark card surface in dark mode, where a deeply
+      // saturated brand (e.g. #0433ff at 51% lightness) nearly disappears. Lift
+      // the lightness into a legible band, keeping hue and saturation intact —
+      // the brand is still the brand, stepped for the surface it's drawn on.
+      if (hsl && varName === '--brand-chart' && isDark) {
+        hsl = raiseLightness(hsl, 62);
+      }
+
       if (hsl) {
         root.style.setProperty(varName, hsl);
         applied.push(varName);
@@ -52,10 +71,25 @@ export const OrgBrandingProvider = () => {
     brand?.brandingButtonColor,
     brand?.brandingButtonTextColor,
     brand?.brandingAccentColor,
+    isDark,
   ]);
 
   return null;
 };
+
+/**
+ * Raise an "H S% L%" string to at least `minL` lightness, leaving hue and
+ * saturation untouched. Returns the input unchanged if it's already light
+ * enough or doesn't parse.
+ */
+function raiseLightness(hsl: string, minL: number): string {
+  const parts = hsl.match(/^([\d.]+) ([\d.]+)% ([\d.]+)%$/);
+  if (!parts) return hsl;
+
+  const l = Number(parts[3]);
+
+  return l >= minL ? hsl : `${parts[1]} ${parts[2]}% ${minL}%`;
+}
 
 /**
  * Convert "#7c5cfc" → "262 96% 68%" (the format Tailwind's

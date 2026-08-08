@@ -16,15 +16,26 @@ export type RecipientEmailAutocompleteProps = {
   placeholder?: string;
   disabled?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  /** Applied to the positioning wrapper (use for width/flex). */
   className?: string;
+  /** Applied to the inner input (use for height/typography). */
+  inputClassName?: string;
+  /**
+   * Which half of the signer row this input drives. `org.searchMembers` matches
+   * the typed text against both name and email either way — this only decides
+   * what gets written back into *this* input when a suggestion is picked, and
+   * which value counts as "already filled" for the exact-match filter.
+   * Defaults to 'email' so existing call sites keep their behaviour.
+   */
+  field?: 'email' | 'name';
 };
 
 /**
- * Email input with org-member autocomplete.
+ * Signer input with org-member autocomplete.
  * - Shows suggestions only when the current user belongs to an organization.
- * - Falls back to a plain email input for personal accounts (no popover).
- * - Picking a suggestion fills the email and also calls `onSelectMember`
- *   so the parent can fill the name field.
+ * - Falls back to a plain input for personal accounts (no popover).
+ * - Picking a suggestion fills this field and also calls `onSelectMember`
+ *   so the parent can fill the other half of the row.
  */
 export const RecipientEmailAutocomplete = ({
   value,
@@ -34,6 +45,8 @@ export const RecipientEmailAutocomplete = ({
   disabled,
   onKeyDown,
   className,
+  inputClassName,
+  field = 'email',
 }: RecipientEmailAutocompleteProps) => {
   const [open, setOpen] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(0);
@@ -49,10 +62,16 @@ export const RecipientEmailAutocomplete = ({
     },
   );
 
-  // Filter out the email already typed exactly (already filled).
-  const filtered = suggestions.filter(
-    (s) => s.email.toLowerCase() !== value.trim().toLowerCase(),
-  );
+  // In email mode, drop the suggestion that exactly matches what's typed: email
+  // is unique, so once it's filled there is nothing left to pick.
+  //
+  // Names are NOT unique — this org has two distinct members both called "Test
+  // User" — so filtering by an exact name match would hide every candidate at
+  // the moment the user most needs to choose between them. Name mode keeps the
+  // full list and lets the secondary email line disambiguate.
+  const typed = value.trim().toLowerCase();
+  const filtered =
+    field === 'name' ? suggestions : suggestions.filter((s) => s.email.toLowerCase() !== typed);
 
   // Close on outside click.
   useEffect(() => {
@@ -66,7 +85,9 @@ export const RecipientEmailAutocomplete = ({
   }, []);
 
   const pick = (s: { id: number; name: string | null; email: string }) => {
-    onChange(s.email);
+    // A member with no name on file still has to put something in a name field,
+    // so fall back to the email rather than blanking what the user typed.
+    onChange(field === 'name' ? s.name || s.email : s.email);
     onSelectMember?.(s);
     setOpen(false);
   };
@@ -102,7 +123,8 @@ export const RecipientEmailAutocomplete = ({
   return (
     <div ref={wrapRef} className={cn('relative', className)}>
       <Input
-        type="email"
+        type={field === 'name' ? 'text' : 'email'}
+        className={inputClassName}
         placeholder={placeholder}
         value={value}
         onChange={(e) => {

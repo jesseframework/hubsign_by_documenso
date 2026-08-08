@@ -10,6 +10,8 @@ export type CardMetricProps = {
   subtitle?: string;
   accentColor?: string;
   iconBg?: string;
+  /** Explicit chip colour, for brand-driven tints that can't be a static class. */
+  iconBgColor?: string;
   className?: string;
   /** When set, the card becomes a link that navigates to this URL on click. */
   href?: string;
@@ -24,6 +26,7 @@ export const CardMetric = ({
   subtitle,
   accentColor,
   iconBg,
+  iconBgColor,
   className,
   href,
   isActive,
@@ -54,8 +57,9 @@ export const CardMetric = ({
         <div
           className={cn(
             'absolute right-3 top-3 hidden h-7 w-7 items-center justify-center rounded-[7px] sm:flex',
-            iconBg || 'bg-primary/10',
+            !iconBgColor && (iconBg || 'bg-primary/10'),
           )}
+          style={iconBgColor ? { background: iconBgColor } : undefined}
         >
           <Icon className="h-3.5 w-3.5" style={{ color: accentColor }} />
         </div>

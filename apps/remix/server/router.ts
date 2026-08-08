@@ -5,6 +5,8 @@ import { tsRestHonoApp } from '@documenso/api/hono';
 import { auth } from '@documenso/auth/server';
 import { API_V2_BETA_URL } from '@documenso/lib/constants/app';
 import { jobsClient } from '@documenso/lib/jobs/client';
+import { SCHEDULED_JOBS } from '@documenso/lib/server-only/scheduler/jobs';
+import { startScheduler } from '@documenso/lib/server-only/scheduler/scheduler';
 import { openApiDocument } from '@documenso/trpc/server/open-api';
 
 import { externalSignupRoute } from './api/external-signup';
@@ -50,5 +52,18 @@ app.use('/api/trpc/*', reactRouterTrpcServer);
 // Unstable API server routes. Order matters for these two.
 app.get(`${API_V2_BETA_URL}/openapi.json`, (c) => c.json(openApiDocument));
 app.use(`${API_V2_BETA_URL}/*`, async (c) => openApiTrpcServerHandler(c));
+
+/**
+ * Recurring work (inbox polling, scheduled workflows, reminders).
+ *
+ * Runs here rather than relying on an external scheduler hitting `/api/cron/*`:
+ * nothing ever called those endpoints, so every one of these features was
+ * silently doing nothing in production. A Postgres advisory lock keeps each job
+ * to one execution per interval no matter how many instances are running.
+ *
+ * Opt out with NEXT_PRIVATE_DISABLE_SCHEDULER=true if you'd rather drive the
+ * endpoints from your own scheduler.
+ */
+startScheduler(SCHEDULED_JOBS);
 
 export default app;

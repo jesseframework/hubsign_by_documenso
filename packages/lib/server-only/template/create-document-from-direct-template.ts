@@ -52,6 +52,7 @@ import { formatDocumentsPath } from '../../utils/teams';
 import { sendDocument } from '../document/send-document';
 import { validateFieldAuth } from '../document/validate-field-auth';
 import { triggerWebhook } from '../webhooks/trigger/trigger-webhook';
+import { resolveOrganizationId } from '../workflow/resolve-organization-id';
 
 export type CreateDocumentFromDirectTemplateOptions = {
   directRecipientName?: string;
@@ -264,6 +265,14 @@ export const createDocumentFromDirectTemplate = async ({
 
   const initialRequestTime = new Date();
 
+  // Stamp the owning org at creation. The document belongs to the template's
+  // owner, not to the (unauthenticated) direct-link signer, so resolve from
+  // the template's team/owner.
+  const organizationId = await resolveOrganizationId({
+    teamId: template.teamId,
+    userId: template.userId,
+  });
+
   const { documentId, recipientId, token } = await prisma.$transaction(async (tx) => {
     const documentData = await tx.documentData.create({
       data: {
@@ -281,6 +290,7 @@ export const createDocumentFromDirectTemplate = async ({
         templateId: template.id,
         userId: template.userId,
         teamId: template.teamId,
+        organizationId,
         title: template.title,
         createdAt: initialRequestTime,
         status: DocumentStatus.PENDING,

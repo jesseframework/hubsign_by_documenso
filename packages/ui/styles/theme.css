@@ -45,6 +45,10 @@
     --primary: 254 97% 67%;
     --primary-foreground: 0 0% 100%;
 
+    /* Chart series hue. Overridden per-org from `brandingPrimaryColor` by
+       OrgBrandingProvider; this is the fallback for orgs with no branding. */
+    --brand-chart: 254 97% 67%;
+
     /* ── Secondary ── */
     --secondary: 252 14% 96%;
     --secondary-foreground: 252 60% 9%;
@@ -158,6 +162,9 @@
     /* ── Primary ── */
     --primary: 254 97% 70%;
     --primary-foreground: 0 0% 100%;
+
+    /* See the light-mode note; same fallback, stepped for the dark surface. */
+    --brand-chart: 254 97% 70%;
 
     /* ── Secondary ── */
     --secondary: 240 14% 16%;

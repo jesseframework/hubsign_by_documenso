@@ -28,6 +28,7 @@ import {
 import { Link } from 'react-router';
 
 import { INBOUND_EMAIL_DOMAIN } from '@documenso/lib/constants/app';
+import { ocrFieldNames, ocrSearchText } from '@documenso/lib/utils/ocr-fields';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import {
@@ -150,6 +151,10 @@ const ocrBadge = (status: string): string => {
       return 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300';
     case 'COMPLETED':
       return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300';
+    // Terminal but unsuccessful — must not inherit the amber "in progress"
+    // default, which would read as still-pending.
+    case 'REJECTED':
+      return 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300';
     case 'ARCHIVED':
       return 'bg-muted text-muted-foreground';
     default:
@@ -169,7 +174,17 @@ const fieldStr = (item: { extractedData?: unknown }, keys: string[]): string => 
 
 /** Best-effort numeric amount from the OCR fields (currency-agnostic). */
 const amountOf = (item: { extractedData?: unknown }): number | null => {
-  const raw = fieldStr(item, ['total_amount', 'invoice_amount', 'totalAmount', 'amount', 'subtotal']);
+  // Wider than OCR_FIELD_ALIASES on purpose: this drives the high/low amount
+  // filter, where an approximate figure beats none. `subtotal` is a last resort
+  // and must never be treated as a synonym for the total elsewhere.
+  const raw = fieldStr(item, [
+    ...ocrFieldNames('total_amount'),
+    'invoice_amount',
+    'totalAmount',
+    'amount',
+    'grand_total',
+    'subtotal',
+  ]);
   if (!raw) return null;
   const n = Number(raw.replace(/[^0-9.\-]/g, ''));
   return Number.isFinite(n) ? n : null;
@@ -199,14 +214,18 @@ const fmtMoney = (currency: string, raw: string): string => {
 const invoiceFields = (item: { extractedData?: unknown }) => ({
   invoiceNumber: fieldStr(item, ['invoice_number', 'invoiceNumber', 'invoice_no']),
   poNumber: fieldStr(item, ['po_number', 'purchase_order', 'poNumber']),
-  vendorName: fieldStr(item, ['vendor_name', 'vendorName', 'vendor', 'supplier', 'supplier_name']),
-  vendorEmail: fieldStr(item, ['vendor_email', 'vendorEmail', 'email']),
+  // `ocrFieldNames` supplies the extractor's real synonyms (e.g. merchant_name),
+  // which is why this column used to be blank for half the queue; the extra
+  // entries after it are display-only guesses that cost nothing to try.
+  vendorName: fieldStr(item, [...ocrFieldNames('vendor_name'), 'vendor_display_name']),
+  vendorEmail: fieldStr(item, ['vendor_email', 'vendorEmail', 'email', 'merchant_contact']),
   currency: fieldStr(item, ['currency', 'currency_code', 'ccy']),
-  total: fieldStr(item, ['total_amount', 'invoice_amount', 'total', 'grand_total']),
-  tax: fieldStr(item, ['tax_amount', 'tax', 'vat']),
+  total: fieldStr(item, [...ocrFieldNames('total_amount'), 'invoice_amount', 'grand_total']),
+  tax: fieldStr(item, [...ocrFieldNames('tax_amount'), 'vat']),
   net: fieldStr(item, ['subtotal', 'net_amount', 'net']),
   invoiceDate: fieldStr(item, ['invoice_date', 'date', 'issue_date']),
-  dueDate: fieldStr(item, ['due_date', 'payment_due']),
+  dueDate: fieldStr(item, [...ocrFieldNames('due_date'), 'payment_due']),
+  customerName: fieldStr(item, ocrFieldNames('customer_name')),
 });
 
 const STATUS_FILTERS = [
@@ -215,6 +234,7 @@ const STATUS_FILTERS = [
   { key: 'SENT_FOR_SIGNATURE', label: 'Sent to sign', icon: SendIcon },
   { key: 'OCR_FAILED', label: 'OCR failed', icon: XCircleIcon },
   { key: 'COMPLETED', label: 'Completed', icon: CheckCheckIcon },
+  { key: 'REJECTED', label: 'Rejected', icon: XCircleIcon },
   { key: 'ARCHIVED', label: 'Archived', icon: ArchiveIcon },
 ] as const;
 
@@ -288,14 +308,11 @@ export default function SignatureInboxPage() {
     const now = Date.now();
     return items.filter((it) => {
       if (q) {
-        const hay = [
-          it.document.title,
-          it.senderEmail ?? '',
-          fieldStr(it, ['vendor_name']),
-          fieldStr(it, ['invoice_number']),
-          fieldStr(it, ['po_number']),
-          fieldStr(it, ['total_amount', 'amount']),
-        ]
+        // Every extracted value, not a fixed set of field names. The previous
+        // four-name list missed anything the extractor spelled differently —
+        // a vendor stored as `merchant_name` was unfindable — and excluded
+        // line items, addresses and reference numbers entirely.
+        const hay = [it.document.title, it.senderEmail ?? '', ocrSearchText(it.extractedData)]
           .join(' ')
           .toLowerCase();
         if (!hay.includes(q)) return false;

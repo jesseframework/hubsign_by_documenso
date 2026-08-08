@@ -30,6 +30,7 @@ import { putPdfFileServerSide } from '../../../universal/upload/put-file.server'
 import { fieldsContainUnsignedRequiredField } from '../../../utils/advanced-fields-helpers';
 import { isDocumentCompleted } from '../../../utils/document';
 import { createDocumentAuditLogData } from '../../../utils/document-audit-logs';
+import { shouldIncludeSigningCertificate } from '../../../utils/signing-certificate';
 import type { JobRunIO } from '../../client/_internal/job';
 import type { TSealDocumentJobDefinition } from './seal-document';
 
@@ -56,6 +57,14 @@ export const run = async ({
               includeSigningCertificate: true,
             },
           },
+        },
+      },
+      // Org-level fallback: documents in this deployment belong to an
+      // organization and carry no teamId, so the team setting alone was
+      // unreachable and the certificate could never be turned off.
+      organization: {
+        select: {
+          includeSigningCertificate: true,
         },
       },
     },
@@ -147,26 +156,42 @@ export const run = async ({
 
   const pdfData = await getFileServerSide(documentData);
 
-  const certificateData =
-    (document.team?.teamGlobalSettings?.includeSigningCertificate ?? true)
-      ? await getCertificatePdf({
-          documentId,
-          language: document.documentMeta?.language,
-          // Tell the renderer the seal's terminal state so the audit page
-          // shows "Completed" / "Rejected" instead of the live "Pending".
-          completionStatus: isRejected ? 'REJECTED' : 'COMPLETED',
-        }).catch((err) => {
-          // Don't abort the seal — but make this loud so we don't keep
-          // silently shipping certificate-less PDFs to production. Most
-          // common cause: Chromium / Playwright not installed in the
-          // production image (dev images already have it from npm install).
-          console.error(
-            '[seal-document.handler] Failed to render audit certificate. Document will be sealed without it.',
-            err,
-          );
-          return null;
-        })
-      : null;
+  const certificateData = shouldIncludeSigningCertificate({
+    teamSetting: document.team?.teamGlobalSettings?.includeSigningCertificate,
+    organizationSetting: document.organization?.includeSigningCertificate,
+  })
+    ? await getCertificatePdf({
+        documentId,
+        language: document.documentMeta?.language,
+        // Tell the renderer the seal's terminal state so the audit page
+        // shows "Completed" / "Rejected" instead of the live "Pending".
+        completionStatus: isRejected ? 'REJECTED' : 'COMPLETED',
+      }).catch((err) => {
+        // Don't abort the seal — but make this loud so we don't keep
+        // silently shipping certificate-less PDFs to production. Most
+        // common cause: Chromium / Playwright not installed in the
+        // production image (dev images already have it from npm install).
+        console.error(
+          '[seal-document.handler] Failed to render audit certificate. Document will be sealed without it.',
+          err,
+        );
+        return null;
+      })
+    : null;
+
+  /**
+   * How many trailing pages of the sealed PDF are the audit certificate, so the
+   * client can offer "Download without audit certificate" by slicing them off.
+   *
+   * Computed here rather than inside the task below on purpose. `io.runTask`
+   * caches its result and is skipped when a job resumes, so a value assigned
+   * inside the closure would silently be 0 on any resumed run — the sealed PDF
+   * would carry certificate pages that nothing knew about. This is derived from
+   * `certificateData`, which is re-fetched on every run.
+   */
+  const certificatePageCount = certificateData
+    ? (await PDFDocument.load(certificateData)).getPageCount()
+    : 0;
 
   const newDataId = await io.runTask('decorate-and-sign-pdf', async () => {
     const pdfDoc = await PDFDocument.load(pdfData);
@@ -277,6 +302,7 @@ export const run = async ({
         data: {
           status: isRejected ? DocumentStatus.REJECTED : DocumentStatus.COMPLETED,
           completedAt: new Date(),
+          certificatePageCount,
           // If a PDF lock password was held during signing, clear it now so the
           // system no longer holds it, and mark the PDF as locked.
           ...(document.pdfPassword && !isRejected

@@ -4,10 +4,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Trans } from '@lingui/react/macro';
 import type { Field } from '@prisma/client';
 import { RecipientRole } from '@prisma/client';
+import { AlertTriangleIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { match } from 'ts-pattern';
 import { z } from 'zod';
 
+import { AppError } from '@documenso/lib/errors/app-error';
 import { fieldsContainUnsignedRequiredField } from '@documenso/lib/utils/advanced-fields-helpers';
 import { Button } from '@documenso/ui/primitives/button';
 import {
@@ -65,6 +67,17 @@ export const DocumentSigningCompleteDialog = ({
   const [showDialog, setShowDialog] = useState(false);
   const [isEditingNextSigner, setIsEditingNextSigner] = useState(false);
 
+  /**
+   * Why the last attempt was refused, shown in the dialog.
+   *
+   * A refusal here is usually something the signer can act on — an organization's
+   * business rule ("this invoice has no valid PO number"), a failed
+   * reauthentication — so it belongs next to the button they just pressed. This
+   * used to be console.error only, which left the dialog sitting open with no
+   * explanation and looked to the signer like the button was broken.
+   */
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+
   const form = useForm<TNextSignerFormSchema>({
     resolver: allowDictateNextSigner ? zodResolver(ZNextSignerFormSchema) : undefined,
     defaultValues: {
@@ -88,12 +101,13 @@ export const DocumentSigningCompleteDialog = ({
     }
 
     setIsEditingNextSigner(false);
+    setSubmissionError(null);
     setShowDialog(open);
   };
 
   const onFormSubmit = async (data: TNextSignerFormSchema) => {
-    console.log('data', data);
-    console.log('form.formState.errors', form.formState.errors);
+    setSubmissionError(null);
+
     try {
       if (allowDictateNextSigner && data.name && data.email) {
         await onSignatureComplete({ name: data.name, email: data.email });
@@ -102,6 +116,17 @@ export const DocumentSigningCompleteDialog = ({
       }
     } catch (error) {
       console.error('Error completing signature:', error);
+
+      // `userMessage` is the text intended for display; `message` is the internal
+      // one. Falling back through both beats showing nothing, but a bare generic
+      // line is used rather than leaking an unexpected internal error verbatim.
+      const parsed = AppError.parseError(error);
+
+      setSubmissionError(
+        parsed.userMessage ||
+          parsed.message ||
+          'Something went wrong and the document was not completed. Please try again.',
+      );
     }
   };
 
@@ -276,6 +301,16 @@ export const DocumentSigningCompleteDialog = ({
               )}
 
               <DocumentSigningDisclosure className="mt-4" />
+
+              {submissionError && (
+                <div
+                  role="alert"
+                  className="border-destructive/30 bg-destructive/10 mt-4 flex gap-2 rounded-md border p-3"
+                >
+                  <AlertTriangleIcon className="text-destructive mt-0.5 h-4 w-4 flex-shrink-0" />
+                  <p className="text-destructive text-sm">{submissionError}</p>
+                </div>
+              )}
 
               <DialogFooter className="mt-4">
                 <div className="flex w-full flex-1 flex-nowrap gap-4">

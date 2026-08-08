@@ -13,6 +13,7 @@ import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { appMetaTags } from '~/utils/meta';
+import { OrgAdminGuard } from '~/components/general/org-admin-guard';
 
 export function meta() {
   return appMetaTags('Edit Workflow');
@@ -99,7 +100,7 @@ const snippetFor = (id: string, kind: string): Record<string, unknown> => {
   }
 };
 
-export default function WorkflowEditorPage() {
+function WorkflowEditorPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -624,5 +625,17 @@ export default function WorkflowEditorPage() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Administrative screen: withheld from ordinary members. The sidebar also
+ * hides the link, but that alone would leave the URL directly reachable.
+ */
+export default function WorkflowEditorPageRoute() {
+  return (
+    <OrgAdminGuard>
+      <WorkflowEditorPage />
+    </OrgAdminGuard>
   );
 }

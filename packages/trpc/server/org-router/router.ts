@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { msg } from '@lingui/core/macro';
 import { SubscriptionStatus } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
+import { DateTime } from 'luxon';
 import { z } from 'zod';
 
 import { getOrCreateOrgPrice } from '@documenso/ee/server-only/stripe/get-or-create-org-price';
@@ -13,6 +14,8 @@ import {
   resolveOrgPlanNameAndPrice,
 } from '@documenso/ee/server-only/stripe/webhook/resolve-org-plan-price';
 import { IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
+import { normalizeClaimableDomains } from '@documenso/lib/constants/public-email-domains';
+import { PUBLIC_EMAIL_DOMAINS } from '@documenso/lib/constants/public-email-domains';
 import { getI18nInstance } from '@documenso/lib/client-only/providers/i18n-server';
 import {
   ORG_DMS_ADDON_PRICE_CENTS,
@@ -90,6 +93,103 @@ const resolveActivePersonalPlan = async (userId: number) => {
 
   return null;
 };
+
+/**
+ * Puts a member onto a purchased seat: capacity check, personal-plan takeover,
+ * counter increment, tier + DMS entitlement.
+ *
+ * Extracted so `assignSeat` and `convertDomainCandidate` cannot drift. The
+ * personal-plan cancellation especially must not be duplicated — a second copy
+ * that forgot it would leave a converted user double-billed (their own
+ * subscription plus the org's seat).
+ */
+const assignSeatToMember = async ({
+  organizationId,
+  memberId,
+  tier,
+  acknowledgeCancelPersonalPlan,
+}: {
+  organizationId: number;
+  memberId: string;
+  tier: 'BUSINESS' | 'ENTERPRISE';
+  acknowledgeCancelPersonalPlan?: boolean;
+}) => {
+  const seatPlan = await prisma.orgSeatPlan.findFirst({
+    where: { organizationId, tier },
+  });
+
+  if (!seatPlan) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'No seats purchased for this tier. Purchase seats first.',
+    });
+  }
+
+  const targetMember = await prisma.organizationMember.findUniqueOrThrow({
+    where: { id: memberId },
+  });
+
+  // A member holds exactly one tier at a time (same as M365 licensing: a user
+  // has one SKU even if the tenant offers several), so this is a no-op rather
+  // than stacking a second tier. Switching tiers means unassign-then-assign.
+  if (targetMember.seatTier) {
+    return targetMember;
+  }
+
+  // Re-checked server-side regardless of whether the client already called
+  // `getMemberBillingConflict` — this is the actual enforcement point.
+  const activePlan = await resolveActivePersonalPlan(targetMember.userId);
+
+  if (activePlan && !acknowledgeCancelPersonalPlan) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'This member has an active personal subscription that will be cancelled.',
+    });
+  }
+
+  if (activePlan) {
+    try {
+      // Cancel immediately with proration — unused time lands as a Stripe
+      // account-balance credit (applied to future invoices), not a card refund.
+      // Same pattern as `transfer-team-subscription.ts`.
+      const canceledSubscription = await stripe.subscriptions.cancel(
+        activePlan.subscription.planId,
+        { invoice_now: true, prorate: true },
+      );
+
+      // Sync locally immediately rather than waiting on the webhook (mirrors
+      // `update-subscription-plan.ts`); the webhook fires later and no-ops.
+      await onSubscriptionDeleted({ subscription: canceledSubscription });
+    } catch (err) {
+      // `resolveActivePersonalPlan` re-verifies against Stripe, but Stripe can
+      // still reject the cancel (e.g. cancelled in between). Either way the
+      // goal — not double-billing — already holds, so don't block the seat.
+      console.warn('Failed to cancel personal subscription during seat assignment:', err);
+    }
+  }
+
+  if (seatPlan.assigned >= seatPlan.quantity) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'All seats are assigned. Purchase more seats.',
+    });
+  }
+
+  await prisma.orgSeatPlan.update({
+    where: { id: seatPlan.id },
+    data: { assigned: { increment: 1 } },
+  });
+
+  return prisma.organizationMember.update({
+    where: { id: memberId },
+    data: {
+      seatTier: seatPlan.tier,
+      // Derived from the org's purchased plan, never client input.
+      dmsAddon: seatPlan.tier === 'ENTERPRISE' ? true : seatPlan.dmsEnabled,
+    },
+  });
+};
+
 
 // ── Org Billing Helpers ──
 
@@ -201,6 +301,10 @@ export const orgRouter = router({
     .query(async ({ ctx, input }) => {
       const myMembership = await prisma.organizationMember.findFirst({
         where: { userId: ctx.user.id },
+        // A user can belong to several orgs, and an unordered findFirst leaves
+        // the choice to Postgres heap order — a plain row UPDATE elsewhere can
+        // flip which directory this searches. Match `resolveOrganizationId`.
+        orderBy: { joinedAt: 'asc' },
       });
 
       if (!myMembership) return [];
@@ -239,6 +343,10 @@ export const orgRouter = router({
   getMyOrganization: authenticatedProcedure.query(async ({ ctx }) => {
     const membership = await prisma.organizationMember.findFirst({
       where: { userId: ctx.user.id },
+      // Must agree with every other org resolution (`getDashboardStats`,
+      // `searchMembers`, `resolveOrganizationId`) — otherwise the header can
+      // name one organization while the numbers below describe another.
+      orderBy: { joinedAt: 'asc' },
       include: {
         organization: {
           include: {
@@ -278,6 +386,8 @@ export const orgRouter = router({
       ocrAutoProcess: z.boolean().optional(),
       ocrDefaultEngine: z.string().nullable().optional(),
       defaultConfidentiality: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']).optional(),
+      // Applied at seal time, so it only affects documents completed afterwards.
+      includeSigningCertificate: z.boolean().optional(),
       allowedEmailDomains: z.array(z.string().min(1).max(253)).optional(),
       signReminderEnabled: z.boolean().optional(),
       signReminderDays: z.number().int().min(1).max(60).optional(),
@@ -304,6 +414,10 @@ export const orgRouter = router({
       workhubPassword: z.string().nullable().optional(),
       workhubMailboxId: z.string().nullable().optional(),
       workhubApiBase: z.string().nullable().optional(),
+      // Inbound filter rules. Entries are trimmed and blanks dropped server-side
+      // too — a blank pattern matches every value and would disable the inbox.
+      inboxBlockedSenders: z.array(z.string().max(320)).max(200).optional(),
+      inboxBlockedSubjects: z.array(z.string().max(500)).max(200).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const membership = await prisma.organizationMember.findFirst({
@@ -314,9 +428,23 @@ export const orgRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN', message: 'Only Org Admins can update the organization' });
       }
 
+      // Normalise the filter lists here rather than trusting the client: a blank
+      // pattern is a substring of everything, so one stray empty entry would
+      // block all inbound mail.
+      const sanitize = (list?: string[]) =>
+        list?.map((entry) => entry.trim()).filter((entry) => entry.length > 0);
+
       return prisma.organization.update({
         where: { id: membership.organizationId },
-        data: input,
+        data: {
+          ...input,
+          ...(input.inboxBlockedSenders && {
+            inboxBlockedSenders: sanitize(input.inboxBlockedSenders),
+          }),
+          ...(input.inboxBlockedSubjects && {
+            inboxBlockedSubjects: sanitize(input.inboxBlockedSubjects),
+          }),
+        },
       });
     }),
 
@@ -1038,24 +1166,15 @@ export const orgRouter = router({
         throw new TRPCError({ code: 'FORBIDDEN' });
       }
 
-      const seatPlan = await prisma.orgSeatPlan.findFirst({
-        where: { organizationId: myMembership.organizationId, tier: input.tier },
-      });
-
-      if (!seatPlan) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'No seats purchased for this tier. Purchase seats first.' });
-      }
-
-      const targetMember = await prisma.organizationMember.findUniqueOrThrow({
-        where: { id: input.memberId },
-      });
-
-      // Admins can't change their own seat — but only when there's someone
-      // else who actually could. Otherwise this would be a hard deadlock: a
-      // sole admin (or one whose only other admins lack the right role) would
-      // have nobody to ask. (Auto-consuming seat #1 on purchase is a separate
-      // mechanism in `purchaseSeats` and is unaffected by this either way.)
-      if (targetMember.id === myMembership.id) {
+      // Admins can't seat themselves — but only when somebody else actually
+      // could. Otherwise a sole admin would deadlock with nobody to ask.
+      // (Auto-consuming seat #1 on purchase is a separate mechanism in
+      // `purchaseSeats` and is unaffected either way.)
+      //
+      // Lives here rather than in `assignSeatToMember` deliberately: it guards
+      // self-service, and has no meaning when an admin seats a brand-new member
+      // during conversion.
+      if (input.memberId === myMembership.id) {
         const otherEligibleAdmin = await prisma.organizationMember.findFirst({
           where: {
             organizationId: myMembership.organizationId,
@@ -1072,70 +1191,11 @@ export const orgRouter = router({
         }
       }
 
-      // Already seated — a member holds exactly one tier at a time (same as
-      // M365 licensing: a user has one SKU, even if the tenant offers
-      // several), so this is a no-op rather than stacking a second tier.
-      // Switching a member's tier would mean unassign-then-assign, not
-      // supported as a single action here.
-      if (targetMember.seatTier) {
-        return targetMember;
-      }
-
-      // Re-check server-side regardless of whether the client already called
-      // `getMemberBillingConflict` — this is the actual enforcement point.
-      const activePlan = await resolveActivePersonalPlan(targetMember.userId);
-
-      if (activePlan && !input.acknowledgeCancelPersonalPlan) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'This member has an active personal subscription that will be cancelled.',
-        });
-      }
-
-      if (activePlan) {
-        try {
-          // Cancel immediately with proration — unused time lands as a Stripe
-          // account-balance credit (applied to future invoices), not a card
-          // refund. Same pattern as `transfer-team-subscription.ts`.
-          const canceledSubscription = await stripe.subscriptions.cancel(activePlan.subscription.planId, {
-            invoice_now: true,
-            prorate: true,
-          });
-
-          // Sync locally immediately rather than waiting on the webhook (mirrors
-          // `update-subscription-plan.ts`) — the webhook will also fire and
-          // no-op harmlessly on top of this.
-          await onSubscriptionDeleted({ subscription: canceledSubscription });
-        } catch (err) {
-          // `resolveActivePersonalPlan` already re-verifies against Stripe, but
-          // Stripe can still reject the cancel itself (e.g. canceled between
-          // that check and here). Either way the goal — not leaving them
-          // double-billed — is already satisfied, so don't block the seat
-          // assignment over it.
-          console.warn('Failed to cancel personal subscription during seat assignment:', err);
-        }
-      }
-
-      // Check if seats are available
-      if (seatPlan.assigned >= seatPlan.quantity) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'All seats are assigned. Purchase more seats.' });
-      }
-
-      // Assign the seat
-      await prisma.orgSeatPlan.update({
-        where: { id: seatPlan.id },
-        data: { assigned: { increment: 1 } },
-      });
-
-      return prisma.organizationMember.update({
-        where: { id: input.memberId },
-        data: {
-          seatTier: seatPlan.tier,
-          // Derived from the org's actual purchased seat plan, not client
-          // input — previously this trusted an arbitrary client-provided
-          // boolean, letting anyone grant themselves free DMS access.
-          dmsAddon: seatPlan.tier === 'ENTERPRISE' ? true : seatPlan.dmsEnabled,
-        },
+      return assignSeatToMember({
+        organizationId: myMembership.organizationId,
+        memberId: input.memberId,
+        tier: input.tier,
+        acknowledgeCancelPersonalPlan: input.acknowledgeCancelPersonalPlan,
       });
     }),
 
@@ -1393,5 +1453,543 @@ export const orgRouter = router({
       });
 
       return { success: true };
+    }),
+
+  /**
+   * Existing HubSign accounts whose email domain matches this org's allow-list
+   * but who are not members yet — surfaced so an admin can adopt them instead of
+   * re-inviting someone who already has an account.
+   *
+   * PRIVACY CONSTRAINTS, and why they are not optional
+   *
+   * `allowedEmailDomains` is free text and is NOT verified. Without limits an
+   * admin could type `gmail.com` and read back a directory of every Gmail user
+   * on the platform. Two rules contain that:
+   *
+   *   1. Public mailbox providers never match — they identify no organization.
+   *   2. Only accounts belonging to NO organization are listed, so one tenant can
+   *      never enumerate or poach another tenant's members.
+   *
+   * Even so this is "unaffiliated accounts on a domain you claim", not "your
+   * staff". Real domain verification (DNS TXT) is the proper fix and does not
+   * exist yet.
+   */
+  listDomainCandidates: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await prisma.organizationMember.findFirst({
+      where: { userId: ctx.user.id, role: 'ORG_ADMIN' },
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    if (!membership) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Only Org Admins can view domain candidates.',
+      });
+    }
+
+    const org = await prisma.organization.findUniqueOrThrow({
+      where: { id: membership.organizationId },
+      select: { allowedEmailDomains: true },
+    });
+
+    const domains = normalizeClaimableDomains(org.allowedEmailDomains);
+
+    if (domains.length === 0) {
+      return { candidates: [], domains: [], ignoredPublicDomains: [] };
+    }
+
+    const candidates = await prisma.user.findMany({
+      where: {
+        disabled: false,
+        // Unaffiliated only — see the privacy note above.
+        organizationMemberships: { none: {} },
+        OR: domains.map((domain) => ({ email: { endsWith: `@${domain}`, mode: 'insensitive' } })),
+      },
+      select: { id: true, name: true, email: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    // Seat availability, so the admin sees what licensing is possible before
+    // clicking rather than discovering "all seats assigned" afterwards.
+    const seatPlans = await prisma.orgSeatPlan.findMany({
+      where: { organizationId: membership.organizationId },
+      select: { tier: true, quantity: true, assigned: true, dmsEnabled: true },
+    });
+
+    // Flagged per candidate: seating them cancels their own subscription, which
+    // is a billing consequence the admin must see in advance.
+    const withPersonalPlan = new Set<number>();
+
+    if (IS_BILLING_ENABLED()) {
+      for (const candidate of candidates) {
+        const plan = await resolveActivePersonalPlan(candidate.id);
+        if (plan) withPersonalPlan.add(candidate.id);
+      }
+    }
+
+    return {
+      candidates: candidates.map((c) => ({
+        ...c,
+        hasPersonalPlan: withPersonalPlan.has(c.id),
+      })),
+      seatPlans: seatPlans.map((p) => ({
+        tier: p.tier,
+        quantity: p.quantity,
+        assigned: p.assigned,
+        available: Math.max(p.quantity - p.assigned, 0),
+        dmsEnabled: p.dmsEnabled,
+      })),
+      domains,
+      // Reported so the UI can explain why a configured domain matched nothing,
+      // rather than looking broken.
+      ignoredPublicDomains: (org.allowedEmailDomains ?? [])
+        .map((d) => d.trim().toLowerCase())
+        .filter((d) => d && PUBLIC_EMAIL_DOMAINS.has(d)),
+    };
+  }),
+
+  /** Adopt a domain-matched account as a member. */
+  convertDomainCandidate: authenticatedProcedure
+    .input(
+      z.object({
+        userId: z.number(),
+        role: z.enum(['ORG_ADMIN', 'DMS_ADMIN', 'TEAM_ADMIN', 'MANAGER', 'MEMBER']).default('MEMBER'),
+        /**
+         * Consume one of the org's purchased seats as part of the conversion.
+         * Omit to add them unlicensed — membership and licensing are separate,
+         * and an org may not have seats to spare.
+         */
+        seatTier: z.enum(['BUSINESS', 'ENTERPRISE']).optional(),
+        /** Required when the user holds a personal plan the seat will cancel. */
+        acknowledgeCancelPersonalPlan: z.boolean().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id, role: 'ORG_ADMIN' },
+        orderBy: { joinedAt: 'asc' },
+      });
+
+      if (!membership) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only Org Admins can add members.',
+        });
+      }
+
+      const org = await prisma.organization.findUniqueOrThrow({
+        where: { id: membership.organizationId },
+        select: { allowedEmailDomains: true },
+      });
+
+      const target = await prisma.user.findUnique({
+        where: { id: input.userId },
+        select: { id: true, email: true, name: true, disabled: true },
+      });
+
+      if (!target || target.disabled) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found.' });
+      }
+
+      // Re-checked server-side rather than trusting the id the client sent: the
+      // list endpoint's filters are the security boundary, so this mutation has
+      // to reapply every one of them or it becomes a way to add ANY user by id.
+      const domains = normalizeClaimableDomains(org.allowedEmailDomains);
+      const targetDomain = target.email.split('@')[1]?.toLowerCase() ?? '';
+
+      if (!domains.includes(targetDomain)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `${target.email} does not match a claimable domain for this organization.`,
+        });
+      }
+
+      const existingAnywhere = await prisma.organizationMember.findFirst({
+        where: { userId: target.id },
+        select: { organizationId: true },
+      });
+
+      if (existingAnywhere) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            existingAnywhere.organizationId === membership.organizationId
+              ? `${target.email} is already a member.`
+              : `${target.email} already belongs to another organization.`,
+        });
+      }
+
+      const created = await prisma.organizationMember.create({
+        data: {
+          organizationId: membership.organizationId,
+          userId: target.id,
+          role: input.role,
+        },
+      });
+
+      // Licensing, if asked for. Runs AFTER the membership exists because a seat
+      // is assigned to a member row, not to a user.
+      //
+      // A throw here (no seats left, or an unacknowledged personal plan) leaves
+      // the member created but unlicensed rather than rolling back — deliberate:
+      // the admin's primary intent was to add the person, and an unlicensed
+      // member is a state the UI already handles and can fix with one click.
+      // Undoing the membership would discard the successful half of the action.
+      let seat: { assigned: boolean; tier?: string; error?: string } = { assigned: false };
+
+      if (input.seatTier) {
+        try {
+          const seated = await assignSeatToMember({
+            organizationId: membership.organizationId,
+            memberId: created.id,
+            tier: input.seatTier,
+            acknowledgeCancelPersonalPlan: input.acknowledgeCancelPersonalPlan,
+          });
+
+          seat = { assigned: Boolean(seated.seatTier), tier: seated.seatTier ?? undefined };
+        } catch (err) {
+          seat = {
+            assigned: false,
+            error: err instanceof TRPCError ? err.message : 'Seat assignment failed.',
+          };
+        }
+      }
+
+      return { success: true, email: target.email, name: target.name, seat };
+    }),
+
+  /**
+   * Aggregates for the organization dashboard (`/org`).
+   *
+   * Every eSign figure is scoped on `Document.organizationId`, stamped at
+   * creation. It used to be derived from the member user-id set, which meant a
+   * user belonging to several organizations caused each of them to report that
+   * user's documents as its own. Approvals, inbox items and workflows are
+   * natively org-scoped and filter directly.
+   */
+  getDashboardStats: authenticatedProcedure
+    .input(
+      z
+        .object({
+          /** Inclusive start, `yyyy-MM-dd`. Omit for no lower bound. */
+          from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          /** Inclusive end, `yyyy-MM-dd`. The whole day is included. */
+          to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+    const membership = await prisma.organizationMember.findFirst({
+      where: { userId: ctx.user.id },
+      // A user can belong to several orgs; without an explicit order Postgres
+      // heap order decides which one this describes, and an unrelated row
+      // UPDATE can silently switch it. Matches `resolveOrganizationId`.
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    if (!membership) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'You are not a member of an organization.',
+      });
+    }
+
+    const { organizationId } = membership;
+
+    // Selected range. `to` covers the whole day, so it's stored as an exclusive
+    // upper bound at the start of the following day — a `<= 2026-08-06` filter
+    // would otherwise drop everything created after midnight on the 6th.
+    const rangeFrom = input?.from ? DateTime.fromISO(input.from, { zone: 'utc' }).startOf('day') : null;
+    const rangeToExclusive = input?.to
+      ? DateTime.fromISO(input.to, { zone: 'utc' }).startOf('day').plus({ days: 1 })
+      : null;
+
+    const hasRange = Boolean(rangeFrom || rangeToExclusive);
+
+    const createdAtFilter =
+      rangeFrom || rangeToExclusive
+        ? {
+            createdAt: {
+              ...(rangeFrom && { gte: rangeFrom.toJSDate() }),
+              ...(rangeToExclusive && { lt: rangeToExclusive.toJSDate() }),
+            },
+          }
+        : {};
+
+    const documentWhere = { organizationId, deletedAt: null, ...createdAtFilter };
+
+    const now = DateTime.utc().startOf('month');
+
+    // Trend window. With no range selected this is twelve whole months ending
+    // with the current one — the previous fixed behaviour. With a range, the
+    // chart must follow it, or the headline and the chart beneath it would be
+    // describing different periods.
+    const trendStart = (rangeFrom ?? now.minus({ months: 11 })).startOf('day');
+    const trendEnd = rangeToExclusive ?? now.plus({ months: 1 });
+
+    // Bucket granularity is chosen from the span, not fixed. Monthly buckets
+    // over a 7-day range would collapse the whole chart into one bar.
+    const spanDays = trendEnd.diff(trendStart, 'days').days;
+    const grain: 'day' | 'month' = spanDays <= 62 ? 'day' : 'month';
+
+    const bucketFormat = grain === 'day' ? 'yyyy-MM-dd' : 'yyyy-MM';
+    const bucketLabel = grain === 'day' ? 'd MMM' : 'MMM yyyy';
+
+    // Pre-seeded so quiet periods plot as zero rather than collapsing the axis.
+    const bucketKeys: string[] = [];
+    for (
+      let cursor = trendStart.startOf(grain);
+      cursor < trendEnd;
+      cursor = cursor.plus(grain === 'day' ? { days: 1 } : { months: 1 })
+    ) {
+      bucketKeys.push(cursor.toFormat(bucketFormat));
+
+      // Guard against a pathological range producing an unbounded series.
+      if (bucketKeys.length >= 400) break;
+    }
+
+    const windowStart = trendStart;
+    const windowEnd = trendEnd;
+
+    // Only these statuses have actually left the building. DRAFT documents have
+    // never been sent to anyone, so they must not count toward "sent" figures.
+    const SENT_STATUSES = ['PENDING', 'COMPLETED', 'REJECTED'] as const;
+
+    const [
+      byStatus,
+      approvalsByStatus,
+      totalDocuments,
+      inboxSourced,
+      pendingDocuments,
+      documentsByMonth,
+      approvalsByMonth,
+      topSenders,
+      activeWorkflows,
+    ] = await Promise.all([
+      prisma.document.groupBy({
+        by: ['status'],
+        where: documentWhere,
+        _count: { _all: true },
+      }),
+      prisma.approvalRequest.groupBy({
+        by: ['status'],
+        where: { organizationId, ...createdAtFilter },
+        _count: { _all: true },
+      }),
+      prisma.document.count({ where: documentWhere }),
+      // Counted over the SAME row set as totalDocuments, via the relation, so
+      // the two slices always partition one population. Counting
+      // SignatureInboxItem directly mixed org-scoped inbox rows with
+      // member-scoped documents and needed a clamp to stay non-negative.
+      prisma.document.count({ where: { ...documentWhere, inboxItem: { isNot: null } } }),
+      // Aging needs each pending document's send time, which lives in the audit
+      // log; `createdAt` is the fallback for documents sent before that log
+      // existed (or never logged).
+      prisma.document.findMany({
+        where: { ...documentWhere, status: 'PENDING' },
+        select: {
+          createdAt: true,
+          auditLogs: {
+            where: { type: 'DOCUMENT_SENT' },
+            select: { createdAt: true },
+            orderBy: { createdAt: 'asc' },
+            take: 1,
+          },
+        },
+      }),
+      // `grain` is a literal from a two-value union, never user text, so it is
+      // safe to interpolate into DATE_TRUNC — which cannot take a bound
+      // parameter for its field argument.
+      prisma.$queryRaw<Array<{ bucket: Date; count: bigint }>>`
+        SELECT DATE_TRUNC(${grain}, "createdAt") AS bucket, COUNT(*) AS count
+        FROM "Document"
+        WHERE "organizationId" = ${organizationId}
+          AND "deletedAt" IS NULL
+          AND "createdAt" >= ${windowStart.toJSDate()}::timestamp
+          AND "createdAt" <  ${windowEnd.toJSDate()}::timestamp
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `,
+      prisma.$queryRaw<Array<{ bucket: Date; count: bigint }>>`
+        SELECT DATE_TRUNC(${grain}, "createdAt") AS bucket, COUNT(*) AS count
+        FROM "ApprovalRequest"
+        WHERE "organizationId" = ${organizationId}
+          AND "createdAt" >= ${windowStart.toJSDate()}::timestamp
+          AND "createdAt" <  ${windowEnd.toJSDate()}::timestamp
+        GROUP BY 1
+        ORDER BY 1 ASC
+      `,
+      // "Senders", so drafts that were never dispatched are excluded — counting
+      // them overstated the leaders and listed people who had sent nothing.
+      prisma.document.groupBy({
+        by: ['userId'],
+        where: { ...documentWhere, status: { in: [...SENT_STATUSES] } },
+        _count: { _all: true },
+        orderBy: { _count: { userId: 'desc' } },
+        take: 5,
+      }),
+      prisma.workflow.count({ where: { organizationId, enabled: true } }),
+    ]);
+
+    // How many distinct people have sent anything, so the card can say "top 5
+    // of N" instead of reporting the length of a capped list as a metric.
+    const distinctSenders = await prisma.document
+      .groupBy({
+        by: ['userId'],
+        where: { ...documentWhere, status: { in: [...SENT_STATUSES] } },
+      })
+      .then((rows) => rows.length);
+
+    const countOf = <T extends string>(
+      rows: Array<{ status: T; _count: { _all: number } }>,
+      value: T,
+    ) => rows.find((r) => r.status === value)?._count._all ?? 0;
+
+    const senderProfiles = await prisma.user.findMany({
+      where: { id: { in: topSenders.map((s) => s.userId) } },
+      select: { id: true, name: true, email: true },
+    });
+
+    const toSeries = (rows: Array<{ bucket: Date; count: bigint }>) => {
+      const found = new Map(
+        rows.map((r) => [
+          DateTime.fromJSDate(r.bucket).toUTC().toFormat(bucketFormat),
+          Number(r.count),
+        ]),
+      );
+
+      return bucketKeys.map((key) => ({
+        month: key,
+        label: DateTime.fromFormat(key, bucketFormat, { zone: 'utc' }).toFormat(bucketLabel),
+        count: found.get(key) ?? 0,
+      }));
+    };
+
+    // Aging is measured on documents still awaiting signature — how long each
+    // has been outstanding since it was SENT, which is what the card claims.
+    // Inbox-sourced documents are created when the email lands and sent much
+    // later, so createdAt would have aged them from the wrong instant.
+    const ageBuckets = [
+      { key: 'current', label: 'Current', min: 0, max: 1, count: 0 },
+      { key: '1-30', label: '1-30 days', min: 1, max: 31, count: 0 },
+      { key: '31-60', label: '31-60 days', min: 31, max: 61, count: 0 },
+      { key: '61-90', label: '61-90 days', min: 61, max: 91, count: 0 },
+      { key: '90+', label: '90+ days', min: 91, max: Infinity, count: 0 },
+    ];
+
+    for (const doc of pendingDocuments) {
+      const sentAt = doc.auditLogs[0]?.createdAt ?? doc.createdAt;
+      // Clamp at zero so a clock-skewed or future-dated row lands in "Current"
+      // rather than matching no bucket and vanishing from a donut that is
+      // supposed to sum to the headline.
+      const days = Math.max(
+        0,
+        Math.floor(DateTime.utc().diff(DateTime.fromJSDate(sentAt), 'days').days),
+      );
+      const bucket = ageBuckets.find((b) => days >= b.min && days < b.max);
+      if (bucket) bucket.count += 1;
+    }
+
+    const documentTrend = toSeries(documentsByMonth);
+    const approvalTrend = toSeries(approvalsByMonth);
+
+    // The last bucket is the current, in-flight month, so both sides of this
+    // comparison cover the SAME elapsed portion of their month — otherwise a
+    // month-to-date figure gets divided by a complete month and the card
+    // reports a collapse every time a month rolls over.
+    //
+    // Both the percentage AND the bars are built from this one basis. An earlier
+    // version charted full months while computing the percentage like-for-like,
+    // which rendered "+900%" above two visually equal bars.
+    const nowUtc = DateTime.utc();
+    const elapsed = nowUtc.diff(now);
+    const throughDay = nowUtc.day;
+    const currentMonthCount = documentTrend[documentTrend.length - 1]?.count ?? 0;
+
+    const previousMonthStart = now.minus({ months: 1 });
+    // Clamp so a long elapsed span can't spill past the end of a shorter
+    // previous month (e.g. 30 days elapsed in March reaching into February).
+    const previousWindowEnd = DateTime.min(previousMonthStart.plus(elapsed), now);
+
+    const previousToDate = await prisma.document.count({
+      where: {
+        ...documentWhere,
+        createdAt: { gte: previousMonthStart.toJSDate(), lt: previousWindowEnd.toJSDate() },
+      },
+    });
+
+    return {
+      totalDocuments,
+      draft: countOf(byStatus, 'DRAFT'),
+      pending: countOf(byStatus, 'PENDING'),
+      completed: countOf(byStatus, 'COMPLETED'),
+      rejected: countOf(byStatus, 'REJECTED'),
+
+      // PENDING and IN_PROGRESS are both "not yet decided" — surfaced as one
+      // figure, but labelled "open" rather than "pending" so the name matches
+      // what it counts.
+      approvalsOpen: countOf(approvalsByStatus, 'PENDING') + countOf(approvalsByStatus, 'IN_PROGRESS'),
+      approvalsApproved: countOf(approvalsByStatus, 'APPROVED'),
+      approvalsRejected: countOf(approvalsByStatus, 'REJECTED'),
+      approvalsCancelled: countOf(approvalsByStatus, 'CANCELLED'),
+
+      inboxSourced,
+      // Both operands come from the same row set now, so the residual can never
+      // go negative and needs no clamp.
+      manualSourced: totalDocuments - inboxSourced,
+      activeWorkflows,
+
+      documentTrend,
+      approvalTrend,
+      // Charted totals, for headlines that sit above a 12-month chart. Distinct
+      // from the all-time totals above, which are not windowed.
+      documentsCharted: documentTrend.reduce((sum, point) => sum + point.count, 0),
+      approvalsCharted: approvalTrend.reduce((sum, point) => sum + point.count, 0),
+
+      ageBuckets: ageBuckets.map(({ key, label, count }) => ({ key, label, count })),
+
+      monthOverMonth: {
+        current: currentMonthCount,
+        previousToDate,
+        // Labels name the exact windows being compared, so the percentage is
+        // self-evidently explained by the two bars beneath it.
+        currentLabel: `${now.toFormat('MMM')} 1–${throughDay}`,
+        previousLabel: `${previousMonthStart.toFormat('MMM')} 1–${throughDay}`,
+        throughDay,
+        // Null, not 100: percent change from a zero base is undefined, and
+        // printing "100%" made 0→1 and a genuine doubling look identical. The
+        // UI renders this as "New activity" instead of a number.
+        percentChange:
+          previousToDate === 0 ? null : ((currentMonthCount - previousToDate) / previousToDate) * 100,
+      },
+
+      distinctSenders,
+      topSenders: topSenders.map((s) => {
+        const profile = senderProfiles.find((p) => p.id === s.userId);
+
+        return {
+          userId: s.userId,
+          name: profile?.name || profile?.email || 'Unknown',
+          email: profile?.email ?? '',
+          count: s._count._all,
+        };
+      }),
+
+      // Echoed back so the UI can state the period it is showing rather than
+      // implying "all time", and so it knows whether month-over-month (which
+      // always describes calendar months) is comparable to the rest of the page.
+      range: {
+        from: rangeFrom?.toFormat('yyyy-MM-dd') ?? null,
+        to: rangeToExclusive?.minus({ days: 1 }).toFormat('yyyy-MM-dd') ?? null,
+        active: hasRange,
+        grain,
+        trendFrom: trendStart.toFormat('yyyy-MM-dd'),
+        trendTo: trendEnd.minus({ days: 1 }).toFormat('yyyy-MM-dd'),
+      },
+
+      /** Server clock at query time, so the UI can show a truthful "updated" age. */
+      generatedAt: DateTime.utc().toISO(),
+    };
     }),
 });

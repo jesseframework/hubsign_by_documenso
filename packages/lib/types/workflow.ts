@@ -99,8 +99,18 @@ export const ZWorkflowActionSchema = z.discriminatedUnion('action', [
     action: z.literal('SEND_EMAIL'),
     /** Recipient address(es). Supports {{templating}} and comma-separated lists. */
     to: z.union([z.string().min(1), z.array(z.string().min(1))]),
+    /**
+     * Key of a saved EmailTemplate to use for the body (see Organization →
+     * Email Templates). When set, the template supplies subject/html/text and
+     * the fields below become optional per-step overrides — set `subject` here
+     * to reuse one body under a different heading, for example.
+     *
+     * Preferred over pasting HTML inline: the markup lives in a real editor
+     * with a preview, and one wording change updates every workflow using it.
+     */
+    templateKey: z.string().min(1).optional(),
     subject: z.string().default(''),
-    /** HTML body. Supports {{templating}}. */
+    /** HTML body. Supports {{templating}}. Ignored if `templateKey` resolves. */
     html: z.string().default(''),
     /** Optional plaintext body; falls back to a stripped version of `html`. */
     text: z.string().optional(),
