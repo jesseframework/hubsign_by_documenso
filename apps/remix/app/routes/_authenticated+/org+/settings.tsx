@@ -65,6 +65,9 @@ function OrgSettingsPage() {
   const [reminderMaxCount, setReminderMaxCount] = useState(3);
   const [remindersInitialized, setRemindersInitialized] = useState(false);
 
+  const [includeCertificate, setIncludeCertificate] = useState(true);
+  const [certificateInitialized, setCertificateInitialized] = useState(false);
+
   // SSO / OIDC
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [oidcClientId, setOidcClientId] = useState('');
@@ -195,6 +198,14 @@ function OrgSettingsPage() {
     setReminderDays(typeof orgRec.signReminderDays === 'number' ? orgRec.signReminderDays : 3);
     setReminderMaxCount(typeof orgRec.signReminderMaxCount === 'number' ? orgRec.signReminderMaxCount : 3);
     setRemindersInitialized(true);
+  }
+
+  if (!certificateInitialized && org) {
+    const orgRec = org as Record<string, unknown>;
+    // Default on when the column is absent, matching the server-side default —
+    // an unset value must not read as "turned off".
+    setIncludeCertificate(orgRec.includeSigningCertificate !== false);
+    setCertificateInitialized(true);
   }
 
   if (!ssoInitialized && org) {
@@ -693,6 +704,68 @@ function OrgSettingsPage() {
               loading={updateOrg.isPending}
             >
               <Trans>Save Domain Restrictions</Trans>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Signed documents — audit certificate */}
+      {isAdmin && (
+        <div className="rounded-[var(--r)] border border-border bg-card p-5">
+          <h2 className="text-[15px] font-semibold">
+            <Trans>Signed Documents</Trans>
+          </h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            <Trans>
+              Controls the Final Audit Report page appended to completed documents.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+            <div className="flex-1 pr-4">
+              <label className="text-[13px] font-medium">
+                <Trans>Attach the audit certificate to signed documents</Trans>
+              </label>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                <Trans>
+                  The certificate is the signing audit trail, so it is normally kept. Turn this
+                  off only if your documents are circulated externally and the extra page is
+                  unwanted — recipients can still download either version.
+                </Trans>
+              </p>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={includeCertificate}
+                onChange={(e) => setIncludeCertificate(e.target.checked)}
+              />
+              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+            </label>
+          </div>
+
+          {/*
+            Stated plainly because it is the one thing that surprises people: the
+            certificate is baked into the PDF when the document is sealed, so this
+            setting cannot retroactively add or remove it.
+          */}
+          <p className="mt-3 text-[12px] text-muted-foreground">
+            <Trans>
+              Applies to documents completed from now on. Documents already signed keep the
+              pages they were sealed with — use the Download menu on those to get a copy
+              without the certificate.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() =>
+                void updateOrg.mutateAsync({ includeSigningCertificate: includeCertificate })
+              }
+              loading={updateOrg.isPending}
+            >
+              <Trans>Save Document Settings</Trans>
             </Button>
           </div>
         </div>

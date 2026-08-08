@@ -76,6 +76,10 @@ msgstr "\"{placeholderEmail}\" im Namen von \"{0}\" hat Sie eingeladen, \"Beispi
 msgid "(no subject)"
 msgstr ""
 
+#: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
+msgid "(optional)"
+msgstr ""
+
 #: apps/remix/app/components/general/document-signing/document-signing-form.tsx
 #: apps/remix/app/components/embed/embed-document-signing-page.tsx
 msgid "(You)"
@@ -133,6 +137,13 @@ msgstr "{0, plural, one {Warte auf 1 Empfänger} other {Warte auf # Empfänger}}
 #: apps/remix/app/components/general/document-signing/document-signing-auto-sign.tsx
 msgid "{0}"
 msgstr "{0}"
+
+#. placeholder {0}: test.data.document.title
+#. placeholder {1}: test.data.verdict.evaluated
+#. placeholder {2}: test.data.verdict.allowed ? 'would be allowed' : 'would be blocked'
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "{0} — {1} rule(s) evaluated, {2}"
+msgstr ""
 
 #. placeholder {0}: result.email
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
@@ -1549,6 +1560,10 @@ msgstr ""
 msgid "Applied to the final signed PDF."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Applies to documents completed from now on. Documents already signed keep the pages they were sealed with — use the Download menu on those to get a copy without the certificate."
+msgstr ""
+
 #. placeholder {0}: files.length
 #: apps/remix/app/routes/_authenticated+/dms+/bulk-upload.tsx
 msgid "Apply to all {0} files"
@@ -1716,6 +1731,22 @@ msgstr "Unterstützend"
 msgid "At least one signature type must be enabled"
 msgstr "Mindestens ein Signaturtyp muss aktiviert sein"
 
+#: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
+msgid "Attach a file"
+msgstr ""
+
+#: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
+msgid "Attach a purchase order, spec sheet or photo. PDF, Word, Excel, images, CSV — up to 15 MB each."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Attach the audit certificate to signed documents"
+msgstr ""
+
+#: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
+msgid "Attachment limit reached"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 msgid "Attempts sealing the document again, useful for after a code change has occurred to resolve an erroneous document."
 msgstr "Versuche, das Dokument erneut zu versiegeln, nützlich nach einer Codeänderung, um ein fehlerhaftes Dokument zu beheben."
@@ -1755,6 +1786,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "Automatically file completed signed documents from HubSign into the Document Manager."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Available fields"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
@@ -1906,6 +1941,11 @@ msgstr ""
 msgid "BulkSender username (optional fallback)"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
+msgid "Business Rules"
+msgstr ""
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 msgid "By"
 msgstr ""
@@ -1960,6 +2000,7 @@ msgstr "Kann vorbereiten"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/email-templates._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approvals.$id.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
@@ -2344,8 +2385,16 @@ msgstr ""
 msgid "Condition (JSONLogic, optional)"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Condition (JSONLogic) — true means the rule fires"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Condition is not valid JSON"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Conditions checked at a point in the document lifecycle. A rule's condition describes the problem — when it's true, the rule fires and its outcome applies."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
@@ -2537,6 +2586,10 @@ msgstr "Steuert die Standardsprache eines hochgeladenen Dokuments. Diese wird al
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Controls the default visibility of an uploaded document."
 msgstr "Steuert die Standard-sichtbarkeit eines hochgeladenen Dokuments."
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Controls the Final Audit Report page appended to completed documents."
+msgstr ""
 
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Controls the formatting of the message that will be sent when inviting a recipient to sign a document. If a custom message has been provided while configuring the document, it will be used instead."
@@ -2747,6 +2800,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Create Organization"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Create rule"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/doc-merge.tsx
@@ -3709,7 +3766,9 @@ msgstr ""
 #: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
 #: apps/remix/app/components/tables/documents-table-action-button.tsx
 #: apps/remix/app/components/general/share-document-download-button.tsx
+#: apps/remix/app/components/general/document/document-supporting-files.tsx
 #: apps/remix/app/components/general/document/document-page-view-dropdown.tsx
+#: apps/remix/app/components/general/document/document-page-view-button.tsx
 #: apps/remix/app/components/general/document/document-page-view-button.tsx
 #: apps/remix/app/components/forms/2fa/view-recovery-codes-dialog.tsx
 #: apps/remix/app/components/forms/2fa/enable-authenticator-app-dialog.tsx
@@ -3732,6 +3791,10 @@ msgstr "Auditprotokolle herunterladen"
 msgid "Download Certificate"
 msgstr "Zertifikat herunterladen"
 
+#: apps/remix/app/components/general/document/document-page-view-button.tsx
+msgid "Download options"
+msgstr ""
+
 #: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
 #: apps/remix/app/components/general/document/document-page-view-dropdown.tsx
 msgid "Download Original"
@@ -3745,10 +3808,12 @@ msgstr ""
 msgid "Download Template CSV"
 msgstr "Vorlage CSV herunterladen"
 
+#: apps/remix/app/components/general/document/document-page-view-button.tsx
 #: packages/ui/components/document/document-download-button.tsx
 msgid "Download with audit certificate"
 msgstr ""
 
+#: apps/remix/app/components/general/document/document-page-view-button.tsx
 #: packages/ui/components/document/document-download-button.tsx
 msgid "Download without audit certificate"
 msgstr ""
@@ -3858,6 +3923,7 @@ msgstr ""
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.webhooks._index.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 #: apps/remix/app/components/tables/templates-table-action-dropdown.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
 #: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
@@ -3874,6 +3940,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "Edit record"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Edit rule"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
@@ -4222,6 +4292,10 @@ msgstr ""
 msgid "Escalation recipients (comma-separated emails)"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Evaluates every signing rule against a real document without enforcing anything, and shows the data the rules saw."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Event"
 msgstr ""
@@ -4475,6 +4549,11 @@ msgstr "Freie Unterschrift"
 
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "Freeform labels for quick document tagging"
+msgstr ""
+
+#. placeholder {0}: file.recipient.name || file.recipient.email
+#: apps/remix/app/components/general/document/document-supporting-files.tsx
+msgid "from {0}"
 msgstr ""
 
 #: apps/remix/app/components/general/document-signing/document-signing-name-field.tsx
@@ -5116,6 +5195,7 @@ msgstr "Teams werden geladen..."
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/documents.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/_index.tsx
@@ -5335,6 +5415,10 @@ msgstr "Mitglieder"
 msgid "Message <0>(Optional)</0>"
 msgstr "Nachricht <0>(Optional)</0>"
 
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Message shown when it fires"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Metadata"
@@ -5439,6 +5523,7 @@ msgstr ""
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/email-templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/users.$id.tsx
@@ -5540,6 +5625,11 @@ msgstr ""
 msgid "New Password"
 msgstr "Neues Passwort"
 
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "New rule"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/team-transfer-dialog.tsx
 msgid "New team owner"
 msgstr "Neuer Teamowner"
@@ -5590,6 +5680,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 msgid "No approval templates yet"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "No business rules yet"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
@@ -5809,6 +5903,10 @@ msgstr ""
 msgid "Not supported"
 msgstr "Nicht unterstützt"
 
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Nothing is enforced until you add one. Start from a preset above."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 msgid "Nothing outstanding beyond 90 days"
 msgstr ""
@@ -5878,6 +5976,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "OCR template"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "off"
 msgstr ""
 
 #. placeholder {0}: document.team?.name
@@ -7116,13 +7218,30 @@ msgstr ""
 msgid "Rows per page"
 msgstr "Zeilen pro Seite"
 
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Rule created"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Rule deleted"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Rule sets (pick a template by conditions)"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Rule updated"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Rules & validations"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Rules on OCR fields inherit OCR's error rate — a value can be present but misread. Pair presence checks with <0>ocr.confidence</0>, and use the tester below before switching a rule on."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
@@ -7156,6 +7275,14 @@ msgstr "Speichern"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Save Branding"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Save changes"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Save Document Settings"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
@@ -7514,6 +7641,10 @@ msgstr "Vorlagen in Ihrem öffentlichen Profil anzeigen, damit Ihre Zielgruppe u
 msgid "Show templates in your team public profile for your audience to sign and get started quickly"
 msgstr "Vorlagen in Ihrem Team-Öffentliches Profil anzeigen, damit Ihre Zielgruppe unterschreiben und schnell loslegen kann"
 
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Show the data the rules saw"
+msgstr ""
+
 #. placeholder {0}: filteredItems.length
 #. placeholder {1}: items.length
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
@@ -7662,6 +7793,14 @@ msgstr "Unterschriften erscheinen, sobald das Dokument abgeschlossen ist"
 #: packages/lib/constants/recipient-roles.ts
 msgid "Signed"
 msgstr "Unterzeichnet"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Signed Documents"
+msgstr ""
+
+#: apps/remix/app/components/general/document/document-page-view-button.tsx
+msgid "Signed pages only, for internal use"
+msgstr ""
 
 #: packages/lib/constants/recipient-roles.ts
 msgid "Signer"
@@ -8060,6 +8199,11 @@ msgstr "Erfolgreich erstellt: {successCount}"
 msgid "Summary:"
 msgstr "Zusammenfassung:"
 
+#: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
+#: apps/remix/app/components/general/document/document-supporting-files.tsx
+msgid "Supporting documents"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/dms+/bulk-upload.tsx
 msgid "Supports PDF, JPEG, PNG, TIFF. Upload invoices, receipts, bank statements, or any documents."
 msgstr ""
@@ -8325,6 +8469,10 @@ msgstr "Vorlagen"
 msgid "Templates allow you to quickly generate documents with pre-filled recipients and fields."
 msgstr "Vorlagen erlauben dir das schnelle Erstlelen von Dokumenten mit vorausgefüllten Empfängern und Feldern."
 
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Test against a document"
+msgstr ""
+
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 #: packages/ui/primitives/template-flow/add-template-fields.tsx
@@ -8388,6 +8536,14 @@ msgstr "Die Authentifizierung, die erforderlich ist, damit Empfänger das Dokume
 
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 msgid "The bot transport is unavailable — this deployment has no Azure Bot credentials. The webhook transport posts the same cards, but cannot update a card after it is posted, so live trackers and in-Teams buttons are disabled."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "The certificate is the signing audit trail, so it is normally kept. Turn this off only if your documents are circulated externally and the extra page is unwanted — recipients can still download either version."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "The condition isn't valid JSON"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/admin+/site-settings.tsx
@@ -8487,6 +8643,10 @@ msgstr "Das folgende Team wurde von seinem Besitzer gelöscht. Du kannst nicht m
 #: packages/email/templates/team-delete.tsx
 msgid "The following team has been deleted by you"
 msgstr "Das folgende Team wurde von dir gelöscht"
+
+#: apps/remix/app/components/general/document/document-page-view-button.tsx
+msgid "The full signed record"
+msgstr ""
 
 #. placeholder {0}: data.teamName
 #: apps/remix/app/routes/_unauthenticated+/team.verify.transfer.$token.tsx
@@ -8655,6 +8815,10 @@ msgstr "Der Webhook wurde erfolgreich erstellt."
 
 #: apps/remix/app/components/general/app-topbar-preferences.tsx
 msgid "Theme"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Then"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
@@ -9152,6 +9316,14 @@ msgstr "Auslöser"
 msgid "Try one of these"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Turn off"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Turn on"
+msgstr ""
+
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "Turn on browser notifications to start receiving pushes."
 msgstr ""
@@ -9522,6 +9694,7 @@ msgid "Uploaded file not an allowed file type"
 msgstr "Die hochgeladene Datei ist kein zulässiger Dateityp"
 
 #: apps/remix/app/routes/_authenticated+/dms+/documents.tsx
+#: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
 msgid "Uploading..."
 msgstr ""
 
@@ -10114,6 +10287,10 @@ msgstr "Willkommen bei HubSign!"
 #: apps/remix/app/routes/_recipient+/sign.$token+/waiting.tsx
 msgid "Were you trying to edit this document instead?"
 msgstr "Hast du stattdessen versucht, dieses Dokument zu bearbeiten?"
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "When"
+msgstr ""
 
 #: apps/remix/app/components/embed/authoring/configure-document-recipients.tsx
 #: packages/ui/primitives/template-flow/add-template-placeholder-recipients.tsx

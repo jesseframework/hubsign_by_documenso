@@ -18,6 +18,7 @@ import type { RequestMetadata } from '../../universal/extract-request-metadata';
 import { getFileServerSide } from '../../universal/upload/get-file.server';
 import { putPdfFileServerSide } from '../../universal/upload/put-file.server';
 import { fieldsContainUnsignedRequiredField } from '../../utils/advanced-fields-helpers';
+import { shouldIncludeSigningCertificate } from '../../utils/signing-certificate';
 import { decryptSecondaryData } from '../crypto/decrypt';
 import { getCertificatePdf } from '../htmltopdf/get-certificate-pdf';
 import { addRejectionStampToPdf } from '../pdf/add-rejection-stamp-to-pdf';
@@ -60,6 +61,11 @@ export const sealDocument = async ({
               includeSigningCertificate: true,
             },
           },
+        },
+      },
+      organization: {
+        select: {
+          includeSigningCertificate: true,
         },
       },
     },
@@ -122,26 +128,28 @@ export const sealDocument = async ({
   // !: Need to write the fields onto the document as a hard copy
   const pdfData = await getFileServerSide(documentData);
 
-  const certificateData =
-    (document.team?.teamGlobalSettings?.includeSigningCertificate ?? true)
-      ? await getCertificatePdf({
-          documentId,
-          language: document.documentMeta?.language,
-          // Tell the renderer the seal's terminal state so the audit page
-          // shows "Completed" / "Rejected" instead of the live "Pending".
-          completionStatus: isRejected ? 'REJECTED' : 'COMPLETED',
-        }).catch((err) => {
-          // Don't abort the seal — but make this loud so we don't keep
-          // silently shipping certificate-less PDFs to production. Most
-          // common cause: Chromium / Playwright not installed in the
-          // production image (dev images already have it from npm install).
-          console.error(
-            '[seal-document] Failed to render audit certificate. Document will be sealed without it.',
-            err,
-          );
-          return null;
-        })
-      : null;
+  const certificateData = shouldIncludeSigningCertificate({
+    teamSetting: document.team?.teamGlobalSettings?.includeSigningCertificate,
+    organizationSetting: document.organization?.includeSigningCertificate,
+  })
+    ? await getCertificatePdf({
+        documentId,
+        language: document.documentMeta?.language,
+        // Tell the renderer the seal's terminal state so the audit page
+        // shows "Completed" / "Rejected" instead of the live "Pending".
+        completionStatus: isRejected ? 'REJECTED' : 'COMPLETED',
+      }).catch((err) => {
+        // Don't abort the seal — but make this loud so we don't keep
+        // silently shipping certificate-less PDFs to production. Most
+        // common cause: Chromium / Playwright not installed in the
+        // production image (dev images already have it from npm install).
+        console.error(
+          '[seal-document] Failed to render audit certificate. Document will be sealed without it.',
+          err,
+        );
+        return null;
+      })
+    : null;
 
   const doc = await PDFDocument.load(pdfData);
 

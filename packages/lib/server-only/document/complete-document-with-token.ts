@@ -66,6 +66,9 @@ export const completeDocumentWithToken = async ({
   documentId,
   requestMetadata,
   nextSigner,
+  // Present when a signed-in user is signing; absent for token-only signers.
+  // Feeds the rule context's `actor.*` namespace.
+  userId,
 }: CompleteDocumentWithTokenOptions) => {
   const document = await getDocument({ token, documentId });
 
@@ -109,6 +112,46 @@ export const completeDocumentWithToken = async ({
 
   if (fieldsContainUnsignedRequiredField(fields)) {
     throw new Error(`Recipient ${recipient.id} has unsigned fields`);
+  }
+
+  // DOCUMENT_SIGN gate — org-authored business rules, e.g. "an invoice over
+  // 300,000 can't be signed without a PO number".
+  //
+  // Placed after the structural checks (turn order, required fields) and before
+  // anything is written, so a refusal leaves no partial state. Only runs for
+  // documents that belong to an organization; a personal document has no rules
+  // to apply. Fails open by design — see `evaluateGate`.
+  if (document.organizationId) {
+    const { evaluateGate, describeBlocks } = await import('../rules/evaluate-gate');
+
+    const verdict = await evaluateGate({
+      gate: 'DOCUMENT_SIGN',
+      subject: {
+        organizationId: document.organizationId,
+        entityType: 'Document',
+        entityId: String(document.id),
+        actorUserId: userId ?? null,
+        recipientId: recipient.id,
+      },
+    });
+
+    if (!verdict.allowed) {
+      const reason = describeBlocks(verdict);
+
+      // INVALID_REQUEST, not UNKNOWN_ERROR: this is a deliberate policy refusal,
+      // so it maps to a 400 rather than being reported as a server fault.
+      //
+      // The authored text goes in `userMessage` as well as `message`. `message`
+      // is defined as internal-for-logging and some transports mask it, whereas
+      // `userMessage` is the field meant to be shown — and a block the signer
+      // can't read tells them nothing about what to fix. These strings are
+      // written by the signer's own organization, so they are safe to display.
+      throw new AppError(AppErrorCode.INVALID_REQUEST, {
+        message: reason,
+        userMessage: reason,
+        statusCode: 400,
+      });
+    }
   }
 
   // Document reauth for completing documents is currently not required.

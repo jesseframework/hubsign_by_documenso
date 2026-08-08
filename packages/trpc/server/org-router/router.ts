@@ -386,6 +386,8 @@ export const orgRouter = router({
       ocrAutoProcess: z.boolean().optional(),
       ocrDefaultEngine: z.string().nullable().optional(),
       defaultConfidentiality: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']).optional(),
+      // Applied at seal time, so it only affects documents completed afterwards.
+      includeSigningCertificate: z.boolean().optional(),
       allowedEmailDomains: z.array(z.string().min(1).max(253)).optional(),
       signReminderEnabled: z.boolean().optional(),
       signReminderDays: z.number().int().min(1).max(60).optional(),

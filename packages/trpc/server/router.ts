@@ -20,6 +20,7 @@ import { teamRouter } from './team-router/router';
 import { templateRouter } from './template-router/router';
 import { router } from './trpc';
 import { webhookRouter } from './webhook-router/router';
+import { businessRuleRouter } from './business-rule-router/router';
 import { emailTemplateRouter } from './email-template-router/router';
 import { workflowRouter } from './workflow-router/router';
 
@@ -43,6 +44,7 @@ export const appRouter = router({
   stamp: stampRouter,
   workflow: workflowRouter,
   emailTemplate: emailTemplateRouter,
+  businessRule: businessRuleRouter,
   approval: approvalRouter,
   inbox: inboxRouter,
   metadata: metadataRouter,

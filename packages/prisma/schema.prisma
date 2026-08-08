@@ -110,6 +110,7 @@ model User {
   dmsAiUsage               DmsAiUsage[]
   createdWorkflows         Workflow[]             @relation("UserCreatedWorkflows")
   createdEmailTemplates    EmailTemplate[]        @relation("UserCreatedEmailTemplates")
+  createdBusinessRules     BusinessRule[]         @relation("UserCreatedBusinessRules")
 
   @@index([email])
 }
@@ -441,6 +442,8 @@ model Document {
   // Signature inbox (email-to-sign queue) link
   inboxItem SignatureInboxItem?
 
+  supportingFiles DocumentSupportingFile[]
+
   @@unique([documentDataId])
   @@index([userId])
   @@index([status])
@@ -449,6 +452,37 @@ model Document {
   /// The dashboard's hot path: every aggregate filters org + not-deleted, and
   /// most also filter or group by status.
   @@index([organizationId, deletedAt, status])
+}
+
+/// A file a signer attached while signing — a PO, a spec sheet, a photo — kept
+/// alongside the document it supports.
+///
+/// Storage mirrors `DocumentData` (`type` + `data`, so S3 or inline base64 per
+/// `NEXT_PUBLIC_UPLOAD_TRANSPORT`) but is held inline rather than by relation:
+/// `DocumentData` is one-to-one with Document and Template, and a document can
+/// have many supporting files.
+model DocumentSupportingFile {
+  id         String @id @default(cuid())
+  documentId Int
+  /// The signer who uploaded it. Null when an owner/admin attached it directly.
+  recipientId Int?
+
+  /// As supplied by the uploader, sanitized. Shown in the download list.
+  fileName    String
+  /// Sniffed server-side, never taken from the client's Content-Type.
+  contentType String
+  sizeBytes   Int
+
+  type DocumentDataType
+  data String @db.Text
+
+  createdAt DateTime @default(now())
+
+  document  Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  recipient Recipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+
+  @@index([documentId])
+  @@index([recipientId])
 }
 
 model DocumentAuditLog {
@@ -562,6 +596,7 @@ model Recipient {
   template             Template?             @relation(fields: [templateId], references: [id], onDelete: Cascade)
   fields               Field[]
   signatures           Signature[]
+  supportingFiles      DocumentSupportingFile[]
   fieldSignedPositions FieldSignedPosition[]
 
   // Sign reminder tracking
@@ -1560,6 +1595,15 @@ model Organization {
 
   defaultConfidentiality DmsConfidentiality @default(INTERNAL)
 
+  /// Whether to append the Final Audit Report page to sealed documents.
+  ///
+  /// Applied at SEAL time, so changing it only affects documents completed
+  /// afterwards — already-sealed PDFs keep whatever they were sealed with.
+  /// A team-level `TeamGlobalSettings.includeSigningCertificate` takes
+  /// precedence for documents that belong to a team; see
+  /// `shouldIncludeSigningCertificate`.
+  includeSigningCertificate Boolean @default(true)
+
   // Security: enforce single concurrent session per user (license/security)
   enforceSingleSession Boolean @default(false)
 
@@ -1635,6 +1679,7 @@ model Organization {
   workflows              Workflow[]              @relation("OrgWorkflows")
   documents              Document[]              @relation("OrgDocuments")
   emailTemplates         EmailTemplate[]         @relation("OrgEmailTemplates")
+  businessRules          BusinessRule[]          @relation("OrgBusinessRules")
 }
 
 enum OrgSeatTier {
@@ -2354,6 +2399,60 @@ model MetadataRecord {
 
   @@unique([organizationId, category, key])
   @@index([organizationId, category])
+}
+
+/// Where a business rule is enforced. Each value has exactly one call site.
+enum BusinessRuleGate {
+  DOCUMENT_SEND
+  DOCUMENT_SIGN
+  INBOX_READY
+}
+
+enum BusinessRuleOutcome {
+  /// Refuses the action and shows `message` to whoever attempted it.
+  BLOCK
+  /// Allows the action, records the hit. Use while tuning a rule before enforcing.
+  WARN
+}
+
+/// An org-authored condition enforced at a named point in the lifecycle.
+///
+/// Separate from `ApprovalRuleSet`/`ApprovalValidationRule` on purpose: those
+/// select an approval template and validate inside an approval step, whereas
+/// these gate an action outright. Both evaluate the same JSONLogic against the
+/// same fact registry — one language, different bindings and outcomes.
+model BusinessRule {
+  id             String           @id @default(cuid())
+  organizationId Int
+  gate           BusinessRuleGate
+  entityType     String           @default("Document")
+
+  name        String
+  description String?
+
+  /// JSONLogic evaluated against the fact registry's context.
+  /// TRUE means the rule FIRES and its outcome applies — so conditions are
+  /// written as the violation ("PO is missing"), not the requirement.
+  conditionConfig Json
+
+  outcome BusinessRuleOutcome @default(BLOCK)
+  /// Shown verbatim to the user when the rule fires, so it must explain the fix.
+  message String
+
+  /// Lower runs first. Only affects the order hits are reported in.
+  priority Int     @default(0)
+  isActive Boolean @default(true)
+
+  createdById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation("OrgBusinessRules", fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("UserCreatedBusinessRules", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  /// The evaluator's hot path: active rules for one org at one gate.
+  @@index([organizationId, gate, isActive])
 }
 
 /// Reusable HTML email body for workflow SEND_EMAIL steps.
