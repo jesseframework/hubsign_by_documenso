@@ -62,6 +62,17 @@ WORKDIR /app/apps/documentation
 # `next start` keeps working — `output: 'export'` is incompatible with it.
 ENV DOCS_STATIC_EXPORT=1
 
+# Deployment addresses the documentation links to. This is a static export, so
+# these are inlined at build time and cannot be changed on a running container —
+# override them here (Komodo: the build's `build_args`) and rebuild.
+ARG NEXT_PUBLIC_HUBSIGN_APP_URL=https://app.hubsign.io
+ARG NEXT_PUBLIC_HUBSIGN_SITE_URL=https://hubsign.io
+ARG NEXT_PUBLIC_HUBSIGN_SUPPORT_EMAIL=support@hubsign.io
+
+ENV NEXT_PUBLIC_HUBSIGN_APP_URL=$NEXT_PUBLIC_HUBSIGN_APP_URL \
+    NEXT_PUBLIC_HUBSIGN_SITE_URL=$NEXT_PUBLIC_HUBSIGN_SITE_URL \
+    NEXT_PUBLIC_HUBSIGN_SUPPORT_EMAIL=$NEXT_PUBLIC_HUBSIGN_SUPPORT_EMAIL
+
 RUN npx next build
 
 # ── Stage 2: serve ───────────────────────────────────────────────────────────

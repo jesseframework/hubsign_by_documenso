@@ -3,6 +3,8 @@ title: Secure Your Account
 description: Learn how to secure your HubSign account with Two-Factor Authentication (2FA) and Passkeys.
 ---
 
+import { appUrl } from '../../../site';
+
 import { Callout, Steps } from 'nextra/components';
 
 # Account Security
@@ -17,7 +19,7 @@ Two-factor authentication (2FA) and Passkeys are used for high-security and high
 
 ### Navigate to Security Settings
 
-Navigate to your account's [security settings](https://app.hubsign.io/settings/security). Here, you can manage your password and other security settings.
+Navigate to your account's <a href={appUrl('/settings/security')}>security settings</a>. Here, you can manage your password and other security settings.
 
 ### Enable 2FA
 
@@ -60,7 +62,7 @@ A passkey is like a secret password stored locally on your device. You can log i
 
 ### Navigate to Security Settings
 
-Navigate to the [security settings](https://app.hubsign.io/settings/security) in your account.
+Navigate to the <a href={appUrl('/settings/security')}>security settings</a> in your account.
 
 ### Manage Passkeys
 

@@ -1,6 +1,8 @@
 import type { DocsThemeConfig } from 'nextra-theme-docs';
 import { useConfig } from 'nextra-theme-docs';
 
+import { SITE_URL, SUPPORT_EMAIL } from './site';
+
 /**
  * HubSign documentation portal theme.
  *
@@ -129,9 +131,9 @@ const themeConfig: DocsThemeConfig = {
           <div className="hs-foot-col">
             <p className="hs-foot-h">Company</p>
             <ul className="hs-foot-list">
-              <li><a href="https://hubsign.io" target="_blank" rel="noreferrer">hubsign.io</a></li>
-              <li><a href="https://hubsign.io/privacy" target="_blank" rel="noreferrer">Privacy</a></li>
-              <li><a href="https://hubsign.io/terms" target="_blank" rel="noreferrer">Terms</a></li>
+              <li><a href={SITE_URL} target="_blank" rel="noreferrer">hubsign.io</a></li>
+              <li><a href={`${SITE_URL}/privacy`} target="_blank" rel="noreferrer">Privacy</a></li>
+              <li><a href={`${SITE_URL}/terms`} target="_blank" rel="noreferrer">Terms</a></li>
             </ul>
           </div>
 
@@ -147,12 +149,12 @@ const themeConfig: DocsThemeConfig = {
                 </a>
               </li>
               <li>
-                <a href="mailto:support@hubsign.io">
+                <a href={`mailto:${SUPPORT_EMAIL}`}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                     <rect x="2" y="4" width="20" height="16" rx="2" />
                     <path d="m22 7-10 6L2 7" />
                   </svg>
-                  support@hubsign.io
+                  {SUPPORT_EMAIL}
                 </a>
               </li>
             </ul>
