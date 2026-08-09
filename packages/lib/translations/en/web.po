@@ -871,6 +871,10 @@ msgstr "Action"
 msgid "Actions"
 msgstr "Actions"
 
+#: apps/remix/app/components/general/redeem-license-key-card.tsx
+msgid "Activate"
+msgstr "Activate"
+
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.members.tsx
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
@@ -1092,8 +1096,12 @@ msgid "Add-ons"
 msgstr "Add-ons"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-msgid "Adding a lot at once? Download the template, fill it in with Excel or Google Sheets, save it as CSV, then use Import. Re-importing an edited file updates the matching records instead of duplicating them."
-msgstr "Adding a lot at once? Download the template, fill it in with Excel or Google Sheets, save it as CSV, then use Import. Re-importing an edited file updates the matching records instead of duplicating them."
+#~ msgid "Adding a lot at once? Download the template, fill it in with Excel or Google Sheets, save it as CSV, then use Import. Re-importing an edited file updates the matching records instead of duplicating them."
+#~ msgstr "Adding a lot at once? Download the template, fill it in with Excel or Google Sheets, save it as CSV, then use Import. Re-importing an edited file updates the matching records instead of duplicating them."
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Adding a lot at once? Download the template, fill it in with Excel or Google Sheets, save it as CSV, then use Import. Re-importing an edited file updates the matching records instead of duplicating them. Rows that repeat a name already used in the same category are skipped and reported rather than overwriting the earlier row."
+msgstr "Adding a lot at once? Download the template, fill it in with Excel or Google Sheets, save it as CSV, then use Import. Re-importing an edited file updates the matching records instead of duplicating them. Rows that repeat a name already used in the same category are skipped and reported rather than overwriting the earlier row."
 
 #: apps/remix/app/components/dialogs/team-checkout-create-dialog.tsx
 msgid "Adding and removing seats will adjust your invoice accordingly."
@@ -3298,6 +3306,10 @@ msgstr "Disconnect"
 msgid "Discovery / Well-Known URL"
 msgstr "Discovery / Well-Known URL"
 
+#: apps/remix/app/components/general/push-notification-banner.tsx
+msgid "Dismiss"
+msgstr "Dismiss"
+
 #: apps/remix/app/components/general/teams/team-email-usage.tsx
 msgid "Display your name and email in documents"
 msgstr "Display your name and email in documents"
@@ -4093,6 +4105,7 @@ msgstr "Email-to-Sign Inbox"
 msgid "Empty field"
 msgstr "Empty field"
 
+#: apps/remix/app/components/general/push-notification-banner.tsx
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "Enable"
 msgstr "Enable"
@@ -4673,6 +4686,10 @@ msgstr "has invited you to sign this document"
 #: apps/remix/app/components/general/document-signing/document-signing-page-view.tsx
 msgid "has invited you to view this document"
 msgstr "has invited you to view this document"
+
+#: apps/remix/app/components/general/redeem-license-key-card.tsx
+msgid "Have an activation key? Enter it to unlock your plan without a card. The key is single-use."
+msgstr "Have an activation key? Enter it to unlock your plan without a card. The key is single-use."
 
 #: packages/ui/primitives/template-flow/add-template-placeholder-recipients.tsx
 #: packages/ui/primitives/template-flow/add-template-placeholder-recipients.tsx
@@ -6052,8 +6069,12 @@ msgid "Only admins can access and view the document"
 msgstr "Only admins can access and view the document"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-msgid "Only Category + Name are required. Name match is case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign request)."
-msgstr "Only Category + Name are required. Name match is case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign request)."
+msgid "Only Category + Name are required. <0>Name identifies the record and must be unique within its category</0> — two people cannot share one name, so give each signee their own (put a job title in Role, not in Name). Name match is case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign request)."
+msgstr "Only Category + Name are required. <0>Name identifies the record and must be unique within its category</0> — two people cannot share one name, so give each signee their own (put a job title in Role, not in Name). Name match is case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign request)."
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+#~ msgid "Only Category + Name are required. Name match is case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign request)."
+#~ msgstr "Only Category + Name are required. Name match is case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign request)."
 
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Only managers and above can access and view the document"
@@ -6882,6 +6903,10 @@ msgstr "Recycle bin is empty"
 #: packages/ui/primitives/signature-pad/signature-pad-color-picker.tsx
 msgid "Red"
 msgstr "Red"
+
+#: apps/remix/app/components/general/redeem-license-key-card.tsx
+msgid "Redeem a license key"
+msgstr "Redeem a license key"
 
 #: apps/remix/app/components/embed/authoring/configure-document-advanced-settings.tsx
 #: packages/ui/primitives/template-flow/add-template-settings.tsx
@@ -9324,6 +9349,10 @@ msgstr "Turn on"
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "Turn on browser notifications to start receiving pushes."
 msgstr "Turn on browser notifications to start receiving pushes."
+
+#: apps/remix/app/components/general/push-notification-banner.tsx
+msgid "Turn on notifications for HubSign so you don't miss a document to sign."
+msgstr "Turn on notifications for HubSign so you don't miss a document to sign."
 
 #: apps/remix/app/routes/_authenticated+/settings+/security._index.tsx
 msgid "Two factor authentication"

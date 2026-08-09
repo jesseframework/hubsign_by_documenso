@@ -876,6 +876,10 @@ msgstr "Aktion"
 msgid "Actions"
 msgstr "Aktionen"
 
+#: apps/remix/app/components/general/redeem-license-key-card.tsx
+msgid "Activate"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.members.tsx
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
@@ -1097,7 +1101,11 @@ msgid "Add-ons"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-msgid "Adding a lot at once? Download the template, fill it in with Excel or Google Sheets, save it as CSV, then use Import. Re-importing an edited file updates the matching records instead of duplicating them."
+#~ msgid "Adding a lot at once? Download the template, fill it in with Excel or Google Sheets, save it as CSV, then use Import. Re-importing an edited file updates the matching records instead of duplicating them."
+#~ msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Adding a lot at once? Download the template, fill it in with Excel or Google Sheets, save it as CSV, then use Import. Re-importing an edited file updates the matching records instead of duplicating them. Rows that repeat a name already used in the same category are skipped and reported rather than overwriting the earlier row."
 msgstr ""
 
 #: apps/remix/app/components/dialogs/team-checkout-create-dialog.tsx
@@ -3303,6 +3311,10 @@ msgstr ""
 msgid "Discovery / Well-Known URL"
 msgstr ""
 
+#: apps/remix/app/components/general/push-notification-banner.tsx
+msgid "Dismiss"
+msgstr ""
+
 #: apps/remix/app/components/general/teams/team-email-usage.tsx
 msgid "Display your name and email in documents"
 msgstr "Zeigen Sie Ihren Namen und Ihre E-Mail in Dokumenten an"
@@ -4098,6 +4110,7 @@ msgstr ""
 msgid "Empty field"
 msgstr "Leeres Feld"
 
+#: apps/remix/app/components/general/push-notification-banner.tsx
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "Enable"
 msgstr ""
@@ -4678,6 +4691,10 @@ msgstr "hat Sie eingeladen, dieses Dokument zu unterzeichnen"
 #: apps/remix/app/components/general/document-signing/document-signing-page-view.tsx
 msgid "has invited you to view this document"
 msgstr "hat Sie eingeladen, dieses Dokument anzusehen"
+
+#: apps/remix/app/components/general/redeem-license-key-card.tsx
+msgid "Have an activation key? Enter it to unlock your plan without a card. The key is single-use."
+msgstr ""
 
 #: packages/ui/primitives/template-flow/add-template-placeholder-recipients.tsx
 #: packages/ui/primitives/template-flow/add-template-placeholder-recipients.tsx
@@ -6057,8 +6074,12 @@ msgid "Only admins can access and view the document"
 msgstr "Nur Administratoren können auf das Dokument zugreifen und es anzeigen"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
-msgid "Only Category + Name are required. Name match is case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign request)."
+msgid "Only Category + Name are required. <0>Name identifies the record and must be unique within its category</0> — two people cannot share one name, so give each signee their own (put a job title in Role, not in Name). Name match is case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign request)."
 msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+#~ msgid "Only Category + Name are required. Name match is case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign request)."
+#~ msgstr ""
 
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Only managers and above can access and view the document"
@@ -6887,6 +6908,10 @@ msgstr ""
 #: packages/ui/primitives/signature-pad/signature-pad-color-picker.tsx
 msgid "Red"
 msgstr "Rot"
+
+#: apps/remix/app/components/general/redeem-license-key-card.tsx
+msgid "Redeem a license key"
+msgstr ""
 
 #: apps/remix/app/components/embed/authoring/configure-document-advanced-settings.tsx
 #: packages/ui/primitives/template-flow/add-template-settings.tsx
@@ -9326,6 +9351,10 @@ msgstr ""
 
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "Turn on browser notifications to start receiving pushes."
+msgstr ""
+
+#: apps/remix/app/components/general/push-notification-banner.tsx
+msgid "Turn on notifications for HubSign so you don't miss a document to sign."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/settings+/security._index.tsx

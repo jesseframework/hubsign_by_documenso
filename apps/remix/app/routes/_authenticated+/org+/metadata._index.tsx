@@ -534,16 +534,20 @@ export default function MetadataPage() {
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">
           <Trans>
-            Only Category + Name are required. Name match is case-insensitive. Keywords let a
-            workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this
-            record's signee/vendor is used (e.g. to trigger a sign request).
+            Only Category + Name are required. <strong>Name identifies the record and must be
+            unique within its category</strong> — two people cannot share one name, so give each
+            signee their own (put a job title in Role, not in Name). Name match is
+            case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data
+            — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign
+            request).
           </Trans>
         </p>
         <p className="mt-1 text-[11px] text-muted-foreground">
           <Trans>
             Adding a lot at once? Download the template, fill it in with Excel or Google Sheets,
             save it as CSV, then use Import. Re-importing an edited file updates the matching
-            records instead of duplicating them.
+            records instead of duplicating them. Rows that repeat a name already used in the same
+            category are skipped and reported rather than overwriting the earlier row.
           </Trans>
         </p>
       </div>
