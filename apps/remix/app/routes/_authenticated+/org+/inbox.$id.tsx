@@ -481,10 +481,22 @@ export default function InboxItemPage() {
               </Button>
 
               <div className="mt-4">
+                {/*
+                  Withheld while OCR is reading. This page is reachable by URL and
+                  can already be open when a re-read starts, so guarding the list's
+                  Review button is not enough on its own — and sending is the
+                  consequential action: it puts an invoice in front of a signer
+                  before anyone could have checked the figures it was read as.
+                */}
                 <Button
                   size="sm"
                   className="w-full"
-                  disabled={send.isPending}
+                  disabled={send.isPending || item.status === 'OCR_PROCESSING'}
+                  title={
+                    item.status === 'OCR_PROCESSING'
+                      ? _(msg`Wait for OCR to finish before sending`)
+                      : undefined
+                  }
                   onClick={() => {
                     const recipients = rows
                       .filter((r) => /\S+@\S+\.\S+/.test(r.email))
@@ -499,6 +511,14 @@ export default function InboxItemPage() {
                   <SendIcon className="mr-1.5 h-4 w-4" />
                   <Trans>Send for signature</Trans>
                 </Button>
+                {item.status === 'OCR_PROCESSING' && (
+                  <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
+                    <Trans>
+                      OCR is still reading this document. The extracted figures may be
+                      incomplete until it finishes.
+                    </Trans>
+                  </p>
+                )}
                 <p className="mt-2 text-[11px] text-muted-foreground">
                   <Trans>
                     Need to place signature fields precisely? Use "Open in editor" for the full

@@ -5975,6 +5975,14 @@ msgstr ""
 msgid "OCR is running…"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "OCR is still reading this document"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "OCR is still reading this document. The extracted figures may be incomplete until it finishes."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
 msgid "OCR Processing Queue"
 msgstr ""
@@ -6766,6 +6774,10 @@ msgstr "Leggi l'intera <0>divulgazione della firma</0>."
 
 #: apps/remix/app/routes/_authenticated+/doc-merge.tsx
 msgid "Reading PDFs…"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Reading…"
 msgstr ""
 
 #: apps/remix/app/components/general/document/document-page-view-recipients.tsx
@@ -9969,6 +9981,10 @@ msgstr "Visualizzatori"
 #: packages/lib/constants/recipient-roles.ts
 msgid "Viewing"
 msgstr "Visualizzazione"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+msgid "Wait for OCR to finish before sending"
+msgstr ""
 
 #: apps/remix/app/components/general/stack-avatars-with-tooltip.tsx
 msgid "Waiting"

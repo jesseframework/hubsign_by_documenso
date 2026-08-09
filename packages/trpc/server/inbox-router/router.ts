@@ -164,6 +164,19 @@ export const inboxRouter = router({
       });
       if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'Inbox item not found.' });
 
+      // Refuse while OCR is still reading. The UI hides the button, but that alone
+      // is not a guard: this page can already be open when a re-read starts, and
+      // the endpoint is reachable directly. Sending here would put an invoice in
+      // front of a signer whose figures nobody could have checked, because they
+      // were not extracted yet — and the extraction that lands afterwards would
+      // overwrite what was sent.
+      if (item.status === 'OCR_PROCESSING') {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'OCR is still reading this document. Wait for it to finish before sending.',
+        });
+      }
+
       // Create any new signers (deduped by email).
       const existingEmails = new Set(item.document.recipients.map((r) => r.email.toLowerCase()));
       for (const r of input.recipients) {

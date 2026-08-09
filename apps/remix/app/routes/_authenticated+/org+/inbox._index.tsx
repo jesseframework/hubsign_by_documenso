@@ -138,6 +138,17 @@ export function meta() {
   return appMetaTags('Signature Inbox');
 }
 
+/**
+ * Whether OCR is still reading this item, so its extracted data is not yet
+ * trustworthy.
+ *
+ * Only the active window counts. `PENDING` (queued, not started) and `OCR_FAILED`
+ * are deliberately excluded: an item that never got picked up, or whose read
+ * failed, has to stay openable or it becomes unreachable — the reviewer needs to
+ * see it in order to do anything about it.
+ */
+const isOcrInFlight = (status: string): boolean => status === 'OCR_PROCESSING';
+
 const ocrBadge = (status: string): string => {
   switch (status) {
     case 'OCR_PROCESSING':
@@ -737,21 +748,60 @@ export default function SignatureInboxPage() {
                     {/* Actions */}
                     <td className="px-4 py-3 align-top">
                       <div className="flex items-center justify-end gap-1">
-                        <Link to={`/org/inbox/${item.id}`}>
-                          <Button size="sm" className="h-7 text-[11px]">
-                            <ScanLineIcon className="mr-1 h-3.5 w-3.5" />
-                            <Trans>Review</Trans>
+                        {/*
+                          Review is withheld while OCR is running: the extracted
+                          fields are what the reviewer is there to check, and
+                          opening the item mid-read shows them blank or partial,
+                          which invites approving figures that have not been read
+                          yet. Rendered as a disabled button rather than a disabled
+                          Button inside the Link — the Link would still navigate,
+                          since it captures the click before the button sees it.
+                          The row updates itself when OCR finishes, so this
+                          re-enables without a refresh.
+                        */}
+                        {isOcrInFlight(item.status) ? (
+                          <Button
+                            size="sm"
+                            className="h-7 text-[11px]"
+                            disabled
+                            title={_(msg`OCR is still reading this document`)}
+                          >
+                            <RefreshCwIcon className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            <Trans>Reading…</Trans>
                           </Button>
-                        </Link>
+                        ) : (
+                          <Link to={`/org/inbox/${item.id}`}>
+                            <Button size="sm" className="h-7 text-[11px]">
+                              <ScanLineIcon className="mr-1 h-3.5 w-3.5" />
+                              <Trans>Review</Trans>
+                            </Button>
+                          </Link>
+                        )}
+                        {/*
+                          Re-run OCR stays available even while a read is in
+                          flight — it is the only way to recover an item that has
+                          stuck in OCR_PROCESSING, and disabling it there would
+                          leave the row with no action but Archive.
+
+                          Scoped to the row being re-run: `reprocess.isPending`
+                          alone disabled the button on every row at once, because
+                          one mutation hook serves the whole table.
+                        */}
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-7 text-[11px]"
                           title={_(msg`Re-run OCR`)}
-                          disabled={reprocess.isPending}
+                          disabled={reprocess.isPending && reprocess.variables?.id === item.id}
                           onClick={() => reprocess.mutate({ id: item.id })}
                         >
-                          <RefreshCwIcon className="h-3.5 w-3.5" />
+                          <RefreshCwIcon
+                            className={`h-3.5 w-3.5 ${
+                              reprocess.isPending && reprocess.variables?.id === item.id
+                                ? 'animate-spin'
+                                : ''
+                            }`}
+                          />
                         </Button>
                         {item.status !== 'ARCHIVED' && (
                           <Button
