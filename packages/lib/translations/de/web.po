@@ -7731,6 +7731,10 @@ msgstr "Anmelden"
 msgid "Sign in to your account"
 msgstr "Melden Sie sich bei Ihrem Konto an"
 
+#: apps/remix/app/components/general/app-topbar.tsx
+msgid "Sign out"
+msgstr ""
+
 #: apps/remix/app/components/general/menu-switcher.tsx
 #: apps/remix/app/components/general/app-nav-mobile.tsx
 msgid "Sign Out"
