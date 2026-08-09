@@ -1,0 +1,64 @@
+---
+title: Email Templates
+description: Reusable email bodies that workflows send by key.
+---
+
+import { Callout } from 'nextra/components';
+
+# Email Templates
+
+**Organization → Email Templates** stores reusable email bodies — subject, HTML and
+plain text — each identified by a **key**.
+
+## Why they exist
+
+A workflow's `SEND_EMAIL` step used to carry its HTML inline, which put markup in a
+JSON editor and meant the same wording had to be pasted into every workflow that sent
+it. A step now references a template by key, so the wording is edited in one place and
+every workflow that uses it follows.
+
+## Creating one
+
+1. **New template**
+2. Give it a **key** — lowercase with hyphens, e.g. `invoice-received`
+3. Write the **subject** and **body**
+4. Save
+
+Use the key from a workflow step:
+
+```json
+{
+  "type": "ACTION",
+  "config": {
+    "action": "SEND_EMAIL",
+    "to": "{{ vars.vendor.email }}",
+    "templateKey": "invoice-received"
+  }
+}
+```
+
+## Placeholders
+
+Bodies render `{{ }}` placeholders against the workflow run — the trigger payload, the
+document, the organization, and any variables the workflow set.
+
+```
+Hello {{ ocr.vendor_name }},
+
+We have received invoice {{ ocr.invoice_number }} for
+{{ ocr.currency }} {{ ocr.total_amount }}.
+```
+
+A placeholder with no matching value renders empty rather than breaking the send.
+
+<Callout type="warning">
+  If a workflow references a key that does not exist, the step is **skipped** — no
+  email is sent, and nothing falls back to a default. Check the key spelling if an
+  expected email never arrives.
+</Callout>
+
+## The plain-text version
+
+Provide one where you can. Some mail clients and most automated filters read it, and
+a missing text part makes a message more likely to be treated as spam. If you leave it
+blank, a stripped version of the HTML is used.

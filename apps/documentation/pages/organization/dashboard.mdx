@@ -1,0 +1,61 @@
+---
+title: Dashboard
+description: Read signing activity for your organization, with date ranges and auto-refresh.
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Dashboard
+
+**Organization → Dashboard** reports live signing activity for your whole
+organization, not just your own documents.
+
+## What it shows
+
+| Group | Figures |
+|---|---|
+| **Headline** | Documents sent, completed, pending, rejected |
+| **Performance** | Completion rate, average turnaround time |
+| **Trend** | Volume over time, and month-on-month change |
+| **People** | Per-member activity, and slowest recipients |
+
+Every number is computed from your organization's own documents. Nothing on this
+page is a sample or a placeholder.
+
+## Using it
+
+<Steps>
+### Choose a period
+
+Use the date range control for a preset period or a custom window. Buckets switch
+from daily to monthly automatically once the span passes about two months, so a
+year-long view stays readable.
+
+### Turn on auto-refresh
+
+Pick a refresh interval if you are watching activity live — during a month-end
+push, for example. The choice is remembered in your browser, so it persists
+between visits without affecting anyone else.
+
+### Read the comparison card carefully
+
+The month-on-month figure compares **matching windows**: the first four days of
+this month against the first four days of last month, not against a full month.
+That is deliberate. Comparing four days against thirty produces a meaningless
+number.
+</Steps>
+
+<Callout type="info">
+  Charts use your organization's brand colour, set under
+  [Settings & Branding](/organization/settings).
+</Callout>
+
+## If a figure looks wrong
+
+**Numbers lower than expected.** The dashboard counts documents that belong to the
+organization. A document created by someone before they were converted to a member
+may be attributed to them personally instead.
+
+**A completion rate of zero with documents present.** Check whether those
+documents are still `PENDING` — sent but not yet signed. The dashboard counts
+completions, not sends.

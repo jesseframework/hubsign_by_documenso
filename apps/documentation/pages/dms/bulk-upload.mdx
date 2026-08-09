@@ -1,0 +1,67 @@
+---
+title: Bulk Upload
+description: Import a backlog of documents with shared metadata.
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Bulk Upload
+
+**Doc Manager → Bulk Upload** imports many files at once, applying the same metadata to
+all of them.
+
+## How it works
+
+<Steps>
+### Drop the files
+
+Drag and drop, or click to browse. The whole set is staged before anything is imported.
+
+### Set the shared metadata
+
+Choose document type, classification, filing location and confidentiality, then
+**Apply to all** files.
+
+### Adjust individual files
+
+Override anything that differs on a per-file basis before importing.
+
+### Import
+
+Files are created as records with the metadata you set.
+</Steps>
+
+## Import in batches that share metadata
+
+The feature applies one set of metadata to the whole drop, so the batch you choose defines
+how much correcting you do afterwards.
+
+Import *one bin at a time* — all of 2024-Q1 accounts payable, then all of 2024-Q2 — rather
+than a mixed pile. The metadata is then genuinely identical for every file, and *Apply to
+all* is the only step you need.
+
+<Callout type="warning">
+  **Settle your [filing structure](/dms/filing) and
+  [retention templates](/dms/compliance) before a large import.** Re-filing and
+  reclassifying hundreds of imported records is the most avoidable work in setting up a
+  DMS, and bulk upload is where that mistake gets made at scale.
+</Callout>
+
+## Filenames
+
+Whatever convention your files already carry is worth preserving in the record title —
+someone will search for the filename they remember. If the source filenames are
+meaningless scanner output (`doc28491020260416133906.pdf`), the title is the one piece of
+metadata worth correcting per file, because search cannot rescue a title nobody would ever
+type.
+
+## Physical records
+
+If the batch corresponds to a physical box, set the format to `BOTH` and the filing
+location to that bin. The import then gives you a searchable index of a box you can still
+put your hands on.
+
+## After importing
+
+Check the [OCR Queue](/dms/ocr-ai) — a large import will take time to process, and OCR
+is what makes the contents searchable rather than just the metadata.

@@ -1,0 +1,53 @@
+---
+title: Compliance Templates
+description: Reusable retention schedules for document types and industries.
+---
+
+import { Callout } from 'nextra/components';
+
+# Compliance Templates
+
+**Doc Manager → Compliance** holds pre-configured **retention schedules** for different
+document types and industries — so "how long do we keep this?" is answered once and applied
+consistently.
+
+## Why templates rather than per-document
+
+Retention set per document drifts. Two people file the same kind of contract a month apart
+and pick different periods; a year later nobody can say which is right. A template attaches
+the period to the **kind** of record, so every document of that type inherits it.
+
+It also means a policy change is made in one place.
+
+## Creating one
+
+**Create Template**, then define the document type it applies to and the retention period.
+
+Templates are the input to [Retention & Disposal](/dms/retention): when a document's
+retention period elapses, it appears there as due for review.
+
+<Callout type="warning">
+  **Retention periods are a legal and policy question, not a technical one.** HubSign will
+  apply whatever schedule you give it. The periods appropriate to your records depend on
+  your jurisdiction, industry and any live litigation or audit. Have them confirmed by
+  whoever owns records policy before relying on them.
+</Callout>
+
+## What a schedule needs to say
+
+At minimum, for each document type:
+
+- **How long** it must be kept
+- **From when** — creation, or a business event such as contract end or final payment
+- **What happens next** — destroy, or archive indefinitely
+
+The "from when" is the part most often left vague and the part that causes the most
+trouble later. *Seven years from the end of the contract* and *seven years from filing*
+are different dates, and only one of them is what a regulator asked for.
+
+## A practical starting point
+
+Rather than templating everything at once, template the categories where you have the most
+volume and the clearest obligation — typically finance records. Leave low-volume or
+uncertain categories out until their policy is settled; an unclear schedule applied to
+thousands of records is worse than no schedule.

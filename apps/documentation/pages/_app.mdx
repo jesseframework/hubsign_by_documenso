@@ -1,10 +1,9 @@
-import { PlausibleProvider } from '../providers/plausible.tsx';
 import '../styles.css';
 
 export default function App({ Component, pageProps }) {
-  return (
-    <PlausibleProvider>
-      <Component {...pageProps} />
-    </PlausibleProvider>
-  );
+  // The upstream app wrapped every page in a Plausible provider reporting to
+  // `documenso.com`, so page views on this portal were attributed to another
+  // party's analytics. Removed rather than repointed: an internal documentation
+  // site has no need to send its traffic anywhere.
+  return <Component {...pageProps} />;
 }

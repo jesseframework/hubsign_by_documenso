@@ -1,3 +1,128 @@
 @tailwind base;
-@tailwind ;
+@tailwind components;
 @tailwind utilities;
+
+/*
+ * HubSign brand.
+ *
+ * The wordmark from hubsign.io is a PNG whose "HubSign" text is near-black. On
+ * Nextra's dark background that text vanishes, and a CSS invert would drag the
+ * purple mark off-brand with it. So dark mode places the artwork on a white
+ * chip: the logo keeps its exact colours in both themes and stays legible.
+ */
+.hubsign-logo img {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+
+.dark .hubsign-logo {
+  background: #fff;
+  border-radius: 8px;
+  padding: 5px 9px;
+}
+
+/* Same treatment for the larger logo on the landing page. */
+.hubsign-logo-hero img {
+  height: 64px;
+  width: auto;
+}
+
+.dark .hubsign-logo-hero {
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px 22px;
+}
+
+/*
+ * The Future Edge logo is the mirror problem: its "FUTUREEDGE TECHNOLOGY"
+ * lettering is white, drawn for the dark site footer, so it disappears against a
+ * light background. Light mode therefore gets the dark chip — the opposite of
+ * the HubSign wordmark above.
+ */
+.futureedge-logo img {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+
+.futureedge-logo {
+  background: #1c1c20;
+  border-radius: 6px;
+  padding: 5px 9px;
+}
+
+.dark .futureedge-logo {
+  background: transparent;
+  padding: 0;
+}
+
+/* Footer: a brand accent rule across the top, as on hubsign.io. */
+.hubsign-footer {
+  position: relative;
+}
+
+.hubsign-footer::before {
+  content: '';
+  position: absolute;
+  top: -3rem;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #7c3aed, #a855f7 55%, transparent);
+}
+
+/* The footer logo sits in a tighter column than the header one. */
+.hubsign-footer .hubsign-logo img {
+  height: 34px;
+}
+
+/*
+ * Landing-page backdrop.
+ *
+ * Replaces the upstream project's background-pattern.png — which was their
+ * artwork, and the last asset this page borrowed from them. Drawn in CSS instead
+ * of shipping an image: two brand-purple glows behind the hero, over a faint
+ * grid. Nothing to download, scales to any viewport, and the colour is the same
+ * purple as the logo rather than an approximation of it.
+ */
+.hubsign-hero-bg {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  pointer-events: none;
+  background-image:
+    /* Grid, kept very light so text stays the focus. */
+    linear-gradient(to right, rgba(124, 58, 237, 0.06) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(124, 58, 237, 0.06) 1px, transparent 1px),
+    /* Two offset glows, brighter one upper-left behind the logo. */
+    radial-gradient(60rem 40rem at 18% -8%, rgba(124, 58, 237, 0.22), transparent 65%),
+    radial-gradient(50rem 34rem at 88% 6%, rgba(168, 85, 247, 0.16), transparent 60%);
+  background-size:
+    3rem 3rem,
+    3rem 3rem,
+    100% 100%,
+    100% 100%;
+}
+
+/* The grid reads as dirt on a dark background; the glows carry it instead. */
+.dark .hubsign-hero-bg {
+  background-image:
+    linear-gradient(to right, rgba(168, 85, 247, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(168, 85, 247, 0.05) 1px, transparent 1px),
+    radial-gradient(60rem 40rem at 18% -8%, rgba(124, 58, 237, 0.3), transparent 65%),
+    radial-gradient(50rem 34rem at 88% 6%, rgba(88, 28, 135, 0.28), transparent 60%);
+  background-size:
+    3rem 3rem,
+    3rem 3rem,
+    100% 100%,
+    100% 100%;
+}
+
+/* Fades the grid out down the page so long content is not sitting on graph paper. */
+.hubsign-hero-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, transparent 0%, hsl(var(--nextra-bg)) 78%);
+}

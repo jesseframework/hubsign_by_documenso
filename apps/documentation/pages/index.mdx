@@ -1,73 +1,160 @@
 ---
 title: Home
-description: Documenso aims to be the world's most trusted document-signing tool. Join us in creating the next generation of open trust infrastructure.
+description: HubSign documentation — electronic signature, organization administration, and integration with your ERP and accounting systems.
 ---
 
-import Image from 'next/image';
 import Link from 'next/link';
 
-import backgroundPattern from '@documenso/assets/images/background-pattern.png';
-import cardBeautifulFigure from '@documenso/assets/images/card-beautiful-figure.png';
-import cardConnectionsFigure from '@documenso/assets/images/card-connections-figure.png';
-import cardPaidFigure from '@documenso/assets/images/card-paid-figure.png';
-import cardSharingFigure from '@documenso/assets/images/card-sharing-figure.png';
-import { cn } from '@documenso/ui/lib/utils';
-import { Card, CardContent, CardTitle } from '@documenso/ui/primitives/card';
+export const Wrapper = ({ children }) => <div className="mt-16 pb-20">{children}</div>;
 
-export const Wrapper = ({ children }) => {
-  return <div className="mt-20">{children}</div>;
-};
+export const Tile = ({ href, eyebrow, title, children }) => (
+  <Link
+    href={href}
+    className="group border-border bg-background/60 hover:border-primary/60 hover:bg-background block rounded-xl border p-6 no-underline backdrop-blur transition dark:bg-black/20"
+  >
+    <span className="text-primary text-[11px] font-semibold uppercase tracking-[0.08em]">
+      {eyebrow}
+    </span>
+    <strong className="group-hover:text-primary mt-1.5 block text-lg font-semibold tracking-tight transition">
+      {title}
+    </strong>
+    <span className="text-foreground/70 mt-2 block text-sm leading-relaxed">{children}</span>
+  </Link>
+);
+
+export const Step = ({ n, title, children }) => (
+  <div className="flex gap-4">
+    <span className="bg-primary/10 text-primary flex h-8 w-8 flex-none items-center justify-center rounded-full text-sm font-semibold">
+      {n}
+    </span>
+    <span>
+      <strong className="block text-[15px] font-semibold tracking-tight">{title}</strong>
+      <span className="text-foreground/70 mt-1 block text-sm leading-relaxed">{children}</span>
+    </span>
+  </div>
+);
 
 <Wrapper>
-  <div
-    className="fixed inset-0 -z-10 bg-center -mt-[15vh] h-full scale-125 object-cover dark:contrast-[70%] dark:invert dark:sepia md:scale-150 lg:scale-[175%] opacity-40 dark:opacity-20"
-    style={{
-      backgroundImage: `url('${backgroundPattern.src}')`,
-    }}
-  />
-  <div className="flex flex-col items-center mb-16">
-    <span className="text-center text-4xl font-bold leading-tight tracking-tight md:text-[48px] lg:text-[64px]">Document signing, finally open source</span>
-    <span className="text-muted-foreground mx-auto mt-4 max-w-2xl text-center leading-normal tracking-tight">Documenso aims to be the world's most trusted document-signing tool. Join us in creating the next generation of open trust infrastructure.</span>
+  {/* HubSign backdrop: brand-purple glow plus a faint grid, drawn in CSS. */}
+  <div className="hubsign-hero-bg" aria-hidden="true" />
 
+  {/* ── Hero ─────────────────────────────────────────────────────────── */}
+
+  <div className="flex flex-col items-center text-center">
+    <span className="hubsign-logo-hero mb-9 inline-flex">
+      <img src="/hubsign-logo.png" alt="HubSign" />
+    </span>
+
+    <h1 className="max-w-3xl text-4xl font-bold leading-[1.1] tracking-tight md:text-5xl lg:text-[56px]">
+      Documentation
+    </h1>
+
+    <p className="text-muted-foreground mx-auto mt-5 max-w-2xl text-base leading-relaxed tracking-tight md:text-lg">
+      Everything you need to send documents for signature, administer your
+      organization, and connect signed results to the systems that use them.
+    </p>
+
+    <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
+      <Link
+        href="/manual"
+        className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-5 py-2.5 text-sm font-semibold no-underline transition"
+      >
+        Read the manual →
+      </Link>
+      <Link
+        href="/organization"
+        className="border-border hover:border-primary/60 hover:text-primary rounded-lg border px-5 py-2.5 text-sm font-semibold no-underline transition"
+      >
+        Browse the guides
+      </Link>
+    </div>
+
+    <p className="text-muted-foreground/70 mt-6 text-xs">
+      Press <kbd className="border-border rounded border px-1.5 py-0.5 font-sans">⌘ K</kbd> to
+      search everything.
+    </p>
   </div>
 
-  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-8 md:mt-8">
-    <Link href="/users">
-      <Card className="col-span-2 lg:col-span-1 h-full dark:bg-black/10 dark:border dark:border-stone-800">
-        <CardContent className="grid grid-cols-1 gap-8 p-6 max-h-[460px]">
-          <span className="text-foreground/80 leading-relaxed">
-            <strong className="block text-2xl font-normal mb-2 tracking-tight">Learn</strong>
-            Learn how to get started with your account and leverage our advanced features to level up your productivity.
-          </span>
-          <div className="flex items-center justify-center p-8 flex-grow">
-            <Image
-              src={cardBeautifulFigure}
-              alt="its fast"
-              className="w-full max-w-xs dark:contrast-[70%] dark:hue-rotate-180 dark:invert"
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+  {/* ── New here ─────────────────────────────────────────────────────── */}
 
-    <Link href='/developers'>
-      <Card className="col-span-2 lg:col-span-1 h-full dark:bg-black/10 dark:border dark:border-stone-800">
-        <CardContent className="grid grid-cols-1 gap-8 p-6 max-h-[460px]">
-          <span className="text-foreground/80 leading-relaxed">
-            <strong className="block text-2xl font-normal mb-2 tracking-tight">Build</strong>
-            Everything you need to set up your local development environment.
-            Use our API and utilize webhooks for seamless integration.
-          </span>
-          <div className="flex items-center justify-center p-8 flex-grow">
-            <Image
-              src={cardConnectionsFigure}
-              alt="its fast"
-              className="w-full max-w-sm dark:contrast-[70%] dark:hue-rotate-180 dark:invert"
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+  <div className="border-border/70 bg-background/50 mt-20 rounded-2xl border p-7 backdrop-blur dark:bg-black/20">
+    <strong className="text-[15px] font-semibold tracking-tight">New to HubSign?</strong>
+    <p className="text-foreground/70 mt-1 text-sm">Sending your first document takes four steps.</p>
 
+    <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <Step n="1" title="Upload">
+        Drop a PDF into E-Sign, or let it arrive by email in the Signature Inbox.
+      </Step>
+      <Step n="2" title="Prepare">
+        Add recipients, then place signature and data fields for each of them.
+      </Step>
+      <Step n="3" title="Send">
+        Each recipient gets a private link. No account needed to sign.
+      </Step>
+      <Step n="4" title="Done">
+        The PDF is sealed with an audit certificate and a digital signature.
+      </Step>
+    </div>
   </div>
+
+  {/* ── Sections ─────────────────────────────────────────────────────── */}
+
+  <h2 className="mt-20 text-xl font-semibold tracking-tight">Browse by topic</h2>
+
+  <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+    <Tile href="/organization" eyebrow="Administer" title="Organization">
+      Members and seats, branding, the invoice inbox, business rules, approvals,
+      workflows and notifications.
+    </Tile>
+
+    <Tile href="/dms" eyebrow="Records" title="Doc Manager">
+      Filing structure, retention and disposal, retrieval of physical files,
+      permissions and audit.
+    </Tile>
+
+    <Tile href="/users/signing-documents" eyebrow="Sign" title="Signing Documents">
+      Upload, place fields, choose recipients and signing order, and send for
+      signature.
+    </Tile>
+
+    <Tile href="/organization/signature-inbox" eyebrow="Automate" title="Signature Inbox">
+      Invoices emailed straight in, read by OCR, reviewed, approved and sent for
+      signature.
+    </Tile>
+
+    <Tile href="/organization/business-rules" eyebrow="Control" title="Business Rules">
+      Refuse a signature when the data is wrong — no PO number, an amount over
+      threshold, a low-confidence read.
+    </Tile>
+
+    <Tile href="/integrations" eyebrow="Connect" title="ERP & Accounting">
+      Post signed invoices to your ledger with webhooks, the REST API or a
+      workflow — with worked examples.
+    </Tile>
+  </div>
+
+  {/* ── Reference ────────────────────────────────────────────────────── */}
+
+  <h2 className="mt-16 text-xl font-semibold tracking-tight">Reference</h2>
+
+  <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
+    <Tile href="/manual" eyebrow="Everything" title="Full Manual">
+      Every feature in one page, with all the reference tables — the version to
+      read end to end or print.
+    </Tile>
+
+    <Tile href="/manual#appendix-a--event-reference" eyebrow="Appendix A" title="Event reference">
+      Every webhook event, workflow trigger and business-rule gate — and which of
+      them fire today.
+    </Tile>
+
+    <Tile href="/manual#appendix-b--known-gaps" eyebrow="Appendix B" title="Known gaps">
+      Current limitations, stated plainly, so nothing gets designed around
+      something that is not there.
+    </Tile>
+  </div>
+
+  <p className="text-muted-foreground/70 mt-16 text-center text-xs">
+    HubSign · Powered by FEPRO · Internal documentation
+  </p>
 </Wrapper>

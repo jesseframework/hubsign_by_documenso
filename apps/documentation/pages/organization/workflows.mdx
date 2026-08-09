@@ -1,0 +1,97 @@
+---
+title: Workflows
+description: Automate a sequence of actions from an event, a schedule, or on demand.
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Workflows
+
+**Organization → Workflows** is general automation: a trigger, an optional condition,
+and a graph of steps.
+
+## Triggers
+
+| Trigger | Starts when |
+|---|---|
+| **Event** | Something happens in HubSign — see the table below |
+| **Schedule** | A cron expression fires, in your timezone |
+| **Manual** | You run it from the UI |
+
+### Events that work today
+
+| Event | Fires |
+|---|---|
+| `INBOX_EMAIL_RECEIVED` | An email arrives in the Signature Inbox |
+| `INBOX_OCR_COMPLETED` | OCR finishes reading an inbox item |
+| `DMS_DOCUMENT_FILED` | A document is filed in Doc Manager |
+| `DMS_RETRIEVAL_REQUESTED` | Someone requests a physical document |
+
+<Callout type="warning">
+  The **eSign events** (`DOCUMENT_COMPLETED`, `DOCUMENT_SIGNED` and the rest) are
+  selectable in the builder but **nothing dispatches them yet** — a workflow triggered
+  on `DOCUMENT_COMPLETED` will never run. Use a **webhook** for those; webhooks on the
+  same events do fire. See [ERP & Accounting](/integrations).
+</Callout>
+
+## Steps
+
+| Step | Purpose |
+|---|---|
+| `CONDITION` | Continue only if a rule passes |
+| `BRANCH` | Fork the path |
+| `SET_VARIABLE` | Compute a value into the run |
+| `ACTION` | Do something |
+
+## Actions
+
+| Action | Does |
+|---|---|
+| `SEND_EMAIL` | Sends an email, optionally rendering a saved [Email Template](/organization/email-templates) by key |
+| `HTTP_REQUEST` | Calls an external URL — the integration workhorse |
+| `NOTIFY` | Raises an in-app notification |
+| `SEND_FOR_SIGNATURE` | Sends a document for signature, optionally adding recipients |
+| `LOOKUP_METADATA` | Matches against your metadata records to enrich the run |
+
+Any string in a step supports `{{ }}` templating against the run — the trigger
+payload, the document, the organization, and variables you have set.
+
+## Building one
+
+<Steps>
+### Pick the trigger
+
+Start with an event that actually fires. `INBOX_OCR_COMPLETED` is the most useful
+starting point for invoice automation — the data has been read by then.
+
+### Add a condition if it should not always run
+
+The trigger can carry a condition, so the workflow only starts for documents you
+care about.
+
+### Add actions
+
+Keep the first version to a single action you can observe — a `NOTIFY` or an email to
+yourself. Confirm it fires before adding anything that writes to another system.
+
+### Enable it
+
+Workflows are created disabled. Nothing happens until you switch it on.
+
+### Watch the runs
+
+The **Runs** view records every execution with per-step status, so a failure shows
+which step failed and why.
+</Steps>
+
+<Callout type="warning">
+  `HTTP_REQUEST` has a timeout but **no automatic retry and no dead-letter queue**. A
+  failed call is recorded on the run and not attempted again. If a call must not be
+  lost, put a queue between HubSign and the destination.
+</Callout>
+
+## Reaching systems outside HubSign
+
+HubSign runs in WorkHub Cloud, so an `HTTP_REQUEST` leaves from there — not from
+inside your network. An address like `https://erp.internal/...` will not resolve. See
+[ERP & Accounting](/integrations) for the options.

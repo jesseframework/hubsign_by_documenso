@@ -1,0 +1,44 @@
+---
+title: Billing & Seats
+description: Where your subscription and seats come from, and what the Billing page shows.
+---
+
+import { Callout } from 'nextra/components';
+
+# Billing & Seats
+
+**Organization → Billing** shows your subscription, seat count and current period as
+provisioned for your tenant.
+
+<Callout type="info">
+  **Seats are purchased in the WorkHub console**, under *My Subscription* — not on
+  this page. HubSign reflects what your tenant has been allocated.
+</Callout>
+
+## Where each thing lives
+
+| | Where | What |
+|---|---|---|
+| Buy or change seats | WorkHub console → *My Subscription* | Subscription and quantity |
+| See seats in use | HubSign → Organization → Billing | Allocation and usage |
+| Assign a seat to a person | HubSign → [Members](/organization/members) | Convert or invite |
+| Mailbox licences for email intake | WorkHub console → *Email → Mailboxes* | The address vendors email |
+
+## What consumes a seat
+
+A seat is consumed **per member who logs in** — not per document, per signature, or
+per recipient.
+
+**Recipients never consume a seat.** People you send documents to sign from an
+emailed link without an account.
+
+Converting a pending user to a member is the moment a seat is spent, and conversion
+is refused when none are free. See [Members & Seats](/organization/members).
+
+## Running out of seats
+
+You will notice it as a refused conversion or a refused invitation. Buy seats in the
+WorkHub console; the new allocation appears here, and the conversion then succeeds.
+
+If someone has left, remove them from Members first — that frees their seat
+immediately and costs nothing. Their documents stay with the organization.

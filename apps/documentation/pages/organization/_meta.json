@@ -1,0 +1,25 @@
+{
+  "index": "Overview",
+  "-- Run the org": {
+    "type": "separator",
+    "title": "Run the organization"
+  },
+  "dashboard": "Dashboard",
+  "members": "Members & Seats",
+  "settings": "Settings & Branding",
+  "billing": "Billing & Seats",
+  "-- Automate": {
+    "type": "separator",
+    "title": "Automate"
+  },
+  "signature-inbox": "Signature Inbox",
+  "business-rules": "Business Rules",
+  "approvals": "Approvals",
+  "workflows": "Workflows",
+  "email-templates": "Email Templates",
+  "-- Connect": {
+    "type": "separator",
+    "title": "Connect"
+  },
+  "teams-notifications": "Microsoft Teams"
+}
