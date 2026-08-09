@@ -23,7 +23,8 @@ export const SITE_URL = (
 ).replace(/\/+$/, '');
 
 /** Where readers should be sent for help. */
-export const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_HUBSIGN_SUPPORT_EMAIL || 'support@hubsign.io';
+export const SUPPORT_EMAIL =
+  process.env.NEXT_PUBLIC_HUBSIGN_SUPPORT_EMAIL || 'support@fepro.io';
 
 /** Build an absolute link into the application. */
 export const appUrl = (path = '') => `${APP_URL}/${String(path).replace(/^\/+/, '')}`;

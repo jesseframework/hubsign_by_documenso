@@ -69,6 +69,22 @@ Verified those listener paths exist (they answer 401 to an unsigned payload rath
 than 404). Leave it off if you would rather build the docs deliberately — nothing
 else depends on them being current.
 
+## Build settings
+
+The site is a static export, so these are inlined at build time. To change one, set
+it in the Komodo build's `build_args` and rebuild — there is nothing to flip on a
+running container.
+
+| Variable | Default |
+|---|---|
+| `NEXT_PUBLIC_HUBSIGN_APP_URL` | `https://app.hubsign.io` |
+| `NEXT_PUBLIC_HUBSIGN_SITE_URL` | `https://hubsign.io` |
+| `NEXT_PUBLIC_HUBSIGN_SUPPORT_EMAIL` | `support@fepro.io` |
+
+Note that MDX does not evaluate an expression inside markdown link syntax —
+`[text]({appUrl('/x')})` renders as a literal relative href. Use a JSX anchor:
+`<a href={appUrl('/x')}>text</a>`.
+
 ## Reverse proxy
 
 Point `docs.hubsign.io` at `172.16.15.52:3010` and terminate TLS there, as for
