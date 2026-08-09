@@ -65,11 +65,22 @@ services:
         sync: false
       - key: NEXT_PRIVATE_STRIPE_WEBHOOK_SECRET
         sync: false
+      # Client-side (pk_live_...) key for embedded checkout — was documented in
+      # .env.example but never wired into this blueprint, so it was likely
+      # never set on the actual service at all. Find it in the Stripe
+      # Dashboard under Developers > API keys (NOT the same as the secret key
+      # above).
+      - key: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+        sync: false
 
       # Features
       - key: NEXT_PUBLIC_POSTHOG_KEY
         sync: false
       - key: NEXT_PUBLIC_FEATURE_BILLING_ENABLED
+        sync: false
+      # "shared" | "dedicated", defaults to "dedicated" if unset. Set to
+      # "shared" only on the main app-hubsign-io production stack.
+      - key: NEXT_PUBLIC_DEPLOYMENT_TYPE
         sync: false
 
       # Storage

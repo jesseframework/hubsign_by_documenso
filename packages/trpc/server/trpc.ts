@@ -2,6 +2,7 @@ import { TRPCError, initTRPC } from '@trpc/server';
 import SuperJSON from 'superjson';
 import type { AnyZodObject } from 'zod';
 
+import { getServerLimits } from '@documenso/ee/server-only/limits/server';
 import { AppError, genericErrorCodeToTrpcErrorCodeMap } from '@documenso/lib/errors/app-error';
 import { getApiTokenByToken } from '@documenso/lib/server-only/public-api/get-api-token-by-token';
 import type { ApiRequestMetadata } from '@documenso/lib/universal/extract-request-metadata';
@@ -186,11 +187,46 @@ export const adminMiddleware = t.middleware(async ({ ctx, next }) => {
 });
 
 /**
+ * Gates a procedure behind DMS entitlement — no server-side check existed
+ * anywhere in `dms-router.ts` before this; the only gate was the client-side
+ * `dms+/_layout.tsx` page component, which blocks the page UI but not the
+ * underlying API. `getServerLimits` already resolves `dmsEnabled` correctly
+ * for both the org-seat add-on path and the standalone individual-DMS-plan
+ * path, so this one check covers every DMS entry point uniformly.
+ */
+export const dmsEntitledMiddleware = t.middleware(async ({ ctx, next }) => {
+  if (!ctx.session || !ctx.user) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'You must be logged in to perform this action.',
+    });
+  }
+
+  const { quota } = await getServerLimits({ email: ctx.user.email });
+
+  if (!quota.dmsEnabled) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'Document Manager is an add-on that is not included in your current plan.',
+    });
+  }
+
+  return await next({
+    ctx: {
+      ...ctx,
+      user: ctx.user,
+      session: ctx.session,
+    },
+  });
+});
+
+/**
  * Routers and Procedures
  */
 export const router = t.router;
 export const procedure = t.procedure;
 export const authenticatedProcedure = t.procedure.use(authenticatedMiddleware);
+export const dmsEntitledProcedure = authenticatedProcedure.use(dmsEntitledMiddleware);
 // While this is functionally the same as `procedure`, it's useful for indicating purpose
 export const maybeAuthenticatedProcedure = t.procedure.use(maybeAuthenticatedMiddleware);
 export const adminProcedure = t.procedure.use(adminMiddleware);

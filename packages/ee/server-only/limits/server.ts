@@ -2,7 +2,7 @@ import { DocumentSource, SubscriptionStatus } from '@prisma/client';
 import { DateTime } from 'luxon';
 
 import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
-import { ORG_SEAT_TIERS } from '@documenso/lib/constants/org-tiers';
+import { ORG_DOC_BLOCK_SIZE, ORG_SEAT_TIERS } from '@documenso/lib/constants/org-tiers';
 import { prisma } from '@documenso/prisma';
 
 import { getDocumentRelatedPrices } from '../stripe/get-document-related-prices.ts';
@@ -51,6 +51,20 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
   // DMS addon overrides dmsEnabled
   if (membership.dmsAddon) {
     seatLimits.dmsEnabled = true;
+  }
+
+  // Purchased document volume blocks (Business-only) stack on top of the
+  // tier's base quota — already `Infinity` for unlimited tiers, so this is a
+  // no-op there.
+  if (tierConfig && Number.isFinite(seatLimits.documents)) {
+    const seatPlan = await prisma.orgSeatPlan.findFirst({
+      where: { organizationId: membership.organizationId, tier: membership.seatTier },
+      select: { docBlockQuantity: true },
+    });
+
+    if (seatPlan?.docBlockQuantity) {
+      seatLimits.documents += seatPlan.docBlockQuantity * ORG_DOC_BLOCK_SIZE;
+    }
   }
 
   // Count usage this month

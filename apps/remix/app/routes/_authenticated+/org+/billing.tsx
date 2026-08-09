@@ -16,10 +16,8 @@ import { useSearchParams } from 'react-router';
 import {
   ORG_DMS_ADDON_DESCRIPTION,
   ORG_DMS_ADDON_FEATURES,
-  ORG_DMS_ADDON_PRICE_CENTS,
-  ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT,
+  ORG_DOC_BLOCK_SIZE,
   ORG_SEAT_TIERS,
-  getOrgYearlyPriceCents,
 } from '@documenso/lib/constants/org-tiers';
 import type { OrgBillingInterval } from '@documenso/lib/constants/org-tiers';
 import { trpc } from '@documenso/trpc/react';
@@ -51,16 +49,15 @@ const TIER_COLORS: Record<keyof typeof ORG_SEAT_TIERS, string> = {
   ENTERPRISE: 'text-amber-600',
 };
 
-// Display-friendly view over the canonical `ORG_SEAT_TIERS` table (dollars instead
-// of cents, '∞' instead of `null`, plus a UI-only accent color per tier).
+// Display-friendly view over the canonical `ORG_SEAT_TIERS` table (limits
+// only — '∞' instead of `null`, plus a UI-only accent color per tier).
+// Pricing is Stripe-authoritative (see `trpc.org.getSeatPricing`), not part
+// of this table.
 const TIER_CONFIG = Object.fromEntries(
   Object.entries(ORG_SEAT_TIERS).map(([tier, config]) => [
     tier,
     {
       name: config.name,
-      price: config.priceCents / 100,
-      yearlyPrice: getOrgYearlyPriceCents(config.priceCents, config.yearlyDiscountPercent) / 100,
-      yearlyDiscountPercent: config.yearlyDiscountPercent,
       docs: config.documents ?? '∞',
       color: TIER_COLORS[tier as keyof typeof ORG_SEAT_TIERS],
       minSeats: config.minSeats,
@@ -70,23 +67,36 @@ const TIER_CONFIG = Object.fromEntries(
   keyof typeof ORG_SEAT_TIERS,
   {
     name: string;
-    price: number;
-    yearlyPrice: number;
-    yearlyDiscountPercent: number;
     docs: number | string;
     color: string;
     minSeats: number;
   }
 >;
 
-const DMS_ADDON_PRICE = ORG_DMS_ADDON_PRICE_CENTS / 100;
-const DMS_ADDON_YEARLY_PRICE =
-  getOrgYearlyPriceCents(ORG_DMS_ADDON_PRICE_CENTS, ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT) / 100;
+type SeatPricing =
+  | {
+      seat: Record<'BUSINESS' | 'ENTERPRISE', { month: number | null; year: number | null }>;
+      dms: Record<'BUSINESS' | 'ENTERPRISE', { month: number | null; year: number | null }>;
+      docBlock: { month: number | null; year: number | null };
+      deployment: 'shared' | 'dedicated';
+    }
+  | undefined;
 
-const seatPriceFor = (tier: string, interval: string) => {
-  const config = TIER_CONFIG[tier as keyof typeof TIER_CONFIG];
-  return interval === 'year' ? config?.yearlyPrice ?? 0 : config?.price ?? 0;
+// Every price display reads through these rather than the raw query result
+// directly, so a still-loading/missing Price consistently shows as $0 instead
+// of each call site needing its own optional-chaining fallback.
+const seatPriceFor = (pricing: SeatPricing, tier: string, interval: string) => {
+  const amounts = pricing?.seat[tier as keyof NonNullable<SeatPricing>['seat']];
+  return ((interval === 'year' ? amounts?.year : amounts?.month) ?? 0) / 100;
 };
+
+const dmsPriceFor = (pricing: SeatPricing, tier: string, interval: string) => {
+  const amounts = pricing?.dms[tier as keyof NonNullable<SeatPricing>['dms']];
+  return ((interval === 'year' ? amounts?.year : amounts?.month) ?? 0) / 100;
+};
+
+const docBlockPriceFor = (pricing: SeatPricing, interval: string) =>
+  ((interval === 'year' ? pricing?.docBlock.year : pricing?.docBlock.month) ?? 0) / 100;
 
 // Static marketing copy (not per-render state), so this lives outside the
 // page component — shown wherever DMS is offered or already included, since
@@ -112,8 +122,6 @@ const DmsFeaturesHoverCard = () => (
   </HoverCard>
 );
 
-const dmsPriceFor = (interval: string) => (interval === 'year' ? DMS_ADDON_YEARLY_PRICE : DMS_ADDON_PRICE);
-
 function OrgBillingPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
@@ -135,6 +143,7 @@ function OrgBillingPage() {
 
   const { data: membership, isLoading } = trpc.org.getMyOrganization.useQuery();
   const { data: seatPlans } = trpc.org.getSeatPlans.useQuery();
+  const { data: pricing } = trpc.org.getSeatPricing.useQuery();
   const setupBilling = trpc.org.setupBilling.useMutation();
   const manageBilling = trpc.org.manageBilling.useMutation();
 
@@ -142,6 +151,8 @@ function OrgBillingPage() {
   const [buyQty, setBuyQty] = useState(ORG_SEAT_TIERS.BUSINESS.minSeats);
   const [buyInterval, setBuyInterval] = useState<OrgBillingInterval>('month');
   const [buyDms, setBuyDms] = useState(false);
+  // Business-only: number of +100/mo document volume blocks to add.
+  const [buyDocBlocks, setBuyDocBlocks] = useState(0);
   const [showBuy, setShowBuy] = useState(false);
   const [embeddedClientSecret, setEmbeddedClientSecret] = useState<string | null>(null);
   // Per-member tier choice for "Give seat", only shown/needed when the org
@@ -176,15 +187,17 @@ function OrgBillingPage() {
   // Keep quantity/DMS defaults in sync with whichever tier is currently
   // selected: topping up an existing tier resets to a single additional
   // seat mirroring its current DMS status; picking a tier with no plan yet
-  // resets to that tier's minimum (Enterprise always includes DMS).
+  // resets to that tier's minimum. DMS is never auto-selected — it's a paid
+  // add-on on every tier now, not bundled into Enterprise.
   useEffect(() => {
     if (existingPlanForSelectedTier) {
       setBuyDms(existingPlanForSelectedTier.dmsEnabled);
       setBuyQty(1);
     } else {
-      setBuyDms(buyTier === 'ENTERPRISE');
+      setBuyDms(false);
       setBuyQty(TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1);
     }
+    setBuyDocBlocks(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buyTier, existingPlanForSelectedTier?.dmsEnabled]);
 
@@ -192,7 +205,14 @@ function OrgBillingPage() {
   // personal subscription: purchasing seats (the admin auto-consumes seat #1)
   // and manually assigning a seat to another member.
   const [pendingConflict, setPendingConflict] = useState<
-    | { kind: 'purchase'; quantity: number; dmsEnabled: boolean; planName: string; priceFormatted: string }
+    | {
+        kind: 'purchase';
+        quantity: number;
+        dmsEnabled: boolean;
+        docBlocks: number;
+        planName: string;
+        priceFormatted: string;
+      }
     | { kind: 'assign'; memberId: string; tier: string; planName: string; priceFormatted: string }
     | null
   >(null);
@@ -248,7 +268,7 @@ function OrgBillingPage() {
 
     const minSeats = isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1;
     const finalQty = Math.max(buyQty, minSeats);
-    const dmsEnabled = buyTier === 'ENTERPRISE' ? true : buyDms;
+    const docBlocks = buyTier === 'BUSINESS' ? buyDocBlocks : 0;
 
     if (!membership.seatTier) {
       const conflict = await utils.org.getMemberBillingConflict.fetch({ memberId: membership.id });
@@ -257,7 +277,8 @@ function OrgBillingPage() {
         setPendingConflict({
           kind: 'purchase',
           quantity: finalQty,
-          dmsEnabled,
+          dmsEnabled: buyDms,
+          docBlocks,
           planName: conflict.planName,
           priceFormatted: conflict.priceFormatted,
         });
@@ -268,8 +289,9 @@ function OrgBillingPage() {
     void purchaseSeats.mutateAsync({
       tier: buyTier as 'BUSINESS' | 'ENTERPRISE',
       quantity: finalQty,
+      docBlocks,
       interval: buyInterval,
-      dmsEnabled,
+      dmsEnabled: buyDms,
     });
   };
 
@@ -329,10 +351,21 @@ function OrgBillingPage() {
   const orgInterval = seatPlans?.[0]?.billingInterval ?? 'month';
   const billedTotal =
     seatPlans?.reduce((sum, p) => {
-      const seatPrice = seatPriceFor(p.tier, p.billingInterval);
-      const dmsPrice = p.dmsEnabled && p.tier !== 'ENTERPRISE' ? dmsPriceFor(p.billingInterval) : 0;
-      return sum + (seatPrice + dmsPrice) * p.quantity;
+      const seatPrice = seatPriceFor(pricing, p.tier, p.billingInterval);
+      const dmsPrice = p.dmsEnabled ? dmsPriceFor(pricing, p.tier, p.billingInterval) : 0;
+      const docBlockCost = p.docBlockQuantity * docBlockPriceFor(pricing, p.billingInterval);
+      return sum + (seatPrice + dmsPrice) * p.quantity + docBlockCost;
     }, 0) ?? 0;
+
+  // Computed from the two independent live Stripe prices rather than a
+  // config discount percent — pricing is Stripe-authoritative now, so
+  // "yearly saves X%" is whatever those two numbers actually imply.
+  const buyTierMonthlyPrice = seatPriceFor(pricing, buyTier, 'month');
+  const buyTierYearlyPricePerMonth = seatPriceFor(pricing, buyTier, 'year') / 12;
+  const buyTierYearlySavingsPercent =
+    buyTierMonthlyPrice > 0
+      ? Math.round((1 - buyTierYearlyPricePerMonth / buyTierMonthlyPrice) * 100)
+      : 0;
 
   return (
     <div className="space-y-4">
@@ -355,10 +388,8 @@ function OrgBillingPage() {
               {TIER_CONFIG[membership.seatTier as keyof typeof TIER_CONFIG]?.name}
             </span>{' '}
             — $
-            {seatPriceFor(membership.seatTier, orgInterval) +
-              (membership.dmsAddon && membership.seatTier !== 'ENTERPRISE'
-                ? dmsPriceFor(orgInterval)
-                : 0)}
+            {seatPriceFor(pricing, membership.seatTier, orgInterval) +
+              (membership.dmsAddon ? dmsPriceFor(pricing, membership.seatTier, orgInterval) : 0)}
             /{orgInterval === 'year' ? 'yr' : 'mo'}
             {membership.dmsAddon && (
               <>
@@ -447,9 +478,8 @@ function OrgBillingPage() {
                     const existingPlan = seatPlans?.find((p) => p.tier === tier);
                     return (
                       <option key={tier} value={tier}>
-                        {config.name} — ${config.price}/seat/mo (
+                        {config.name} — ${seatPriceFor(pricing, tier, 'month')}/seat/mo (
                         {config.docs === '∞' ? 'unlimited' : `${config.docs} docs`}
-                        {tier === 'ENTERPRISE' ? ' + DMS' : ''}
                         {existingPlan
                           ? `, ${existingPlan.quantity} seats active`
                           : `, min ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}`}
@@ -485,7 +515,7 @@ function OrgBillingPage() {
                       }`}
                       onClick={() => setBuyInterval('year')}
                     >
-                      Yearly · Save {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.yearlyDiscountPercent}%
+                      Yearly{buyTierYearlySavingsPercent > 0 && ` · Save ${buyTierYearlySavingsPercent}%`}
                     </button>
                   </div>
                 )}
@@ -505,37 +535,51 @@ function OrgBillingPage() {
                   onChange={(e) => setBuyQty(Number(e.target.value))}
                 />
               </div>
-              {buyTier !== 'ENTERPRISE' && (
-                <label
-                  className="flex items-center gap-1.5 text-[12px]"
-                  title={
-                    dmsLockedOn
-                      ? "Your plan includes DMS — it can't be removed when buying additional seats."
-                      : undefined
-                  }
-                >
-                  <input
-                    type="checkbox"
-                    checked={buyDms}
-                    disabled={dmsLockedOn}
-                    onChange={(e) => setBuyDms(e.target.checked)}
-                    className="rounded"
+              {/* DMS is a paid add-on on every tier now — no longer bundled
+                  into Enterprise, so no tier restriction here. */}
+              <label
+                className="flex items-center gap-1.5 text-[12px]"
+                title={
+                  dmsLockedOn
+                    ? "Your plan includes DMS — it can't be removed when buying additional seats."
+                    : undefined
+                }
+              >
+                <input
+                  type="checkbox"
+                  checked={buyDms}
+                  disabled={dmsLockedOn}
+                  onChange={(e) => setBuyDms(e.target.checked)}
+                  className="rounded"
+                />
+                <span className="font-medium text-muted-foreground">
+                  + DMS Add-On (${dmsPriceFor(pricing, buyTier, buyInterval)}/seat/
+                  {buyInterval === 'year' ? 'yr' : 'mo'})
+                </span>
+              </label>
+              <div className="-ml-2">
+                <DmsFeaturesHoverCard />
+              </div>
+              {buyTier === 'BUSINESS' && (
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    + Doc blocks (+{ORG_DOC_BLOCK_SIZE}/mo each, $
+                    {docBlockPriceFor(pricing, buyInterval)}/{buyInterval === 'year' ? 'yr' : 'mo'})
+                  </label>
+                  <Input
+                    className="mt-1 h-8 w-20 text-[13px]"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={buyDocBlocks}
+                    onChange={(e) => setBuyDocBlocks(Math.max(0, Number(e.target.value)))}
                   />
-                  <span className="font-medium text-muted-foreground">
-                    + DMS Add-On (${dmsPriceFor(buyInterval)}/seat/{buyInterval === 'year' ? 'yr' : 'mo'})
-                  </span>
-                </label>
-              )}
-              {buyTier !== 'ENTERPRISE' && (
-                <div className="-ml-2">
-                  <DmsFeaturesHoverCard />
                 </div>
               )}
               <div className="text-[13px] font-medium text-muted-foreground">
                 = $
-                {buyQty *
-                  (seatPriceFor(buyTier, buyInterval) +
-                    (buyDms && buyTier !== 'ENTERPRISE' ? dmsPriceFor(buyInterval) : 0))}
+                {buyQty * (seatPriceFor(pricing, buyTier, buyInterval) + (buyDms ? dmsPriceFor(pricing, buyTier, buyInterval) : 0)) +
+                  (buyTier === 'BUSINESS' ? buyDocBlocks * docBlockPriceFor(pricing, buyInterval) : 0)}
                 /{buyInterval === 'year' ? 'year' : 'month'}
               </div>
               <Button
@@ -558,12 +602,16 @@ function OrgBillingPage() {
           <div className="divide-y divide-border">
             {seatPlans.map((plan) => {
               const config = TIER_CONFIG[plan.tier as keyof typeof TIER_CONFIG];
-              // All-in per-seat rate (base + DMS if included) — shown
+              // All-in per-seat rate (base + DMS if purchased) — shown
               // consistently everywhere a per-seat price appears, so it
               // never contradicts the all-in total or the "Your Plan" card.
-              const allInSeatPrice =
-                seatPriceFor(plan.tier, plan.billingInterval) +
-                (plan.dmsEnabled && plan.tier !== 'ENTERPRISE' ? dmsPriceFor(plan.billingInterval) : 0);
+              const dmsPrice = plan.dmsEnabled ? dmsPriceFor(pricing, plan.tier, plan.billingInterval) : 0;
+              const allInSeatPrice = seatPriceFor(pricing, plan.tier, plan.billingInterval) + dmsPrice;
+              const docBlockCost = plan.docBlockQuantity * docBlockPriceFor(pricing, plan.billingInterval);
+              const effectiveDocs =
+                typeof config?.docs === 'number'
+                  ? config.docs + plan.docBlockQuantity * ORG_DOC_BLOCK_SIZE
+                  : config?.docs;
               return (
                 <div key={plan.id} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -572,11 +620,12 @@ function OrgBillingPage() {
                     </div>
                     <span className="inline-flex items-center gap-1 text-[12px] text-muted-foreground">
                       ${allInSeatPrice}/seat/
-                      {plan.billingInterval === 'year' ? 'yr' : 'mo'} · {config?.docs} docs/mo
+                      {plan.billingInterval === 'year' ? 'yr' : 'mo'} · {effectiveDocs} docs/mo
+                      {plan.docBlockQuantity > 0 && ` (+${plan.docBlockQuantity} block${plan.docBlockQuantity > 1 ? 's' : ''})`}
                       {plan.dmsEnabled && (
                         <>
                           {' '}
-                          · DMS included <DmsFeaturesHoverCard />
+                          · DMS add-on <DmsFeaturesHoverCard />
                         </>
                       )}
                       {plan.billingInterval === 'year' && ' · Yearly'}
@@ -590,12 +639,7 @@ function OrgBillingPage() {
                       </p>
                     </div>
                     <span className="text-[13px] font-semibold">
-                      $
-                      {(seatPriceFor(plan.tier, plan.billingInterval) +
-                        (plan.dmsEnabled && plan.tier !== 'ENTERPRISE'
-                          ? dmsPriceFor(plan.billingInterval)
-                          : 0)) *
-                        plan.quantity}
+                      ${allInSeatPrice * plan.quantity + docBlockCost}
                       /{plan.billingInterval === 'year' ? 'yr' : 'mo'}
                     </span>
                   </div>
@@ -737,6 +781,7 @@ function OrgBillingPage() {
                   void purchaseSeats.mutateAsync({
                     tier: buyTier as 'BUSINESS' | 'ENTERPRISE',
                     quantity: pendingConflict.quantity,
+                    docBlocks: pendingConflict.docBlocks,
                     interval: buyInterval,
                     dmsEnabled: pendingConflict.dmsEnabled,
                     acknowledgeCancelPersonalPlan: true,
