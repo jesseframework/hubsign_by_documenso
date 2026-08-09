@@ -19,10 +19,31 @@ second image out of one repository the same way.
 | **Stack** | `hubsign-docs` — id `6a78e9dbb9e386e97cb696aa` |
 | server | us-flint-2 (`172.16.15.52`) |
 | published port | `3010` → container `80` |
-| replicas | 2, `start-first` rolling updates |
+| replicas | 1 — see the Compose note below |
 
 The stack's compose lives inline in Komodo. Its reviewable source is
 `docker/production/docs.compose.yml` — **change both together.**
+
+## Komodo deploys with `docker compose up`, not `docker stack deploy`
+
+This shapes the compose file, and getting it wrong is how the first deploy failed.
+Komodo's container names are `<project>-<service>-<n>`, which is Compose's scheme.
+
+- **The overlay network needs `attachable: true`.** Swarm will not let a plain
+  container join a swarm-scoped overlay otherwise: *"network … not manually
+  attachable"*. `hubconnect` sets this for the same reason.
+- **Only one replica can publish a fixed host port.** Compose honours
+  `deploy.replicas` by starting that many containers and each binds 3010, so a
+  second replica dies on a port conflict. Swarm's routing mesh would share the
+  port; Compose has no equivalent. Every working stack on this instance runs one
+  replica.
+- `deploy.mode`, `update_config` and `placement` are Swarm-only and silently
+  ignored. They are not used here rather than implying behaviour this deployment
+  does not have — so a redeploy has a few seconds of downtime.
+
+If a deploy fails on the network after a compose change, **the old network is still
+there with the old flags** — Compose reuses a network by name rather than
+recreating it. Destroy the stack (or delete that network) and deploy again.
 
 ## First deploy
 

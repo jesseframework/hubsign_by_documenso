@@ -10,10 +10,35 @@ version: "3.8"
 # Image is built by the Komodo build `hubsign-docs` from
 # apps/documentation/Dockerfile and pushed to the private registry, the same way
 # workhub-platform-portal builds a second image out of one repository.
+#
+# ── DEPLOYED WITH `docker compose up`, NOT `docker stack deploy` ──────────────
+#
+# Komodo uses Compose here — its container names are `<project>-<service>-<n>`,
+# which is Compose's scheme, not Swarm's `<stack>_<service>.<slot>`. Two things
+# follow, and the first version of this file got both wrong:
+#
+#   • The overlay network must be `attachable: true`. Swarm refuses to let a
+#     plain container join a swarm-scoped overlay otherwise, which fails with
+#     "network ... not manually attachable". `hubconnect` sets this for the same
+#     reason.
+#
+#   • Only ONE replica can publish a fixed host port. Compose honours
+#     `deploy.replicas` by starting that many containers, and each one binds
+#     3010 on the host — so a second replica dies on a port conflict. Swarm's
+#     routing mesh would have shared the port; Compose has no such thing. Every
+#     working stack on this instance runs a single replica for this reason.
+#
+# `deploy.mode`, `update_config` and `placement` are Swarm-only and silently
+# ignored by Compose, so they are not used here rather than implying behaviour
+# this deployment does not have. A redeploy therefore has a short gap while the
+# container restarts; for documentation that is an acceptable trade against the
+# complexity of fronting it with something that can drain connections.
 
 services:
   hubsign-docs:
     image: 172.16.15.51:5000/futureedge/hubsign-docs:latest
+
+    restart: unless-stopped
 
     ports:
       # 3010 verified free across the swarm. Point the reverse proxy for
@@ -27,20 +52,8 @@ services:
       retries: 3
       start_period: 5s
 
-    deploy:
-      mode: replicated
-      # Stateless, ~86 MB, no volumes — so a second replica costs almost nothing
-      # and means a rolling update never drops the site.
-      replicas: 2
-      update_config:
-        order: start-first
-        failure_action: rollback
-      restart_policy:
-        condition: on-failure
-        delay: 5s
-        max_attempts: 3
-      labels:
-        - "komodo.stack=hubsign-docs"
+    labels:
+      - "komodo.stack=hubsign-docs"
 
     networks:
       - hubsign-docs-net
@@ -48,3 +61,5 @@ services:
 networks:
   hubsign-docs-net:
     driver: overlay
+    # Required — see the note above. Without it the container cannot join.
+    attachable: true
