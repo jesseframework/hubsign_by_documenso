@@ -1,0 +1,50 @@
+version: "3.8"
+
+# HubSign documentation portal — docs.hubsign.io
+#
+# This is the compose Komodo holds inline for the `hubsign-docs` stack. It is kept
+# in the repository so the deployed configuration is reviewable in git, but Komodo
+# stores its own copy (every stack on this instance uses inline file_contents).
+# Change both when you change either.
+#
+# Image is built by the Komodo build `hubsign-docs` from
+# apps/documentation/Dockerfile and pushed to the private registry, the same way
+# workhub-platform-portal builds a second image out of one repository.
+
+services:
+  hubsign-docs:
+    image: 172.16.15.51:5000/futureedge/hubsign-docs:latest
+
+    ports:
+      # 3010 verified free across the swarm. Point the reverse proxy for
+      # docs.hubsign.io here. Container listens on 80 (nginx).
+      - "3010:80"
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+    deploy:
+      mode: replicated
+      # Stateless, ~86 MB, no volumes — so a second replica costs almost nothing
+      # and means a rolling update never drops the site.
+      replicas: 2
+      update_config:
+        order: start-first
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      labels:
+        - "komodo.stack=hubsign-docs"
+
+    networks:
+      - hubsign-docs-net
+
+networks:
+  hubsign-docs-net:
+    driver: overlay

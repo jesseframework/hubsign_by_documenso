@@ -88,7 +88,8 @@ services:
   #
   # Built from apps/documentation/Dockerfile at the repository root.
   docs:
-    image: jesseframework/hubsign-docs:latest
+    # Private registry, matching every other Komodo-built image here.
+    image: 172.16.15.51:5000/futureedge/hubsign-docs:latest
     ports:
       # Host port chosen to sit clear of the app on 3000. Point the reverse proxy
       # for docs.hubsign.io at this.
