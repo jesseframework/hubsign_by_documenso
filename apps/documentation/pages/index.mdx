@@ -1,160 +1,226 @@
 ---
 title: Home
-description: HubSign documentation — electronic signature, organization administration, and integration with your ERP and accounting systems.
+description: Guides, reference and integration docs for HubSign — sending documents for signature, administering your organization, and connecting signed results to your systems.
+# Nextra resolves the page theme as { ...metaThemeContext, ...frontMatter }, so
+# these win. Set here rather than in _meta.json because this entry is
+# `display: hidden`, and a hidden entry does not reliably become the active one
+# whose meta `theme` block is read.
+layout: full
+toc: false
+breadcrumb: false
+timestamp: false
 ---
 
 import Link from 'next/link';
 
-export const Wrapper = ({ children }) => <div className="mt-16 pb-20">{children}</div>;
-
-export const Tile = ({ href, eyebrow, title, children }) => (
-  <Link
-    href={href}
-    className="group border-border bg-background/60 hover:border-primary/60 hover:bg-background block rounded-xl border p-6 no-underline backdrop-blur transition dark:bg-black/20"
+export const Icon = ({ children }) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="var(--hs-brand-600)"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
   >
-    <span className="text-primary text-[11px] font-semibold uppercase tracking-[0.08em]">
-      {eyebrow}
-    </span>
-    <strong className="group-hover:text-primary mt-1.5 block text-lg font-semibold tracking-tight transition">
-      {title}
-    </strong>
-    <span className="text-foreground/70 mt-2 block text-sm leading-relaxed">{children}</span>
+    {children}
+  </svg>
+);
+
+export const Topic = ({ href, icon, title, count, children }) => (
+  <Link href={href} className="hs-topic">
+    {icon}
+    <h3>{title}</h3>
+    <p>{children}</p>
+    <span className="hs-count">{count}</span>
   </Link>
 );
 
-export const Step = ({ n, title, children }) => (
-  <div className="flex gap-4">
-    <span className="bg-primary/10 text-primary flex h-8 w-8 flex-none items-center justify-center rounded-full text-sm font-semibold">
-      {n}
-    </span>
-    <span>
-      <strong className="block text-[15px] font-semibold tracking-tight">{title}</strong>
-      <span className="text-foreground/70 mt-1 block text-sm leading-relaxed">{children}</span>
-    </span>
-  </div>
-);
+<div className="hs-landing">
 
-<Wrapper>
-  {/* HubSign backdrop: brand-purple glow plus a faint grid, drawn in CSS. */}
-  <div className="hubsign-hero-bg" aria-hidden="true" />
+  {/* ── Hero ─────────────────────────────────────────────────────── */}
 
-  {/* ── Hero ─────────────────────────────────────────────────────────── */}
+  <section className="hs-hero">
 
-  <div className="flex flex-col items-center text-center">
-    <span className="hubsign-logo-hero mb-9 inline-flex">
-      <img src="/hubsign-logo.png" alt="HubSign" />
-    </span>
+    {/* Signatures draw themselves on a stagger. Atmosphere rather than ornament —
+        it is a picture of what the product does. */}
+    <div className="hs-sig-field" aria-hidden="true">
+      <svg className="hs-sig hs-sig-a" viewBox="0 0 460 150" fill="none">
+        <path d="M12 108c18-6 30-26 36-52 4-18 1-34-8-34-11 0-14 22-11 42 5 32 22 54 38 54 14 0 22-14 26-30 3-13 8-20 14-20 7 0 9 9 7 20-2 12 2 20 11 20 12 0 20-12 26-28 5-13 11-19 18-19 8 0 10 8 8 18-2 13 4 21 15 21 16 0 30-16 42-40" />
+        <path d="M232 66c14-4 28-10 42-18" />
+        <path d="M320 92c16 2 34-4 52-18 14-11 24-13 30-6 5 6 2 15-8 24-12 11-14 18-6 22 9 5 24 0 42-14" />
+        <line className="hs-rule" x1="10" y1="132" x2="440" y2="132" />
+      </svg>
 
-    <h1 className="max-w-3xl text-4xl font-bold leading-[1.1] tracking-tight md:text-5xl lg:text-[56px]">
-      Documentation
-    </h1>
+      <svg className="hs-sig hs-sig-b" viewBox="0 0 380 130" fill="none">
+        <path d="M14 96c22 0 38-14 46-38 6-18 4-32-5-32-10 0-13 16-9 34 6 28 22 46 40 46 15 0 25-10 32-26 5-12 10-17 16-15 7 2 7 11 3 20-6 13-2 21 10 21 18 0 36-18 50-46" />
+        <path d="M188 40c-6 24-4 44 6 58 8 11 20 12 34 4 12-7 20-7 24 1 4 9-1 17-14 24" />
+        <line className="hs-rule" x1="10" y1="116" x2="366" y2="116" />
+      </svg>
 
-    <p className="text-muted-foreground mx-auto mt-5 max-w-2xl text-base leading-relaxed tracking-tight md:text-lg">
-      Everything you need to send documents for signature, administer your
-      organization, and connect signed results to the systems that use them.
-    </p>
-
-    <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
-      <Link
-        href="/manual"
-        className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg px-5 py-2.5 text-sm font-semibold no-underline transition"
-      >
-        Read the manual →
-      </Link>
-      <Link
-        href="/organization"
-        className="border-border hover:border-primary/60 hover:text-primary rounded-lg border px-5 py-2.5 text-sm font-semibold no-underline transition"
-      >
-        Browse the guides
-      </Link>
+      <svg className="hs-sig hs-sig-c" viewBox="0 0 300 110" fill="none">
+        <path d="M12 80c18-2 30-16 36-38 4-15 2-27-6-27-9 0-11 14-8 29 5 24 19 40 34 40 13 0 22-9 28-24 4-11 9-15 14-13 6 2 6 10 2 18-5 11-1 18 9 18 15 0 30-15 42-38" />
+        <line className="hs-rule" x1="10" y1="98" x2="290" y2="98" />
+      </svg>
     </div>
 
-    <p className="text-muted-foreground/70 mt-6 text-xs">
-      Press <kbd className="border-border rounded border px-1.5 py-0.5 font-sans">⌘ K</kbd> to
-      search everything.
+    <p className="hs-eyebrow">HubSign documentation</p>
+
+    <h1>How can we help you send, sign, or connect?</h1>
+
+    <p className="hs-lede">
+      Everything for sending documents for signature, administering your
+      organization, and wiring signed results into the systems that use them.
     </p>
-  </div>
 
-  {/* ── New here ─────────────────────────────────────────────────────── */}
-
-  <div className="border-border/70 bg-background/50 mt-20 rounded-2xl border p-7 backdrop-blur dark:bg-black/20">
-    <strong className="text-[15px] font-semibold tracking-tight">New to HubSign?</strong>
-    <p className="text-foreground/70 mt-1 text-sm">Sending your first document takes four steps.</p>
-
-    <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-      <Step n="1" title="Upload">
-        Drop a PDF into E-Sign, or let it arrive by email in the Signature Inbox.
-      </Step>
-      <Step n="2" title="Prepare">
-        Add recipients, then place signature and data fields for each of them.
-      </Step>
-      <Step n="3" title="Send">
-        Each recipient gets a private link. No account needed to sign.
-      </Step>
-      <Step n="4" title="Done">
-        The PDF is sealed with an audit certificate and a digital signature.
-      </Step>
+    <div className="hs-popular">
+      <span className="hs-popular-label">Popular:</span>
+      <Link href="/users/get-started/account-creation">Getting your account</Link>
+      <Link href="/organization/signature-inbox">Signature Inbox</Link>
+      <Link href="/organization/business-rules">Business rules</Link>
+      <Link href="/manual#36-completion-the-audit-certificate-and-downloads">
+        Audit certificates
+      </Link>
     </div>
+  </section>
+
+  {/* ── Topics ───────────────────────────────────────────────────── */}
+
+  <div className="hs-section-head" id="topics">
+    <h2>Browse by topic</h2>
+    <Link href="/manual">Full manual →</Link>
   </div>
 
-  {/* ── Sections ─────────────────────────────────────────────────────── */}
+  <div className="hs-topics">
 
-  <h2 className="mt-20 text-xl font-semibold tracking-tight">Browse by topic</h2>
+    <Topic
+      href="/users/signing-documents"
+      title="Signing"
+      count="12 pages"
+      icon={
+        <Icon>
+          <path d="M3 21c3-1 5-3 7-6l7-7a2.8 2.8 0 1 1 4 4l-7 7c-3 2-5 4-6 7" />
+          <path d="M14 6l4 4" />
+        </Icon>
+      }
+    >
+      Fields, recipients, signing order, supporting files and the audit certificate.
+    </Topic>
 
-  <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
-    <Tile href="/organization" eyebrow="Administer" title="Organization">
-      Members and seats, branding, the invoice inbox, business rules, approvals,
-      workflows and notifications.
-    </Tile>
+    <Topic
+      href="/dms"
+      title="Doc Manager"
+      count="11 pages"
+      icon={
+        <Icon>
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+        </Icon>
+      }
+    >
+      Filing structure, retention and disposal, retrievals, permissions and audit.
+    </Topic>
 
-    <Tile href="/dms" eyebrow="Records" title="Doc Manager">
-      Filing structure, retention and disposal, retrieval of physical files,
-      permissions and audit.
-    </Tile>
+    <Topic
+      href="/organization"
+      title="Organization"
+      count="14 pages"
+      icon={
+        <Icon>
+          <circle cx="9" cy="8" r="3.2" />
+          <path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
+          <path d="M17 8.5a3 3 0 0 1 0 5" />
+          <path d="M18.5 20c0-2.4-.9-4-2.2-5" />
+        </Icon>
+      }
+    >
+      Members and seats, branding, the invoice inbox, approvals and workflows.
+    </Topic>
 
-    <Tile href="/users/signing-documents" eyebrow="Sign" title="Signing Documents">
-      Upload, place fields, choose recipients and signing order, and send for
-      signature.
-    </Tile>
+    <Topic
+      href="/integrations"
+      title="Integrations"
+      count="1 guide"
+      icon={
+        <Icon>
+          <path d="M9 3v5M15 3v5" />
+          <path d="M6 8h12v4a6 6 0 0 1-12 0Z" />
+          <path d="M12 18v3" />
+        </Icon>
+      }
+    >
+      REST API, webhooks, and posting signed invoices to your ERP.
+    </Topic>
 
-    <Tile href="/organization/signature-inbox" eyebrow="Automate" title="Signature Inbox">
-      Invoices emailed straight in, read by OCR, reviewed, approved and sent for
-      signature.
-    </Tile>
-
-    <Tile href="/organization/business-rules" eyebrow="Control" title="Business Rules">
-      Refuse a signature when the data is wrong — no PO number, an amount over
-      threshold, a low-confidence read.
-    </Tile>
-
-    <Tile href="/integrations" eyebrow="Connect" title="ERP & Accounting">
-      Post signed invoices to your ledger with webhooks, the REST API or a
-      workflow — with worked examples.
-    </Tile>
   </div>
 
-  {/* ── Reference ────────────────────────────────────────────────────── */}
+  {/* ── Onboarding ───────────────────────────────────────────────── */}
 
-  <h2 className="mt-16 text-xl font-semibold tracking-tight">Reference</h2>
-
-  <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-3">
-    <Tile href="/manual" eyebrow="Everything" title="Full Manual">
-      Every feature in one page, with all the reference tables — the version to
-      read end to end or print.
-    </Tile>
-
-    <Tile href="/manual#appendix-a--event-reference" eyebrow="Appendix A" title="Event reference">
-      Every webhook event, workflow trigger and business-rule gate — and which of
-      them fire today.
-    </Tile>
-
-    <Tile href="/manual#appendix-b--known-gaps" eyebrow="Appendix B" title="Known gaps">
-      Current limitations, stated plainly, so nothing gets designed around
-      something that is not there.
-    </Tile>
+  <div className="hs-onboard">
+    <div className="hs-onboard-head">
+      <h2>New to HubSign?</h2>
+      <Link href="/manual#32-preparing-a-document">Start the walkthrough →</Link>
+    </div>
+    <ol className="hs-steps">
+      <li className="hs-step">
+        <b>1</b>Upload
+      </li>
+      <li className="hs-arrow" aria-hidden="true">→</li>
+      <li className="hs-step">
+        <b>2</b>Prepare
+      </li>
+      <li className="hs-arrow" aria-hidden="true">→</li>
+      <li className="hs-step">
+        <b>3</b>Send
+      </li>
+      <li className="hs-arrow" aria-hidden="true">→</li>
+      <li className="hs-step">
+        <b>4</b>Sealed
+      </li>
+    </ol>
   </div>
 
-  <p className="text-muted-foreground/70 mt-16 text-center text-xs">
-    HubSign · Powered by FEPRO · Internal documentation
-  </p>
-</Wrapper>
+  {/* ── Latest ───────────────────────────────────────────────────── */}
+
+  <div className="hs-section-head">
+    <h2>Latest additions</h2>
+    <Link href="/manual#appendix-b--known-gaps">Known gaps →</Link>
+  </div>
+
+  <ul className="hs-recent">
+    <li>
+      <Link href="/dms">
+        <span className="hs-recent-title">
+          Doc Manager — filing, retention, retrieval and audit
+        </span>
+        <time dateTime="2026-08-09">9 Aug 2026</time>
+      </Link>
+    </li>
+    <li>
+      <Link href="/organization">
+        <span className="hs-recent-title">
+          Organization — members, seats, rules, approvals and workflows
+        </span>
+        <time dateTime="2026-08-09">9 Aug 2026</time>
+      </Link>
+    </li>
+    <li>
+      <Link href="/integrations">
+        <span className="hs-recent-title">
+          Posting signed invoices to an ERP or accounting system
+        </span>
+        <time dateTime="2026-08-09">9 Aug 2026</time>
+      </Link>
+    </li>
+    <li>
+      <Link href="/manual#36-completion-the-audit-certificate-and-downloads">
+        <span className="hs-recent-title">
+          Downloading a signed PDF with or without the audit certificate
+        </span>
+        <time dateTime="2026-08-08">8 Aug 2026</time>
+      </Link>
+    </li>
+  </ul>
+
+</div>

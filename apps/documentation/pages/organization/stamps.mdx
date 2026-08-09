@@ -1,0 +1,61 @@
+---
+title: Stamps
+description: Company seals and marks that are burned into the PDF when a document is sealed.
+---
+
+import { Callout } from 'nextra/components';
+
+# Stamps
+
+**Organization → Stamps** is a shared library of marks — a company seal, a
+registration number, a "PAID" or "RECEIVED" stamp — that can be placed on a document
+and burned into the finished PDF.
+
+Stamps are **organization-scoped**: every member can use every stamp in the library,
+so a seal is defined once rather than re-uploaded by each person who needs it.
+
+## Three kinds
+
+| Kind | Made by |
+|---|---|
+| **Uploaded** | You supply an image — a scan of a physical seal, a logo |
+| **Designed** | Built in the editor from text and shapes |
+| **AI generated** | Generated, then editable like a designed stamp |
+
+## Dynamic placeholders
+
+A stamp can carry tokens that are filled in at the moment it is applied, rather than
+being fixed text:
+
+```
+{date}
+{signer.name}
+```
+
+This is what makes a "RECEIVED" stamp useful — the date is the date it was actually
+applied, not the date somebody typed into the design.
+
+## When a stamp becomes part of the document
+
+Stamps are drawn into the PDF during **sealing**, along with signature fields and the
+audit certificate.
+
+<Callout type="warning">
+  That means a stamp is permanent once the document completes, and a stamp added to the
+  library afterwards cannot appear on a document that is already sealed. Get the stamp
+  right before sending, not after.
+</Callout>
+
+Stamp placement is best-effort: if a stamp cannot be drawn for some reason, the seal
+still completes and the failure is logged rather than blocking the signature. A
+document is more important than its ornament — but it does mean you should check that
+a stamp you rely on actually appears on the finished PDF the first time you use it.
+
+## A note on seals as legal marks
+
+In some jurisdictions a company seal carries legal weight. HubSign draws the image
+you give it; it does not verify that whoever applied it was entitled to.
+
+If a seal in your organization is meaningful rather than decorative, control **who can
+send documents** rather than relying on the stamp library being restricted — every
+member can use every stamp.

@@ -51,7 +51,7 @@ and a graph of steps.
 | `HTTP_REQUEST` | Calls an external URL — the integration workhorse |
 | `NOTIFY` | Raises an in-app notification |
 | `SEND_FOR_SIGNATURE` | Sends a document for signature, optionally adding recipients |
-| `LOOKUP_METADATA` | Matches against your metadata records to enrich the run |
+| `LOOKUP_METADATA` | Resolves a name against your [Metadata](/organization/metadata) records — the way to turn a vendor name OCR read into their email address |
 
 Any string in a step supports `{{ }}` templating against the run — the trigger
 payload, the document, the organization, and variables you have set.

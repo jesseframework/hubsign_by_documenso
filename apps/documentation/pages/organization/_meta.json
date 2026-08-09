@@ -16,10 +16,21 @@
   "business-rules": "Business Rules",
   "approvals": "Approvals",
   "workflows": "Workflows",
+  "-- Reference data": {
+    "type": "separator",
+    "title": "Reference data"
+  },
+  "metadata": "Metadata",
   "email-templates": "Email Templates",
+  "stamps": "Stamps",
   "-- Connect": {
     "type": "separator",
     "title": "Connect"
   },
-  "teams-notifications": "Microsoft Teams"
+  "teams-notifications": "Microsoft Teams",
+  "-- Housekeeping": {
+    "type": "separator",
+    "title": "Housekeeping"
+  },
+  "recycle-bin": "Recycle Bin"
 }

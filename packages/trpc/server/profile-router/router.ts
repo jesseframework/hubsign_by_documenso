@@ -1,7 +1,13 @@
 import { SubscriptionStatus } from '@prisma/client';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
 
 import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
 import { AppError } from '@documenso/lib/errors/app-error';
+import {
+  LicenseRedeemError,
+  redeemLicenseKey,
+} from '@documenso/lib/server-only/license/redeem-license-key';
 import { setAvatarImage } from '@documenso/lib/server-only/profile/set-avatar-image';
 import { getSubscriptionsByUserId } from '@documenso/lib/server-only/subscription/get-subscriptions-by-user-id';
 import { createBillingPortal } from '@documenso/lib/server-only/user/create-billing-portal';
@@ -100,6 +106,25 @@ export const profileRouter = router({
         priceId: input.priceId,
         action: input.action,
       });
+    }),
+
+  /**
+   * Redeem a WorkHub-minted INDIVIDUAL license key (a Stripe-free activation).
+   * Only activates a free account — rejected if the user already has an active
+   * paid subscription (enforced in `redeemLicenseKey`).
+   */
+  redeemLicenseKey: authenticatedProcedure
+    .input(z.object({ key: z.string().min(1).max(2000) }))
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const { grant } = await redeemLicenseKey({ key: input.key.trim(), userId: ctx.user.id });
+        return { tier: grant.tier, addons: grant.addons, expiresAt: grant.expiresAt };
+      } catch (err) {
+        if (err instanceof LicenseRedeemError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+        }
+        throw err;
+      }
     }),
 
   updateProfile: authenticatedProcedure

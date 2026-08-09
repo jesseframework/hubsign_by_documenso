@@ -6,7 +6,13 @@ import { ORG_SEAT_TIERS } from '@documenso/lib/constants/org-tiers';
 import { prisma } from '@documenso/prisma';
 
 import { getDocumentRelatedPrices } from '../stripe/get-document-related-prices.ts';
-import { FREE_PLAN_LIMITS, SELFHOSTED_PLAN_LIMITS, TEAM_PLAN_LIMITS } from './constants';
+import {
+  FREE_PLAN_LIMITS,
+  INDIVIDUAL_LICENSE_LIMITS,
+  LICENSE_GRACE_DAYS,
+  SELFHOSTED_PLAN_LIMITS,
+  TEAM_PLAN_LIMITS,
+} from './constants';
 import { ERROR_CODES } from './errors';
 import type { TLimitsResponseSchema, TLimitsSchema } from './schema';
 import { ZLimitsSchema } from './schema';
@@ -26,6 +32,30 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
   if (!user || user.organizationMemberships.length === 0) return null;
 
   const membership = user.organizationMemberships[0];
+
+  // License-key grants expire. If this org's plan is a license grant past its
+  // grace window, fail closed to Free — ignoring any seatTier the grant set.
+  // Normal Stripe plans (source='stripe') carry no expiresAt here.
+  const licensePlan = await prisma.orgSeatPlan.findFirst({
+    where: { organizationId: membership.organizationId, source: 'license_key' },
+  });
+  if (licensePlan?.expiresAt) {
+    const graceMs = LICENSE_GRACE_DAYS * 24 * 60 * 60 * 1000;
+    if (Date.now() > licensePlan.expiresAt.getTime() + graceMs) {
+      // Fail closed to Free — UNLESS a paid (Stripe) plan has since backed the
+      // seat (an org may buy a plan after a trial lapses). Only queried on the
+      // rare expired-license path, so no cost for normal members.
+      const paidPlan = await prisma.orgSeatPlan.findFirst({
+        where: { organizationId: membership.organizationId, source: 'stripe' },
+      });
+      if (!paidPlan) {
+        return {
+          quota: { ...FREE_PLAN_LIMITS, dmsEnabled: false },
+          remaining: { ...FREE_PLAN_LIMITS, dmsEnabled: false },
+        };
+      }
+    }
+  }
 
   // If no seat assigned, user is in org but has no plan → treat as free
   if (!membership.seatTier) {
@@ -138,6 +168,31 @@ const handleUserLimits = async ({ email }: HandleUserLimitsOptions) => {
     const documentPlanPrices = await getDocumentRelatedPrices();
 
     for (const subscription of activeSubscriptions) {
+      // License-key subscription — no Stripe price. Derive the quota from the
+      // grant's tier/add-ons and honour the grace-then-close expiry.
+      if (subscription.source === 'license_key') {
+        const graceMs = LICENSE_GRACE_DAYS * 24 * 60 * 60 * 1000;
+        if (subscription.periodEnd && Date.now() > subscription.periodEnd.getTime() + graceMs) {
+          continue; // expired past grace → contributes nothing (fail closed to Free)
+        }
+        const licenseQuota = structuredClone(INDIVIDUAL_LICENSE_LIMITS);
+        if (subscription.licenseAddons.includes('dms')) {
+          licenseQuota.dmsEnabled = true;
+          quota.dmsEnabled = true;
+          remaining.dmsEnabled = true;
+        }
+        if (licenseQuota.documents > quota.documents && licenseQuota.recipients > quota.recipients) {
+          const dmsWasEnabled = quota.dmsEnabled;
+          quota = licenseQuota;
+          remaining = structuredClone(quota);
+          if (dmsWasEnabled) {
+            quota.dmsEnabled = true;
+            remaining.dmsEnabled = true;
+          }
+        }
+        continue;
+      }
+
       const price = documentPlanPrices.find((price) => price.id === subscription.priceId);
 
       if (!price || typeof price.product === 'string' || price.product.deleted) {

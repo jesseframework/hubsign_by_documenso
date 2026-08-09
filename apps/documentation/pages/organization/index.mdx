@@ -9,7 +9,7 @@ import { Callout } from 'nextra/components';
 
 Everything that belongs to your company rather than to one person lives here:
 members and seats, branding, the invoice intake queue, approval chains, business
-rules, workflows and notifications.
+rules, workflows, your vendor reference data, stamps and notifications.
 
 <Callout type="info">
   Most of these pages are **Org Admin** only. Ordinary members do not see the links,
@@ -28,9 +28,12 @@ rules, workflows and notifications.
 | Stop a document being signed when data is wrong | [Business Rules](/organization/business-rules) |
 | Require internal sign-off before a document goes out | [Approvals](/organization/approvals) |
 | Automate a sequence of actions | [Workflows](/organization/workflows) |
+| Look up a vendor's email from what OCR read | [Metadata](/organization/metadata) |
 | Change the wording of an automated email | [Email Templates](/organization/email-templates) |
+| Put a company seal or "PAID" mark on a document | [Stamps](/organization/stamps) |
 | Post signing updates to a Teams channel | [Microsoft Teams](/organization/teams-notifications) |
 | Send a signed invoice to our accounting system | [ERP & Accounting](/integrations) |
+| Recover a document somebody deleted | [Recycle Bin](/organization/recycle-bin) |
 
 ## How the pieces fit together
 
@@ -43,6 +46,7 @@ flowchart LR
     B --> C[Approvals<br/>internal sign-off]
     C --> D[Signing<br/>authorised signature]
     D --> E[Workflows<br/>notify and post to the ERP]
+    F[Metadata<br/>vendor email and contacts] --> E
 ```
 
 Each one is useful on its own. Add them in that order — intake first, then rules

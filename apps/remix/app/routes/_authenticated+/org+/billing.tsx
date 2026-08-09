@@ -41,6 +41,7 @@ import { useToast } from '@documenso/ui/primitives/use-toast';
 import { EmbeddedCheckoutForm } from '~/components/general/embedded-checkout-form';
 import { appMetaTags } from '~/utils/meta';
 import { OrgAdminGuard } from '~/components/general/org-admin-guard';
+import { RedeemLicenseKeyCard } from '~/components/general/redeem-license-key-card';
 
 export function meta() {
   return appMetaTags('Organization Billing');
@@ -342,6 +343,8 @@ function OrgBillingPage() {
           <Trans>Purchase seats and assign plans to members.</Trans>
         </p>
       </div>
+
+      {isAdmin && <RedeemLicenseKeyCard organizationId={org.id} />}
 
       {/* Your Plan — org seat limits supersede personal billing entirely, so
           this is the one place that actually reflects what governs you. */}

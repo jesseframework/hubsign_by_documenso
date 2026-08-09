@@ -598,7 +598,11 @@ pending user consumes a seat, and conversion is refused when none are free.
 Seats are purchased in the **WorkHub console** under *My Subscription*, not here.
 This page reflects what your tenant has been allocated.
 
-**Recycle Bin** — soft-deleted documents, restorable until purged.
+**Recycle Bin** — deleted **Doc Manager** records, restorable by an Org Admin or DMS
+Admin. E-Sign documents do not appear here: a draft or pending document is deleted
+outright and permanently, and a completed one is retained but not restorable from this
+page. The interface mentions 30-day retention, but nothing currently purges expired
+items automatically.
 
 ---
 

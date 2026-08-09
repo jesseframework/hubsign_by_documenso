@@ -4,7 +4,10 @@
     "title": "Home",
     "display": "hidden",
     "theme": {
-      "timestamp": false
+      "timestamp": false,
+      "layout": "full",
+      "toc": false,
+      "breadcrumb": false
     }
   },
   "organization": {
