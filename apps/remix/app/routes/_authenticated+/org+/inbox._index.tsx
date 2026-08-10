@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
@@ -21,6 +21,8 @@ import {
   SearchIcon,
   SendIcon,
   SlidersHorizontalIcon,
+  Volume2Icon,
+  VolumeXIcon,
   WorkflowIcon,
   XCircleIcon,
   XIcon,
@@ -40,6 +42,11 @@ import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { useInboxEvents } from '~/hooks/use-inbox-events';
 import { formatRelativeTime } from '~/utils/format-relative-time';
+import {
+  isInboxChimeEnabled,
+  playInboxChime,
+  setInboxChimeEnabled,
+} from '~/utils/inbox-chime';
 import { appMetaTags } from '~/utils/meta';
 
 const runStatusColor = (status: string | null | undefined): string => {
@@ -371,6 +378,12 @@ export default function SignatureInboxPage() {
 
   // Live-refresh the list when OCR finishes or new mail is ingested (SSE).
   useInboxEvents();
+
+  // Start at the util's default so server and first client render agree, then
+  // read the stored preference once mounted — localStorage doesn't exist during
+  // SSR and reading it in the initialiser would cause a hydration mismatch.
+  const [chimeOn, setChimeOn] = useState(true);
+  useEffect(() => setChimeOn(isInboxChimeEnabled()), []);
   const inboxAddress =
     org?.inboxEmail || (org?.slug ? `${org.slug}@${INBOUND_EMAIL_DOMAIN()}` : null);
 
@@ -412,16 +425,42 @@ export default function SignatureInboxPage() {
             </Trans>
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-shrink-0"
-          disabled={fetchNow.isPending}
-          onClick={() => fetchNow.mutate()}
-        >
-          <RefreshCwIcon className="mr-1 h-3.5 w-3.5" />
-          <Trans>Fetch from WorkHub</Trans>
-        </Button>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="px-2"
+            title={
+              chimeOn
+                ? _(msg`Sound on for new mail — click to mute`)
+                : _(msg`Sound muted — click to unmute`)
+            }
+            aria-pressed={chimeOn}
+            onClick={() => {
+              const next = !chimeOn;
+              setChimeOn(next);
+              setInboxChimeEnabled(next);
+              // Play on enable so the volume is known before relying on it —
+              // and because this click satisfies the browser's autoplay gate.
+              if (next) playInboxChime();
+            }}
+          >
+            {chimeOn ? (
+              <Volume2Icon className="h-3.5 w-3.5" />
+            ) : (
+              <VolumeXIcon className="h-3.5 w-3.5" />
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={fetchNow.isPending}
+            onClick={() => fetchNow.mutate()}
+          >
+            <RefreshCwIcon className="mr-1 h-3.5 w-3.5" />
+            <Trans>Fetch from WorkHub</Trans>
+          </Button>
+        </div>
       </div>
 
       {inboxAddress && (

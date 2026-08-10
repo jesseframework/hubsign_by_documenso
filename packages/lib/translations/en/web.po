@@ -8077,6 +8077,14 @@ msgstr "Sorry, we were unable to download the audit logs. Please try again later
 msgid "Sorry, we were unable to download the certificate. Please try again later."
 msgstr "Sorry, we were unable to download the certificate. Please try again later."
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Sound muted — click to unmute"
+msgstr "Sound muted — click to unmute"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Sound on for new mail — click to mute"
+msgstr "Sound on for new mail — click to mute"
+
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 msgid "Source"
 msgstr "Source"

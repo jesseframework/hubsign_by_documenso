@@ -90,6 +90,15 @@ export const triggerWorkflows = async ({
 
   const now = new Date().toISOString();
 
+  // Email templates routinely sign off with `{{organization.name}}`; without it
+  // the placeholder renders empty and the mail goes out reading "Sent
+  // automatically by ." Fetched once per dispatch, and only after the
+  // no-workflows early return above.
+  const organization = await prisma.organization.findUnique({
+    where: { id: organizationId },
+    select: { id: true, name: true, slug: true },
+  });
+
   for (const workflow of workflows) {
     const parsed = ZWorkflowDefinitionSchema.safeParse(workflow.definition);
 
@@ -103,7 +112,7 @@ export const triggerWorkflows = async ({
       trigger: parsed.data.trigger,
       payload: data,
       document: data,
-      organization: { id: organizationId },
+      organization: organization ?? { id: organizationId },
       now,
     };
 

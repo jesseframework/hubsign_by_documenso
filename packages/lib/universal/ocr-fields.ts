@@ -43,12 +43,50 @@ export const OCR_FIELD_ALIASES = {
     'issued_by',
     'remit_to',
   ],
-  invoiceNumber: ['invoice_number', 'invoice_no', 'invoice_num', 'invoice', 'bill_number', 'reference'],
-  invoiceDate: ['invoice_date', 'date', 'issue_date', 'bill_date'],
-  dueDate: ['due_date', 'invoice_due_date', 'payment_due_date', 'payment_due'],
-  totalAmount: ['total_amount', 'total', 'total_amount_due', 'amount_due', 'total_charges', 'grand_total'],
+  vendorAddress: ['vendor_address', 'merchant_address', 'supplier_address', 'remit_to_address'],
+  vendorContact: [
+    'vendor_email',
+    'vendor_contact',
+    'merchant_email',
+    'merchant_contact',
+    'supplier_email',
+    'supplier_contact',
+    'contact_email',
+  ],
+
+  invoiceNumber: [
+    'invoice_number',
+    'invoice_no',
+    'invoice_num',
+    'invoice',
+    'bill_number',
+    'bill_no',
+    'document_number',
+    'reference',
+    'reference_number',
+  ],
+  invoiceDate: ['invoice_date', 'date', 'issue_date', 'issued_date', 'bill_date', 'document_date'],
+  dueDate: ['due_date', 'invoice_due_date', 'payment_due_date', 'payment_due', 'pay_by'],
+  poNumber: ['po_number', 'po_no', 'purchase_order', 'purchase_order_number', 'order_number'],
+
+  // `*_amount` variants first: a bare `total`/`tax` is likelier to be a
+  // line-item figure on templates that emit both.
+  subtotal: ['subtotal', 'sub_total', 'net_amount', 'amount_before_tax'],
+  taxAmount: ['tax_amount', 'tax', 'vat', 'vat_amount', 'gct', 'sales_tax'],
+  totalAmount: [
+    'total_amount',
+    'total',
+    'total_amount_due',
+    'amount_due',
+    'total_charges',
+    'grand_total',
+    'balance_due',
+  ],
   currency: ['currency', 'currency_code'],
+
   accountNumber: ['account_number', 'account_no', 'account', 'customer_account_number'],
+  billTo: ['bill_to', 'billed_to', 'customer_name', 'sold_to', 'client_name'],
+  paymentTerms: ['payment_terms', 'terms', 'payment_term'],
 } as const;
 
 export type OcrCanonicalField = keyof typeof OCR_FIELD_ALIASES;

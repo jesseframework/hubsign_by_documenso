@@ -8082,6 +8082,14 @@ msgstr "Entschuldigung, wir konnten die Prüfprotokolle nicht herunterladen. Bit
 msgid "Sorry, we were unable to download the certificate. Please try again later."
 msgstr "Entschuldigung, wir konnten das Zertifikat nicht herunterladen. Bitte versuchen Sie es später erneut."
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Sound muted — click to unmute"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Sound on for new mail — click to mute"
+msgstr ""
+
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 msgid "Source"
 msgstr "Quelle"
