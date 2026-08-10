@@ -2425,10 +2425,11 @@ model SignatureInboxItem {
   extractedData Json? /// Flattened field_name → value map from BMS ML.
   ocrMeta       Json? /// Full OCR metadata (confidences, field_extractions, etc.).
 
-  error     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  viewedAt  DateTime? /// Set when a user first opens the item. Null = unread (Outlook-style, shared across the org).
+  error      String?
+  createdAt  DateTime  @default(now())
+  receivedAt DateTime? /// True mailbox arrival time from the mail server. Null when upstream gave no date; SLA clocks fall back to createdAt (the ingest instant), which diverges from arrival whenever polling has been down.
+  updatedAt  DateTime  @updatedAt
+  viewedAt   DateTime? /// Set when a user first opens the item. Null = unread (Outlook-style, shared across the org).
 
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 

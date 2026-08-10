@@ -5,11 +5,13 @@ import { jobs } from '@documenso/lib/jobs/client';
 import { bmsMlGetTemplates } from '@documenso/lib/server-only/bms-ml/client';
 import { sendDocument } from '@documenso/lib/server-only/document/send-document';
 import { ensureSignatureFields } from '@documenso/lib/server-only/field/ensure-signature-fields';
+import { describeBlocks, evaluateGate } from '@documenso/lib/server-only/rules/evaluate-gate';
 import { publishInboxEvent } from '@documenso/lib/server-only/inbox/inbox-events';
 import { pollWorkHubInboxForOrg } from '@documenso/lib/server-only/inbox/poll-workhub-inbox';
 import { rememberTemplateForSender } from '@documenso/lib/server-only/inbox/resolve-ocr-template';
-import { SLA_ORG_SELECT, evaluateItemsSla } from '@documenso/lib/server-only/inbox/sla';
+import { SLA_ORG_SELECT, evaluateItemsSla, slaClockStart } from '@documenso/lib/server-only/inbox/sla';
 import { nanoid } from '@documenso/lib/universal/id';
+import { normalizeMetadataKey } from '@documenso/lib/universal/metadata';
 import { prisma } from '@documenso/prisma';
 
 import { authenticatedProcedure, router } from '../trpc';
@@ -21,6 +23,12 @@ const requireOrgMember = async (userId: number) => {
   }
   return membership;
 };
+
+/** Most inbox items the SLA dashboard will evaluate in one window. */
+const SLA_ITEM_LIMIT = 1000;
+
+/** Most overdue rows listed. The count shown to the user is never this capped value. */
+const OVERDUE_LIST_LIMIT = 15;
 
 export const inboxRouter = router({
   /** The signature inbox queue for the organization. */
@@ -202,6 +210,23 @@ export const inboxRouter = router({
         });
       }
 
+      // Enforce the organization's DOCUMENT_SEND rules before anything is
+      // written, so a refusal (a duplicate invoice, a missing PO) leaves no
+      // half-sent state. Fails open — see `evaluateGate`.
+      const verdict = await evaluateGate({
+        gate: 'DOCUMENT_SEND',
+        subject: {
+          organizationId: membership.organizationId,
+          entityType: 'Document',
+          entityId: String(item.documentId),
+          actorUserId: ctx.user.id,
+        },
+      });
+
+      if (!verdict.allowed) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: describeBlocks(verdict) });
+      }
+
       // Emailed-in documents carry no field layout — without a signature field
       // the recipient opens the document and has nothing to sign.
       await ensureSignatureFields({ documentId: item.documentId });
@@ -367,24 +392,43 @@ export const inboxRouter = router({
 
       const since = new Date(Date.now() - (input?.days ?? 30) * 24 * 60 * 60 * 1000);
 
-      const items = await prisma.signatureInboxItem.findMany({
-        where: {
-          organizationId: membership.organizationId,
-          createdAt: { gte: since },
-          status: { not: 'ARCHIVED' },
-        },
-        select: {
-          id: true,
-          createdAt: true,
-          senderEmail: true,
-          subject: true,
-          extractedData: true,
-          documentId: true,
-          document: { select: { status: true, completedAt: true } },
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 1000,
-      });
+      const scope = {
+        organizationId: membership.organizationId,
+        createdAt: { gte: since },
+        status: { not: 'ARCHIVED' as const },
+      };
+
+      // Bounded so one enormous organization cannot make this query unbounded.
+      // The count alongside it is what lets the page say so out loud instead of
+      // quietly reporting a percentage of reality as if it were all of it.
+      const [items, inRange, archived] = await Promise.all([
+        prisma.signatureInboxItem.findMany({
+          where: scope,
+          select: {
+            id: true,
+            createdAt: true,
+            receivedAt: true,
+            senderEmail: true,
+            subject: true,
+            extractedData: true,
+            documentId: true,
+            document: { select: { status: true, completedAt: true } },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: SLA_ITEM_LIMIT,
+        }),
+        prisma.signatureInboxItem.count({ where: scope }),
+        // Archived items are left out of the measurement, and archiving is not
+        // SLA-aware — so archiving a breach quietly raises the score for every
+        // past window. Count them so the page can own that rather than hide it.
+        prisma.signatureInboxItem.count({
+          where: {
+            organizationId: membership.organizationId,
+            createdAt: { gte: since },
+            status: 'ARCHIVED',
+          },
+        }),
+      ]);
 
       const results = await evaluateItemsSla({
         organizationId: membership.organizationId,
@@ -392,59 +436,271 @@ export const inboxRouter = router({
         items,
       });
 
-      const leg = (pick: (r: (typeof results)[number]) => { state: string; ratio: number }) => {
+      /**
+       * A leg that is past target AND still running.
+       *
+       * `state === 'breached'` on its own is not enough: it is also the state of
+       * an invoice that was sent, just sent late. Those are finished work. Only
+       * this predicate describes something a person can still do anything about.
+       */
+      const isOpenBreach = (leg: { state: string; settled: boolean }) =>
+        leg.state === 'breached' && !leg.settled;
+
+      const leg = (
+        pick: (r: (typeof results)[number]) => { state: string; settled: boolean },
+      ) => {
         const tracked = results.filter((r) => pick(r).state !== 'untracked');
         const met = tracked.filter((r) => pick(r).state === 'met').length;
         const breached = tracked.filter((r) => pick(r).state === 'breached').length;
         const atRisk = tracked.filter((r) => pick(r).state === 'at-risk').length;
         const onTrack = tracked.filter((r) => pick(r).state === 'on-track').length;
-        const settled = met + breached;
+        const decided = met + breached;
 
         return {
           tracked: tracked.length,
           met,
           breached,
+          /** Of those breaches, the ones still outstanding right now. */
+          breachedOpen: tracked.filter((r) => isOpenBreach(pick(r))).length,
           atRisk,
           onTrack,
-          // Only finished work can be scored; open items aren't yet a pass or fail.
-          onTimeRate: settled > 0 ? met / settled : null,
+          // Only decided work can be scored; on-track items aren't yet pass or fail.
+          onTimeRate: decided > 0 ? met / decided : null,
         };
       };
 
-      // Worst offenders by breach count — where to actually spend attention.
-      const byVendor = new Map<string, { vendor: string; breached: number; total: number }>();
+      const internal = leg((r) => r.internal);
+      const endToEnd = leg((r) => r.endToEnd);
+
+      // ── Organization health ────────────────────────────────────────────
+      // Counts a currently-overdue open item as a failure, not as "pending".
+      // A queue of items that are already late is not healthy just because
+      // nobody has finished them yet — that framing is how a backlog hides.
+      const met = internal.met + endToEnd.met;
+      const failed = internal.breached + endToEnd.breached;
+      const judged = met + failed;
+      const score = judged > 0 ? Math.round((met / judged) * 100) : null;
+
+      const band: 'healthy' | 'watch' | 'critical' | 'unknown' =
+        score === null ? 'unknown' : score >= 90 ? 'healthy' : score >= 75 ? 'watch' : 'critical';
+
+      // ── Trend ──────────────────────────────────────────────────────────
+      // Bucketed by the day the invoice ARRIVED, so a bucket answers "how well
+      // did we handle what came in that day" rather than smearing one slow item
+      // across every day it stayed open.
+      const days = input?.days ?? 30;
+      const bucketCount = Math.max(2, Math.ceil(days / (days <= 14 ? 1 : 7)));
+
+      // Buckets divide the window that was actually queried, rather than being
+      // laid out in fixed 7-day steps. Fixed steps overshoot whenever the range
+      // is not a multiple of the step — 30 days needs 5 seven-day buckets, which
+      // reach back 35 days — and the extra 5 days were never fetched, so the
+      // leftmost bar would be drawn from a window that is partly empty by
+      // construction and read as a genuine dip.
+      const windowStart = since.getTime();
+      const windowEnd = Date.now();
+      const msPerBucket = (windowEnd - windowStart) / bucketCount;
+
+      const buckets = Array.from({ length: bucketCount }, (_, i) => {
+        const start = windowStart + i * msPerBucket;
+        return { start, end: start + msPerBucket, met: 0, breached: 0 };
+      });
+
+      const itemsById = new Map(items.map((i) => [i.id, i]));
+
       for (const r of results) {
-        const key = r.vendorLabel ?? 'Unknown vendor';
-        const row = byVendor.get(key) ?? { vendor: key, breached: 0, total: 0 };
-        row.total += 1;
-        if (r.internal.state === 'breached' || r.endToEnd.state === 'breached') {
-          row.breached += 1;
+        const item = itemsById.get(r.inboxItemId);
+        if (!item) continue;
+
+        const at = slaClockStart(item).getTime();
+        // `>=` on the last bucket so an item arriving this instant is not dropped
+        // by the exclusive upper bound.
+        const bucket =
+          buckets.find((b) => at >= b.start && at < b.end) ??
+          (at >= buckets[buckets.length - 1].start ? buckets[buckets.length - 1] : undefined);
+        if (!bucket) continue;
+
+        for (const state of [r.internal.state, r.endToEnd.state]) {
+          if (state === 'met') bucket.met += 1;
+          if (state === 'breached') bucket.breached += 1;
         }
-        byVendor.set(key, row);
       }
+
+      const trend = buckets.map((b) => {
+        const total = b.met + b.breached;
+        return {
+          // Both ends, because a bucket is a span of several days — labelling it
+          // with only its start date read as "this happened on the 4th".
+          from: new Date(b.start).toISOString().slice(0, 10),
+          to: new Date(b.end - 1).toISOString().slice(0, 10),
+          onTimeRate: total > 0 ? b.met / total : null,
+          met: b.met,
+          breached: b.breached,
+        };
+      });
+
+      // Direction from the first and last buckets that actually have data —
+      // empty buckets carry no signal and would fake a slope.
+      //
+      // Both endpoints must clear a minimum sample. Without that floor a single
+      // invoice arriving today is a whole endpoint: one item sent outside
+      // working hours (0 business minutes, therefore "met") sat opposite a
+      // 13-outcome bucket and announced "Improving +77 pts across the window".
+      const MIN_BUCKET_SAMPLE = 3;
+      const scored = trend.filter(
+        (t) => t.onTimeRate !== null && t.met + t.breached >= MIN_BUCKET_SAMPLE,
+      );
+      const firstRate = scored.at(0)?.onTimeRate ?? null;
+      const lastRate = scored.at(-1)?.onTimeRate ?? null;
+      const deltaPoints =
+        firstRate !== null && lastRate !== null && scored.length >= 2
+          ? Math.round((lastRate - firstRate) * 100)
+          : null;
+
+      const direction: 'improving' | 'steady' | 'declining' | 'unknown' =
+        deltaPoints === null ? 'unknown' : deltaPoints >= 5 ? 'improving' : deltaPoints <= -5 ? 'declining' : 'steady';
+
+      /** The span the slope was actually measured over, for an honest caption. */
+      const trendSpan =
+        deltaPoints !== null ? { from: scored[0].from, to: scored[scored.length - 1].to } : null;
+
+      // ── Forecast ───────────────────────────────────────────────────────
+      // Deliberately not a model. Open items already past target WILL breach,
+      // and at-risk ones are past the warning threshold with the clock running —
+      // that is a countable near-certainty, not a prediction, and it is the
+      // number someone can actually act on this morning.
+      //
+      // Every count here is restricted to work whose clock is STILL RUNNING. An
+      // earlier version counted any breached leg, which swept in invoices that
+      // had already been sent and even ones already fully signed, and then
+      // labelled the total "will miss without action" — advertising finished
+      // work as a to-do list.
+      const openBreached = results.filter(
+        (r) => isOpenBreach(r.internal) || isOpenBreach(r.endToEnd),
+      ).length;
+      const openAtRisk = results.filter(
+        (r) =>
+          (r.internal.state === 'at-risk' || r.endToEnd.state === 'at-risk') &&
+          !isOpenBreach(r.internal) &&
+          !isOpenBreach(r.endToEnd),
+      ).length;
+      /** Missed target, but the work is done — history, not something to chase. */
+      const finishedLate = results.filter(
+        (r) =>
+          !isOpenBreach(r.internal) &&
+          !isOpenBreach(r.endToEnd) &&
+          ((r.internal.state === 'breached' && r.internal.settled) ||
+            (r.endToEnd.state === 'breached' && r.endToEnd.settled)),
+      ).length;
+
+      // ── Per-vendor ─────────────────────────────────────────────────────
+      const vendorRows = new Map<
+        string,
+        {
+          vendor: string;
+          total: number;
+          met: number;
+          breached: number;
+          openBreached: number;
+          minutes: number[];
+        }
+      >();
+
+      for (const r of results) {
+        // Group on the NORMALISED name. OCR spells the same company differently
+        // between reads — "FUTURE EDGE TECHNOLOGY INC" and "Future Edge
+        // Technology Inc." were rendering as two vendors, one at 0% and one at
+        // 100%, at opposite ends of a table sorted worst-first. Target
+        // resolution already normalises; only this grouping did not.
+        const key = r.vendorLabel ? normalizeMetadataKey(r.vendorLabel) : 'unknown';
+        const row = vendorRows.get(key) ?? {
+          vendor: r.vendorLabel ?? 'Unknown vendor',
+          total: 0,
+          met: 0,
+          breached: 0,
+          openBreached: 0,
+          minutes: [],
+        };
+        row.total += 1;
+        if (r.internal.state === 'met') row.met += 1;
+        if (r.internal.state === 'breached') row.breached += 1;
+        if (isOpenBreach(r.internal)) row.openBreached += 1;
+
+        // Average over every leg whose clock has STOPPED, late ones included.
+        // Averaging only the invoices that met target reports the fastest time a
+        // vendor ever managed as its typical one: in this deployment Northgate
+        // showed "0h avg turnaround" next to three breaches, because its single
+        // on-time invoice arrived and went out after hours (0 business minutes)
+        // while the three that took ~25h were excluded for having been late.
+        // Still-running items are excluded because they have no turnaround yet.
+        if (r.internal.settled && (r.internal.state === 'met' || r.internal.state === 'breached')) {
+          row.minutes.push(r.internal.elapsedMinutes);
+        }
+
+        vendorRows.set(key, row);
+      }
+
+      const vendors = [...vendorRows.values()]
+        .map((row) => {
+          const decided = row.met + row.breached;
+          return {
+            vendor: row.vendor,
+            total: row.total,
+            met: row.met,
+            breached: row.breached,
+            openBreached: row.openBreached,
+            onTimeRate: decided > 0 ? row.met / decided : null,
+            avgInternalMinutes: row.minutes.length
+              ? Math.round(row.minutes.reduce((a, b) => a + b, 0) / row.minutes.length)
+              : null,
+            /** How many finished invoices that average is based on. */
+            avgSampleSize: row.minutes.length,
+          };
+        })
+        .sort((a, b) => b.breached - a.breached || b.total - a.total);
+
+      // Past the internal target and still not sent. Sorted worst-first so the
+      // capped list shows the invoices that have been waiting longest, and the
+      // count is reported separately from the list — reading `.length` off a
+      // sliced array told the user "15 overdue" whenever there were more.
+      const overdueUnsent = results
+        .filter((r) => isOpenBreach(r.internal) && r.internal.dueAt !== null)
+        .map((r) => ({
+          inboxItemId: r.inboxItemId,
+          vendor: r.vendorLabel,
+          overdueByMinutes: r.internal.elapsedMinutes - r.internal.targetMinutes,
+        }))
+        .sort((a, b) => b.overdueByMinutes - a.overdueByMinutes);
 
       return {
         enabled: true as const,
-        days: input?.days ?? 30,
+        days,
         total: results.length,
-        internal: leg((r) => r.internal),
-        endToEnd: leg((r) => r.endToEnd),
+        /** Set when the window holds more items than were evaluated. */
+        truncated: inRange > items.length ? { evaluated: items.length, inRange } : null,
+        health: { score, band, direction, deltaPoints, judged, trendSpan },
+        /** How many items in this window fall back to the ingest instant. */
+        ingestTimed: results.filter((r) => r.startedFrom === 'ingest').length,
+        internal,
+        endToEnd,
+        trend,
+        vendors,
+        forecast: {
+          openBreached,
+          openAtRisk,
+          willMissWithoutAction: openBreached + openAtRisk,
+          finishedLate,
+        },
+        /** Excluded from at least one clock for want of a target. */
         untracked: results.filter(
-          (r) => r.internal.state === 'untracked' && r.endToEnd.state === 'untracked',
+          (r) => r.internal.state === 'untracked' || r.endToEnd.state === 'untracked',
         ).length,
-        worstVendors: [...byVendor.values()]
-          .filter((v) => v.breached > 0)
-          .sort((a, b) => b.breached - a.breached)
-          .slice(0, 5),
-        /** Open items already past target — the actionable list. */
-        breachedOpen: results
-          .filter((r) => r.internal.state === 'breached' && r.internal.dueAt !== null)
-          .slice(0, 10)
-          .map((r) => ({
-            inboxItemId: r.inboxItemId,
-            vendor: r.vendorLabel,
-            overdueByMinutes: r.internal.elapsedMinutes - r.internal.targetMinutes,
-          })),
+        archived,
+        breachedOpen: {
+          /** The true number outstanding — never the length of the capped list. */
+          count: overdueUnsent.length,
+          items: overdueUnsent.slice(0, OVERDUE_LIST_LIMIT),
+        },
       };
     }),
 

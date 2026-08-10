@@ -107,7 +107,60 @@ export type WorkHubMessage = {
   subject: string;
   isRead?: boolean;
   hasAttachments?: boolean;
+  /**
+   * When the message actually landed in the mailbox, per the mail server.
+   *
+   * Null when the upstream payload carries no usable date. This is the instant
+   * every SLA clock should start from: the row's own `createdAt` is whenever the
+   * poller happened to insert it, which is the same thing only while polling is
+   * healthy. It is not the same thing after an outage — a gap in this deployment
+   * left June messages being ingested on 4 August, all within ten seconds.
+   */
+  receivedAt: Date | null;
   raw: Record<string, unknown>;
+};
+
+/** Field names seen across Graph, IMAP bridges and WorkHub's own shape. */
+const MESSAGE_DATE_KEYS = [
+  'receivedDateTime',
+  'receivedAt',
+  'receivedDate',
+  'dateReceived',
+  'sentDateTime',
+  'sentAt',
+  'date',
+  'createdDateTime',
+  'internalDate',
+];
+
+/**
+ * Best-effort arrival timestamp from whatever the upstream API called it.
+ *
+ * Returns null rather than a guess: a wrong start instant silently corrupts
+ * every turnaround figure downstream, so "unknown" has to stay distinguishable.
+ */
+export const readMessageReceivedAt = (raw: Record<string, unknown>): Date | null => {
+  const value = pick(raw, MESSAGE_DATE_KEYS);
+
+  if (value === undefined) {
+    return null;
+  }
+
+  // Epoch milliseconds (Gmail's `internalDate`) arrive as a number or a numeric
+  // string; anything else is treated as a parseable date string.
+  const asNumber = typeof value === 'number' ? value : /^\d{10,}$/.test(String(value)) ? Number(value) : NaN;
+  const parsed = Number.isFinite(asNumber) ? new Date(asNumber) : new Date(String(value));
+
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  // A clock far in the future is a parse artefact, not a real arrival.
+  if (parsed.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
+    return null;
+  }
+
+  return parsed;
 };
 
 export type WorkHubAttachmentMeta = {
@@ -183,6 +236,7 @@ export const workhubListInbox = async (
       subject: String(pick(o, ['subject', 'Subject']) ?? ''),
       isRead: Boolean(pick(o, ['isRead', 'read'])),
       hasAttachments: Boolean(pick(o, ['hasAttachments', 'hasAttachment'])),
+      receivedAt: readMessageReceivedAt(o),
       raw: o,
     };
   });

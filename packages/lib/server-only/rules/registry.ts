@@ -13,12 +13,14 @@ import {
   organizationProvider,
   recipientsProvider,
 } from './providers/entity';
+import { duplicateProvider } from './providers/duplicate';
 import { ocrProvider } from './providers/ocr';
 import type { RuleContext, RuleField, RuleFactProvider, RuleSubject } from './types';
 
 export const PROVIDERS: RuleFactProvider[] = [
   documentProvider,
   ocrProvider,
+  duplicateProvider,
   recipientsProvider,
   organizationProvider,
   actorProvider,

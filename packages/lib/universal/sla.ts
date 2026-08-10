@@ -33,7 +33,11 @@ export const DEFAULT_SLA_CALENDAR: SlaCalendar = {
   holidays: [],
 };
 
-const parseHhMm = (value: string, fallback: { hour: number; minute: number }) => {
+const parseHhMm = (value: unknown, fallback: { hour: number; minute: number }) => {
+  if (typeof value !== 'string') {
+    return fallback;
+  }
+
   const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
 
   if (!match) {
@@ -58,7 +62,21 @@ const parseHhMm = (value: string, fallback: { hour: number; minute: number }) =>
  * length falls back to 09:00–17:00.
  */
 export const normalizeCalendar = (calendar: Partial<SlaCalendar> | null | undefined): SlaCalendar => {
-  const source = { ...DEFAULT_SLA_CALENDAR, ...(calendar ?? {}) };
+  // Field-by-field rather than a spread. A spread lets an explicitly-`undefined`
+  // property overwrite the default with nothing, and the stored config reaches
+  // here full of nullable columns: an organization that de-selected every
+  // working day, or that has never saved a workday start, produced
+  // `workingDays: undefined` and threw on `.filter` — which surfaced to the user
+  // as the SLA page reporting that SLA tracking was switched off.
+  const source: SlaCalendar = {
+    timezone: calendar?.timezone ?? DEFAULT_SLA_CALENDAR.timezone,
+    workingDays: calendar?.workingDays?.length
+      ? calendar.workingDays
+      : DEFAULT_SLA_CALENDAR.workingDays,
+    workdayStart: calendar?.workdayStart ?? DEFAULT_SLA_CALENDAR.workdayStart,
+    workdayEnd: calendar?.workdayEnd ?? DEFAULT_SLA_CALENDAR.workdayEnd,
+    holidays: calendar?.holidays ?? DEFAULT_SLA_CALENDAR.holidays,
+  };
 
   const workingDays = [...new Set(source.workingDays.filter((d) => d >= 1 && d <= 7))].sort();
   const start = parseHhMm(source.workdayStart, { hour: 9, minute: 0 });
@@ -207,6 +225,16 @@ export type SlaEvaluation = {
   dueAt: Date | null;
   /** Portion of the target used; can exceed 1 when breached. */
   ratio: number;
+  /**
+   * The clock has stopped — the work finished, on time or not.
+   *
+   * `state` alone cannot tell these apart: "breached" covers both an invoice
+   * still sitting unsent past its target and one that was sent, just sent late.
+   * The first needs someone to act today; the second is history. Anything that
+   * counts work "still to do" must filter on this, or it reports finished work
+   * as outstanding.
+   */
+  settled: boolean;
 };
 
 /**
@@ -229,7 +257,14 @@ export const evaluateSla = ({
   now: Date;
 }): SlaEvaluation => {
   if (!targetHours || targetHours <= 0) {
-    return { state: 'untracked', elapsedMinutes: 0, targetMinutes: 0, dueAt: null, ratio: 0 };
+    return {
+      state: 'untracked',
+      elapsedMinutes: 0,
+      targetMinutes: 0,
+      dueAt: null,
+      ratio: 0,
+      settled: completedAt !== null,
+    };
   }
 
   const config = normalizeCalendar(calendar);
@@ -245,6 +280,7 @@ export const evaluateSla = ({
       targetMinutes,
       dueAt,
       ratio,
+      settled: true,
     };
   }
 
@@ -254,6 +290,7 @@ export const evaluateSla = ({
     targetMinutes,
     dueAt,
     ratio,
+    settled: false,
   };
 };
 

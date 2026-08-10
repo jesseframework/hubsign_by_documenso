@@ -431,17 +431,27 @@ export const orgRouter = router({
       signReminderMaxCount: z.number().int().min(1).max(10).optional(),
       // SLA — targets are in BUSINESS hours, measured on the calendar below.
       slaEnabled: z.boolean().optional(),
-      slaTimezone: z.string().max(64).nullable().optional(),
-      /** ISO weekdays, 1 = Monday. */
-      slaWorkingDays: z.array(z.number().int().min(1).max(7)).max(7).optional(),
+      slaTimezone: z
+        .string()
+        .max(64)
+        .refine((tz) => DateTime.local().setZone(tz).isValid, 'Not a recognised time zone')
+        .nullable()
+        .optional(),
+      /**
+       * ISO weekdays, 1 = Monday. At least one: a week with no working days has
+       * no clock to measure against, and saving an empty one used to leave the
+       * SLA page reporting that tracking was switched off.
+       */
+      slaWorkingDays: z.array(z.number().int().min(1).max(7)).min(1).max(7).optional(),
+      // `\d{1,2}` alone accepts "99:99"; bound the actual hour and minute.
       slaWorkdayStart: z
         .string()
-        .regex(/^\d{1,2}:\d{2}$/, 'Use HH:mm')
+        .regex(/^([01]?\d|2[0-3]):[0-5]\d$/, 'Use HH:mm')
         .nullable()
         .optional(),
       slaWorkdayEnd: z
         .string()
-        .regex(/^\d{1,2}:\d{2}$/, 'Use HH:mm')
+        .regex(/^([01]?\d|2[0-3]):[0-5]\d$/, 'Use HH:mm')
         .nullable()
         .optional(),
       slaHolidays: z
@@ -476,7 +486,25 @@ export const orgRouter = router({
       // too — a blank pattern matches every value and would disable the inbox.
       inboxBlockedSenders: z.array(z.string().max(320)).max(200).optional(),
       inboxBlockedSubjects: z.array(z.string().max(500)).max(200).optional(),
-    }))
+    })
+    // A working day that ends before it starts has zero length. The SLA engine
+    // falls back to 09:00–17:00 rather than dividing by it, so the calendar the
+    // organization believes it saved is not the one being measured against.
+    // Compared as minutes, not as strings — "9:00" sorts after "17:00".
+    .refine(
+      (input) => {
+        const minutes = (hhmm: string) => {
+          const [h, m] = hhmm.split(':');
+          return Number(h) * 60 + Number(m);
+        };
+        return (
+          !input.slaWorkdayStart ||
+          !input.slaWorkdayEnd ||
+          minutes(input.slaWorkdayEnd) > minutes(input.slaWorkdayStart)
+        );
+      },
+      { message: 'The working day must end after it starts.', path: ['slaWorkdayEnd'] },
+    ))
     .mutation(async ({ ctx, input }) => {
       const membership = await prisma.organizationMember.findFirst({
         where: { userId: ctx.user.id, role: { in: ['ORG_ADMIN'] } },

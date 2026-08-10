@@ -298,6 +298,21 @@ const sendForSignature: WorkflowActionHandler<
     added.push(r.email);
   }
 
+  // The organization's send rules apply to an automated send exactly as they do
+  // to a manual one — otherwise a workflow becomes a way around a BLOCK rule
+  // (a duplicate invoice, say) that a person clicking Send would have hit.
+  const { evaluateGate, describeBlocks } = await import('../rules/evaluate-gate');
+
+  const verdict = await evaluateGate({
+    gate: 'DOCUMENT_SEND',
+    subject: { organizationId, entityType: 'Document', entityId: String(documentId) },
+  });
+
+  if (!verdict.allowed) {
+    logger.warn(`[workflow:SEND_FOR_SIGNATURE] blocked by rules: ${describeBlocks(verdict)}`);
+    return { skipped: true, reason: 'blocked-by-rules', message: describeBlocks(verdict) };
+  }
+
   // An emailed-in document has no field layout, so without this the signer
   // receives a document with nothing to sign.
   const { ensureSignatureFields } = await import('../field/ensure-signature-fields');

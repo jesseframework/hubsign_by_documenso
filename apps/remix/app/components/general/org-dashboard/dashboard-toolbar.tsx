@@ -68,9 +68,12 @@ export type DashboardToolbarProps = {
   isFetching: boolean;
   /** Server timestamp of the data currently on screen. */
   generatedAt?: string | null;
+  /** Rendered at the start of the bar — used for the SLA entry point. */
+  leading?: React.ReactNode;
 };
 
 export const DashboardToolbar = ({
+  leading,
   range,
   onRangeChange,
   refreshMs,
@@ -106,6 +109,7 @@ export const DashboardToolbar = ({
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-[var(--r)] border border-border bg-card p-2">
+      {leading}
       <select
         className={cn(controlClass, 'font-medium')}
         value={activePreset}

@@ -28,6 +28,47 @@ const fireOcrCompleted = async (inboxItemId: string): Promise<void> => {
   // Push the finished OCR result to any open inbox views in realtime.
   publishInboxEvent(item.organizationId, { type: 'ocr', inboxItemId: item.id, status: item.status });
 
+  // Duplicate check runs here because this is the first moment the vendor and
+  // invoice number are known. Fired as its own event so a workflow can notify
+  // the vendor and the AP team without every OCR completion having to branch.
+  try {
+    const { findDuplicateInboxItems } = await import('../rules/providers/duplicate');
+
+    const duplicate = await findDuplicateInboxItems({
+      organizationId: item.organizationId,
+      inboxItemId: item.id,
+      extractedData: item.extractedData,
+    });
+
+    if (duplicate.isDuplicate) {
+      console.warn(
+        `[inbox] duplicate invoice: item ${item.id} matches ${duplicate.originalInboxItemId} ` +
+          `on ${duplicate.matchedOn}${duplicate.originalAlreadySent ? ' (original ALREADY SENT)' : ''}`,
+      );
+
+      await triggerWorkflows({
+        event: 'INBOX_DUPLICATE_DETECTED',
+        organizationId: item.organizationId,
+        data: {
+          inboxItemId: item.id,
+          duplicate,
+          sender: item.senderEmail,
+          extractedData: item.extractedData,
+          ...buildOcrCanonicalFields(item.extractedData),
+          document: {
+            id: item.document.id,
+            title: item.document.title,
+            status: item.document.status,
+            userId: item.document.userId,
+          },
+        },
+      });
+    }
+  } catch (err) {
+    // Detection is advisory; it must never stop OCR completing.
+    console.error('[inbox] duplicate detection failed:', err);
+  }
+
   await triggerWorkflows({
     event: 'INBOX_OCR_COMPLETED',
     organizationId: item.organizationId,

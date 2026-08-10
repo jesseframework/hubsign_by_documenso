@@ -47,6 +47,11 @@ export const WORKFLOW_EVENTS = [
   // Signature inbox (email-to-sign)
   { key: 'INBOX_EMAIL_RECEIVED', label: 'Inbox email received', group: 'Inbox' },
   { key: 'INBOX_OCR_COMPLETED', label: 'Inbox OCR completed', group: 'Inbox' },
+  {
+    key: 'INBOX_DUPLICATE_DETECTED',
+    label: 'Inbox duplicate invoice detected',
+    group: 'Inbox',
+  },
 ] as const;
 
 export type WorkflowEventKey = (typeof WORKFLOW_EVENTS)[number]['key'];

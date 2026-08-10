@@ -27,6 +27,7 @@ import {
   FileTextIcon,
   FolderArchiveIcon,
   FolderTreeIcon,
+  GaugeIcon,
   Globe2Icon,
   HeartIcon,
   InboxIcon,
@@ -227,6 +228,7 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
 
   const orgNav: SubNavItem[] = [
     { to: '/org', icon: LayoutDashboardIcon, label: <Trans>Dashboard</Trans>, exact: true },
+    { to: '/org/sla', icon: GaugeIcon, label: <Trans>SLA</Trans> },
     // `alsoWithoutOrg`: this is the only route to the "Create Organization"
     // form, so it has to stay reachable for someone who isn't in an org yet.
     {

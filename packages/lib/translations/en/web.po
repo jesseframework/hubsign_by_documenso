@@ -67,6 +67,16 @@ msgstr "\"{documentTitle}\" has been successfully deleted"
 msgid "\"{placeholderEmail}\" on behalf of \"{0}\" has invited you to sign \"example document\"."
 msgstr "\"{placeholderEmail}\" on behalf of \"{0}\" has invited you to sign \"example document\"."
 
+#. placeholder {0}: vendor.openBreached
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "({0} open)"
+msgstr "({0} open)"
+
+#. placeholder {0}: vendor.avgSampleSize
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "(n={0})"
+msgstr "(n={0})"
+
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
 msgid "(no subject)"
 msgstr "(no subject)"
@@ -155,6 +165,10 @@ msgstr "{0} added with a {tier} seat"
 msgid "{0} added, but no seat was assigned"
 msgstr "{0} added, but no seat was assigned"
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "{0} already over, {1} past 80% of target with the clock running."
+#~ msgstr "{0} already over, {1} past 80% of target with the clock running."
+
 #. placeholder {0}: pendingConflict.kind === 'purchase' ? 'You have' : 'This member has'
 #. placeholder {1}: pendingConflict.planName
 #. placeholder {2}: pendingConflict.priceFormatted
@@ -163,19 +177,22 @@ msgstr "{0} added, but no seat was assigned"
 msgid "{0} an active <0>{1}</0> personal subscription ({2}). {3} immediately — unused time is credited to the account balance, not refunded to the card. Continue?"
 msgstr "{0} an active <0>{1}</0> personal subscription ({2}). {3} immediately — unused time is credited to the account balance, not refunded to the card. Continue?"
 
+#. placeholder {0}: data.archived
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "{0} archived invoice(s) from this window are not measured, so archiving a late invoice removes it from these figures."
+msgstr "{0} archived invoice(s) from this window are not measured, so archiving a late invoice removes it from these figures."
+
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 #~ msgid "{0} arrived via the signature inbox"
 #~ msgstr "{0} arrived via the signature inbox"
 
-#. placeholder {0}: leg.atRisk
 #: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "{0} at risk"
-msgstr "{0} at risk"
+#~ msgid "{0} at risk"
+#~ msgstr "{0} at risk"
 
-#. placeholder {0}: leg.breached
 #: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "{0} breached"
-msgstr "{0} breached"
+#~ msgid "{0} breached"
+#~ msgstr "{0} breached"
 
 #. placeholder {0}: team.name
 #: apps/remix/app/components/dialogs/public-profile-template-manage-dialog.tsx
@@ -204,10 +221,24 @@ msgstr "{0} has invited you to {recipientActionVerb} the document \"{1}\"."
 msgid "{0} invited you to {recipientActionVerb} a document"
 msgstr "{0} invited you to {recipientActionVerb} a document"
 
+#. placeholder {0}: data.truncated.inRange
+#. placeholder {1}: data.truncated.evaluated
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "{0} invoices arrived in this window but only the most recent {1} were measured. Every figure above describes that subset."
+msgstr "{0} invoices arrived in this window but only the most recent {1} were measured. Every figure above describes that subset."
+
 #. placeholder {0}: data.untracked
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "{0} item(s) are missing a target on at least one clock and are excluded from it — set one on the vendor's Metadata record, or an organization default in Settings."
+msgstr "{0} item(s) are missing a target on at least one clock and are excluded from it — set one on the vendor's Metadata record, or an organization default in Settings."
+
 #: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "{0} item(s) have no SLA target — set one on the vendor's Metadata record or as an organization default."
-msgstr "{0} item(s) have no SLA target — set one on the vendor's Metadata record or as an organization default."
+#~ msgid "{0} item(s) have no SLA target — set one on the vendor's Metadata record or as an organization default."
+#~ msgstr "{0} item(s) have no SLA target — set one on the vendor's Metadata record or as an organization default."
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "{0} item(s) have no SLA target and are excluded — set one on the vendor's Metadata record, or an organization default in Settings."
+#~ msgstr "{0} item(s) have no SLA target and are excluded — set one on the vendor's Metadata record, or an organization default in Settings."
 
 #. placeholder {0}: memberName || memberEmail
 #: packages/email/templates/team-join.tsx
@@ -224,6 +255,11 @@ msgstr "{0} left the team {teamName} on HubSign"
 msgid "{0} locations configured. Go to Filing Structure to manage."
 msgstr "{0} locations configured. Go to Filing Structure to manage."
 
+#. placeholder {0}: data.forecast.finishedLate
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "{0} more missed target but are already done — counted against the score, not against you today."
+msgstr "{0} more missed target but are already done — counted against the score, not against you today."
+
 #. placeholder {0}: remaining.documents
 #. placeholder {1}: quota.documents
 #: apps/remix/app/components/general/document/document-upload.tsx
@@ -231,11 +267,23 @@ msgstr "{0} locations configured. Go to Filing Structure to manage."
 msgid "{0} of {1} documents remaining this month."
 msgstr "{0} of {1} documents remaining this month."
 
+#. placeholder {0}: data.ingestTimed
+#. placeholder {1}: data.total
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "{0} of {1} invoices have no arrival time from the mail server, so their clock starts when HubSign ingested them. If the inbox poller was ever down, those invoices look faster than they were."
+msgstr "{0} of {1} invoices have no arrival time from the mail server, so their clock starts when HubSign ingested them. If the inbox poller was ever down, those invoices look faster than they were."
+
 #. placeholder {0}: table.getFilteredSelectedRowModel().rows.length
 #. placeholder {1}: table.getFilteredRowModel().rows.length
 #: packages/ui/primitives/data-table-pagination.tsx
 msgid "{0} of {1} row(s) selected."
 msgstr "{0} of {1} row(s) selected."
+
+#. placeholder {0}: leg.breachedOpen
+#. placeholder {1}: leg.breached
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "{0} of those {1} are still outstanding right now."
+msgstr "{0} of those {1} are still outstanding right now."
 
 #. placeholder {0}: user.name || user.email
 #. placeholder {1}: document.team.name
@@ -244,13 +292,18 @@ msgstr "{0} of {1} row(s) selected."
 msgid "{0} on behalf of \"{1}\" has invited you to {recipientActionVerb} the document \"{2}\"."
 msgstr "{0} on behalf of \"{1}\" has invited you to {recipientActionVerb} the document \"{2}\"."
 
-#. placeholder {0}: leg.onTrack
 #: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "{0} open"
-msgstr "{0} open"
+#~ msgid "{0} open"
+#~ msgstr "{0} open"
 
-#. placeholder {0}: data.breachedOpen.length
-#: apps/remix/app/components/general/org-dashboard/sla-card.tsx
+#. placeholder {0}: data.forecast.openBreached
+#. placeholder {1}: data.forecast.openAtRisk
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "{0} over target and still open, {1} past 80% with the clock running."
+msgstr "{0} over target and still open, {1} past 80% with the clock running."
+
+#. placeholder {0}: data.breachedOpen.count
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "{0} overdue and still unsent"
 msgstr "{0} overdue and still unsent"
 
@@ -869,6 +922,12 @@ msgstr "Account Re-Authentication"
 msgid "Acknowledgment"
 msgstr "Acknowledgment"
 
+#. placeholder {0}: data.total
+#. placeholder {1}: data.days
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Across {0} invoices in the last {1} days. Items already past target count against the score rather than waiting to be finished."
+msgstr "Across {0} invoices in the last {1} days. Items already past target count against the score rather than waiting to be finished."
+
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 msgid "Across all organization members"
 msgstr "Across all organization members"
@@ -1193,6 +1252,11 @@ msgstr "AI Agent"
 #: apps/remix/app/components/general/document/document-status.tsx
 msgid "All"
 msgstr "All"
+
+#. placeholder {0}: leg.breached
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "All {0} breaches are finished work — none still outstanding."
+msgstr "All {0} breaches are finished work — none still outstanding."
 
 #: apps/remix/app/components/general/app-command-menu.tsx
 msgid "All documents"
@@ -1759,6 +1823,10 @@ msgstr "Assisting"
 msgid "At least one signature type must be enabled"
 msgstr "At least one signature type must be enabled"
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "at risk"
+msgstr "at risk"
+
 #: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
 msgid "Attach a file"
 msgstr "Attach a file"
@@ -1831,6 +1899,14 @@ msgstr "Avatar"
 #: apps/remix/app/components/forms/avatar-image.tsx
 msgid "Avatar Updated"
 msgstr "Avatar Updated"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Avg time to send"
+msgstr "Avg time to send"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "Avg turnaround"
+#~ msgstr "Avg turnaround"
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings._index.tsx
 msgid "Awaiting email confirmation"
@@ -1916,6 +1992,18 @@ msgstr "Branding Preferences"
 #: apps/remix/app/components/forms/team-branding-preferences-form.tsx
 msgid "Branding preferences updated"
 msgstr "Branding preferences updated"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "breached"
+msgstr "breached"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "Breached"
+#~ msgstr "Breached"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Breached (to send)"
+msgstr "Breached (to send)"
 
 #: apps/remix/app/components/tables/settings-security-activity-table.tsx
 #: apps/remix/app/components/tables/internal-audit-log-table.tsx
@@ -2021,6 +2109,10 @@ msgstr "By proceeding, you agree to our <0>Terms of Service</0> and <1>Privacy P
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "By using the electronic signature feature, you are consenting to conduct transactions and receive disclosures electronically. You acknowledge that your electronic signature on documents is binding and that you accept the terms outlined in the documents you are signing."
 msgstr "By using the electronic signature feature, you are consenting to conduct transactions and receive disclosures electronically. You acknowledge that your electronic signature on documents is binding and that you accept the terms outlined in the documents you are signing."
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "By vendor"
+msgstr "By vendor"
 
 #: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
 msgid "Cabinet created"
@@ -2319,6 +2411,10 @@ msgstr "Client ID"
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Client Secret"
 msgstr "Client Secret"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "clocks"
+msgstr "clocks"
 
 #: apps/remix/app/components/general/teams/team-transfer-status.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-auth-passkey.tsx
@@ -4232,9 +4328,13 @@ msgstr "Enabling the account results in the user being able to use the account a
 msgid "Enclosed Document"
 msgstr "Enclosed Document"
 
-#: apps/remix/app/components/general/org-dashboard/sla-card.tsx
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "End to end"
 msgstr "End to end"
+
+#: apps/remix/app/components/general/org-dashboard/sla-card.tsx
+#~ msgid "end to end on time"
+#~ msgstr "end to end on time"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 msgid "Ends chain"
@@ -4728,6 +4828,14 @@ msgstr "Go to your <0>public profile settings</0> to add documents."
 msgid "Green"
 msgstr "Green"
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "Grouped by the day the invoice arrived, so each bar answers \"how well did we handle what came in then\"."
+#~ msgstr "Grouped by the day the invoice arrived, so each bar answers \"how well did we handle what came in then\"."
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Grouped by when the invoice arrived, so each bar answers \"how well did we handle what came in then\". A bar counts clocks, not invoices — an invoice with both an internal and an end-to-end target contributes two."
+msgstr "Grouped by when the invoice arrived, so each bar answers \"how well did we handle what came in then\". A bar counts clocks, not invoices — an invoice with both an internal and an end-to-end target contributes two."
+
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
 msgid "Has a personal subscription — assigning a seat cancels it (prorated credit)."
 msgstr "Has a personal subscription — assigning a seat cancels it (prorated credit)."
@@ -4760,6 +4868,14 @@ msgstr "Have an activation key? Enter it to unlock your plan without a card. The
 #: packages/ui/primitives/document-flow/add-signers.tsx
 msgid "Having an assistant as the last signer means they will be unable to take any action as there are no subsequent signers to assist."
 msgstr "Having an assistant as the last signer means they will be unable to take any action as there are no subsequent signers to assist."
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "health"
+msgstr "health"
+
+#: apps/remix/app/components/general/org-dashboard/sla-card.tsx
+#~ msgid "health score"
+#~ msgstr "health score"
 
 #: apps/remix/app/components/embed/embed-document-signing-page.tsx
 msgid "Help complete the document for other signers."
@@ -4992,6 +5108,10 @@ msgid "Integrations"
 msgstr "Integrations"
 
 #: apps/remix/app/components/general/org-dashboard/sla-card.tsx
+#~ msgid "internal on time"
+#~ msgstr "internal on time"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "Internal turnaround"
 msgstr "Internal turnaround"
 
@@ -5078,8 +5198,20 @@ msgid "Invoice info"
 msgstr "Invoice info"
 
 #: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "Invoice SLA"
-msgstr "Invoice SLA"
+#~ msgid "Invoice SLA"
+#~ msgstr "Invoice SLA"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "Invoice turnaround against target, measured in business hours from the moment the email arrives."
+#~ msgstr "Invoice turnaround against target, measured in business hours from the moment the email arrives."
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Invoice turnaround against target, measured in business hours from the moment the invoice reaches the inbox."
+msgstr "Invoice turnaround against target, measured in business hours from the moment the invoice reaches the inbox."
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Invoices"
+msgstr "Invoices"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "Invoices from this email extract with this template."
@@ -5163,11 +5295,13 @@ msgstr "Label"
 msgid "Language"
 msgstr "Language"
 
-#. placeholder {0}: data.days
-#. placeholder {1}: data.total
 #: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "last {0} days · {1} items"
-msgstr "last {0} days · {1} items"
+#~ msgid "last {0} days"
+#~ msgstr "last {0} days"
+
+#: apps/remix/app/components/general/org-dashboard/sla-card.tsx
+#~ msgid "last {0} days · {1} items"
+#~ msgstr "last {0} days · {1} items"
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
@@ -5510,6 +5644,10 @@ msgstr "Message <0>(Optional)</0>"
 msgid "Message shown when it fires"
 msgstr "Message shown when it fires"
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "met"
+msgstr "met"
+
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Metadata"
@@ -5555,8 +5693,8 @@ msgstr "Monthly Active Users: Users that had at least one of their documents com
 #~ msgstr "Monthly Document Trend"
 
 #: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "Most breaches by vendor"
-msgstr "Most breaches by vendor"
+#~ msgid "Most breaches by vendor"
+#~ msgstr "Most breaches by vendor"
 
 #: apps/remix/app/components/dialogs/template-move-to-folder-dialog.tsx
 #: apps/remix/app/components/dialogs/template-move-dialog.tsx
@@ -5850,6 +5988,10 @@ msgstr "No filing locations yet"
 msgid "No further action is required from you at this time."
 msgstr "No further action is required from you at this time."
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "No invoices in this window."
+msgstr "No invoices in this window."
+
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "No metadata yet"
 msgstr "No metadata yet"
@@ -5998,9 +6140,13 @@ msgstr "Not connected yet."
 msgid "Not supported"
 msgstr "Not supported"
 
-#: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "nothing finished yet"
-msgstr "nothing finished yet"
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "nothing finished yet"
+#~ msgstr "nothing finished yet"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Nothing has finished in this window yet, so there is no trend to show."
+msgstr "Nothing has finished in this window yet, so there is no trend to show."
 
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 msgid "Nothing is enforced until you add one. Start from a preset above."
@@ -6009,6 +6155,10 @@ msgstr "Nothing is enforced until you add one. Start from a preset above."
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 msgid "Nothing outstanding beyond 90 days"
 msgstr "Nothing outstanding beyond 90 days"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "nothing scored yet"
+msgstr "nothing scored yet"
 
 #: apps/remix/app/components/tables/documents-table-empty-state.tsx
 #: apps/remix/app/components/tables/documents-table-empty-state.tsx
@@ -6135,11 +6285,35 @@ msgstr "On this page, you can create new Webhooks and manage the existing ones."
 msgid "On this page, you can edit the webhook and its settings."
 msgstr "On this page, you can edit the webhook and its settings."
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "On time"
+#~ msgstr "On time"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "on time · {0} of {1} finished"
+#~ msgstr "on time · {0} of {1} finished"
+
 #. placeholder {0}: leg.met
 #. placeholder {1}: leg.met + leg.breached
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "on time · {0} of {1} scored"
+msgstr "on time · {0} of {1} scored"
+
 #: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "on time ({0} of {1} finished)"
-msgstr "on time ({0} of {1} finished)"
+#~ msgid "on time ({0} of {1} finished)"
+#~ msgstr "on time ({0} of {1} finished)"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "On time (to send)"
+msgstr "On time (to send)"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "on track"
+msgstr "on track"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "On-time trend"
+msgstr "On-time trend"
 
 #: apps/remix/app/components/dialogs/document-delete-dialog.tsx
 msgid "Once confirmed, the following will occur:"
@@ -6212,9 +6386,21 @@ msgstr "Only users whose email matches one of these domains can be invited or se
 msgid "Oops! Something went wrong."
 msgstr "Oops! Something went wrong."
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "open"
+#~ msgstr "open"
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "Open in editor"
 msgstr "Open in editor"
+
+#: apps/remix/app/components/general/org-dashboard/sla-card.tsx
+#~ msgid "Open SLA dashboard"
+#~ msgstr "Open SLA dashboard"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Open SLA Setup"
+msgstr "Open SLA Setup"
 
 #: apps/remix/app/components/general/document/document-stamps-button.tsx
 msgid "Open the library"
@@ -6289,10 +6475,14 @@ msgstr "Organizations let you share the Document Manager across your team with r
 msgid "Otherwise, the document will be created as a draft."
 msgstr "Otherwise, the document will be created as a draft."
 
-#. placeholder {0}: Math.round(item.overdueByMinutes / 60)
-#: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "over by {0}h"
-msgstr "over by {0}h"
+#. placeholder {0}: shortDuration(item.overdueByMinutes)
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "over by {0}"
+msgstr "over by {0}"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "over by {0}h"
+#~ msgstr "over by {0}h"
 
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/audit-log.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/documents._index.tsx
@@ -6930,16 +7120,24 @@ msgid "Received"
 msgstr "Received"
 
 #: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "received → fully signed"
-msgstr "received → fully signed"
+#~ msgid "received → fully signed"
+#~ msgstr "received → fully signed"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "received → fully signed · includes the signer"
+msgstr "received → fully signed · includes the signer"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Received → fully signed. Includes the signer's time."
 msgstr "Received → fully signed. Includes the signer's time."
 
 #: apps/remix/app/components/general/org-dashboard/sla-card.tsx
-msgid "received → sent for signature"
-msgstr "received → sent for signature"
+#~ msgid "received → sent for signature"
+#~ msgstr "received → sent for signature"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "received → sent for signature · what your team controls"
+msgstr "received → sent for signature · what your team controls"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Received → sent for signature. What your team controls."
@@ -7817,6 +8015,12 @@ msgstr "Show the data the rules saw"
 msgid "Showing {0} of {1}"
 msgstr "Showing {0} of {1}"
 
+#. placeholder {0}: data.breachedOpen.items.length
+#. placeholder {1}: data.breachedOpen.count
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Showing the {0} longest-waiting of {1}."
+msgstr "Showing the {0} longest-waiting of {1}."
+
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Shows SLA performance on the dashboard and flags overdue items."
 msgstr "Shows SLA performance on the dashboard and flags overdue items."
@@ -8076,6 +8280,12 @@ msgstr "Site Banner"
 msgid "Site Settings"
 msgstr "Site Settings"
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#: apps/remix/app/components/general/app-sidebar.tsx
+#: apps/remix/app/components/general/org-dashboard/sla-toolbar-button.tsx
+msgid "SLA"
+msgstr "SLA"
+
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "SLA end-to-end"
 msgstr "SLA end-to-end"
@@ -8087,6 +8297,10 @@ msgstr "SLA internal"
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "SLA Setup"
 msgstr "SLA Setup"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "SLA tracking is off"
+msgstr "SLA tracking is off"
 
 #: packages/ui/primitives/document-flow/missing-signature-field-dialog.tsx
 msgid "Some signers have not been assigned a signature field. Please assign at least 1 signature field to each signer before proceeding."
@@ -8751,6 +8965,11 @@ msgstr "The certificate is the signing audit trail, so it is normally kept. Turn
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "The clock"
 msgstr "The clock"
+
+#. placeholder {0}: data.health.judged
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "The clock starts when the invoice reached the mailbox. Health is scored over {0} decided outcomes across both clocks, so an invoice with two targets counts twice."
+msgstr "The clock starts when the invoice reached the mailbox. Health is scored over {0} decided outcomes across both clocks, so an invoice with two targets counts twice."
 
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 msgid "The condition isn't valid JSON"
@@ -9533,6 +9752,10 @@ msgstr "Triggers"
 msgid "Try one of these"
 msgstr "Try one of these"
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Turn it on in Organization → Settings → SLA Setup, then set turnaround targets there or per vendor on the Metadata page."
+msgstr "Turn it on in Organization → Settings → SLA Setup, then set turnaround targets there or per vendor on the Metadata page."
+
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 msgid "Turn off"
 msgstr "Turn off"
@@ -10012,6 +10235,10 @@ msgstr "Validation rules (block/warn before this step)"
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
 msgid "Value"
 msgstr "Value"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Vendor"
+msgstr "Vendor"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "Vendor / Contact"
@@ -10560,6 +10787,14 @@ msgstr "While waiting for them to do so you can create your own HubSign account 
 msgid "Who do you want to remind?"
 msgstr "Who do you want to remind?"
 
+#: apps/remix/app/components/general/org-dashboard/sla-card.tsx
+#~ msgid "will miss without action"
+#~ msgstr "will miss without action"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Will miss without action"
+msgstr "Will miss without action"
+
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Withdrawing Consent"
 msgstr "Withdrawing Consent"
@@ -10612,6 +10847,14 @@ msgstr "Working days"
 #: apps/remix/app/components/general/app-sidebar.tsx
 msgid "Workspace"
 msgstr "Workspace"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "Worst first. A vendor consistently missing target may simply need a longer one set on its Metadata record."
+#~ msgstr "Worst first. A vendor consistently missing target may simply need a longer one set on its Metadata record."
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Worst first. Average turnaround covers invoices that have actually been sent, late ones included, so it is not flattered by the ones that went out fastest. A vendor consistently missing target may simply need a longer one set on its Metadata record."
+msgstr "Worst first. Average turnaround covers invoices that have actually been sent, late ones included, so it is not flattered by the ones that went out fastest. A vendor consistently missing target may simply need a longer one set on its Metadata record."
 
 #: apps/remix/app/components/forms/public-profile-form.tsx
 msgid "Write about the team"

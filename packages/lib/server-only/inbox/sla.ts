@@ -179,11 +179,17 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
     const identifiedVendor = vendorName ? knownKeys.has(normalizeMetadataKey(vendorName)) : false;
 
     if (!identifiedVendor) {
-      const haystack = [
-        vendorName ?? '',
-        item.subject ?? '',
-        JSON.stringify(item.extractedData ?? {}),
-      ]
+      // Extracted VALUES only. Stringifying the whole object dragged the OCR
+      // field names in with them, so an ordinary keyword like "total" or "date"
+      // matched the schema of every invoice rather than anything on it.
+      const extractedValues =
+        item.extractedData && typeof item.extractedData === 'object'
+          ? Object.values(item.extractedData as Record<string, unknown>)
+              .filter((v) => typeof v === 'string' || typeof v === 'number')
+              .join(' ')
+          : '';
+
+      const haystack = [vendorName ?? '', item.subject ?? '', extractedValues]
         .join(' ')
         .toLowerCase();
 
@@ -209,14 +215,34 @@ export type ItemSlaResult = {
   targets: SlaTargets;
   internal: SlaEvaluation;
   endToEnd: SlaEvaluation;
+  /**
+   * Whether the clock started from the mail server's arrival time or from the
+   * row's own insert instant. The fallback is only equivalent while polling is
+   * healthy, so the dashboard has to be able to say how much of a window rests
+   * on it.
+   */
+  startedFrom: 'mail-server' | 'ingest';
 };
 
 type EvaluableItem = Pick<
   SignatureInboxItem,
-  'id' | 'createdAt' | 'senderEmail' | 'subject' | 'extractedData' | 'documentId'
+  'id' | 'createdAt' | 'receivedAt' | 'senderEmail' | 'subject' | 'extractedData' | 'documentId'
 > & {
   document: { status: string; completedAt: Date | null };
 };
+
+/**
+ * When the invoice actually arrived.
+ *
+ * `createdAt` is when the poller INSERTed the row, which equals arrival only if
+ * the poller was running. It was not: a 25-day gap in this deployment ended with
+ * ten June messages ingested inside ten seconds on 4 August, every one of them
+ * measured as having arrived that evening. Prefer the mail server's timestamp;
+ * fall back only when the source gave none.
+ */
+export const slaClockStart = (
+  item: Pick<SignatureInboxItem, 'createdAt' | 'receivedAt'>,
+): Date => item.receivedAt ?? item.createdAt;
 
 /**
  * Evaluate both clocks for a set of items.
@@ -263,6 +289,7 @@ export const evaluateItemsSla = async ({
   return items.map((item) => {
     const targets = resolve(item);
     const sentAt = sentAtByDocument.get(item.documentId) ?? null;
+    const startedAt = slaClockStart(item);
 
     return {
       inboxItemId: item.id,
@@ -271,15 +298,16 @@ export const evaluateItemsSla = async ({
       // dashboard blame a different company for this invoice's breach.
       vendorLabel: resolveOcrVendorName(item.extractedData) ?? targets.vendorLabel ?? null,
       targets,
+      startedFrom: item.receivedAt ? ('mail-server' as const) : ('ingest' as const),
       internal: evaluateSla({
-        startedAt: item.createdAt,
+        startedAt,
         completedAt: sentAt,
         targetHours: targets.internalHours,
         calendar,
         now,
       }),
       endToEnd: evaluateSla({
-        startedAt: item.createdAt,
+        startedAt,
         completedAt: item.document.completedAt,
         targetHours: targets.endToEndHours,
         calendar,

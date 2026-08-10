@@ -279,6 +279,9 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
           subject: msg.subject,
           receivedById,
           externalMessageId,
+          // The mail server's own arrival time, so SLA measures the vendor's
+          // wait rather than the poller's schedule.
+          receivedAt: msg.receivedAt,
         });
 
         await triggerWorkflows({
