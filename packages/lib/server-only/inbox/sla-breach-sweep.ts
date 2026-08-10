@@ -98,6 +98,12 @@ export const sweepSlaBreachesForOrg = async (organizationId: number): Promise<nu
     }
   }
 
+  if (marked > 0) {
+    console.log(
+      `[sla-sweep] org ${organizationId}: marked ${marked} of ${breached.length} breached item(s) read`,
+    );
+  }
+
   return marked;
 };
 

@@ -133,6 +133,11 @@ export const markInboxEmailRead = async ({
       data: { emailReadAt: new Date() },
     });
 
+    // Logged on success as well as failure. Silence is not confirmation — with
+    // only the error path logged, a working mailbox and a mailbox nobody is
+    // calling look identical from the outside.
+    console.log(`[inbox] marked mailbox message read (${reason}) for item ${item.id}`);
+
     return 'marked';
   } catch (err) {
     // Deliberately swallowed: see the header. Logged so a mailbox that never

@@ -21,7 +21,20 @@ import { resolveOcrTemplate } from './resolve-ocr-template';
 const fireOcrCompleted = async (inboxItemId: string): Promise<void> => {
   const item = await prisma.signatureInboxItem.findUnique({
     where: { id: inboxItemId },
-    include: { document: { select: { id: true, title: true, status: true, userId: true } } },
+    include: {
+      document: {
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          userId: true,
+          // Who is actually operating this queue. An internal alert needs a
+          // person's address: sending it to the organization's inbound mailbox
+          // would deliver the warning into the very inbox being warned about.
+          user: { select: { id: true, email: true, name: true } },
+        },
+      },
+    },
   });
   if (!item) return;
 
@@ -55,6 +68,13 @@ const fireOcrCompleted = async (inboxItemId: string): Promise<void> => {
           sender: item.senderEmail,
           extractedData: item.extractedData,
           ...buildOcrCanonicalFields(item.extractedData),
+          owner: item.document.user
+            ? {
+                id: item.document.user.id,
+                email: item.document.user.email,
+                name: item.document.user.name,
+              }
+            : null,
           document: {
             id: item.document.id,
             title: item.document.title,

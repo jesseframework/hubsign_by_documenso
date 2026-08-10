@@ -11,6 +11,7 @@
 
 import { prisma } from '@documenso/prisma';
 
+import { NEXT_PUBLIC_WEBAPP_URL } from '../../constants/app';
 import { jobs } from '../../jobs/client';
 import type { TWorkflowRunContext } from '../../types/workflow';
 import { WORKFLOW_EVENT_KEYS, ZWorkflowDefinitionSchema } from '../../types/workflow';
@@ -94,10 +95,24 @@ export const triggerWorkflows = async ({
   // the placeholder renders empty and the mail goes out reading "Sent
   // automatically by ." Fetched once per dispatch, and only after the
   // no-workflows early return above.
-  const organization = await prisma.organization.findUnique({
+  const organizationRecord = await prisma.organization.findUnique({
     where: { id: organizationId },
-    select: { id: true, name: true, slug: true },
+    select: { id: true, name: true, slug: true, inboxEmail: true },
   });
+
+  /**
+   * What `{{organization.*}}` resolves to inside a step.
+   *
+   * `inboxEmail` and `url` are here so a template can address the organization's
+   * own AP mailbox and link back into the app without the address being typed
+   * into each workflow — which would have to be edited in every one of them the
+   * day it changes. An unresolvable placeholder renders as empty string and the
+   * email silently goes nowhere, so anything a template needs has to be present
+   * here rather than assumed.
+   */
+  const organization = organizationRecord
+    ? { ...organizationRecord, url: NEXT_PUBLIC_WEBAPP_URL() }
+    : { id: organizationId, url: NEXT_PUBLIC_WEBAPP_URL() };
 
   for (const workflow of workflows) {
     const parsed = ZWorkflowDefinitionSchema.safeParse(workflow.definition);
@@ -112,7 +127,7 @@ export const triggerWorkflows = async ({
       trigger: parsed.data.trigger,
       payload: data,
       document: data,
-      organization: organization ?? { id: organizationId },
+      organization,
       now,
     };
 
