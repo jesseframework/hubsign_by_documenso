@@ -298,6 +298,11 @@ const sendForSignature: WorkflowActionHandler<
     added.push(r.email);
   }
 
+  // An emailed-in document has no field layout, so without this the signer
+  // receives a document with nothing to sign.
+  const { ensureSignatureFields } = await import('../field/ensure-signature-fields');
+  const fieldsAdded = await ensureSignatureFields({ documentId });
+
   const { sendDocument } = await import('../document/send-document');
   await sendDocument({
     documentId,
@@ -311,7 +316,13 @@ const sendForSignature: WorkflowActionHandler<
     data: { status: 'SENT_FOR_SIGNATURE' },
   });
 
-  return { sent: true, documentId, recipients: recipients.map((r) => r.email), added };
+  return {
+    sent: true,
+    documentId,
+    recipients: recipients.map((r) => r.email),
+    added,
+    signatureFieldsAdded: fieldsAdded,
+  };
 };
 
 /** Extra fields ({{vars.<saveAs>.email}}, .contactName, .role, …) from a record. */

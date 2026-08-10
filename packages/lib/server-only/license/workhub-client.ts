@@ -9,6 +9,8 @@
  *      (WorkHub also IP-allowlists this endpoint to HubSign's egress IP.)
  */
 
+import { env } from '@documenso/lib/utils/env';
+
 export type WorkHubGrantType = 'org' | 'individual';
 
 export interface WorkHubLicenseGrant {
@@ -35,7 +37,7 @@ export class WorkHubLicenseError extends Error {
 }
 
 function baseUrl(): string {
-  const url = (process.env.WORKHUB_LICENSE_API_URL ?? '').trim().replace(/\/$/, '');
+  const url = (env('WORKHUB_LICENSE_API_URL') ?? '').trim().replace(/\/$/, '');
   if (!url) {
     throw new WorkHubLicenseError(
       'WORKHUB_LICENSE_API_URL is not configured on this HubSign deployment',

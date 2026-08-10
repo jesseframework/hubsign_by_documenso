@@ -23,6 +23,7 @@ import { trpc } from '@documenso/trpc/react';
 
 import { CardMetric } from '~/components/general/metric-card';
 import { ChartCard } from '~/components/general/org-dashboard/chart-card';
+import { SlaCard } from '~/components/general/org-dashboard/sla-card';
 import type { DashboardRange } from '~/components/general/org-dashboard/dashboard-toolbar';
 import {
   DashboardToolbar,
@@ -163,6 +164,8 @@ export default function OrgDashboard() {
           )}
         </p>
       </div>
+
+      <SlaCard />
 
       <DashboardToolbar
         range={range}

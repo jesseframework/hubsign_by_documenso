@@ -4,9 +4,11 @@ import { z } from 'zod';
 import { jobs } from '@documenso/lib/jobs/client';
 import { bmsMlGetTemplates } from '@documenso/lib/server-only/bms-ml/client';
 import { sendDocument } from '@documenso/lib/server-only/document/send-document';
+import { ensureSignatureFields } from '@documenso/lib/server-only/field/ensure-signature-fields';
 import { publishInboxEvent } from '@documenso/lib/server-only/inbox/inbox-events';
 import { pollWorkHubInboxForOrg } from '@documenso/lib/server-only/inbox/poll-workhub-inbox';
 import { rememberTemplateForSender } from '@documenso/lib/server-only/inbox/resolve-ocr-template';
+import { SLA_ORG_SELECT, evaluateItemsSla } from '@documenso/lib/server-only/inbox/sla';
 import { nanoid } from '@documenso/lib/universal/id';
 import { prisma } from '@documenso/prisma';
 
@@ -200,6 +202,10 @@ export const inboxRouter = router({
         });
       }
 
+      // Emailed-in documents carry no field layout — without a signature field
+      // the recipient opens the document and has nothing to sign.
+      await ensureSignatureFields({ documentId: item.documentId });
+
       // Send as the document owner so ownership checks pass (shared queue).
       await sendDocument({
         documentId: item.documentId,
@@ -336,6 +342,110 @@ export const inboxRouter = router({
       });
 
       return archived;
+    }),
+
+  /**
+   * SLA performance across the inbox, for the dashboard.
+   *
+   * Computed on read from the audit log rather than denormalised columns, so it
+   * covers items that predate SLA being enabled. At inbox sizes far beyond a
+   * hand-managed AP queue this should move to stored `slaDueAt`/`slaState`
+   * columns maintained on status change.
+   */
+  slaStats: authenticatedProcedure
+    .input(z.object({ days: z.number().int().min(1).max(365).default(30) }).optional())
+    .query(async ({ ctx, input }) => {
+      const membership = await requireOrgMember(ctx.user.id);
+      const org = await prisma.organization.findUnique({
+        where: { id: membership.organizationId },
+        select: SLA_ORG_SELECT,
+      });
+
+      if (!org?.slaEnabled) {
+        return { enabled: false as const };
+      }
+
+      const since = new Date(Date.now() - (input?.days ?? 30) * 24 * 60 * 60 * 1000);
+
+      const items = await prisma.signatureInboxItem.findMany({
+        where: {
+          organizationId: membership.organizationId,
+          createdAt: { gte: since },
+          status: { not: 'ARCHIVED' },
+        },
+        select: {
+          id: true,
+          createdAt: true,
+          senderEmail: true,
+          subject: true,
+          extractedData: true,
+          documentId: true,
+          document: { select: { status: true, completedAt: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 1000,
+      });
+
+      const results = await evaluateItemsSla({
+        organizationId: membership.organizationId,
+        org,
+        items,
+      });
+
+      const leg = (pick: (r: (typeof results)[number]) => { state: string; ratio: number }) => {
+        const tracked = results.filter((r) => pick(r).state !== 'untracked');
+        const met = tracked.filter((r) => pick(r).state === 'met').length;
+        const breached = tracked.filter((r) => pick(r).state === 'breached').length;
+        const atRisk = tracked.filter((r) => pick(r).state === 'at-risk').length;
+        const onTrack = tracked.filter((r) => pick(r).state === 'on-track').length;
+        const settled = met + breached;
+
+        return {
+          tracked: tracked.length,
+          met,
+          breached,
+          atRisk,
+          onTrack,
+          // Only finished work can be scored; open items aren't yet a pass or fail.
+          onTimeRate: settled > 0 ? met / settled : null,
+        };
+      };
+
+      // Worst offenders by breach count — where to actually spend attention.
+      const byVendor = new Map<string, { vendor: string; breached: number; total: number }>();
+      for (const r of results) {
+        const key = r.vendorLabel ?? 'Unknown vendor';
+        const row = byVendor.get(key) ?? { vendor: key, breached: 0, total: 0 };
+        row.total += 1;
+        if (r.internal.state === 'breached' || r.endToEnd.state === 'breached') {
+          row.breached += 1;
+        }
+        byVendor.set(key, row);
+      }
+
+      return {
+        enabled: true as const,
+        days: input?.days ?? 30,
+        total: results.length,
+        internal: leg((r) => r.internal),
+        endToEnd: leg((r) => r.endToEnd),
+        untracked: results.filter(
+          (r) => r.internal.state === 'untracked' && r.endToEnd.state === 'untracked',
+        ).length,
+        worstVendors: [...byVendor.values()]
+          .filter((v) => v.breached > 0)
+          .sort((a, b) => b.breached - a.breached)
+          .slice(0, 5),
+        /** Open items already past target — the actionable list. */
+        breachedOpen: results
+          .filter((r) => r.internal.state === 'breached' && r.internal.dueAt !== null)
+          .slice(0, 10)
+          .map((r) => ({
+            inboxItemId: r.inboxItemId,
+            vendor: r.vendorLabel,
+            overdueByMinutes: r.internal.elapsedMinutes - r.internal.targetMinutes,
+          })),
+      };
     }),
 
   /** Pull new messages from this org's WorkHub inbox now (also runs on the cron). */

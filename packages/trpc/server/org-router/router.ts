@@ -429,6 +429,27 @@ export const orgRouter = router({
       signReminderEnabled: z.boolean().optional(),
       signReminderDays: z.number().int().min(1).max(60).optional(),
       signReminderMaxCount: z.number().int().min(1).max(10).optional(),
+      // SLA — targets are in BUSINESS hours, measured on the calendar below.
+      slaEnabled: z.boolean().optional(),
+      slaTimezone: z.string().max(64).nullable().optional(),
+      /** ISO weekdays, 1 = Monday. */
+      slaWorkingDays: z.array(z.number().int().min(1).max(7)).max(7).optional(),
+      slaWorkdayStart: z
+        .string()
+        .regex(/^\d{1,2}:\d{2}$/, 'Use HH:mm')
+        .nullable()
+        .optional(),
+      slaWorkdayEnd: z
+        .string()
+        .regex(/^\d{1,2}:\d{2}$/, 'Use HH:mm')
+        .nullable()
+        .optional(),
+      slaHolidays: z
+        .array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Use yyyy-MM-dd'))
+        .max(200)
+        .optional(),
+      slaDefaultInternalHours: z.number().int().min(1).max(2000).nullable().optional(),
+      slaDefaultEndToEndHours: z.number().int().min(1).max(2000).nullable().optional(),
       // SSO / OIDC
       oidcEnabled: z.boolean().optional(),
       oidcClientId: z.string().nullable().optional(),
@@ -480,6 +501,14 @@ export const orgRouter = router({
           }),
           ...(input.inboxBlockedSubjects && {
             inboxBlockedSubjects: sanitize(input.inboxBlockedSubjects),
+          }),
+          // Deduped and ordered so the stored calendar stays readable and a
+          // repeated holiday can't be counted twice by anything downstream.
+          ...(input.slaWorkingDays && {
+            slaWorkingDays: [...new Set(input.slaWorkingDays)].sort((a, b) => a - b),
+          }),
+          ...(input.slaHolidays && {
+            slaHolidays: [...new Set(sanitize(input.slaHolidays) ?? [])].sort(),
           }),
         },
       });

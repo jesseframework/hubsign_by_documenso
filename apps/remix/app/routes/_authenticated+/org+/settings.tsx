@@ -31,6 +31,17 @@ const toPatternList = (value: string): string[] =>
     .map((line) => line.trim())
     .filter((line) => line.length > 0);
 
+/** ISO weekday numbers (1 = Monday), as the SLA calendar stores them. */
+const WEEKDAYS = [
+  { iso: 1, label: 'Mon' },
+  { iso: 2, label: 'Tue' },
+  { iso: 3, label: 'Wed' },
+  { iso: 4, label: 'Thu' },
+  { iso: 5, label: 'Fri' },
+  { iso: 6, label: 'Sat' },
+  { iso: 7, label: 'Sun' },
+];
+
 function OrgSettingsPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
@@ -64,6 +75,17 @@ function OrgSettingsPage() {
   const [reminderDays, setReminderDays] = useState(3);
   const [reminderMaxCount, setReminderMaxCount] = useState(3);
   const [remindersInitialized, setRemindersInitialized] = useState(false);
+
+  // SLA — targets are in BUSINESS hours, counted on the working calendar below.
+  const [slaEnabled, setSlaEnabled] = useState(false);
+  const [slaTimezone, setSlaTimezone] = useState('UTC');
+  const [slaWorkingDays, setSlaWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [slaWorkdayStart, setSlaWorkdayStart] = useState('09:00');
+  const [slaWorkdayEnd, setSlaWorkdayEnd] = useState('17:00');
+  const [slaHolidaysText, setSlaHolidaysText] = useState('');
+  const [slaInternalHours, setSlaInternalHours] = useState('8');
+  const [slaEndToEndHours, setSlaEndToEndHours] = useState('72');
+  const [slaInitialized, setSlaInitialized] = useState(false);
 
   const [includeCertificate, setIncludeCertificate] = useState(true);
   const [certificateInitialized, setCertificateInitialized] = useState(false);
@@ -198,6 +220,24 @@ function OrgSettingsPage() {
     setReminderDays(typeof orgRec.signReminderDays === 'number' ? orgRec.signReminderDays : 3);
     setReminderMaxCount(typeof orgRec.signReminderMaxCount === 'number' ? orgRec.signReminderMaxCount : 3);
     setRemindersInitialized(true);
+  }
+
+  if (!slaInitialized && org) {
+    const orgRec = org as Record<string, unknown>;
+    setSlaEnabled(Boolean(orgRec.slaEnabled));
+    setSlaTimezone((orgRec.slaTimezone as string) || 'UTC');
+    const days = orgRec.slaWorkingDays;
+    if (Array.isArray(days) && days.length) setSlaWorkingDays(days as number[]);
+    setSlaWorkdayStart((orgRec.slaWorkdayStart as string) || '09:00');
+    setSlaWorkdayEnd((orgRec.slaWorkdayEnd as string) || '17:00');
+    setSlaHolidaysText(Array.isArray(orgRec.slaHolidays) ? (orgRec.slaHolidays as string[]).join('\n') : '');
+    setSlaInternalHours(
+      typeof orgRec.slaDefaultInternalHours === 'number' ? String(orgRec.slaDefaultInternalHours) : '',
+    );
+    setSlaEndToEndHours(
+      typeof orgRec.slaDefaultEndToEndHours === 'number' ? String(orgRec.slaDefaultEndToEndHours) : '',
+    );
+    setSlaInitialized(true);
   }
 
   if (!certificateInitialized && org) {
@@ -874,6 +914,192 @@ function OrgSettingsPage() {
               loading={updateOrg.isPending}
             >
               <Trans>Save Reminder Settings</Trans>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* SLA */}
+      {isAdmin && (
+        <div className="rounded-[var(--r)] border border-border bg-card p-5">
+          <h2 className="text-[15px] font-semibold"><Trans>SLA Setup</Trans></h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            <Trans>
+              Turnaround targets for Signature Inbox items, measured from the moment the email
+              arrives. Targets are in <strong>business hours</strong> — an invoice arriving Friday
+              evening does not burn the weekend. A vendor's own target on its Metadata record
+              overrides the defaults here.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+            <div className="flex-1 pr-4">
+              <label className="text-[13px] font-medium"><Trans>Track SLA</Trans></label>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                <Trans>Shows SLA performance on the dashboard and flags overdue items.</Trans>
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={slaEnabled}
+              onClick={() => setSlaEnabled(!slaEnabled)}
+              className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
+                slaEnabled ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  slaEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          {slaEnabled && (
+            <>
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Default internal target (business hours)</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 text-[13px]"
+                    type="number"
+                    min={1}
+                    value={slaInternalHours}
+                    onChange={(e) => setSlaInternalHours(e.target.value)}
+                    placeholder="8"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    <Trans>Received → sent for signature. What your team controls.</Trans>
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Default end-to-end target (business hours)</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 text-[13px]"
+                    type="number"
+                    min={1}
+                    value={slaEndToEndHours}
+                    onChange={(e) => setSlaEndToEndHours(e.target.value)}
+                    placeholder="72"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    <Trans>Received → fully signed. Includes the signer's time.</Trans>
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-5 text-[12px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <Trans>The clock</Trans>
+              </p>
+
+              <div className="mt-2 grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Timezone</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 text-[13px]"
+                    value={slaTimezone}
+                    onChange={(e) => setSlaTimezone(e.target.value)}
+                    placeholder="America/Jamaica"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">IANA name</p>
+                </div>
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Day starts</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 text-[13px]"
+                    value={slaWorkdayStart}
+                    onChange={(e) => setSlaWorkdayStart(e.target.value)}
+                    placeholder="09:00"
+                  />
+                </div>
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Day ends</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 text-[13px]"
+                    value={slaWorkdayEnd}
+                    onChange={(e) => setSlaWorkdayEnd(e.target.value)}
+                    placeholder="17:00"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>Working days</Trans>
+                </label>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {WEEKDAYS.map((day) => {
+                    const on = slaWorkingDays.includes(day.iso);
+                    return (
+                      <button
+                        key={day.iso}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          setSlaWorkingDays(
+                            on
+                              ? slaWorkingDays.filter((d) => d !== day.iso)
+                              : [...slaWorkingDays, day.iso].sort((a, b) => a - b),
+                          )
+                        }
+                        className={`h-8 w-12 rounded-md border text-[12px] font-medium transition-colors ${
+                          on
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border text-muted-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {day.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>Holidays</Trans>
+                </label>
+                <textarea
+                  className="mt-1 min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-[12px]"
+                  value={slaHolidaysText}
+                  onChange={(e) => setSlaHolidaysText(e.target.value)}
+                  placeholder={'2026-12-25\n2027-01-01'}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  <Trans>One yyyy-MM-dd date per line. The clock pauses on these days.</Trans>
+                </p>
+              </div>
+            </>
+          )}
+
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() =>
+                void updateOrg.mutateAsync({
+                  slaEnabled,
+                  slaTimezone: slaTimezone.trim() || null,
+                  slaWorkingDays,
+                  slaWorkdayStart: slaWorkdayStart.trim() || null,
+                  slaWorkdayEnd: slaWorkdayEnd.trim() || null,
+                  slaHolidays: toPatternList(slaHolidaysText),
+                  slaDefaultInternalHours: slaInternalHours ? Number(slaInternalHours) : null,
+                  slaDefaultEndToEndHours: slaEndToEndHours ? Number(slaEndToEndHours) : null,
+                })
+              }
+              loading={updateOrg.isPending}
+            >
+              <Trans>Save SLA Settings</Trans>
             </Button>
           </div>
         </div>

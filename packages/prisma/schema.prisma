@@ -1589,6 +1589,24 @@ model Organization {
   ocrAutoProcess       Boolean @default(false) // Auto-OCR on upload
   ocrDefaultEngine     String? // auto, doctr, easyocr, tesseract, pymupdf
 
+  // SLA — turnaround targets for Signature Inbox items, measured from the
+  // moment the email arrives. Two clocks: INTERNAL (received → sent for
+  // signature, what this org controls) and END-TO-END (received → fully
+  // signed, which also depends on the signer).
+  slaEnabled              Boolean  @default(false)
+  /// IANA zone the working day is expressed in, e.g. "America/Jamaica".
+  slaTimezone             String?
+  /// ISO weekdays that count as working days: 1 = Monday … 7 = Sunday.
+  slaWorkingDays          Int[]    @default([1, 2, 3, 4, 5])
+  /// Local "HH:mm" bounds of the working day. Outside these the clock pauses.
+  slaWorkdayStart         String?
+  slaWorkdayEnd           String?
+  /// "yyyy-MM-dd" dates treated as non-working regardless of weekday.
+  slaHolidays             String[] @default([])
+  /// Fallbacks in business hours, used when a vendor sets no target of its own.
+  slaDefaultInternalHours Int?
+  slaDefaultEndToEndHours Int?
+
   // Stripe billing
   stripeCustomerId                String?   @unique
   stripeSubscriptionId            String?   @unique

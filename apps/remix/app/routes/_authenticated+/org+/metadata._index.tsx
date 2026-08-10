@@ -63,6 +63,9 @@ export default function MetadataPage() {
   const [signerName, setSignerName] = useState('');
   const [signerEmail, setSignerEmail] = useState('');
   const [signerRole, setSignerRole] = useState('');
+  // Turnaround targets in business hours; blank = inherit the org default.
+  const [slaInternalHours, setSlaInternalHours] = useState('');
+  const [slaEndToEndHours, setSlaEndToEndHours] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Extraction templates, so a vendor can be pinned to one — invoices from that
@@ -82,6 +85,8 @@ export default function MetadataPage() {
     setSignerName('');
     setSignerEmail('');
     setSignerRole('');
+    setSlaInternalHours('');
+    setSlaEndToEndHours('');
   };
 
   const upsert = trpc.metadata.upsert.useMutation({
@@ -216,6 +221,8 @@ export default function MetadataPage() {
               'signerName',
               'signerEmail',
               'signerRole',
+              'slaInternalHours',
+              'slaEndToEndHours',
             ].some((f) => value(f));
 
             if (hasAnyValue) {
@@ -242,6 +249,11 @@ export default function MetadataPage() {
           if (signerNameValue) extra.signerName = signerNameValue;
           if (signerEmailValue) extra.signerEmail = signerEmailValue;
           if (signerRoleValue) extra.signerRole = signerRoleValue.toUpperCase();
+
+          const slaInternal = Number(value('slaInternalHours'));
+          const slaEndToEnd = Number(value('slaEndToEndHours'));
+          if (Number.isFinite(slaInternal) && slaInternal > 0) extra.slaInternalHours = slaInternal;
+          if (Number.isFinite(slaEndToEnd) && slaEndToEnd > 0) extra.slaEndToEndHours = slaEndToEnd;
 
           records.push({
             category,
@@ -316,6 +328,8 @@ export default function MetadataPage() {
     setSignerName(typeof d.signerName === 'string' ? d.signerName : '');
     setSignerEmail(typeof d.signerEmail === 'string' ? d.signerEmail : '');
     setSignerRole(typeof d.signerRole === 'string' ? d.signerRole : '');
+    setSlaInternalHours(typeof d.slaInternalHours === 'number' ? String(d.slaInternalHours) : '');
+    setSlaEndToEndHours(typeof d.slaEndToEndHours === 'number' ? String(d.slaEndToEndHours) : '');
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -338,6 +352,8 @@ export default function MetadataPage() {
     if (signerName.trim()) extra.signerName = signerName.trim();
     if (signerEmail.trim()) extra.signerEmail = signerEmail.trim();
     if (signerRole.trim()) extra.signerRole = signerRole.trim().toUpperCase();
+    if (Number(slaInternalHours) > 0) extra.slaInternalHours = Number(slaInternalHours);
+    if (Number(slaEndToEndHours) > 0) extra.slaEndToEndHours = Number(slaEndToEndHours);
 
     if (ocrTemplateId) {
       const chosen = ocrTemplates?.templates.find((t) => String(t.id) === ocrTemplateId);
@@ -561,6 +577,34 @@ export default function MetadataPage() {
               placeholder="SIGNER"
             />
           </div>
+          <div className="w-[110px]">
+            <label className={label}>
+              <Trans>SLA internal</Trans>
+            </label>
+            <Input
+              className="h-8 text-[13px]"
+              type="number"
+              min={1}
+              value={slaInternalHours}
+              onChange={(e) => setSlaInternalHours(e.target.value)}
+              placeholder="hours"
+              title={_(msg`Business hours from email received to sent for signature. Blank uses the org default.`)}
+            />
+          </div>
+          <div className="w-[110px]">
+            <label className={label}>
+              <Trans>SLA end-to-end</Trans>
+            </label>
+            <Input
+              className="h-8 text-[13px]"
+              type="number"
+              min={1}
+              value={slaEndToEndHours}
+              onChange={(e) => setSlaEndToEndHours(e.target.value)}
+              placeholder="hours"
+              title={_(msg`Business hours from email received to fully signed. Blank uses the org default.`)}
+            />
+          </div>
           {Boolean(ocrTemplates?.templates.length) && (
             <div className="w-[170px]">
               <label className={label}>
@@ -715,6 +759,18 @@ export default function MetadataPage() {
                           title={_(msg`Invoices from this email extract with this template.`)}
                         >
                           OCR: {templateLabel}
+                        </p>
+                      )}
+                      {(typeof d.slaInternalHours === 'number' ||
+                        typeof d.slaEndToEndHours === 'number') && (
+                        <p
+                          className="mt-1 text-[10px] text-muted-foreground"
+                          title={_(msg`Turnaround targets in business hours.`)}
+                        >
+                          SLA:{' '}
+                          {typeof d.slaInternalHours === 'number' ? `${d.slaInternalHours}h` : '—'}
+                          {' / '}
+                          {typeof d.slaEndToEndHours === 'number' ? `${d.slaEndToEndHours}h` : '—'}
                         </p>
                       )}
                       {typeof d.signerEmail === 'string' && d.signerEmail && (
