@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
@@ -21,6 +21,8 @@ import {
   SearchIcon,
   SendIcon,
   SlidersHorizontalIcon,
+  Volume2Icon,
+  VolumeXIcon,
   WorkflowIcon,
   XCircleIcon,
   XIcon,
@@ -40,6 +42,11 @@ import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { useInboxEvents } from '~/hooks/use-inbox-events';
 import { formatRelativeTime } from '~/utils/format-relative-time';
+import {
+  isInboxChimeEnabled,
+  playInboxChime,
+  setInboxChimeEnabled,
+} from '~/utils/inbox-chime';
 import { appMetaTags } from '~/utils/meta';
 
 const runStatusColor = (status: string | null | undefined): string => {
@@ -137,6 +144,17 @@ function WorkflowActivityIndicator({
 export function meta() {
   return appMetaTags('Signature Inbox');
 }
+
+/**
+ * Whether OCR is still reading this item, so its extracted data is not yet
+ * trustworthy.
+ *
+ * Only the active window counts. `PENDING` (queued, not started) and `OCR_FAILED`
+ * are deliberately excluded: an item that never got picked up, or whose read
+ * failed, has to stay openable or it becomes unreachable — the reviewer needs to
+ * see it in order to do anything about it.
+ */
+const isOcrInFlight = (status: string): boolean => status === 'OCR_PROCESSING';
 
 const ocrBadge = (status: string): string => {
   switch (status) {
@@ -360,6 +378,12 @@ export default function SignatureInboxPage() {
 
   // Live-refresh the list when OCR finishes or new mail is ingested (SSE).
   useInboxEvents();
+
+  // Start at the util's default so server and first client render agree, then
+  // read the stored preference once mounted — localStorage doesn't exist during
+  // SSR and reading it in the initialiser would cause a hydration mismatch.
+  const [chimeOn, setChimeOn] = useState(true);
+  useEffect(() => setChimeOn(isInboxChimeEnabled()), []);
   const inboxAddress =
     org?.inboxEmail || (org?.slug ? `${org.slug}@${INBOUND_EMAIL_DOMAIN()}` : null);
 
@@ -401,16 +425,42 @@ export default function SignatureInboxPage() {
             </Trans>
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-shrink-0"
-          disabled={fetchNow.isPending}
-          onClick={() => fetchNow.mutate()}
-        >
-          <RefreshCwIcon className="mr-1 h-3.5 w-3.5" />
-          <Trans>Fetch from WorkHub</Trans>
-        </Button>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="px-2"
+            title={
+              chimeOn
+                ? _(msg`Sound on for new mail — click to mute`)
+                : _(msg`Sound muted — click to unmute`)
+            }
+            aria-pressed={chimeOn}
+            onClick={() => {
+              const next = !chimeOn;
+              setChimeOn(next);
+              setInboxChimeEnabled(next);
+              // Play on enable so the volume is known before relying on it —
+              // and because this click satisfies the browser's autoplay gate.
+              if (next) playInboxChime();
+            }}
+          >
+            {chimeOn ? (
+              <Volume2Icon className="h-3.5 w-3.5" />
+            ) : (
+              <VolumeXIcon className="h-3.5 w-3.5" />
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={fetchNow.isPending}
+            onClick={() => fetchNow.mutate()}
+          >
+            <RefreshCwIcon className="mr-1 h-3.5 w-3.5" />
+            <Trans>Fetch from WorkHub</Trans>
+          </Button>
+        </div>
       </div>
 
       {inboxAddress && (
@@ -737,21 +787,60 @@ export default function SignatureInboxPage() {
                     {/* Actions */}
                     <td className="px-4 py-3 align-top">
                       <div className="flex items-center justify-end gap-1">
-                        <Link to={`/org/inbox/${item.id}`}>
-                          <Button size="sm" className="h-7 text-[11px]">
-                            <ScanLineIcon className="mr-1 h-3.5 w-3.5" />
-                            <Trans>Review</Trans>
+                        {/*
+                          Review is withheld while OCR is running: the extracted
+                          fields are what the reviewer is there to check, and
+                          opening the item mid-read shows them blank or partial,
+                          which invites approving figures that have not been read
+                          yet. Rendered as a disabled button rather than a disabled
+                          Button inside the Link — the Link would still navigate,
+                          since it captures the click before the button sees it.
+                          The row updates itself when OCR finishes, so this
+                          re-enables without a refresh.
+                        */}
+                        {isOcrInFlight(item.status) ? (
+                          <Button
+                            size="sm"
+                            className="h-7 text-[11px]"
+                            disabled
+                            title={_(msg`OCR is still reading this document`)}
+                          >
+                            <RefreshCwIcon className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            <Trans>Reading…</Trans>
                           </Button>
-                        </Link>
+                        ) : (
+                          <Link to={`/org/inbox/${item.id}`}>
+                            <Button size="sm" className="h-7 text-[11px]">
+                              <ScanLineIcon className="mr-1 h-3.5 w-3.5" />
+                              <Trans>Review</Trans>
+                            </Button>
+                          </Link>
+                        )}
+                        {/*
+                          Re-run OCR stays available even while a read is in
+                          flight — it is the only way to recover an item that has
+                          stuck in OCR_PROCESSING, and disabling it there would
+                          leave the row with no action but Archive.
+
+                          Scoped to the row being re-run: `reprocess.isPending`
+                          alone disabled the button on every row at once, because
+                          one mutation hook serves the whole table.
+                        */}
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-7 text-[11px]"
                           title={_(msg`Re-run OCR`)}
-                          disabled={reprocess.isPending}
+                          disabled={reprocess.isPending && reprocess.variables?.id === item.id}
                           onClick={() => reprocess.mutate({ id: item.id })}
                         >
-                          <RefreshCwIcon className="h-3.5 w-3.5" />
+                          <RefreshCwIcon
+                            className={`h-3.5 w-3.5 ${
+                              reprocess.isPending && reprocess.variables?.id === item.id
+                                ? 'animate-spin'
+                                : ''
+                            }`}
+                          />
                         </Button>
                         {item.status !== 'ARCHIVED' && (
                           <Button

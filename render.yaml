@@ -99,6 +99,31 @@ services:
       - key: NEXT_PRIVATE_UPLOAD_SECRET_ACCESS_KEY
         sync: false
 
+      # Push notifications (Firebase Cloud Messaging).
+      # Optional — leave every value blank to disable push entirely.
+      # NEXT_PUBLIC_* are read at runtime (root.tsx injects them into
+      # window.__ENV__), so setting them takes effect on restart, no rebuild.
+      # NEXT_PRIVATE_FCM_SERVICE_ACCOUNT_JSON is the service-account key file
+      # base64-encoded (`base64 -i serviceAccountKey.json`), not raw JSON.
+      - key: NEXT_PUBLIC_FIREBASE_API_KEY
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_APP_ID
+        sync: false
+      - key: NEXT_PUBLIC_FIREBASE_VAPID_KEY
+        sync: false
+      - key: NEXT_PRIVATE_FCM_PROJECT_ID
+        sync: false
+      - key: NEXT_PRIVATE_FCM_SERVICE_ACCOUNT_JSON
+        sync: false
+
       # Crypto
       - key: NEXT_PRIVATE_ENCRYPTION_KEY
         generateValue: true

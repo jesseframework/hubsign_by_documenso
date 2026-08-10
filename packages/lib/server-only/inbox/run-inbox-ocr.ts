@@ -11,6 +11,7 @@ import { Prisma } from '@prisma/client';
 
 import { prisma } from '@documenso/prisma';
 
+import { buildOcrCanonicalFields } from '../../universal/ocr-fields';
 import { getFileServerSide } from '../../universal/upload/get-file.server';
 import { bmsMlUploadDocument, isBmsMlConfigured } from '../bms-ml/client';
 import { triggerWorkflows } from '../workflow/trigger-workflows';
@@ -38,6 +39,10 @@ const fireOcrCompleted = async (inboxItemId: string): Promise<void> => {
       ocrConfidence: item.ocrConfidence,
       needsReview: item.needsReview,
       extractedData: item.extractedData,
+      // Template-independent aliases ({{payload.vendorName}}, …). Workflows key
+      // off these so a document routed to a different OCR template — which
+      // names its fields differently — doesn't silently stop matching.
+      ...buildOcrCanonicalFields(item.extractedData),
       sender: item.senderEmail,
       document: {
         id: item.document.id,

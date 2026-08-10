@@ -1,0 +1,86 @@
+---
+title: Settings & Branding
+description: Branding, the audit certificate, sign reminders, SSO, member domains and email intake.
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Settings & Branding
+
+**Organization → Settings** is a set of cards. **Each card saves independently** —
+press the save button in the card you changed.
+
+| Card | Controls |
+|---|---|
+| **General** | Name, slug, domain, logo |
+| **Branding** | Colours applied across the app, emails and dashboard charts |
+| **Signed Documents** | Whether the audit certificate is attached to signed PDFs |
+| **Sign Reminders** | Chase recipients who have not signed |
+| **Email-to-Sign** | The inbox address for [invoice intake](/organization/signature-inbox) |
+| **Single Sign-On** | Your own identity provider |
+| **Member domains** | Restrict membership to your email domains |
+| **Security** | Enforce one session per user |
+| **Confidentiality** | Default classification for new documents |
+
+## Branding
+
+Set your primary and accent colours, sidebar, and button colours. These are applied
+to the app, to the emails your recipients receive, and to the
+[Dashboard](/organization/dashboard) charts, so a recipient sees your brand rather
+than a generic one.
+
+## Signed Documents — the audit certificate
+
+The **Final Audit Report** is the page appended to a signed PDF recording who
+signed, when, from where, and the document's integrity hash. It is your evidence
+that the signature happened.
+
+Turn it off only if your documents are circulated externally and the extra page is
+unwanted.
+
+<Callout type="warning">
+  This applies at **seal time**, so it only affects documents completed from now on.
+  Documents already signed keep the pages they were sealed with — the certificate is
+  baked into the PDF and cannot be removed retroactively.
+</Callout>
+
+For documents already signed, use the **Download** menu on the document page and
+choose *Download without audit certificate*. That gives you the signed pages alone
+while leaving the sealed original intact.
+
+## Sign Reminders
+
+Enable reminders, then set the interval in days and a maximum count. Recipients who
+have not signed are emailed automatically until they sign or the maximum is reached.
+
+## Single Sign-On
+
+<Steps>
+### Register HubSign with your provider
+
+Create an application in Microsoft 365 / Azure AD, Google Workspace, Okta or Auth0
+and note the client ID and secret.
+
+### Enter the details here
+
+Paste the well-known URL, client ID and secret, and give the button a label your
+staff will recognise.
+
+### Share the sign-in link
+
+Members sign in at `/signin?org=<your-slug>`.
+</Steps>
+
+## Member domains and self-signup
+
+Adding a domain such as `yourcompany.com` means people registering with that domain
+appear in [Members](/organization/members) as pending, ready to convert.
+
+Combine it with **Disable self-signup** to stop staff creating their own accounts
+outside your control — they are told the organization already exists and to ask an
+administrator.
+
+<Callout>
+  Domain restriction affects **membership**, not signing. External recipients can
+  still be sent documents and still sign them, regardless of their email domain.
+</Callout>

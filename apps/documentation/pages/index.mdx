@@ -1,73 +1,226 @@
 ---
 title: Home
-description: Documenso aims to be the world's most trusted document-signing tool. Join us in creating the next generation of open trust infrastructure.
+description: Guides, reference and integration docs for HubSign — sending documents for signature, administering your organization, and connecting signed results to your systems.
+# Nextra resolves the page theme as { ...metaThemeContext, ...frontMatter }, so
+# these win. Set here rather than in _meta.json because this entry is
+# `display: hidden`, and a hidden entry does not reliably become the active one
+# whose meta `theme` block is read.
+layout: full
+toc: false
+breadcrumb: false
+timestamp: false
 ---
 
-import Image from 'next/image';
 import Link from 'next/link';
 
-import backgroundPattern from '@documenso/assets/images/background-pattern.png';
-import cardBeautifulFigure from '@documenso/assets/images/card-beautiful-figure.png';
-import cardConnectionsFigure from '@documenso/assets/images/card-connections-figure.png';
-import cardPaidFigure from '@documenso/assets/images/card-paid-figure.png';
-import cardSharingFigure from '@documenso/assets/images/card-sharing-figure.png';
-import { cn } from '@documenso/ui/lib/utils';
-import { Card, CardContent, CardTitle } from '@documenso/ui/primitives/card';
+export const Icon = ({ children }) => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="var(--hs-brand-600)"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    {children}
+  </svg>
+);
 
-export const Wrapper = ({ children }) => {
-  return <div className="mt-20">{children}</div>;
-};
+export const Topic = ({ href, icon, title, count, children }) => (
+  <Link href={href} className="hs-topic">
+    {icon}
+    <h3>{title}</h3>
+    <p>{children}</p>
+    <span className="hs-count">{count}</span>
+  </Link>
+);
 
-<Wrapper>
-  <div
-    className="fixed inset-0 -z-10 bg-center -mt-[15vh] h-full scale-125 object-cover dark:contrast-[70%] dark:invert dark:sepia md:scale-150 lg:scale-[175%] opacity-40 dark:opacity-20"
-    style={{
-      backgroundImage: `url('${backgroundPattern.src}')`,
-    }}
-  />
-  <div className="flex flex-col items-center mb-16">
-    <span className="text-center text-4xl font-bold leading-tight tracking-tight md:text-[48px] lg:text-[64px]">Document signing, finally open source</span>
-    <span className="text-muted-foreground mx-auto mt-4 max-w-2xl text-center leading-normal tracking-tight">Documenso aims to be the world's most trusted document-signing tool. Join us in creating the next generation of open trust infrastructure.</span>
+<div className="hs-landing">
+
+  {/* ── Hero ─────────────────────────────────────────────────────── */}
+
+  <section className="hs-hero">
+
+    {/* Signatures draw themselves on a stagger. Atmosphere rather than ornament —
+        it is a picture of what the product does. */}
+    <div className="hs-sig-field" aria-hidden="true">
+      <svg className="hs-sig hs-sig-a" viewBox="0 0 460 150" fill="none">
+        <path d="M12 108c18-6 30-26 36-52 4-18 1-34-8-34-11 0-14 22-11 42 5 32 22 54 38 54 14 0 22-14 26-30 3-13 8-20 14-20 7 0 9 9 7 20-2 12 2 20 11 20 12 0 20-12 26-28 5-13 11-19 18-19 8 0 10 8 8 18-2 13 4 21 15 21 16 0 30-16 42-40" />
+        <path d="M232 66c14-4 28-10 42-18" />
+        <path d="M320 92c16 2 34-4 52-18 14-11 24-13 30-6 5 6 2 15-8 24-12 11-14 18-6 22 9 5 24 0 42-14" />
+        <line className="hs-rule" x1="10" y1="132" x2="440" y2="132" />
+      </svg>
+
+      <svg className="hs-sig hs-sig-b" viewBox="0 0 380 130" fill="none">
+        <path d="M14 96c22 0 38-14 46-38 6-18 4-32-5-32-10 0-13 16-9 34 6 28 22 46 40 46 15 0 25-10 32-26 5-12 10-17 16-15 7 2 7 11 3 20-6 13-2 21 10 21 18 0 36-18 50-46" />
+        <path d="M188 40c-6 24-4 44 6 58 8 11 20 12 34 4 12-7 20-7 24 1 4 9-1 17-14 24" />
+        <line className="hs-rule" x1="10" y1="116" x2="366" y2="116" />
+      </svg>
+
+      <svg className="hs-sig hs-sig-c" viewBox="0 0 300 110" fill="none">
+        <path d="M12 80c18-2 30-16 36-38 4-15 2-27-6-27-9 0-11 14-8 29 5 24 19 40 34 40 13 0 22-9 28-24 4-11 9-15 14-13 6 2 6 10 2 18-5 11-1 18 9 18 15 0 30-15 42-38" />
+        <line className="hs-rule" x1="10" y1="98" x2="290" y2="98" />
+      </svg>
+    </div>
+
+    <p className="hs-eyebrow">HubSign documentation</p>
+
+    <h1>How can we help you send, sign, or connect?</h1>
+
+    <p className="hs-lede">
+      Everything for sending documents for signature, administering your
+      organization, and wiring signed results into the systems that use them.
+    </p>
+
+    <div className="hs-popular">
+      <span className="hs-popular-label">Popular:</span>
+      <Link href="/users/get-started/account-creation">Getting your account</Link>
+      <Link href="/organization/signature-inbox">Signature Inbox</Link>
+      <Link href="/organization/business-rules">Business rules</Link>
+      <Link href="/manual#36-completion-the-audit-certificate-and-downloads">
+        Audit certificates
+      </Link>
+    </div>
+  </section>
+
+  {/* ── Topics ───────────────────────────────────────────────────── */}
+
+  <div className="hs-section-head" id="topics">
+    <h2>Browse by topic</h2>
+    <Link href="/manual">Full manual →</Link>
+  </div>
+
+  <div className="hs-topics">
+
+    <Topic
+      href="/users/signing-documents"
+      title="Signing"
+      count="12 pages"
+      icon={
+        <Icon>
+          <path d="M3 21c3-1 5-3 7-6l7-7a2.8 2.8 0 1 1 4 4l-7 7c-3 2-5 4-6 7" />
+          <path d="M14 6l4 4" />
+        </Icon>
+      }
+    >
+      Fields, recipients, signing order, supporting files and the audit certificate.
+    </Topic>
+
+    <Topic
+      href="/dms"
+      title="Doc Manager"
+      count="11 pages"
+      icon={
+        <Icon>
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
+        </Icon>
+      }
+    >
+      Filing structure, retention and disposal, retrievals, permissions and audit.
+    </Topic>
+
+    <Topic
+      href="/organization"
+      title="Organization"
+      count="14 pages"
+      icon={
+        <Icon>
+          <circle cx="9" cy="8" r="3.2" />
+          <path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" />
+          <path d="M17 8.5a3 3 0 0 1 0 5" />
+          <path d="M18.5 20c0-2.4-.9-4-2.2-5" />
+        </Icon>
+      }
+    >
+      Members and seats, branding, the invoice inbox, approvals and workflows.
+    </Topic>
+
+    <Topic
+      href="/integrations"
+      title="Integrations"
+      count="1 guide"
+      icon={
+        <Icon>
+          <path d="M9 3v5M15 3v5" />
+          <path d="M6 8h12v4a6 6 0 0 1-12 0Z" />
+          <path d="M12 18v3" />
+        </Icon>
+      }
+    >
+      REST API, webhooks, and posting signed invoices to your ERP.
+    </Topic>
 
   </div>
 
-  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-8 md:mt-8">
-    <Link href="/users">
-      <Card className="col-span-2 lg:col-span-1 h-full dark:bg-black/10 dark:border dark:border-stone-800">
-        <CardContent className="grid grid-cols-1 gap-8 p-6 max-h-[460px]">
-          <span className="text-foreground/80 leading-relaxed">
-            <strong className="block text-2xl font-normal mb-2 tracking-tight">Learn</strong>
-            Learn how to get started with your account and leverage our advanced features to level up your productivity.
-          </span>
-          <div className="flex items-center justify-center p-8 flex-grow">
-            <Image
-              src={cardBeautifulFigure}
-              alt="its fast"
-              className="w-full max-w-xs dark:contrast-[70%] dark:hue-rotate-180 dark:invert"
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+  {/* ── Onboarding ───────────────────────────────────────────────── */}
 
-    <Link href='/developers'>
-      <Card className="col-span-2 lg:col-span-1 h-full dark:bg-black/10 dark:border dark:border-stone-800">
-        <CardContent className="grid grid-cols-1 gap-8 p-6 max-h-[460px]">
-          <span className="text-foreground/80 leading-relaxed">
-            <strong className="block text-2xl font-normal mb-2 tracking-tight">Build</strong>
-            Everything you need to set up your local development environment.
-            Use our API and utilize webhooks for seamless integration.
-          </span>
-          <div className="flex items-center justify-center p-8 flex-grow">
-            <Image
-              src={cardConnectionsFigure}
-              alt="its fast"
-              className="w-full max-w-sm dark:contrast-[70%] dark:hue-rotate-180 dark:invert"
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
-
+  <div className="hs-onboard">
+    <div className="hs-onboard-head">
+      <h2>New to HubSign?</h2>
+      <Link href="/manual#32-preparing-a-document">Start the walkthrough →</Link>
+    </div>
+    <ol className="hs-steps">
+      <li className="hs-step">
+        <b>1</b>Upload
+      </li>
+      <li className="hs-arrow" aria-hidden="true">→</li>
+      <li className="hs-step">
+        <b>2</b>Prepare
+      </li>
+      <li className="hs-arrow" aria-hidden="true">→</li>
+      <li className="hs-step">
+        <b>3</b>Send
+      </li>
+      <li className="hs-arrow" aria-hidden="true">→</li>
+      <li className="hs-step">
+        <b>4</b>Sealed
+      </li>
+    </ol>
   </div>
-</Wrapper>
+
+  {/* ── Latest ───────────────────────────────────────────────────── */}
+
+  <div className="hs-section-head">
+    <h2>Latest additions</h2>
+    <Link href="/manual#appendix-b--known-gaps">Known gaps →</Link>
+  </div>
+
+  <ul className="hs-recent">
+    <li>
+      <Link href="/dms">
+        <span className="hs-recent-title">
+          Doc Manager — filing, retention, retrieval and audit
+        </span>
+        <time dateTime="2026-08-09">9 Aug 2026</time>
+      </Link>
+    </li>
+    <li>
+      <Link href="/organization">
+        <span className="hs-recent-title">
+          Organization — members, seats, rules, approvals and workflows
+        </span>
+        <time dateTime="2026-08-09">9 Aug 2026</time>
+      </Link>
+    </li>
+    <li>
+      <Link href="/integrations">
+        <span className="hs-recent-title">
+          Posting signed invoices to an ERP or accounting system
+        </span>
+        <time dateTime="2026-08-09">9 Aug 2026</time>
+      </Link>
+    </li>
+    <li>
+      <Link href="/manual#36-completion-the-audit-certificate-and-downloads">
+        <span className="hs-recent-title">
+          Downloading a signed PDF with or without the audit certificate
+        </span>
+        <time dateTime="2026-08-08">8 Aug 2026</time>
+      </Link>
+    </li>
+  </ul>
+
+</div>

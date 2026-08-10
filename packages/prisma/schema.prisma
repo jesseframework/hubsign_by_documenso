@@ -288,6 +288,14 @@ model Subscription {
   // scheduled reminder job doesn't re-send until the subscription renews.
   renewalReminderSentForPeriodEnd DateTime?
 
+  // License-key activation (WorkHub-minted, INDIVIDUAL grants). When
+  // source='license_key' there is no Stripe price, so the limits resolver
+  // derives the quota from licenseTier/licenseAddons instead of Stripe product
+  // metadata, and `periodEnd` carries the grant's expiry.
+  source        String   @default("stripe") // "stripe" | "license_key"
+  licenseTier   String?
+  licenseAddons String[] @default([])
+
   team Team? @relation(fields: [teamId], references: [id], onDelete: Cascade)
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1711,11 +1719,40 @@ model OrgSeatPlan {
   // Stripe
   stripePriceId String?
 
+  // License-key activation (WorkHub-minted). `source` distinguishes a normal
+  // Stripe-billed plan from a trial granted by a license key; `expiresAt` is
+  // the grant's end (the limits resolver fails closed to Free after a grace
+  // window). Null expiresAt = a normal Stripe plan.
+  source    String    @default("stripe") // "stripe" | "license_key"
+  expiresAt DateTime?
+
   organizationId Int
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Local ledger of redeemed WorkHub license keys. WorkHub enforces GLOBAL
+// single-use (its own ledger); this is HubSign's local audit + idempotency +
+// the source of the "trial active until <date>" UI and the expiry sweep.
+model LicenseKeyRedemption {
+  id               String   @id @default(cuid())
+  jti              String   @unique // WorkHub key id
+  grantType        String // 'org' | 'individual'
+  subject          String // org id (as string) or user email
+  tier             String
+  addons           String[] @default([])
+  seats            Int?
+  days             Int
+  redeemedAt       DateTime @default(now())
+  expiresAt        DateTime
+  organizationId   Int?
+  userId           Int?
+  redeemedByUserId Int?
+
+  @@index([organizationId])
+  @@index([userId])
 }
 
 model OrganizationMember {

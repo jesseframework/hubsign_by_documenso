@@ -199,7 +199,29 @@ export const metadataRouter = router({
           data = { ...(data ?? {}), ocrTemplateId: template.id, ocrTemplateName: template.name };
         }
 
-        pending.set(`${category}::${key}`, {
+        const mapKey = `${category}::${key}`;
+
+        // A record's identity is its name, so two rows sharing a name within a
+        // category are the same record. Writing both into `pending` silently kept
+        // only the last, which is how a 7-row file could report success and leave
+        // 5 records — the earlier rows disappeared before any database call, with
+        // nothing reported. Now the first row wins and the collision is named, so
+        // the file can be corrected.
+        const clash = pending.get(mapKey);
+
+        if (clash) {
+          errors.push({
+            row: record.row,
+            label: record.label,
+            message:
+              `Duplicate name "${record.label.trim()}" in category "${category}"` +
+              (clash.row ? ` — already used on row ${clash.row}` : '') +
+              '. Names must be unique within a category, so this row was skipped.',
+          });
+          continue;
+        }
+
+        pending.set(mapKey, {
           category,
           key,
           label: record.label.trim(),

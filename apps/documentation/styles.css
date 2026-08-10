@@ -1,3 +1,589 @@
 @tailwind base;
-@tailwind ;
+@tailwind components;
 @tailwind utilities;
+
+/*
+ * HubSign brand.
+ *
+ * The wordmark from hubsign.io is a PNG whose "HubSign" text is near-black. On
+ * Nextra's dark background that text vanishes, and a CSS invert would drag the
+ * purple mark off-brand with it. So dark mode places the artwork on a white
+ * chip: the logo keeps its exact colours in both themes and stays legible.
+ */
+.hubsign-logo img {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+
+.dark .hubsign-logo {
+  background: #fff;
+  border-radius: 8px;
+  padding: 5px 9px;
+}
+
+/* Same treatment for the larger logo on the landing page. */
+.hubsign-logo-hero img {
+  height: 64px;
+  width: auto;
+}
+
+.dark .hubsign-logo-hero {
+  background: #fff;
+  border-radius: 14px;
+  padding: 14px 22px;
+}
+
+/*
+ * The Future Edge logo is the mirror problem: its "FUTUREEDGE TECHNOLOGY"
+ * lettering is white, drawn for the dark site footer, so it disappears against a
+ * light background. Light mode therefore gets the dark chip — the opposite of
+ * the HubSign wordmark above.
+ */
+.futureedge-logo img {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+
+.futureedge-logo {
+  background: #1c1c20;
+  border-radius: 6px;
+  padding: 5px 9px;
+}
+
+.dark .futureedge-logo {
+  background: transparent;
+  padding: 0;
+}
+
+/* The footer logo sits in a tighter column than the header one. */
+.hs-foot .hubsign-logo img {
+  height: 34px;
+}
+
+
+
+/* ============================================================
+   Landing page
+   ============================================================
+   Ported from the reference design. Two deliberate departures:
+
+   1. NO EXTERNAL FONTS. The reference loads Hanken Grotesk and IBM Plex Mono
+      from Google. This portal deliberately makes no third-party requests — the
+      upstream analytics call was removed for the same reason — so the local
+      stack is used, with a mono face only for the small accent text where it
+      does the most work.
+
+   2. THE HERO IS CONTAINED, NOT FULL-BLEED. A full-bleed band needs `100vw`,
+      which includes the scrollbar and gives every page a horizontal scroll on
+      platforms with a classic scrollbar. A rounded surface inside the container
+      reads the same and cannot break the page.
+   ============================================================ */
+
+:root {
+  --hs-brand-50: #f4f0fb;
+  --hs-brand-200: #d0c1ed;
+  --hs-brand-400: #8b63c4;
+  --hs-brand-600: #6b3fa0;
+  --hs-brand-700: #55307f;
+  --hs-brand-900: #2f1a52;
+
+  --hs-line: #e7e4ef;
+  --hs-line-strong: #d6d2e2;
+  --hs-surface: #ffffff;
+  --hs-page: #fbfafd;
+  --hs-muted: #5b5670;
+  --hs-faint: #8e89a3;
+
+  --hs-radius: 14px;
+  --hs-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+.dark {
+  --hs-brand-50: rgba(139, 99, 196, 0.12);
+  --hs-brand-200: rgba(139, 99, 196, 0.35);
+  --hs-brand-400: #a583d8;
+  --hs-brand-600: #b794e6;
+  --hs-brand-700: #c9aef0;
+  --hs-brand-900: #e5d8f7;
+
+  --hs-line: rgba(255, 255, 255, 0.1);
+  --hs-line-strong: rgba(255, 255, 255, 0.18);
+  --hs-surface: rgba(255, 255, 255, 0.03);
+  --hs-page: transparent;
+  --hs-muted: rgba(255, 255, 255, 0.62);
+  --hs-faint: rgba(255, 255, 255, 0.42);
+}
+
+/*
+ * The landing runs full width via `layout: "full"` in pages/_meta.json, which is
+ * Nextra's supported way to drop the max-w-6xl content cap. Doing it in CSS meant
+ * fighting the framework — and the selector targeted <main>, which the full
+ * layout replaces with <article> anyway.
+ *
+ * The wide container is for the card grids; the hero's own text stays measured.
+ */
+.hs-landing {
+  padding: 0 clamp(16px, 4vw, 56px) 72px;
+}
+
+/* ---------- hero ---------- */
+
+.hs-hero {
+  position: relative;
+  overflow: hidden;
+  margin-top: 28px;
+  padding: 56px 40px 60px;
+  background: var(--hs-surface);
+  border: 1px solid var(--hs-line);
+  border-radius: 20px;
+}
+
+.hs-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hs-eyebrow {
+  margin: 0 0 14px;
+  font-family: var(--hs-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--hs-brand-600);
+}
+
+.hs-hero h1 {
+  max-width: 19ch;
+  margin: 0;
+  font-size: clamp(30px, 4.4vw, 44px);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+}
+
+.hs-lede {
+  max-width: 54ch;
+  margin: 16px 0 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--hs-muted);
+}
+
+.hs-popular {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  margin-top: 18px;
+  font-size: 13px;
+}
+
+.hs-popular .hs-popular-label {
+  margin-right: 4px;
+  color: var(--hs-faint);
+}
+
+.hs-popular a {
+  padding: 4px 8px;
+  color: var(--hs-brand-600);
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.hs-popular a:hover {
+  background: var(--hs-brand-50);
+}
+
+/* ---------- ambient signature field ----------
+   Signatures draw themselves, hold, fade, and restart on a stagger. Kept at very
+   low contrast: atmosphere for a signing product, never a legibility cost. */
+
+.hs-sig-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+}
+
+.hs-sig {
+  position: absolute;
+}
+
+.hs-sig path {
+  fill: none;
+  stroke: var(--hs-brand-600);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: hs-sign 16s ease-in-out infinite;
+}
+
+.hs-sig .hs-rule {
+  stroke: var(--hs-brand-600);
+  stroke-width: 1;
+  stroke-dasharray: none;
+  stroke-dashoffset: 0;
+  opacity: 0.07;
+  animation: none;
+}
+
+@keyframes hs-sign {
+  0% {
+    stroke-dashoffset: 1000;
+    opacity: 0;
+  }
+  4% {
+    opacity: 0.16;
+  }
+  38%,
+  68% {
+    stroke-dashoffset: 0;
+    opacity: 0.16;
+  }
+  84%,
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}
+
+.hs-sig-a {
+  top: 2%;
+  right: -3%;
+  width: 460px;
+}
+.hs-sig-b {
+  top: 44%;
+  right: 12%;
+  width: 380px;
+}
+.hs-sig-c {
+  bottom: 4%;
+  left: 48%;
+  width: 300px;
+}
+
+.hs-sig-b path {
+  animation-delay: 5.3s;
+}
+.hs-sig-c path {
+  animation-delay: 10.6s;
+}
+
+/* ---------- sections ---------- */
+
+.hs-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 48px 0 16px;
+}
+
+.hs-section-head h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.hs-section-head a {
+  font-size: 14px;
+  color: var(--hs-brand-600);
+  text-decoration: none;
+}
+
+.hs-section-head a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- topic cards ---------- */
+
+.hs-topics {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+
+.hs-topic {
+  display: block;
+  padding: 20px;
+  background: var(--hs-surface);
+  border: 1px solid var(--hs-line);
+  border-radius: var(--hs-radius);
+  text-decoration: none;
+  transition: border-color 0.15s, transform 0.15s;
+}
+
+.hs-topic:hover {
+  border-color: var(--hs-brand-200);
+  transform: translateY(-2px);
+}
+
+.hs-topic h3 {
+  margin: 12px 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.hs-topic p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--hs-muted);
+}
+
+.hs-count {
+  display: block;
+  margin-top: 14px;
+  font-family: var(--hs-mono);
+  font-size: 11px;
+  color: var(--hs-faint);
+}
+
+/* ---------- onboarding strip ---------- */
+
+.hs-onboard {
+  margin-top: 24px;
+  padding: 20px;
+  background: var(--hs-surface);
+  border: 1px solid var(--hs-line);
+  border-radius: var(--hs-radius);
+}
+
+.hs-onboard-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.hs-onboard-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.hs-onboard-head a {
+  font-size: 14px;
+  color: var(--hs-brand-600);
+  text-decoration: none;
+}
+
+.hs-onboard-head a:hover {
+  text-decoration: underline;
+}
+
+.hs-steps {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.hs-steps .hs-step {
+  padding: 6px 14px;
+  background: var(--hs-brand-50);
+  color: var(--hs-brand-900);
+  border-radius: 999px;
+}
+
+.hs-steps .hs-step b {
+  margin-right: 6px;
+  font-family: var(--hs-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--hs-brand-600);
+}
+
+.hs-steps .hs-arrow {
+  color: var(--hs-faint);
+}
+
+/* ---------- list of links with dates ---------- */
+
+.hs-recent {
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--hs-line);
+  border-bottom: 1px solid var(--hs-line);
+}
+
+.hs-recent li + li {
+  border-top: 1px solid var(--hs-line);
+}
+
+.hs-recent a {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 0;
+  text-decoration: none;
+}
+
+.hs-recent a:hover {
+  color: var(--hs-brand-600);
+}
+
+.hs-recent .hs-recent-title {
+  font-size: 15px;
+}
+
+.hs-recent time {
+  flex-shrink: 0;
+  font-family: var(--hs-mono);
+  font-size: 11px;
+  color: var(--hs-faint);
+}
+
+@media (max-width: 900px) {
+  .hs-sig-b,
+  .hs-sig-c {
+    display: none;
+  }
+  .hs-sig-a {
+    top: auto;
+    bottom: 2%;
+    right: -14%;
+    width: 340px;
+  }
+  .hs-hero {
+    padding: 40px 24px 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hs-sig path {
+    animation: none;
+    stroke-dashoffset: 0;
+    opacity: 0.1;
+  }
+  .hs-topic:hover {
+    transform: none;
+  }
+}
+
+/* ---------- footer ---------- */
+
+.hs-foot {
+  width: 100%;
+  font-size: 14px;
+}
+
+.hs-foot-grid {
+  display: grid;
+  gap: 40px 32px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .hs-foot-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .hs-foot-grid {
+    grid-template-columns: 1.6fr 1fr 1fr 1fr;
+  }
+}
+
+.hs-foot-brand {
+  max-width: 26rem;
+}
+
+.hs-foot-tag {
+  margin: 16px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--hs-muted);
+}
+
+.hs-foot-powered {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--hs-line);
+  font-size: 12px;
+  color: var(--hs-faint);
+}
+
+.hs-foot-h {
+  margin: 0;
+  font-family: var(--hs-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--hs-muted);
+}
+
+.hs-foot-list {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hs-foot-list li + li {
+  margin-top: 10px;
+}
+
+.hs-foot-list a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--hs-muted);
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.hs-foot-list a:hover {
+  color: var(--hs-brand-600);
+}
+
+.hs-foot-list svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  color: var(--hs-faint);
+}
+
+.hs-foot-bottom {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--hs-line);
+  font-size: 12px;
+  color: var(--hs-faint);
+}
+
+@media (min-width: 640px) {
+  .hs-foot-bottom {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+/* The footer logo sits in a tighter column than the header one. */
+.hs-foot .hubsign-logo img {
+  height: 34px;
+}

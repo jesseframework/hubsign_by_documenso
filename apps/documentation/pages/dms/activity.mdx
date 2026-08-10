@@ -1,0 +1,61 @@
+---
+title: Activity & Audit
+description: The record of who did what to which document, and how to use it.
+---
+
+import { Callout } from 'nextra/components';
+
+# Activity & Audit
+
+**Doc Manager → Activity** is the audit log for the records library: who did what, to which
+document, and when.
+
+## What it records
+
+Every consequential action leaves an entry — filing and re-filing, classification changes,
+downloads, permission changes, retrieval requests and returns, retention decisions and
+disposals.
+
+Individual documents also carry their own history on the document page, which is usually the
+faster route when you have a specific record in question.
+
+## What it is actually for
+
+Three uses, in rough order of how often they come up:
+
+**Answering "where did this go?"** A record that is not where someone expects it was usually
+re-filed, and the log says by whom. This resolves most "missing document" reports.
+
+**Proving a destruction was authorised.** When a record has been disposed of, the question
+later is not whether it is gone but whether it should have been. The retention decision and
+who made it are here — see [Retention & Disposal](/dms/retention).
+
+**Demonstrating access control.** Being able to show who downloaded a `RESTRICTED` document,
+and that nobody else did, is often the actual requirement behind a confidentiality policy.
+
+<Callout type="info">
+  For signed documents, the signing audit trail is separate and lives on the document in
+  E-Sign, alongside the audit certificate in the sealed PDF. The DMS log records what happened
+  to the record; the certificate records what happened at signing.
+</Callout>
+
+## A suggested practice
+
+Read it periodically rather than only when something goes wrong. Two patterns are worth
+noticing early:
+
+- **Re-filing churn** — the same records moving repeatedly usually means the
+  [filing structure](/dms/filing) does not match how people think about the documents
+- **Download patterns that do not match roles** — often a sign that
+  [permissions](/dms/permissions) were granted ad hoc and never revisited
+
+Both are easier to fix as habits than as incidents.
+
+## What the log cannot tell you
+
+It records actions in HubSign. It cannot record what happened to **paper** — whether a box was
+actually shredded, or whether a retrieved file made it back to the right shelf.
+
+That gap is why the [retrieval](/dms/retrievals) states and the disposal statuses need to be
+kept honest by the people handling the physical records. The log is only as truthful as the
+statuses people set.

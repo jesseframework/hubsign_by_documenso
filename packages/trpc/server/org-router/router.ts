@@ -35,6 +35,10 @@ import { OrgMemberInviteEmailTemplate } from '@documenso/email/templates/org-mem
 import { OrgMemberWelcomeEmailTemplate } from '@documenso/email/templates/org-member-welcome';
 import { ONE_DAY } from '@documenso/lib/constants/time';
 import { jobs } from '@documenso/lib/jobs/client';
+import {
+  LicenseRedeemError,
+  redeemLicenseKey,
+} from '@documenso/lib/server-only/license/redeem-license-key';
 import { stripe } from '@documenso/lib/server-only/stripe';
 import { prisma } from '@documenso/prisma';
 
@@ -290,6 +294,39 @@ export const orgRouter = router({
       });
 
       return org;
+    }),
+
+  /**
+   * Redeem a WorkHub-minted license key for this organization (a Stripe-free
+   * activation). Only an ORG_ADMIN may redeem, and only for a free/inactive org
+   * (never overriding an active paid plan) — enforced in `redeemLicenseKey`.
+   */
+  redeemLicenseKey: authenticatedProcedure
+    .input(
+      z.object({
+        key: z.string().min(1).max(2000),
+        organizationId: z.number().int(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const { grant } = await redeemLicenseKey({
+          key: input.key.trim(),
+          userId: ctx.user.id,
+          organizationId: input.organizationId,
+        });
+        return {
+          tier: grant.tier,
+          addons: grant.addons,
+          seats: grant.seats,
+          expiresAt: grant.expiresAt,
+        };
+      } catch (err) {
+        if (err instanceof LicenseRedeemError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+        }
+        throw err;
+      }
     }),
 
   /**

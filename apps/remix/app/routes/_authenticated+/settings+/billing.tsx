@@ -18,6 +18,7 @@ import { prisma } from '@documenso/prisma';
 import { BillingPlans } from '~/components/general/billing-plans';
 import { BillingPortalButton } from '~/components/general/billing-portal-button';
 import { PlanSwitcher } from '~/components/general/plan-switcher';
+import { RedeemLicenseKeyCard } from '~/components/general/redeem-license-key-card';
 import { SubscriptionAddons } from '~/components/general/subscription-addons';
 import { appMetaTags } from '~/utils/meta';
 import { superLoaderJson, useSuperLoaderData } from '~/utils/super-json-loader';
@@ -176,6 +177,10 @@ export default function TeamsSettingBillingPage() {
 
   return (
     <div>
+      <div className="mb-8">
+        <RedeemLicenseKeyCard />
+      </div>
+
       <div className="flex flex-row items-end justify-between">
         <div>
           <h3 className="text-2xl font-semibold">

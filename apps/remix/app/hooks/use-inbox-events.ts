@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 
 import { trpc } from '@documenso/trpc/react';
 
+import { playInboxChime } from '~/utils/inbox-chime';
+
 /** Mirrors `InboxEvent` in `@documenso/lib/server-only/inbox/inbox-events`. */
 type InboxEvent = {
   type: 'new' | 'ocr' | 'update' | 'viewed' | 'workflow';
@@ -28,6 +30,16 @@ let reconnectDelay = INITIAL_RECONNECT_MS;
 let hasConnected = false;
 
 const dispatch = (event: InboxEvent) => {
+  // Sound once per event, here rather than in the per-listener callbacks —
+  // the sidebar, the list, and an open item all subscribe, so chiming inside
+  // a listener would play it two or three times for one arriving email.
+  //
+  // Only `new` rings: `ocr`/`update`/`viewed` fire during normal churn, and the
+  // synthetic post-reconnect refresh would otherwise chime for old mail.
+  if (event.type === 'new') {
+    playInboxChime();
+  }
+
   for (const notify of listeners) {
     notify(event);
   }

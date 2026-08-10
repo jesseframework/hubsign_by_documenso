@@ -1,0 +1,63 @@
+---
+title: OCR Queue & AI
+description: Track OCR processing, and ask questions of your document library.
+---
+
+import { Callout } from 'nextra/components';
+
+# OCR Queue & AI
+
+## OCR Processing Queue
+
+**Doc Manager → OCR Queue** tracks OCR status for uploaded documents.
+
+OCR is what makes a scan's **contents** searchable. Until it has run, a document is findable
+by its metadata only — see [Search](/dms/search).
+
+### If nothing is processing
+
+The queue depends on the **BMS ML service** being configured for your organization. Until it
+is, uploads will sit unprocessed. The page says so, and links to the settings.
+
+Configuration lives under **Organization → Settings**, where the service URL and credentials
+are set. This is the same service the
+[Signature Inbox](/organization/signature-inbox) uses to read invoices.
+
+### After a bulk import
+
+Expect a backlog. A [bulk upload](/dms/bulk-upload) of several hundred files will take time
+to work through, and search on content will be incomplete until it finishes. Check here
+before concluding that an imported document is missing text.
+
+<Callout type="warning">
+  **OCR output is a machine's guess.** In real data here, extracted purchase-order numbers
+  have come out as `"Box"`, `"licy"` and `"rt"`. Treat extracted values as a search aid and a
+  starting point for review — never as authoritative data feeding a financial decision
+  unchecked.
+</Callout>
+
+## AI
+
+**Doc Manager → AI** lets you ask questions about your documents, generate reports and get
+insights, as a conversation.
+
+### What it is good for
+
+- Locating something you can describe but not name — *"the lease amendment that changed the
+  break clause"*
+- Summarising across records — *"what did we agree with this supplier"*
+- Drafting a report from what is filed
+
+### What to check before relying on an answer
+
+An AI answer is generated from document content, which for scanned records means it is
+generated from **OCR output**. Two layers of inference sit between the paper and the answer.
+
+For anything consequential — a figure, a date, an obligation — open the underlying document
+and read it. The AI is a way to find the right document quickly, which is genuinely valuable;
+it is not a substitute for reading the record you are about to act on.
+
+<Callout type="info">
+  Answers are limited to documents you are permitted to see, so two people can legitimately
+  get different answers to the same question. See [Permissions](/dms/permissions).
+</Callout>

@@ -58,6 +58,11 @@ export default function MetadataPage() {
   const [phone, setPhone] = useState('');
   const [keywords, setKeywords] = useState('');
   const [ocrTemplateId, setOcrTemplateId] = useState('');
+  // Who signs documents from this vendor — kept on the same record so one row
+  // drives both the confirmation email and the signature request.
+  const [signerName, setSignerName] = useState('');
+  const [signerEmail, setSignerEmail] = useState('');
+  const [signerRole, setSignerRole] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Extraction templates, so a vendor can be pinned to one — invoices from that
@@ -74,6 +79,9 @@ export default function MetadataPage() {
     setPhone('');
     setKeywords('');
     setOcrTemplateId('');
+    setSignerName('');
+    setSignerEmail('');
+    setSignerRole('');
   };
 
   const upsert = trpc.metadata.upsert.useMutation({
@@ -205,6 +213,9 @@ export default function MetadataPage() {
               'phone',
               'keywords',
               'ocrTemplate',
+              'signerName',
+              'signerEmail',
+              'signerRole',
             ].some((f) => value(f));
 
             if (hasAnyValue) {
@@ -223,6 +234,14 @@ export default function MetadataPage() {
           if (roleValue) extra.role = roleValue.toUpperCase();
           if (phoneValue) extra.phone = phoneValue;
           if (keywordValues.length) extra.keywords = keywordValues;
+
+          const signerNameValue = value('signerName');
+          const signerEmailValue = value('signerEmail');
+          const signerRoleValue = value('signerRole');
+
+          if (signerNameValue) extra.signerName = signerNameValue;
+          if (signerEmailValue) extra.signerEmail = signerEmailValue;
+          if (signerRoleValue) extra.signerRole = signerRoleValue.toUpperCase();
 
           records.push({
             category,
@@ -294,6 +313,9 @@ export default function MetadataPage() {
           : '',
     );
     setOcrTemplateId(typeof d.ocrTemplateId === 'number' ? String(d.ocrTemplateId) : '');
+    setSignerName(typeof d.signerName === 'string' ? d.signerName : '');
+    setSignerEmail(typeof d.signerEmail === 'string' ? d.signerEmail : '');
+    setSignerRole(typeof d.signerRole === 'string' ? d.signerRole : '');
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -313,6 +335,9 @@ export default function MetadataPage() {
       .map((k) => k.trim())
       .filter(Boolean);
     if (kw.length) extra.keywords = kw;
+    if (signerName.trim()) extra.signerName = signerName.trim();
+    if (signerEmail.trim()) extra.signerEmail = signerEmail.trim();
+    if (signerRole.trim()) extra.signerRole = signerRole.trim().toUpperCase();
 
     if (ocrTemplateId) {
       const chosen = ocrTemplates?.templates.find((t) => String(t.id) === ocrTemplateId);
@@ -501,6 +526,41 @@ export default function MetadataPage() {
               placeholder="e.g. northgate, consulting, IT services"
             />
           </div>
+          <div className="min-w-[160px] flex-1">
+            <label className={label}>
+              <Trans>Signer name</Trans>
+            </label>
+            <Input
+              className="h-8 text-[13px]"
+              value={signerName}
+              onChange={(e) => setSignerName(e.target.value)}
+              placeholder="who signs"
+            />
+          </div>
+          <div className="min-w-[180px] flex-1">
+            <label className={label}>
+              <Trans>Signer email</Trans>
+            </label>
+            <Input
+              className="h-8 text-[13px]"
+              type="email"
+              value={signerEmail}
+              onChange={(e) => setSignerEmail(e.target.value)}
+              placeholder="signer@company.com"
+            />
+          </div>
+          <div className="w-[120px]">
+            <label className={label}>
+              <Trans>Signer role</Trans>
+            </label>
+            <Input
+              className="h-8 text-[13px]"
+              list="metadata-roles"
+              value={signerRole}
+              onChange={(e) => setSignerRole(e.target.value)}
+              placeholder="SIGNER"
+            />
+          </div>
           {Boolean(ocrTemplates?.templates.length) && (
             <div className="w-[170px]">
               <label className={label}>
@@ -534,16 +594,28 @@ export default function MetadataPage() {
         </div>
         <p className="mt-2 text-[11px] text-muted-foreground">
           <Trans>
-            Only Category + Name are required. Name match is case-insensitive. Keywords let a
-            workflow auto-route by scanning the invoice's OCR data — if any keyword appears, this
-            record's signee/vendor is used (e.g. to trigger a sign request).
+            Only Category + Name are required. <strong>Name identifies the record and must be
+            unique within its category</strong> — two people cannot share one name, so give each
+            signee their own (put a job title in Role, not in Name). Name match is
+            case-insensitive. Keywords let a workflow auto-route by scanning the invoice's OCR data
+            — if any keyword appears, this record's signee/vendor is used (e.g. to trigger a sign
+            request).
+          </Trans>
+        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          <Trans>
+            One vendor record covers the whole invoice flow — <strong>Email</strong> receives the
+            "we received your invoice" confirmation, and <strong>Signer email</strong> is who the
+            document is then sent to for signature. Leave the signer blank to send only the
+            confirmation. A separate "signee" record is no longer needed.
           </Trans>
         </p>
         <p className="mt-1 text-[11px] text-muted-foreground">
           <Trans>
             Adding a lot at once? Download the template, fill it in with Excel or Google Sheets,
             save it as CSV, then use Import. Re-importing an edited file updates the matching
-            records instead of duplicating them.
+            records instead of duplicating them. Rows that repeat a name already used in the same
+            category are skipped and reported rather than overwriting the earlier row.
           </Trans>
         </p>
       </div>
@@ -643,6 +715,17 @@ export default function MetadataPage() {
                           title={_(msg`Invoices from this email extract with this template.`)}
                         >
                           OCR: {templateLabel}
+                        </p>
+                      )}
+                      {typeof d.signerEmail === 'string' && d.signerEmail && (
+                        <p
+                          className="mt-1 text-[10px] text-muted-foreground"
+                          title={_(msg`Documents from this vendor are sent to this person.`)}
+                        >
+                          {typeof d.signerRole === 'string' && d.signerRole
+                            ? d.signerRole.toLowerCase()
+                            : 'signer'}
+                          : {d.signerEmail}
                         </p>
                       )}
                     </td>

@@ -1,33 +1,64 @@
 ---
-title: Create Your Account
-description: Learn how to create an account on Documenso.
+title: Getting Your Account
+description: How to get access to HubSign and what to do first.
 ---
 
 import { Callout, Steps } from 'nextra/components';
 
-# Create Your Account
+# Getting Your Account
+
+HubSign is a cloud service on **WorkHub Cloud**. There is nothing to install —
+your organization is provisioned as a tenant, and an administrator grants you
+access to it.
 
 <Steps>
-### Pick a Plan
+### Get access
 
-The first step to start using Documenso is to pick a plan and create an account. At the moment of writing this guide, we have 3 plans available: Free, Individual, and Teams.
+There are two ways an account is created:
 
-Explore each plan's features and choose the one that best suits your needs. The [pricing page](https://documen.so/pricing) has more information about the plans.
+- **An administrator invites you.** You receive an email with a link to set your
+  password and sign in.
+- **You register with a company email address.** If your organization has
+  restricted membership to its own email domains, registering with an address on
+  one of those domains puts you in the members list with **pending** status. An
+  administrator then converts you to a full member, which assigns you a licensed
+  seat.
 
-<Callout>All plans are subject to our [Fair Use Policy](/users/fair-use).</Callout>
+<Callout>
+  If self-signup has been disabled for your organization, registering will tell you
+  the organization already exists and to ask an administrator to add you. That is
+  expected — it keeps accounts under your administrator's control.
+</Callout>
 
-### Create an account
+### Sign in
 
-If you are unsure which plan to choose, you can start with the free plan and upgrade later.
+Sign in at your organization's HubSign address in any modern browser. Nothing is
+installed on your machine, and you can sign in from anywhere.
 
-To create a free account, navigate to the [registration page](https://documen.so/free) and fill in the required information.
+If **Single Sign-On** is configured, use the SSO link for your organization
+(`/signin?org=<your-organization-slug>`) and authenticate with your normal company
+identity provider — Microsoft 365, Google Workspace, Okta or Auth0. You will not
+need a separate HubSign password.
 
-### Optional: Claim a Premium Username
+<Callout type="info">
+  Signing does not require an account at all. People you send documents to open a
+  private link from their email and sign in the browser, whether or not they are in
+  your organization.
+</Callout>
 
-You can claim a premium username by upgrading to a paid plan. After upgrading to a paid plan, you can update your [public profile](https://app.documenso.com/settings/public-profile).
+### Secure your account
 
-### Optional: Create a Team
+Set up two-factor authentication or a passkey. See
+[Account security](/users/get-started/account-security).
 
-If you are working with others, you can create a team and invite your team members to collaborate on your documents. More information about teams is available in the [Teams section](/users/get-started/teams).
+<Callout type="info">
+  Your organization may enforce a single concurrent session per user. If so, signing
+  in somewhere new ends your other session.
+</Callout>
+
+### Send your first document
+
+Go to **E-Sign**, upload a PDF, add recipients and place their fields. The
+[User Manual](/manual#32-preparing-a-document) walks through it step by step.
 
 </Steps>

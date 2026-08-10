@@ -1,0 +1,25 @@
+{
+  "index": "Overview",
+  "-- Set up": {
+    "type": "separator",
+    "title": "Set up"
+  },
+  "filing": "Filing Structure",
+  "permissions": "Permissions & Confidentiality",
+  "compliance": "Compliance Templates",
+  "-- Daily use": {
+    "type": "separator",
+    "title": "Daily use"
+  },
+  "documents": "Filing a Document",
+  "bulk-upload": "Bulk Upload",
+  "search": "Search & Favourites",
+  "retrievals": "Retrieval Requests",
+  "-- Lifecycle": {
+    "type": "separator",
+    "title": "Lifecycle"
+  },
+  "retention": "Retention & Disposal",
+  "ocr-ai": "OCR Queue & AI",
+  "activity": "Activity & Audit"
+}
