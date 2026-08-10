@@ -9,6 +9,7 @@
 
 import type { TWorkflowAction } from '../../types/workflow';
 import { normalizeMetadataKey } from '../../universal/metadata';
+import { asMatchPercent, matchVendorName } from '../../universal/vendor-match';
 import { renderTemplate, resolveTemplatesDeep, resolveValue } from './template';
 
 export type WorkflowLogger = {
@@ -366,16 +367,77 @@ const lookupMetadata: WorkflowActionHandler<
 
   const { prisma } = await import('@documenso/prisma');
 
-  // EXACT mode — look up by normalized name.
+  // NAME mode — exact first, then fuzzy.
   if (config.key && config.key.trim()) {
     const rawKey = renderTemplate(config.key, data).trim();
     const key = normalizeMetadataKey(rawKey);
     if (!key) return { found: false, key: rawKey };
+
     const record = await prisma.metadataRecord.findUnique({
       where: { organizationId_category_key: { organizationId, category: config.category, key } },
     });
-    if (!record) return { found: false, key: rawKey };
-    return { found: true, key: rawKey, label: record.label, email: record.email, ...recordExtra(record) };
+
+    if (record) {
+      return {
+        found: true,
+        key: rawKey,
+        label: record.label,
+        email: record.email,
+        matchScore: 100,
+        matchMethod: 'exact',
+        ...recordExtra(record),
+      };
+    }
+
+    // No character-for-character hit. The name came off an invoice, so this is
+    // the common case rather than the exception: "Company Ltd." against
+    // "Company Limited", a dropped suffix, a scanning slip. Before the fuzzy
+    // pass this returned not-found and the workflow silently did nothing, which
+    // is indistinguishable from no rule having applied.
+    const candidates = await prisma.metadataRecord.findMany({
+      where: { organizationId, category: config.category },
+    });
+
+    const outcome = matchVendorName(
+      rawKey,
+      candidates.map((c) => ({ name: c.label ?? c.key, value: c })),
+      { threshold: (config.minScore ?? 85) / 100 },
+    );
+
+    if (outcome.ambiguousWith) {
+      // Two vendors fit equally well. Picking one would be a coin flip that
+      // could email the wrong company or route to the wrong approver.
+      logger.warn(
+        `[workflow:LOOKUP_METADATA] "${rawKey}" is ambiguous between ` +
+          outcome.ambiguousWith.map((c) => `"${c.name}" (${asMatchPercent(c.score)}%)`).join(' and ') +
+          ' — no match returned',
+      );
+      return { found: false, key: rawKey, ambiguous: true, matchScore: asMatchPercent(outcome.bestScore) };
+    }
+
+    if (!outcome.match) {
+      logger.info(
+        `[workflow:LOOKUP_METADATA] no "${config.category}" match for "${rawKey}" ` +
+          `(closest ${asMatchPercent(outcome.bestScore)}%)`,
+      );
+      return { found: false, key: rawKey, matchScore: asMatchPercent(outcome.bestScore) };
+    }
+
+    const matched = outcome.match.value;
+    logger.info(
+      `[workflow:LOOKUP_METADATA] "${rawKey}" matched "${matched.label}" ` +
+        `at ${asMatchPercent(outcome.match.score)}% (${outcome.match.method})`,
+    );
+
+    return {
+      found: true,
+      key: rawKey,
+      label: matched.label,
+      email: matched.email,
+      matchScore: asMatchPercent(outcome.match.score),
+      matchMethod: outcome.match.method,
+      ...recordExtra(matched),
+    };
   }
 
   // KEYWORD mode — scan text for each record's keywords, return the first match.

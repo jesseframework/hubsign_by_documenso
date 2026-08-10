@@ -659,9 +659,53 @@ them working, is in
 > `lookup` step's output: an empty `"key": ""` means the path is wrong, not that
 > the vendor is missing.
 
-**Name matching is forgiving.** `LOOKUP_METADATA` in exact mode normalizes both
-sides — lowercased, punctuation collapsed — so `"Northgate Consulting Ltd."` on
-the invoice matches a record named `Northgate Consulting Ltd`.
+**Name matching is forgiving.** The name on an invoice is whatever OCR read off
+the page, and it rarely matches your directory character for character.
+`LOOKUP_METADATA` in name mode therefore tries three passes and stops at the
+first that answers:
+
+| Pass | What it ignores | Score | Example |
+|------|-----------------|-------|---------|
+| Exact | case, punctuation, accents, `&` vs `and` | 100% | `Northgate Consulting Ltd.` → `Northgate Consulting Ltd` |
+| Legal form | the company suffix, and leading "The" | 97% | `NORTHGATE CONSULTING LIMITED` → `Northgate Consulting Ltd` |
+| Fuzzy | a character or two of scanning noise | ≥ 85% | `Northgate Consultng Ltd` → `Northgate Consulting Ltd` |
+
+So `Company Limited`, `Company Ltd.` and `Company` are all one vendor, and
+`Digital Ocean` finds `DigitalOcean`.
+
+The step's output carries `matchScore` (a percentage) and `matchMethod`
+(`exact`, `core` or `fuzzy`), so a later condition can treat an uncertain match
+differently — for instance, notify a human instead of emailing the vendor:
+
+```json
+{ ">=": [{ "var": "vars.vendor.matchScore" }, 97] }
+```
+
+Raise the bar for a particular step with `minScore` (50–100, default 85):
+
+```json
+{ "action": "LOOKUP_METADATA", "category": "vendor",
+  "key": "{{payload.vendorName}}", "minScore": 92, "saveAs": "vendor" }
+```
+
+**What it deliberately will not match.** A fuzzy hit has to be unambiguous, because
+the cost of a wrong one is a payment confirmation sent to the wrong company or an
+invoice routed to the wrong approver. So the lookup returns *nothing* rather than
+guess when:
+
+- one whole word differs — `Southgate Consulting` will not match `Northgate
+  Consulting`, even though only two characters separate them;
+- a branch or unit number differs — `Depot 24` never matches `Depot 42`;
+- two directory records fit almost equally well — the step logs both and reports
+  `found: false` with `ambiguous: true`;
+- the name is shorter than four characters once the suffix is removed.
+
+A miss is visible in the run log as `no "vendor" match for "..." (closest 72%)`,
+which tells you whether to add the vendor or lower `minScore`.
+
+The same matching is used for per-vendor SLA targets and for grouping the SLA
+dashboard's vendor table, so a vendor is one row there exactly when it is one
+record here.
 
 **Recipient role can be templated.** `role` on a `SEND_FOR_SIGNATURE` recipient
 accepts a literal (`SIGNER`, `APPROVER`, `CC`, `VIEWER`) *or* a placeholder such

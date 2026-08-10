@@ -143,10 +143,20 @@ export const ZWorkflowActionSchema = z.discriminatedUnion('action', [
     /** Lookup grouping, e.g. "vendor" or "signee". */
     category: z.string().min(1),
     /**
-     * EXACT-match mode: look up by normalized name. Supports {{templating}},
-     * e.g. "{{payload.extractedData.vendor_name}}". Omit to use keyword mode.
+     * NAME-match mode: look up by name. Supports {{templating}}, e.g.
+     * "{{payload.vendorName}}". Omit to use keyword mode.
+     *
+     * Tried exactly first, then fuzzily — the name on an invoice rarely matches
+     * the directory character for character ("Company Ltd." vs "Company
+     * Limited"). The result carries `matchScore` and `matchMethod` so a later
+     * step can treat a fuzzy hit differently from an exact one.
      */
     key: z.string().min(1).optional(),
+    /**
+     * Minimum fuzzy confidence, as a percentage. Below this, the lookup reports
+     * not-found rather than guessing. Exact and legal-form matches always pass.
+     */
+    minScore: z.number().int().min(50).max(100).default(85).optional(),
     /**
      * KEYWORD mode (when `key` is omitted): scan this text for each record's
      * keywords and return the first match. Supports {{templating}}. Defaults to

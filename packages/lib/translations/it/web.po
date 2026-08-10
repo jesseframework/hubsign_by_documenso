@@ -1913,6 +1913,10 @@ msgstr ""
 #~ msgid "Avg turnaround"
 #~ msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "awaiting {pending} signature(s)"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings._index.tsx
 msgid "Awaiting email confirmation"
 msgstr "In attesa della conferma email"
@@ -3133,6 +3137,10 @@ msgstr ""
 #: packages/email/templates/team-invite.tsx
 msgid "Decline"
 msgstr "Declina"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "declined"
+msgstr ""
 
 #: apps/remix/app/components/general/teams/team-invitations.tsx
 msgid "Declined team invitation"
@@ -6489,6 +6497,11 @@ msgstr ""
 #~ msgid "over by {0}h"
 #~ msgstr ""
 
+#. placeholder {0}: overdueLabel(item.sla?.overdueByMinutes ?? 0)
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "overdue {0}"
+msgstr ""
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/audit-log.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/documents._index.tsx
 #: apps/remix/app/components/tables/user-settings-current-teams-table.tsx
@@ -8176,6 +8189,11 @@ msgstr "Le firme appariranno una volta completato il documento"
 #: packages/lib/constants/recipient-roles.ts
 msgid "Signed"
 msgstr "Firmato"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "signed {signed}/{total}"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Signed Documents"

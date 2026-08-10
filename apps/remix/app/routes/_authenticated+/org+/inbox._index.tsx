@@ -16,6 +16,7 @@ import {
   DollarSignIcon,
   InboxIcon,
   MinusCircleIcon,
+  PenLineIcon,
   RefreshCwIcon,
   ScanLineIcon,
   SearchIcon,
@@ -178,6 +179,76 @@ const ocrBadge = (status: string): string => {
     default:
       return 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300';
   }
+};
+
+/**
+ * Where the signatures actually stand, as opposed to whether a send happened.
+ *
+ * `item.status` reaching SENT_FOR_SIGNATURE only records that the document went
+ * out. It stays there whether the signer opened it a minute later or has been
+ * ignoring it for a week, so on its own it cannot answer the question the queue
+ * exists to answer.
+ */
+function SignatureStatus({
+  signature,
+}: {
+  signature: {
+    documentStatus: string;
+    total: number;
+    signed: number;
+    rejected: number;
+    pending: number;
+    waitingOn: string[];
+  };
+}) {
+  const { documentStatus, total, signed, rejected, pending, waitingOn } = signature;
+
+  // Nothing has been sent, so there is no signing state to report yet.
+  if (documentStatus === 'DRAFT' || total === 0) {
+    return null;
+  }
+
+  if (rejected > 0) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+        <XCircleIcon className="h-3 w-3" />
+        <Trans>declined</Trans>
+      </span>
+    );
+  }
+
+  if (documentStatus === 'COMPLETED' || (total > 0 && signed === total)) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+        <CheckCheckIcon className="h-3 w-3" />
+        <Trans>signed {signed}/{total}</Trans>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+      title={waitingOn.length ? `Waiting on ${waitingOn.join(', ')}` : undefined}
+    >
+      <PenLineIcon className="h-3 w-3" />
+      {signed > 0 ? (
+        <Trans>signed {signed}/{total}</Trans>
+      ) : (
+        <Trans>awaiting {pending} signature(s)</Trans>
+      )}
+    </span>
+  );
+}
+
+/** "3h", "2d 4h" — how far past target an overdue invoice is. */
+const overdueLabel = (minutes: number): string => {
+  const m = Math.max(0, Math.round(minutes));
+  if (m < 60) return `${m}m`;
+  if (m < 60 * 24) return `${Math.floor(m / 60)}h`;
+  const d = Math.floor(m / (60 * 24));
+  const h = Math.round((m % (60 * 24)) / 60);
+  return h ? `${d}d ${h}h` : `${d}d`;
 };
 
 /** Read the first non-empty value among the given OCR field names. */
@@ -669,12 +740,31 @@ export default function SignatureInboxPage() {
                 const headline = f.invoiceNumber || item.document.title;
                 const hasAmounts = Boolean(f.total || f.tax || f.net);
                 const isUnread = !item.viewedAt;
+                // Past its internal target AND still unsent. Coloured at the row
+                // rather than tucked into a badge: an overdue invoice should be
+                // findable by scrolling, not by reading.
+                //
+                // `open` is what keeps a completed-but-late invoice out of this.
+                // It missed its target, which the SLA dashboard records, but it
+                // is finished and nothing about it needs doing today.
+                const isOverdue = item.sla?.state === 'breached' && item.sla.open;
                 return (
-                  <tr key={item.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                  <tr
+                    key={item.id}
+                    className={`border-b border-border last:border-0 ${
+                      isOverdue
+                        ? 'bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-950/40 dark:hover:bg-orange-950/60'
+                        : 'hover:bg-muted/20'
+                    }`}
+                  >
                     {/* Invoice info */}
                     <td
                       className={`border-l-[3px] px-4 py-3 align-top ${
-                        isUnread ? 'border-l-primary' : 'border-l-transparent'
+                        isOverdue
+                          ? 'border-l-orange-500'
+                          : isUnread
+                            ? 'border-l-primary'
+                            : 'border-l-transparent'
                       }`}
                     >
                       <Link
@@ -708,6 +798,20 @@ export default function SignatureInboxPage() {
                             review
                           </span>
                         )}
+                        {isOverdue && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+                            title={
+                              item.sla?.dueAt
+                                ? `SLA due ${new Date(item.sla.dueAt).toLocaleString()}`
+                                : undefined
+                            }
+                          >
+                            <AlertTriangleIcon className="h-3 w-3" />
+                            <Trans>overdue {overdueLabel(item.sla?.overdueByMinutes ?? 0)}</Trans>
+                          </span>
+                        )}
+                        <SignatureStatus signature={item.signature} />
                         <WorkflowActivityIndicator item={item} />
                       </div>
                     </td>

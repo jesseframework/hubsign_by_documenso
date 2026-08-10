@@ -1908,6 +1908,10 @@ msgstr "Avg time to send"
 #~ msgid "Avg turnaround"
 #~ msgstr "Avg turnaround"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "awaiting {pending} signature(s)"
+msgstr "awaiting {pending} signature(s)"
+
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings._index.tsx
 msgid "Awaiting email confirmation"
 msgstr "Awaiting email confirmation"
@@ -3128,6 +3132,10 @@ msgstr "Decision recorded"
 #: packages/email/templates/team-invite.tsx
 msgid "Decline"
 msgstr "Decline"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "declined"
+msgstr "declined"
 
 #: apps/remix/app/components/general/teams/team-invitations.tsx
 msgid "Declined team invitation"
@@ -6484,6 +6492,11 @@ msgstr "over by {0}"
 #~ msgid "over by {0}h"
 #~ msgstr "over by {0}h"
 
+#. placeholder {0}: overdueLabel(item.sla?.overdueByMinutes ?? 0)
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "overdue {0}"
+msgstr "overdue {0}"
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/audit-log.tsx
 #: apps/remix/app/routes/_authenticated+/admin+/documents._index.tsx
 #: apps/remix/app/components/tables/user-settings-current-teams-table.tsx
@@ -8171,6 +8184,11 @@ msgstr "Signatures will appear once the document has been completed"
 #: packages/lib/constants/recipient-roles.ts
 msgid "Signed"
 msgstr "Signed"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "signed {signed}/{total}"
+msgstr "signed {signed}/{total}"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Signed Documents"

@@ -165,7 +165,7 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
       if (!decision.ingest) {
         console.log(`[workhub-poll] skipping message ${msg.id}: ${decision.detail}`);
 
-        await workhubMarkRead(config, msg.id).catch((err) =>
+        await workhubMarkRead(config, msg.id, { mailboxId }).catch((err) =>
           console.error('[workhub-poll] mark-read failed for filtered message:', err),
         );
 
@@ -308,7 +308,7 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
 
       // Only once every attachment landed — marking read after a partial import
       // would hide the message from the next poll with documents still missing.
-      await workhubMarkRead(config, msg.id).catch((err) =>
+      await workhubMarkRead(config, msg.id, { mailboxId }).catch((err) =>
         console.error('[workhub-poll] mark-read failed:', err),
       );
     } catch (err) {

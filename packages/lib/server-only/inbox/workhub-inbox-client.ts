@@ -27,6 +27,31 @@ export type WorkHubInboxConfig = {
   mailboxId?: string | null;
 };
 
+/**
+ * A non-OK response from the inbox API, carrying enough to act on.
+ *
+ * `status` and `missing` let a caller tell apart the failures that are worth
+ * retrying (a flaky proxy) from the ones that will fail identically every time
+ * until a human changes something — a key without `email.update` being the one
+ * that matters here.
+ */
+export class WorkHubInboxError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    /** Permission scopes the API says the key lacks, when it says so. */
+    readonly missing: string[] | null = null,
+  ) {
+    super(message);
+    this.name = 'WorkHubInboxError';
+  }
+
+  /** No amount of retrying will help: the credential itself is short a scope. */
+  get isPermissionDenied(): boolean {
+    return this.status === 401 || this.status === 403;
+  }
+}
+
 export const isWorkHubInboxConfigured = (config: WorkHubInboxConfig): boolean =>
   // Only an API key can read the inbox. BulkSender username/password (HTTP Basic)
   // is a send-only credential and is rejected by the inbox API's auth middleware,
@@ -174,8 +199,13 @@ const request = async (
   config: WorkHubInboxConfig,
   method: string,
   path: string,
+  payload?: unknown,
 ): Promise<unknown> => {
-  const res = await fetch(url(config, path), { method, headers: headers(config) });
+  const res = await fetch(url(config, path), {
+    method,
+    headers: headers(config),
+    body: payload === undefined ? undefined : JSON.stringify(payload),
+  });
   const text = await res.text();
 
   // The inbox API always answers JSON. Gateways/proxies and auth redirects can
@@ -209,7 +239,20 @@ const request = async (
   if (!res.ok) {
     const message =
       (body && typeof body === 'object' && (body.detail || body.error)) || `HTTP ${res.status}`;
-    throw new Error(`WorkHub inbox ${method} ${path} failed: ${message}`);
+
+    // The API names the permissions the key is short of. Passing that straight
+    // through turns an opaque "forbidden" into the exact thing to go and fix.
+    const missing =
+      body && typeof body === 'object' && Array.isArray(body.missing) ? body.missing : null;
+
+    const error = new WorkHubInboxError(
+      `WorkHub inbox ${method} ${path} failed: ${message}` +
+        (missing?.length ? ` — the API key is missing: ${missing.join(', ')}` : ''),
+      res.status,
+      missing,
+    );
+
+    throw error;
   }
   return body;
 };
@@ -311,11 +354,28 @@ export const workhubFetchAttachment = async (
   return { contentBase64: content.replace(/^data:[^;]+;base64,/, '') };
 };
 
+/**
+ * Mark a message read (or unread) in the WorkHub mailbox.
+ *
+ * `isRead` is REQUIRED by the endpoint. This used to send no body at all, so
+ * every call — including the poller's, after a successful import — was rejected
+ * and swallowed by its `.catch`, leaving ingested mail sitting unread in the
+ * mailbox indefinitely.
+ *
+ * `mailboxId` is only needed when the API key spans several mailboxes; it is
+ * omitted for a single-mailbox credential rather than sent as null.
+ */
 export const workhubMarkRead = async (
   config: WorkHubInboxConfig,
   emailId: string,
+  options?: { isRead?: boolean; mailboxId?: string | null },
 ): Promise<void> => {
-  await request(config, 'POST', `/email/inbox/${encodeURIComponent(emailId)}/mark-read`);
+  const mailboxId = options?.mailboxId?.trim();
+
+  await request(config, 'POST', `/email/inbox/${encodeURIComponent(emailId)}/mark-read`, {
+    isRead: options?.isRead ?? true,
+    ...(mailboxId ? { mailboxId } : {}),
+  });
 };
 
 /** List the mailboxes the credential/key can access. */

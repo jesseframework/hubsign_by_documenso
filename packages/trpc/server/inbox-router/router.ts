@@ -7,11 +7,12 @@ import { sendDocument } from '@documenso/lib/server-only/document/send-document'
 import { ensureSignatureFields } from '@documenso/lib/server-only/field/ensure-signature-fields';
 import { describeBlocks, evaluateGate } from '@documenso/lib/server-only/rules/evaluate-gate';
 import { publishInboxEvent } from '@documenso/lib/server-only/inbox/inbox-events';
+import { markInboxEmailRead } from '@documenso/lib/server-only/inbox/mark-email-read';
 import { pollWorkHubInboxForOrg } from '@documenso/lib/server-only/inbox/poll-workhub-inbox';
 import { rememberTemplateForSender } from '@documenso/lib/server-only/inbox/resolve-ocr-template';
 import { SLA_ORG_SELECT, evaluateItemsSla, slaClockStart } from '@documenso/lib/server-only/inbox/sla';
 import { nanoid } from '@documenso/lib/universal/id';
-import { normalizeMetadataKey } from '@documenso/lib/universal/metadata';
+import { vendorCoreName } from '@documenso/lib/universal/vendor-match';
 import { prisma } from '@documenso/prisma';
 
 import { authenticatedProcedure, router } from '../trpc';
@@ -46,7 +47,15 @@ export const inboxRouter = router({
               id: true,
               title: true,
               status: true,
+              completedAt: true,
               _count: { select: { recipients: true } },
+              // The real signing state. The inbox item's own status only says
+              // that a send happened, not what became of it — a document can sit
+              // at "sent for signature" for a week with nobody having signed.
+              recipients: {
+                select: { id: true, email: true, name: true, role: true, signingStatus: true },
+                orderBy: { id: 'asc' },
+              },
             },
           },
         },
@@ -69,9 +78,64 @@ export const inboxRouter = router({
         }
       }
 
+      // SLA state per row, so an overdue invoice is visible in the queue itself
+      // rather than only on the dashboard — the queue is where someone acts.
+      const org = await prisma.organization.findUnique({
+        where: { id: membership.organizationId },
+        select: SLA_ORG_SELECT,
+      });
+
+      const slaByItem = new Map<
+        string,
+        { state: string; open: boolean; overdueByMinutes: number; dueAt: Date | null }
+      >();
+
+      if (org?.slaEnabled) {
+        const evaluated = await evaluateItemsSla({
+          organizationId: membership.organizationId,
+          org,
+          items: items.map((item) => ({ ...item, document: item.document })),
+        });
+
+        for (const result of evaluated) {
+          slaByItem.set(result.inboxItemId, {
+            state: result.internal.state,
+            // The clock is still running. A breach that has already been sent is
+            // history — colouring its row as urgent would put a finished,
+            // fully-signed invoice at the top of someone's to-do pile.
+            open: !result.internal.settled,
+            overdueByMinutes: Math.max(
+              0,
+              result.internal.elapsedMinutes - result.internal.targetMinutes,
+            ),
+            dueAt: result.internal.dueAt,
+          });
+        }
+      }
+
       return items.map((item) => {
         const statuses = statusesByItem.get(item.id) ?? [];
-        return { ...item, workflow: { status: statuses[0] ?? null, runs: statuses.length } };
+        const recipients = item.document.recipients;
+        const signed = recipients.filter((r) => r.signingStatus === 'SIGNED').length;
+        const rejected = recipients.filter((r) => r.signingStatus === 'REJECTED').length;
+
+        return {
+          ...item,
+          workflow: { status: statuses[0] ?? null, runs: statuses.length },
+          sla: slaByItem.get(item.id) ?? null,
+          /** Where the signatures themselves actually stand. */
+          signature: {
+            documentStatus: item.document.status,
+            total: recipients.length,
+            signed,
+            rejected,
+            pending: recipients.length - signed - rejected,
+            completedAt: item.document.completedAt,
+            waitingOn: recipients
+              .filter((r) => r.signingStatus === 'NOT_SIGNED')
+              .map((r) => r.name || r.email),
+          },
+        };
       });
     }),
 
@@ -143,6 +207,16 @@ export const inboxRouter = router({
         // sidebar. Only on the transition, so this can't loop with the
         // refetch the event itself triggers.
         publishInboxEvent(membership.organizationId, { type: 'viewed', inboxItemId: item.id });
+
+        // Someone is looking at this document, so the mailbox copy no longer
+        // needs anyone's attention either. Not awaited: this is a read query
+        // serving a page, and a slow or unreachable mailbox cluster must not
+        // hold it up. The helper is idempotent, so at most one call is ever made.
+        void markInboxEmailRead({
+          organizationId: membership.organizationId,
+          inboxItemId: item.id,
+          reason: 'opened',
+        });
       }
 
       return item;
@@ -607,12 +681,13 @@ export const inboxRouter = router({
       >();
 
       for (const r of results) {
-        // Group on the NORMALISED name. OCR spells the same company differently
-        // between reads — "FUTURE EDGE TECHNOLOGY INC" and "Future Edge
-        // Technology Inc." were rendering as two vendors, one at 0% and one at
-        // 100%, at opposite ends of a table sorted worst-first. Target
-        // resolution already normalises; only this grouping did not.
-        const key = r.vendorLabel ? normalizeMetadataKey(r.vendorLabel) : 'unknown';
+        // Group on the CORE name — the same identity test the directory lookup
+        // uses, so a vendor is one row here exactly when it is one record there.
+        // OCR spells the same company differently between reads: "FUTURE EDGE
+        // TECHNOLOGY INC" and "Future Edge Technology Inc." were rendering as
+        // two vendors, one at 0% and one at 100%, at opposite ends of a table
+        // sorted worst-first.
+        const key = r.vendorLabel ? vendorCoreName(r.vendorLabel) || 'unknown' : 'unknown';
         const row = vendorRows.get(key) ?? {
           vendor: r.vendorLabel ?? 'Unknown vendor',
           total: 0,

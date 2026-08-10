@@ -28,8 +28,8 @@
 
 import { prisma } from '@documenso/prisma';
 
-import { normalizeMetadataKey } from '../../../universal/metadata';
 import { readOcrField } from '../../../universal/ocr-fields';
+import { vendorCoreName } from '../../../universal/vendor-match';
 import type { RuleFactProvider, RuleSubject } from '../types';
 
 /** How far back to look. Beyond this a repeat is likelier a genuine re-bill. */
@@ -42,10 +42,19 @@ type Candidate = {
   extractedData: unknown;
 };
 
-/** Vendor identity, normalised so "Acme Ltd." and "ACME LTD" are one vendor. */
+/**
+ * Vendor identity, reduced to the core name so "Acme Ltd.", "ACME LTD" and
+ * "Acme Limited" are one vendor.
+ *
+ * Deliberately the same identity test the directory lookup uses. A vendor
+ * re-sending an invoice whose suffix happened to OCR differently the second time
+ * is exactly the duplicate this provider exists to catch, and comparing raw
+ * spellings would let it through. The total still has to agree as well, so a
+ * looser vendor test cannot on its own flag two different invoices.
+ */
 const vendorKeyOf = (extractedData: unknown): string | null => {
   const name = readOcrField(extractedData, 'vendorName');
-  const key = name ? normalizeMetadataKey(name) : '';
+  const key = name ? vendorCoreName(name) : '';
   return key || null;
 };
 

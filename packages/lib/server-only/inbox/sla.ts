@@ -20,6 +20,7 @@ import { prisma } from '@documenso/prisma';
 
 import { normalizeMetadataKey } from '../../universal/metadata';
 import { resolveOcrVendorName } from '../../universal/ocr-fields';
+import { matchVendorName, prepareVendorCandidates } from '../../universal/vendor-match';
 import {
   type SlaCalendar,
   type SlaEvaluation,
@@ -128,9 +129,55 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
   // Only records that actually carry a target can win; the rest of the
   // directory is noise for this purpose.
   const withTargets = candidates.filter((c) => c.internal !== null || c.endToEnd !== null);
-  const byKey = new Map(withTargets.map((c) => [c.key, c]));
   /** Every directory key, including records that set no target of their own. */
-  const knownKeys = new Set(candidates.map((c) => c.key));
+  const byKey = new Map(candidates.map((c) => [c.key, c]));
+
+  // Reduced once, not once per invoice. The dashboard resolves every item in the
+  // window against this list, so deriving each record's core name inside that
+  // loop was the bulk of the work — about 3ms per invoice against 500 vendors.
+  const prepared = prepareVendorCandidates(
+    candidates.map((c) => ({ name: c.label ?? c.key, value: c })),
+  );
+
+  /**
+   * Identification is a pure function of the name, and a window is mostly
+   * repeats — twelve of this deployment's thirty-two invoices are from one
+   * vendor. Matching is linear in directory size, so caching by name turns
+   * "invoices × vendors" into "distinct vendor names × vendors".
+   */
+  type Identity = {
+    record: ResolverRecord | null;
+    /** The vendor is in the directory, even if which record is unclear. */
+    known: boolean;
+  };
+
+  const identityCache = new Map<string, Identity>();
+
+  const identify = (vendorName: string): Identity => {
+    const cached = identityCache.get(vendorName);
+    if (cached) return cached;
+
+    const exact = byKey.get(normalizeMetadataKey(vendorName));
+    let identity: Identity;
+
+    if (exact) {
+      identity = { record: exact, known: true };
+    } else {
+      const outcome = matchVendorName(vendorName, prepared);
+      // An ambiguous result still means "this vendor is in the directory" — we
+      // just cannot say which record. Treating it as unknown let the keyword
+      // branch below borrow a different vendor's target, which is precisely the
+      // capture the guard exists to stop, and it happens exactly when the
+      // directory holds the same company twice.
+      identity = {
+        record: outcome.match?.value ?? null,
+        known: outcome.match !== null || outcome.ambiguousWith !== null,
+      };
+    }
+
+    identityCache.set(vendorName, identity);
+    return identity;
+  };
 
   const orgDefaults: SlaTargets = {
     internalHours: org.slaDefaultInternalHours ?? null,
@@ -141,17 +188,25 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
   return (item: Pick<SignatureInboxItem, 'senderEmail' | 'extractedData' | 'subject'>): SlaTargets => {
     const vendorName = resolveOcrVendorName(item.extractedData);
 
-    // 1. The vendor named on the invoice.
-    if (vendorName) {
-      const hit = byKey.get(normalizeMetadataKey(vendorName));
-      if (hit) {
-        return {
-          internalHours: hit.internal ?? orgDefaults.internalHours,
-          endToEndHours: hit.endToEnd ?? orgDefaults.endToEndHours,
-          source: 'vendor',
-          vendorLabel: hit.label ?? undefined,
-        };
-      }
+    // Identify the vendor ONCE, against the whole directory — exactly first,
+    // then by name similarity so "Company Ltd." on the invoice still finds
+    // "Company Limited" in the directory.
+    //
+    // Identity and target are separate questions and are answered in that order.
+    // Searching only the records that carry a target would let an invoice be
+    // attributed to some other vendor that happens to have one, when its own
+    // record simply leaves the target unset.
+    const identity = vendorName ? identify(vendorName) : { record: null, known: false };
+    const identified = identity.record;
+
+    // 1. That vendor's own target.
+    if (identified && (identified.internal !== null || identified.endToEnd !== null)) {
+      return {
+        internalHours: identified.internal ?? orgDefaults.internalHours,
+        endToEndHours: identified.endToEnd ?? orgDefaults.endToEndHours,
+        source: 'vendor',
+        vendorLabel: identified.label ?? undefined,
+      };
     }
 
     // 2. The sender's own record — catches mail whose vendor name didn't extract.
@@ -176,9 +231,7 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
     //    whichever other vendor's keyword happens to appear". Without this guard
     //    a generic keyword like "consulting" on one vendor silently captures
     //    every invoice from any company with that word in its name.
-    const identifiedVendor = vendorName ? knownKeys.has(normalizeMetadataKey(vendorName)) : false;
-
-    if (!identifiedVendor) {
+    if (!identity.known) {
       // Extracted VALUES only. Stringifying the whole object dragged the OCR
       // field names in with them, so an ordinary keyword like "total" or "date"
       // matched the schema of every invoice rather than anything on it.
