@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import { BuildingIcon, PencilIcon, PlusIcon } from 'lucide-react';
+import { BuildingIcon, CopyIcon, PencilIcon, PlusIcon } from 'lucide-react';
 
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
@@ -349,6 +349,29 @@ function OrgSettingsPage() {
             <div>
               <label className="text-[12px] font-medium text-muted-foreground">Domain</label>
               <p className="mt-0.5 text-[13px]">{org.domain || 'Not set'}</p>
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">
+                Organization ID
+              </label>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                <p className="font-mono text-[13px] tabular-nums">{org.id}</p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-1.5 text-muted-foreground"
+                  title={_(msg`Copy organization ID`)}
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(String(org.id));
+                    toast({ title: _(msg`Organization ID copied`) });
+                  }}
+                >
+                  <CopyIcon className="h-3 w-3" />
+                </Button>
+              </div>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                <Trans>Quote this when generating a license key or raising support.</Trans>
+              </p>
             </div>
           </div>
         )}

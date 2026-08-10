@@ -2656,6 +2656,10 @@ msgstr ""
 msgid "Copy Link"
 msgstr "Copiar enlace"
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Copy organization ID"
+msgstr ""
+
 #: apps/remix/app/components/tables/settings-public-profile-templates-table.tsx
 msgid "Copy sharable link"
 msgstr "Copiar enlace compartible"
@@ -6186,6 +6190,10 @@ msgid "Organization Details"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Organization ID copied"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Organization updated"
 msgstr ""
 
@@ -6744,6 +6752,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "Quick filters"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Quote this when generating a license key or raising support."
 msgstr ""
 
 #: packages/ui/primitives/document-flow/types.ts

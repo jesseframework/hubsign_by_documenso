@@ -2651,6 +2651,10 @@ msgstr "Copy key"
 msgid "Copy Link"
 msgstr "Copy Link"
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Copy organization ID"
+msgstr "Copy organization ID"
+
 #: apps/remix/app/components/tables/settings-public-profile-templates-table.tsx
 msgid "Copy sharable link"
 msgstr "Copy sharable link"
@@ -6181,6 +6185,10 @@ msgid "Organization Details"
 msgstr "Organization Details"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Organization ID copied"
+msgstr "Organization ID copied"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Organization updated"
 msgstr "Organization updated"
 
@@ -6740,6 +6748,10 @@ msgstr "Questions about your plan? Manage or cancel anytime from your <0>billing
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "Quick filters"
 msgstr "Quick filters"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Quote this when generating a license key or raising support."
+msgstr "Quote this when generating a license key or raising support."
 
 #: packages/ui/primitives/document-flow/types.ts
 msgid "Radio"

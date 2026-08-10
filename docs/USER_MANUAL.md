@@ -399,6 +399,39 @@ the document title and sender. It is not limited to a fixed list of fields.
 anything OCR misread, then send for signature. A confidence score and a
 "needs review" flag are shown per item.
 
+### 4.4.1 Extraction templates — the lever on OCR accuracy
+
+BMS ML extracts far more accurately when it knows what kind of document it is
+looking at. Given a matching **extraction template** it pulls named fields with
+per-field confidence; given none it falls back to generic AI extraction, which
+is materially less accurate and returns a different, less predictable set of
+fields.
+
+A template has to be chosen *before* the document is read, when the only
+reliable thing known about it is who sent it. So the sender address is the
+routing key. In order:
+
+1. A template picked by hand on the item, if someone re-ran OCR with one chosen.
+2. The template on the metadata vendor record whose **Email** matches the sender.
+3. The template on a vendor record with the **same email domain** as the sender.
+4. The organization's default template (Organization → Settings).
+5. None — generic extraction.
+
+Domain matching deliberately skips public providers (gmail.com, outlook.com and
+similar). Without that, one vendor saved with a Gmail contact would capture every
+document arriving from any Gmail account.
+
+**Assigning a template.** Set **OCR template** on the vendor's metadata record,
+or open an item, choose a template, and tick *"Always use this template for
+&lt;sender&gt;"* when re-running OCR — which writes it back to that sender's
+vendor record, creating one if none exists. Accuracy therefore improves with use
+rather than requiring the directory to be filled in up front.
+
+**Seeing which template ran.** Each item shows the template that was applied and
+why it was chosen ("matched *vendor* by sender email"), or an amber **No
+template** badge when extraction ran generically. If items are extracting poorly,
+that badge is the first thing to check.
+
 ## 4.5 Business Rules
 
 **Organization → Business Rules** lets you refuse or flag an action based on the
@@ -566,68 +599,86 @@ Templates render `{{ }}` placeholders against the workflow run context.
 **Stamps** — image or text stamps (a company seal, "PAID", a registration mark)
 positioned on a document and burned in at seal time.
 
-**Metadata** — organization-defined reference records with keywords, used by
-`LOOKUP_METADATA` to enrich workflow runs — for example resolving a vendor name
-from an extracted string. Records can also pin a **BMS ML OCR template** to a
-vendor, so invoices arriving from that vendor's email extract with it (see
-§4.8.1). Records are maintained on the page, or in bulk via **Download
-template** → edit in Excel → **Import CSV**.
+**Metadata** — the organization's lookup directory, resolved by
+`LOOKUP_METADATA` at workflow run time. One record per vendor holds everything
+the invoice flow needs about them:
+
+| Field | Used for |
+| --- | --- |
+| **Name** | The lookup key. Matched against the vendor name read off the invoice. |
+| **Email** | Where the "we received your invoice" confirmation is sent. |
+| **Signer name / email / role** | Who the document is then sent to for signature. |
+| **OCR template** | The BMS ML template invoices from this vendor extract with (see §4.4.1). |
+| **Keywords** | Alternative matching, by scanning the OCR text rather than the name. |
+
+Records are maintained on the page, or in bulk via **Download template** → edit
+in Excel → **Import CSV**. Re-importing an edited file updates matching records
+rather than duplicating them.
 
 ### 4.9.1 Invoice received → confirm to vendor → send for signature
 
-The two automations most organizations want on inbound invoices are one
-`INBOX_OCR_COMPLETED` workflow. The chain is:
+Both automations are one `INBOX_OCR_COMPLETED` workflow over a single lookup:
 
 ```
-lookup        LOOKUP_METADATA  category "vendor", key = the extracted vendor name
-  └ check     CONDITION        vars.vendor.found == true
-      └ email SEND_EMAIL       to {{vars.vendor.email}}, templateKey "invoice-received"
-          └ lookup_signee  LOOKUP_METADATA  category "signee", same key
-              └ check_signee   CONDITION    vars.signer.found == true
-                  └ send_for_signature  SEND_FOR_SIGNATURE
+lookup            LOOKUP_METADATA  category "vendor", key {{payload.vendorName}}
+ └ check          CONDITION        vars.vendor.found == true
+    └ email       SEND_EMAIL       to {{vars.vendor.email}}, templateKey "invoice-received"
+       └ check_signer   CONDITION  !! vars.vendor.signerEmail
+          └ send_for_signature  SEND_FOR_SIGNATURE  to {{vars.vendor.signerEmail}}
 ```
 
-**Templating roots.** There is no `ocr.*` root. The event payload is exposed as
-both `payload.*` and `document.*`; OCR fields live under
-`payload.extractedData.*`. A `LOOKUP_METADATA` result saved as `vendor` is then
-readable as `{{vars.vendor.email}}`, `{{vars.vendor.contactName}}`,
-`{{vars.vendor.role}}` and any other field on that record.
+A vendor with no signer set still gets the confirmation — the run simply stops
+at `check_signer`. That is the intended way to say "acknowledge this vendor's
+invoices but don't route them for signature".
+
+**Use the canonical field names, not `extractedData`.** Every OCR template names
+its fields differently — one emits `vendor_name`, another `merchant_name`, a
+third `supplier`. HubSign publishes template-independent values on the event
+payload; read those and a document routed to a different template keeps working.
 
 | What you want | Path |
 | --- | --- |
-| Extracted field | `{{payload.extractedData.<field>}}` |
+| Vendor name | `{{payload.vendorName}}` |
+| Invoice number, total, dates | `{{payload.invoiceNumber}}`, `{{payload.totalAmount}}`, `{{payload.invoiceDate}}`, `{{payload.dueDate}}` |
 | The document to send | `{{payload.document.id}}` |
 | Who emailed the invoice | `{{payload.sender}}` |
-| A looked-up record | `{{vars.<saveAs>.email}}` |
+| A looked-up record | `{{vars.<saveAs>.email}}`, `{{vars.<saveAs>.signerEmail}}`, … |
+| The organization | `{{organization.name}}` |
+| Raw OCR field (discouraged) | `{{payload.extractedData.<field>}}` |
 
-**The field name depends on the OCR template.** `LOOKUP_METADATA` in exact mode
-matches on a *normalized* name (lowercased, punctuation collapsed), so
-`"Northgate Consulting Ltd."` matches a record keyed `northgate consulting ltd`.
-But which extracted field holds that name varies by template — generic
-extraction and the `FutureEdge` template both emit **`merchant_name`**, not
-`vendor_name`. Point the step's `key` at whatever the template actually emits;
-`payload.extractedData` on any processed item shows the real field names.
+The full list of canonical names, and the extractor-side naming rules that keep
+them working, is in
+[BMS ML field contract](./BMS_ML_FIELD_CONTRACT.md). There is no `ocr.*` root.
 
-> A `key` that resolves to an empty string makes the lookup return
-> `found: false`, the `CONDITION` takes its `else` branch, and the run ends as
-> **COMPLETED** having done nothing. Check the `lookup` step's output — an
-> empty `"key": ""` means the template path is wrong, not that the vendor is
-> missing.
+> **The silent-failure mode to know.** A `key` that resolves to an empty string
+> makes the lookup return `found: false`, the `CONDITION` takes its else-branch,
+> and the run finishes as **COMPLETED** having done nothing. No error is raised
+> anywhere. This ran unnoticed for 21 runs on one deployment — the workflow read
+> `payload.extractedData.vendor_name` while the template emitted `merchant_name`.
+> When a workflow "succeeds" but nothing happened, open the run and check the
+> `lookup` step's output: an empty `"key": ""` means the path is wrong, not that
+> the vendor is missing.
 
-**Two records are needed per vendor, not one.** The `vendor` record supplies the
-confirmation address; the `signee` record supplies who signs. Both are looked up
-under the *same key* — the extracted vendor name — so the `signee` record must
-be **named after the vendor**, with the signer's address in its `Email` field.
+**Name matching is forgiving.** `LOOKUP_METADATA` in exact mode normalizes both
+sides — lowercased, punctuation collapsed — so `"Northgate Consulting Ltd."` on
+the invoice matches a record named `Northgate Consulting Ltd`.
 
-**Recipient role is fixed per step.** `role` on a `SEND_FOR_SIGNATURE` recipient
-is a literal (`SIGNER`, `APPROVER`, `CC`, `VIEWER`) and is **not** templated —
-`{{vars.signer.role}}` will not work. To route to an approver, either hardcode
-`"role": "APPROVER"` on the step or branch to a second step with a `CONDITION`.
+**Recipient role can be templated.** `role` on a `SEND_FOR_SIGNATURE` recipient
+accepts a literal (`SIGNER`, `APPROVER`, `CC`, `VIEWER`) *or* a placeholder such
+as `{{vars.vendor.signerRole}}`, so the role travels with the vendor record
+instead of being fixed in the step. An unrecognised value falls back to `SIGNER`
+and logs a warning on the run rather than failing the send.
 
 **Preconditions for the send to fire.** The document must still be `DRAFT` and
 must belong to this organization's Signature Inbox; otherwise the step skips
 with `already-<status>` or `document-not-in-org-inbox`. On success the inbox
 item moves to `SENT_FOR_SIGNATURE`.
+
+> Migrating from the older two-record setup (a separate `signee` record named
+> after the vendor)? Move the signer's address into the vendor record's **Signer
+> email** field, point the step at `{{vars.vendor.signerEmail}}`, and delete the
+> `signee` record and its lookup step. Separate `signee` records still resolve,
+> so nothing breaks until you do.
 
 **Doc Manager (DMS)** — filing structure, classification, search and retrieval
 requests over your document library, with **DMS Permissions** controlling who
@@ -774,15 +825,15 @@ workflow on `DOCUMENT_COMPLETED` can post them with no re-keying.
       "Idempotency-Key": "hubsign-doc-{{ document.id }}"
     },
     "body": {
-      "vendorName": "{{ payload.extractedData.merchant_name }}",
-      "invoiceNumber": "{{ payload.extractedData.invoice_number }}",
-      "poNumber": "{{ payload.extractedData.po_number }}",
-      "invoiceDate": "{{ payload.extractedData.invoice_date }}",
-      "dueDate": "{{ payload.extractedData.due_date }}",
-      "currency": "{{ payload.extractedData.currency }}",
-      "subtotal": "{{ payload.extractedData.subtotal }}",
-      "taxAmount": "{{ payload.extractedData.tax_amount }}",
-      "totalAmount": "{{ payload.extractedData.total_amount }}",
+      "vendorName": "{{ payload.vendorName }}",
+      "invoiceNumber": "{{ payload.invoiceNumber }}",
+      "poNumber": "{{ payload.poNumber }}",
+      "invoiceDate": "{{ payload.invoiceDate }}",
+      "dueDate": "{{ payload.dueDate }}",
+      "currency": "{{ payload.currency }}",
+      "subtotal": "{{ payload.subtotal }}",
+      "taxAmount": "{{ payload.taxAmount }}",
+      "totalAmount": "{{ payload.totalAmount }}",
       "signedPdfUrl": "{{ document.downloadUrl }}",
       "signedAt": "{{ document.completedAt }}"
     },
