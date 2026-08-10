@@ -158,13 +158,22 @@ export const ZWorkflowActionSchema = z.discriminatedUnion('action', [
      * the inbox payload's `document.id`). Supports {{templating}}.
      */
     documentId: z.union([z.string().min(1), z.number()]).optional(),
-    /** Signers to add before sending. `email`/`name` support {{templating}}. */
+    /** Signers to add before sending. All three fields support {{templating}}. */
     recipients: z
       .array(
         z.object({
           email: z.string().min(1),
           name: z.string().optional(),
-          role: z.enum(['SIGNER', 'APPROVER', 'CC', 'VIEWER']).default('SIGNER'),
+          /**
+           * SIGNER | APPROVER | CC | VIEWER, or a {{template}} resolving to one
+           * — e.g. `{{vars.vendor.signerRole}}` to take the role from the
+           * matched metadata record.
+           *
+           * Typed as a string rather than an enum precisely so a placeholder
+           * can be stored here; the rendered value is validated against
+           * `RECIPIENT_ROLES` at run time and falls back to SIGNER.
+           */
+          role: z.string().default('SIGNER'),
         }),
       )
       .min(1),

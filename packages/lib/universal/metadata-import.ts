@@ -16,6 +16,9 @@ export const METADATA_IMPORT_COLUMNS = [
   'Phone',
   'Keywords',
   'OCR template',
+  'Signer name',
+  'Signer email',
+  'Signer role',
 ] as const;
 
 /** The fields a parsed row can carry, keyed by our internal names. */
@@ -27,7 +30,10 @@ export type MetadataImportField =
   | 'role'
   | 'phone'
   | 'keywords'
-  | 'ocrTemplate';
+  | 'ocrTemplate'
+  | 'signerName'
+  | 'signerEmail'
+  | 'signerRole';
 
 /**
  * Header text (lowercased, trimmed) → internal field. Generous on purpose:
@@ -77,6 +83,22 @@ export const METADATA_IMPORT_HEADER_ALIASES: Record<string, MetadataImportField>
   template: 'ocrTemplate',
   'template name': 'ocrTemplate',
   'extraction template': 'ocrTemplate',
+
+  // Who signs documents from this vendor. Kept on the same row as the vendor so
+  // one record drives both the confirmation email and the signature request.
+  'signer name': 'signerName',
+  signername: 'signerName',
+  'signee name': 'signerName',
+  'approver name': 'signerName',
+
+  'signer email': 'signerEmail',
+  signeremail: 'signerEmail',
+  'signee email': 'signerEmail',
+  'approver email': 'signerEmail',
+
+  'signer role': 'signerRole',
+  signerrole: 'signerRole',
+  'signee role': 'signerRole',
 };
 
 /**
@@ -88,15 +110,20 @@ export const MAX_METADATA_IMPORT_ROWS = 1000;
 
 /** Example rows shipped in the template so the expected shape is self-evident. */
 const TEMPLATE_EXAMPLE_ROWS: string[][] = [
+  // One row per vendor carries both halves of the invoice flow: `Email` is
+  // where the receipt confirmation goes, `Signer *` is who gets asked to sign.
   [
     'vendor',
     'Skidd View Ltd.',
     'Jane Doe',
-    'jane.doe@skiddview.com',
-    'SIGNER',
+    'accounts@skiddview.com',
+    '',
     '+1 555 0100',
     'skidd, skidd view, consulting',
     '',
+    'Alex Kim',
+    'alex.kim@example.com',
+    'SIGNER',
   ],
   [
     'vendor',
@@ -107,8 +134,13 @@ const TEMPLATE_EXAMPLE_ROWS: string[][] = [
     '',
     'northgate',
     'Flow Bill v2.0',
+    'Dana Reid',
+    'dana.reid@example.com',
+    'APPROVER',
   ],
-  ['signee', 'Finance Approver', 'Alex Kim', 'alex.kim@example.com', 'APPROVER', '', '', ''],
+  // A vendor with no signer set is still valid — it just gets the confirmation
+  // email and stops there.
+  ['vendor', 'Acme Freight', 'Billing Dept', 'billing@acmefreight.com', '', '', 'acme', '', '', '', ''],
 ];
 
 /** RFC 4180 quoting — only quote when the value would otherwise break the row. */

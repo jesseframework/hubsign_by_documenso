@@ -3736,6 +3736,10 @@ msgstr "Dokumente erstellt aus Vorlage"
 msgid "Documents emailed in for signature. Each is read by OCR (BMS ML) so you can review the data, then send it off to sign."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Documents from this vendor are sent to this person."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/dms+/retention.tsx
 msgid "Documents Past Retention Date"
 msgstr ""
@@ -6077,6 +6081,10 @@ msgstr ""
 msgid "One rule per line, matched anywhere in the value and case-insensitively. Mail sent by HubSign itself, or from this org's own inbox address, is always ignored — you don't need to list those."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "One vendor record covers the whole invoice flow — <0>Email</0> receives the \"we received your invoice\" confirmation, and <1>Signer email</1> is who the document is then sent to for signature. Leave the signer blank to send only the confirmation. A separate \"signee\" record is no longer needed."
+msgstr ""
+
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Only admins can access and view the document"
 msgstr "Nur Administratoren können auf das Dokument zugreifen und es anzeigen"
@@ -7851,9 +7859,21 @@ msgstr "Unterzeichner"
 msgid "Signer Details"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Signer email"
+msgstr ""
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 msgid "Signer Events"
 msgstr "Signer-Ereignisse"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Signer name"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Signer role"
+msgstr ""
 
 #: apps/remix/app/routes/_share+/verify.$token.tsx
 #: packages/lib/constants/recipient-roles.ts

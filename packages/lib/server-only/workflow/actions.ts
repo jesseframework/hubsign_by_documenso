@@ -177,6 +177,41 @@ const notify: WorkflowActionHandler<Extract<TWorkflowAction, { action: 'NOTIFY' 
   return { userId, sent };
 };
 
+/** Recipient roles the signing flow accepts. */
+const RECIPIENT_ROLES = ['SIGNER', 'APPROVER', 'CC', 'VIEWER'] as const;
+
+type RecipientRole = (typeof RECIPIENT_ROLES)[number];
+
+/**
+ * Resolve a recipient's role, which may be a literal or a `{{template}}` such
+ * as `{{vars.vendor.signerRole}}`.
+ *
+ * Falls back to SIGNER rather than throwing: a metadata record with a typo'd or
+ * missing role should still get the document in front of someone, and the warn
+ * makes the misconfiguration findable in the run log.
+ */
+const resolveRecipientRole = (
+  raw: string | undefined,
+  data: unknown,
+  logger: WorkflowLogger,
+): RecipientRole => {
+  const rendered = renderTemplate(raw ?? '', data).trim().toUpperCase();
+
+  if (!rendered) {
+    return 'SIGNER';
+  }
+
+  if ((RECIPIENT_ROLES as readonly string[]).includes(rendered)) {
+    return rendered as RecipientRole;
+  }
+
+  logger.warn(
+    `[workflow:SEND_FOR_SIGNATURE] role "${rendered}" is not one of ${RECIPIENT_ROLES.join(', ')} — defaulting to SIGNER`,
+  );
+
+  return 'SIGNER';
+};
+
 const sendForSignature: WorkflowActionHandler<
   Extract<TWorkflowAction, { action: 'SEND_FOR_SIGNATURE' }>
 > = async (config, { data, logger }) => {
@@ -211,7 +246,7 @@ const sendForSignature: WorkflowActionHandler<
     .map((r) => ({
       email: renderTemplate(r.email, data).trim(),
       name: r.name ? renderTemplate(r.name, data).trim() : '',
-      role: r.role ?? 'SIGNER',
+      role: resolveRecipientRole(r.role, data, logger),
     }))
     .filter((r) => /\S+@\S+\.\S+/.test(r.email));
   if (recipients.length === 0) {

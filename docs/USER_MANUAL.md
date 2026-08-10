@@ -568,7 +568,66 @@ positioned on a document and burned in at seal time.
 
 **Metadata** — organization-defined reference records with keywords, used by
 `LOOKUP_METADATA` to enrich workflow runs — for example resolving a vendor name
-from an extracted string.
+from an extracted string. Records can also pin a **BMS ML OCR template** to a
+vendor, so invoices arriving from that vendor's email extract with it (see
+§4.8.1). Records are maintained on the page, or in bulk via **Download
+template** → edit in Excel → **Import CSV**.
+
+### 4.9.1 Invoice received → confirm to vendor → send for signature
+
+The two automations most organizations want on inbound invoices are one
+`INBOX_OCR_COMPLETED` workflow. The chain is:
+
+```
+lookup        LOOKUP_METADATA  category "vendor", key = the extracted vendor name
+  └ check     CONDITION        vars.vendor.found == true
+      └ email SEND_EMAIL       to {{vars.vendor.email}}, templateKey "invoice-received"
+          └ lookup_signee  LOOKUP_METADATA  category "signee", same key
+              └ check_signee   CONDITION    vars.signer.found == true
+                  └ send_for_signature  SEND_FOR_SIGNATURE
+```
+
+**Templating roots.** There is no `ocr.*` root. The event payload is exposed as
+both `payload.*` and `document.*`; OCR fields live under
+`payload.extractedData.*`. A `LOOKUP_METADATA` result saved as `vendor` is then
+readable as `{{vars.vendor.email}}`, `{{vars.vendor.contactName}}`,
+`{{vars.vendor.role}}` and any other field on that record.
+
+| What you want | Path |
+| --- | --- |
+| Extracted field | `{{payload.extractedData.<field>}}` |
+| The document to send | `{{payload.document.id}}` |
+| Who emailed the invoice | `{{payload.sender}}` |
+| A looked-up record | `{{vars.<saveAs>.email}}` |
+
+**The field name depends on the OCR template.** `LOOKUP_METADATA` in exact mode
+matches on a *normalized* name (lowercased, punctuation collapsed), so
+`"Northgate Consulting Ltd."` matches a record keyed `northgate consulting ltd`.
+But which extracted field holds that name varies by template — generic
+extraction and the `FutureEdge` template both emit **`merchant_name`**, not
+`vendor_name`. Point the step's `key` at whatever the template actually emits;
+`payload.extractedData` on any processed item shows the real field names.
+
+> A `key` that resolves to an empty string makes the lookup return
+> `found: false`, the `CONDITION` takes its `else` branch, and the run ends as
+> **COMPLETED** having done nothing. Check the `lookup` step's output — an
+> empty `"key": ""` means the template path is wrong, not that the vendor is
+> missing.
+
+**Two records are needed per vendor, not one.** The `vendor` record supplies the
+confirmation address; the `signee` record supplies who signs. Both are looked up
+under the *same key* — the extracted vendor name — so the `signee` record must
+be **named after the vendor**, with the signer's address in its `Email` field.
+
+**Recipient role is fixed per step.** `role` on a `SEND_FOR_SIGNATURE` recipient
+is a literal (`SIGNER`, `APPROVER`, `CC`, `VIEWER`) and is **not** templated —
+`{{vars.signer.role}}` will not work. To route to an approver, either hardcode
+`"role": "APPROVER"` on the step or branch to a second step with a `CONDITION`.
+
+**Preconditions for the send to fire.** The document must still be `DRAFT` and
+must belong to this organization's Signature Inbox; otherwise the step skips
+with `already-<status>` or `document-not-in-org-inbox`. On success the inbox
+item moves to `SENT_FOR_SIGNATURE`.
 
 **Doc Manager (DMS)** — filing structure, classification, search and retrieval
 requests over your document library, with **DMS Permissions** controlling who
@@ -715,15 +774,15 @@ workflow on `DOCUMENT_COMPLETED` can post them with no re-keying.
       "Idempotency-Key": "hubsign-doc-{{ document.id }}"
     },
     "body": {
-      "vendorName": "{{ ocr.vendor_name }}",
-      "invoiceNumber": "{{ ocr.invoice_number }}",
-      "poNumber": "{{ ocr.po_number }}",
-      "invoiceDate": "{{ ocr.invoice_date }}",
-      "dueDate": "{{ ocr.due_date }}",
-      "currency": "{{ ocr.currency }}",
-      "subtotal": "{{ ocr.subtotal }}",
-      "taxAmount": "{{ ocr.tax_amount }}",
-      "totalAmount": "{{ ocr.total_amount }}",
+      "vendorName": "{{ payload.extractedData.merchant_name }}",
+      "invoiceNumber": "{{ payload.extractedData.invoice_number }}",
+      "poNumber": "{{ payload.extractedData.po_number }}",
+      "invoiceDate": "{{ payload.extractedData.invoice_date }}",
+      "dueDate": "{{ payload.extractedData.due_date }}",
+      "currency": "{{ payload.extractedData.currency }}",
+      "subtotal": "{{ payload.extractedData.subtotal }}",
+      "taxAmount": "{{ payload.extractedData.tax_amount }}",
+      "totalAmount": "{{ payload.extractedData.total_amount }}",
       "signedPdfUrl": "{{ document.downloadUrl }}",
       "signedAt": "{{ document.completedAt }}"
     },
