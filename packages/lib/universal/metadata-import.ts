@@ -16,9 +16,7 @@ export const METADATA_IMPORT_COLUMNS = [
   'Phone',
   'Keywords',
   'OCR template',
-  'Signer name',
-  'Signer email',
-  'Signer role',
+  'Signers',
   'SLA internal hours',
   'SLA end-to-end hours',
 ] as const;
@@ -33,6 +31,7 @@ export type MetadataImportField =
   | 'phone'
   | 'keywords'
   | 'ocrTemplate'
+  | 'signers'
   | 'signerName'
   | 'signerEmail'
   | 'signerRole'
@@ -88,8 +87,17 @@ export const METADATA_IMPORT_HEADER_ALIASES: Record<string, MetadataImportField>
   'template name': 'ocrTemplate',
   'extraction template': 'ocrTemplate',
 
-  // Who signs documents from this vendor. Kept on the same row as the vendor so
-  // one record drives both the confirmation email and the signature request.
+  // The whole approval chain in one cell: `email|role|name`, entries separated
+  // by `;`, and the order in the cell IS the signing order. One column rather
+  // than a numbered block because five signers across three fields each would
+  // widen the sheet to 25 columns, most of them blank on most rows.
+  signers: 'signers',
+  'signer list': 'signers',
+  'signing chain': 'signers',
+  'approval chain': 'signers',
+
+  // The single-signer columns from before the chain existed. Still read, so a
+  // spreadsheet someone saved last month imports unchanged.
   'signer name': 'signerName',
   signername: 'signerName',
   'signee name': 'signerName',
@@ -123,10 +131,18 @@ export const METADATA_IMPORT_HEADER_ALIASES: Record<string, MetadataImportField>
  */
 export const MAX_METADATA_IMPORT_ROWS = 1000;
 
-/** Example rows shipped in the template so the expected shape is self-evident. */
+/**
+ * Example rows shipped in the template so the expected shape is self-evident.
+ *
+ * The three deliberately show the three shapes of the Signers cell: a full
+ * chain, a single signer, and none at all.
+ */
 const TEMPLATE_EXAMPLE_ROWS: string[][] = [
   // One row per vendor carries both halves of the invoice flow: `Email` is
-  // where the receipt confirmation goes, `Signer *` is who gets asked to sign.
+  // where the receipt confirmation goes, `Signers` is who gets asked to sign.
+  //
+  // Chain of three. Order in the cell is the order they are asked, so Alex signs
+  // first and Finance is only copied at the end.
   [
     'vendor',
     'Skidd View Ltd.',
@@ -136,12 +152,11 @@ const TEMPLATE_EXAMPLE_ROWS: string[][] = [
     '+1 555 0100',
     'skidd, skidd view, consulting',
     '',
-    'Alex Kim',
-    'alex.kim@example.com',
-    'SIGNER',
+    'alex.kim@example.com|SIGNER|Alex Kim;dana.reid@example.com|APPROVER|Dana Reid;ap@skiddview.com|CC|Finance',
     '8',
     '72',
   ],
+  // Just an address: role defaults to SIGNER and the name is optional.
   [
     'vendor',
     'Northgate Supplies',
@@ -151,15 +166,13 @@ const TEMPLATE_EXAMPLE_ROWS: string[][] = [
     '',
     'northgate',
     'Flow Bill v2.0',
-    'Dana Reid',
     'dana.reid@example.com',
-    'APPROVER',
     '24',
     '120',
   ],
   // A vendor with no signer set is still valid — it just gets the confirmation
   // email and stops there.
-  ['vendor', 'Acme Freight', 'Billing Dept', 'billing@acmefreight.com', '', '', 'acme', '', '', '', '', '', ''],
+  ['vendor', 'Acme Freight', 'Billing Dept', 'billing@acmefreight.com', '', '', 'acme', '', '', '', ''],
 ];
 
 /** RFC 4180 quoting — only quote when the value would otherwise break the row. */

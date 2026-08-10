@@ -22,6 +22,7 @@ import { router } from './trpc';
 import { webhookRouter } from './webhook-router/router';
 import { businessRuleRouter } from './business-rule-router/router';
 import { emailTemplateRouter } from './email-template-router/router';
+import { exportRouter } from './export-router/router';
 import { workflowRouter } from './workflow-router/router';
 
 export const appRouter = router({
@@ -48,6 +49,7 @@ export const appRouter = router({
   approval: approvalRouter,
   inbox: inboxRouter,
   metadata: metadataRouter,
+  export: exportRouter,
   msTeams: msTeamsRouter,
 });
 

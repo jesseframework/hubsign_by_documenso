@@ -42,12 +42,27 @@ const INTERNAL_HOST_SUFFIXES = ['.local', '.internal', '.localhost', '.home.arpa
 /**
  * Hosts that actually accept a POSTed Adaptive Card.
  *
- * Power Automate ("Post to a channel when a webhook request is received") issues
- * `*.logic.azure.com`; some tenants get the regionalised `*.logic.azure.us` /
- * `.cn`. The retiring O365 connector issued `*.webhook.office.com`, still valid
- * where it hasn't been switched off yet.
+ * Teams Workflows ("Post to a channel when a webhook request is received")
+ * issues one of two shapes depending on how new the tenant's Power Platform
+ * environment is:
+ *
+ *   new  https://<env-id>.<region>.environment.api.powerplatform.com:443/powerautomate/…
+ *   old  https://prod-12.westus.logic.azure.com/workflows/…
+ *
+ * The newer form is what "Copy webhook link" hands out today, so it is listed
+ * first — the error message below names the first two entries. Both accept the
+ * same Adaptive Card envelope.
+ *
+ * Some tenants get the regionalised `*.logic.azure.us` / `.cn`. The retiring
+ * O365 connector issued `*.webhook.office.com`, still valid where it hasn't
+ * been switched off yet.
+ *
+ * Sovereign-cloud Power Platform hosts are deliberately absent: this is an
+ * allowlist of SSRF destinations, so entries are added when a real tenant
+ * produces one, never guessed at.
  */
 const WEBHOOK_HOST_SUFFIXES = [
+  '.environment.api.powerplatform.com',
   '.logic.azure.com',
   '.logic.azure.us',
   '.logic.azure.cn',

@@ -24,6 +24,8 @@ Version 2.3.0 · Last updated 2026-08-09
    - [4.2 Settings](#42-settings)
    - [4.3 Members, domains and seats](#43-members-domains-and-seats)
    - [4.4 Signature Inbox (email-to-sign + OCR)](#44-signature-inbox-email-to-sign--ocr)
+     - [4.4.2 Responsibility — who owes a signature](#442-responsibility--who-owes-a-signature)
+     - [4.4.3 Exporting to Excel](#443-exporting-to-excel)
    - [4.5 Business Rules](#45-business-rules)
    - [4.6 Approvals](#46-approvals)
    - [4.7 Workflows](#47-workflows)
@@ -432,6 +434,79 @@ why it was chosen ("matched *vendor* by sender email"), or an amber **No
 template** badge when extraction ran generically. If items are extracting poorly,
 that badge is the first thing to check.
 
+### 4.4.2 Responsibility — who owes a signature
+
+The **Responsibility** column answers the question the queue is usually opened
+to answer: who is this waiting on, and how often have we asked them.
+
+- For a document signed **in order**, it names only the person whose turn it is,
+  with their step number ("step 2 of 3"). The three people behind them in the
+  chain have not been asked yet, so naming them would be misleading.
+- For a document signed **all at once**, it names everyone still outstanding.
+- **"not emailed yet"** distinguishes a recipient who has not been contacted
+  from one who is ignoring us.
+- A declined document shows who declined, and a finished one shows that everyone
+  signed.
+
+The blue **reminders** chip beside the name shows the total sent and how long
+ago. Hovering it lists each send with its date, whether it was automatic or sent
+by hand, and who sent it.
+
+One honest caveat is shown in that hover card where it applies. Reminder times
+were not recorded before this feature existed — the system kept a count and a
+single "last reminded" timestamp per person, overwritten on each send. For
+anyone reminded more than once before then, only the most recent date survives,
+and the card says how many earlier sends have no recorded time rather than
+quietly listing fewer dates than the count beside it. Everything sent from now
+on is logged individually.
+
+Automatic reminders are configured in Organization → Settings; manual ones come
+from **Send reminder** on the document. A manual reminder deliberately does not
+spend the automatic quota, so nudging someone by hand will not switch their
+scheduled reminders off.
+
+### 4.4.3 Exporting to Excel
+
+**Export to Excel**, beside the search box, opens the column builder.
+
+The left panel is every field available for this organization, grouped:
+document and status fields, the invoice fields as the grid reads them, signing
+and reminder state, SLA figures, workflow status, OCR quality, and every raw OCR
+key the extractor has actually produced for your documents. That last group is
+discovered from your own data rather than a fixed list, so a field a new
+extraction template starts returning appears without any change to HubSign.
+
+The right panel is the sheet as it will be written — drag rows to reorder
+(top to bottom becomes left to right in Excel), click a heading to rename it,
+and **Add custom** appends a fixed-value column, useful for a "Checked by"
+column someone fills in after the fact.
+
+**Reference tables.** **Attach** joins your Metadata directory onto every row,
+so a vendor's phone number or account code can sit beside the invoice. Rows are
+paired by vendor name using the same fuzzy matching the workflow engine uses, so
+"Northgate Consulting Ltd." on the invoice finds "Northgate Consulting Limited"
+in the directory. Two extra columns record how each pairing was made — the match
+percentage and whether it was exact, a legal-form difference, or approximate —
+so a match can be audited rather than trusted. Where two directory entries score
+too closely to choose between, the row is left blank instead of guessed. You can
+change which category is searched and raise the match threshold.
+
+**Filters** at the top decide which rows go in. Opening the dialog from the
+Signature Inbox carries the grid's current filters across.
+
+Every workbook has a second sheet, **Export notes**, recording when it was
+generated and by whom, the filters applied, how many rows matched, and how the
+reference-table join performed. Exports are capped at 5,000 rows; if the filters
+match more, the notes sheet says so rather than letting a truncated file pass for
+a complete one.
+
+The export is generated on the server from the full filtered set — it is not a
+copy of the rows on screen, which are capped at 100.
+
+**Saving a layout.** Name it and press **Save layout**, and it appears under
+Organization → **Exports**, where it can be re-run with one click or edited. The
+Exports page is shared by every grid that supports exporting.
+
 ## 4.5 Business Rules
 
 **Organization → Business Rules** lets you refuse or flag an action based on the
@@ -607,7 +682,7 @@ the invoice flow needs about them:
 | --- | --- |
 | **Name** | The lookup key. Matched against the vendor name read off the invoice. |
 | **Email** | Where the "we received your invoice" confirmation is sent. |
-| **Signer name / email / role** | Who the document is then sent to for signature. |
+| **Signers** | The approval chain — who the document is sent to, and in what order. |
 | **OCR template** | The BMS ML template invoices from this vendor extract with (see §4.4.1). |
 | **Keywords** | Alternative matching, by scanning the OCR text rather than the name. |
 
@@ -624,7 +699,7 @@ lookup            LOOKUP_METADATA  category "vendor", key {{payload.vendorName}}
  └ check          CONDITION        vars.vendor.found == true
     └ email       SEND_EMAIL       to {{vars.vendor.email}}, templateKey "invoice-received"
        └ check_signer   CONDITION  !! vars.vendor.signerEmail
-          └ send_for_signature  SEND_FOR_SIGNATURE  to {{vars.vendor.signerEmail}}
+          └ send_for_signature  SEND_FOR_SIGNATURE  recipientsFrom {{vars.vendor.signers}}
 ```
 
 A vendor with no signer set still gets the confirmation — the run simply stops
@@ -642,7 +717,7 @@ payload; read those and a document routed to a different template keeps working.
 | Invoice number, total, dates | `{{payload.invoiceNumber}}`, `{{payload.totalAmount}}`, `{{payload.invoiceDate}}`, `{{payload.dueDate}}` |
 | The document to send | `{{payload.document.id}}` |
 | Who emailed the invoice | `{{payload.sender}}` |
-| A looked-up record | `{{vars.<saveAs>.email}}`, `{{vars.<saveAs>.signerEmail}}`, … |
+| A looked-up record | `{{vars.<saveAs>.email}}`, `{{vars.<saveAs>.signers}}`, `{{vars.<saveAs>.signerEmail}}`, … |
 | The organization | `{{organization.name}}` |
 | Raw OCR field (discouraged) | `{{payload.extractedData.<field>}}` |
 
@@ -706,6 +781,41 @@ which tells you whether to add the vendor or lower `minScore`.
 The same matching is used for per-vendor SLA targets and for grouping the SLA
 dashboard's vendor table, so a vendor is one row there exactly when it is one
 record here.
+
+**Several signers, in order.** A vendor record holds a list, not one person, and the
+order in the list is the order they are asked. Set it in the **Signers** table on
+the Metadata page — add a row per person, pick a role, and move rows with the
+arrows. Type into the address box to search your organization's members, or just
+enter any address for someone who has no account here.
+
+Point a `SEND_FOR_SIGNATURE` step at the whole list rather than at one address:
+
+```json
+{ "action": "SEND_FOR_SIGNATURE",
+  "documentId": "{{payload.document.id}}",
+  "recipientsFrom": "{{vars.vendor.signers}}" }
+```
+
+`recipientsFrom` exists because `recipients` is a fixed array in the workflow
+JSON, and a `{{ }}` placeholder substitutes text — it cannot expand into "one
+entry per signer this vendor happens to have".
+
+With **In order** (the default for more than one signer) each person is only
+invited once the one above has signed. **All at once** asks everyone
+immediately. A step can override the record with `"signingOrder": "SEQUENTIAL"`
+or `"PARALLEL"`.
+
+In the spreadsheet this is a single **Signers** column, `email|role|name` with
+`;` between people:
+
+```
+jane@x.com|SIGNER|Jane Doe;marcus@x.com|APPROVER|Marcus Reid;ap@x.com|CC|Finance
+```
+
+Only the address is required, so `jane@x.com;bob@x.com` is valid and both become
+SIGNER. A role that isn't recognised is reported on that row and treated as
+SIGNER rather than failing the import. The old `Signer name` / `Signer email` /
+`Signer role` columns still import, as a chain of one.
 
 **Recipient role can be templated.** `role` on a `SEND_FOR_SIGNATURE` recipient
 accepts a literal (`SIGNER`, `APPROVER`, `CC`, `VIEWER`) *or* a placeholder such

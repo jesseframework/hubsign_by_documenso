@@ -4,6 +4,7 @@ import type {
   TRecipientAuthOptions,
 } from '@documenso/lib/types/document-auth';
 import type { TDocumentEmailSettings } from '@documenso/lib/types/document-email';
+import type { TExportConfig } from '@documenso/lib/types/export';
 import type { TDocumentFormValues } from '@documenso/lib/types/document-form-values';
 import type { TFieldMetaNotOptionalSchema } from '@documenso/lib/types/field-meta';
 import type {
@@ -24,6 +25,8 @@ declare global {
     type RecipientAuthOptions = TRecipientAuthOptions;
 
     type FieldMeta = TFieldMetaNotOptionalSchema;
+
+    type ExportTemplateConfig = TExportConfig;
 
     type WorkflowDefinition = TWorkflowDefinition;
     type WorkflowRunContext = TWorkflowRunContext;

@@ -9,6 +9,12 @@
 
 import type { TWorkflowAction } from '../../types/workflow';
 import { normalizeMetadataKey } from '../../universal/metadata';
+import {
+  type MetadataSigner,
+  type MetadataSigningOrder,
+  readRecordSigners,
+  readRecordSigningOrder,
+} from '../../universal/metadata-signers';
 import { asMatchPercent, matchVendorName } from '../../universal/vendor-match';
 import { renderTemplate, resolveTemplatesDeep, resolveValue } from './template';
 
@@ -181,6 +187,52 @@ const notify: WorkflowActionHandler<Extract<TWorkflowAction, { action: 'NOTIFY' 
 /** Recipient roles the signing flow accepts. */
 const RECIPIENT_ROLES = ['SIGNER', 'APPROVER', 'CC', 'VIEWER'] as const;
 
+/**
+ * Resolve a signer chain from a `{{path}}` on the run context.
+ *
+ * The value at the path is whatever the lookup put there — for a metadata record
+ * that is `data.signers`, so `readRecordSigners` also handles the legacy
+ * single-signer shape and a record written before chains existed still resolves
+ * to a one-entry list.
+ *
+ * `renderTemplate` cannot be used: it stringifies, and this needs the array.
+ */
+const readSignerList = (
+  path: string,
+  data: unknown,
+  logger: { warn: (message: string) => void },
+): { signers: MetadataSigner[]; signingOrder: MetadataSigningOrder | null } => {
+  const cleaned = path.trim().replace(/^\{\{\s*/, '').replace(/\s*\}\}$/, '');
+
+  const value = cleaned
+    .split('.')
+    .reduce<unknown>(
+      (acc, key) =>
+        acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[key] : undefined,
+      data,
+    );
+
+  if (value === undefined || value === null) {
+    logger.warn(`[workflow:SEND_FOR_SIGNATURE] "${path}" resolved to nothing`);
+    return { signers: [], signingOrder: null };
+  }
+
+  // The path may point at the list itself or at the record holding it; accept
+  // both so an author does not have to know which shape the lookup returned.
+  const signers = Array.isArray(value)
+    ? readRecordSigners({ signers: value })
+    : readRecordSigners(value);
+
+  if (signers.length === 0) {
+    logger.warn(`[workflow:SEND_FOR_SIGNATURE] "${path}" held no usable signers`);
+  }
+
+  return {
+    signers,
+    signingOrder: Array.isArray(value) ? null : readRecordSigningOrder(value),
+  };
+};
+
 type RecipientRole = (typeof RECIPIENT_ROLES)[number];
 
 /**
@@ -243,17 +295,33 @@ const sendForSignature: WorkflowActionHandler<
 
   const organizationId = Number(root.organization?.id);
 
-  const recipients = config.recipients
-    .map((r) => ({
+  // A chain resolved from the run context — typically a metadata record's
+  // `signers`. Read first so its order is the signing order, with any statically
+  // configured recipients appended after it.
+  const fromList = config.recipientsFrom
+    ? readSignerList(config.recipientsFrom, data, logger)
+    : { signers: [], signingOrder: null };
+
+  const recipients = [
+    ...fromList.signers.map((s) => ({ email: s.email, name: s.name ?? '', role: s.role })),
+    ...config.recipients.map((r) => ({
       email: renderTemplate(r.email, data).trim(),
       name: r.name ? renderTemplate(r.name, data).trim() : '',
       role: resolveRecipientRole(r.role, data, logger),
-    }))
-    .filter((r) => /\S+@\S+\.\S+/.test(r.email));
+    })),
+  ]
+    .filter((r) => /\S+@\S+\.\S+/.test(r.email))
+    // The same address twice would ask one person to sign the same document
+    // twice, and in sequential mode would deadlock behind itself.
+    .filter((r, i, all) => all.findIndex((o) => o.email.toLowerCase() === r.email.toLowerCase()) === i);
+
   if (recipients.length === 0) {
     logger.warn('[workflow:SEND_FOR_SIGNATURE] no resolvable recipients — skipping');
     return { skipped: true, reason: 'no-recipients' };
   }
+
+  // Step config wins, then the record's own preference, then the document's.
+  const signingOrder = config.signingOrder ?? fromList.signingOrder;
 
   const { prisma } = await import('@documenso/prisma');
 
@@ -283,20 +351,42 @@ const sendForSignature: WorkflowActionHandler<
   const { nanoid } = await import('../../universal/id');
   const existing = new Set(document.recipients.map((r) => r.email.toLowerCase()));
   const added: string[] = [];
+
+  // Continue after anyone already on the document, so adding a chain to a
+  // document that already has a recipient does not put two people at position 1
+  // — which sequential signing reads as a tie and cannot resolve.
+  let position = document.recipients.length;
+
   for (const r of recipients) {
     if (existing.has(r.email.toLowerCase())) continue;
+    position += 1;
+
     await prisma.recipient.create({
       data: {
         documentId,
         email: r.email,
         name: r.name,
         token: nanoid(),
+        // Always written, even in parallel mode: it is ignored unless the
+        // document is sequential, and storing it means switching a document to
+        // sequential later preserves the intended order instead of inventing one.
+        signingOrder: position,
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions -- z.enum value matches RecipientRole
         role: r.role as never,
       },
     });
     existing.add(r.email.toLowerCase());
     added.push(r.email);
+  }
+
+  // Turn-taking is enforced off the DOCUMENT's setting, so the per-recipient
+  // order above does nothing on its own.
+  if (signingOrder) {
+    await prisma.documentMeta.upsert({
+      where: { documentId },
+      create: { documentId, signingOrder },
+      update: { signingOrder },
+    });
   }
 
   // The organization's send rules apply to an automated send exactly as they do

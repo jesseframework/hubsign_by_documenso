@@ -5,6 +5,10 @@ import { assertSafeWebhookUrl, maskWebhookUrl } from './webhook-url';
 const POWER_AUTOMATE_URL =
   'https://prod-12.westus.logic.azure.com/workflows/abc123/triggers/manual/paths/invoke?api-version=2016-06-01&sig=SECRETSIG9xyz';
 
+/** The shape Teams "Copy webhook link" produces on a current tenant. */
+const POWER_PLATFORM_URL =
+  'https://default1111.ca.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/19/workflows/abc123/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=SECRETSIG9xyz';
+
 describe('assertSafeWebhookUrl', () => {
   it('accepts a real Power Automate flow URL', () => {
     expect(() => assertSafeWebhookUrl(POWER_AUTOMATE_URL)).not.toThrow();
@@ -108,6 +112,18 @@ describe('assertSafeWebhookUrl', () => {
     for (const url of accepted) {
       expect(() => assertSafeWebhookUrl(url), url).not.toThrow();
     }
+  });
+
+  it('accepts the current Power Platform host, including its explicit :443', () => {
+    // What "Copy webhook link" produces in Teams today. The port is spelled out
+    // in the URL Teams hands over, and `logic.azure.com` never appears.
+    expect(() => assertSafeWebhookUrl(POWER_PLATFORM_URL)).not.toThrow();
+  });
+
+  it('does not let a powerplatform lookalike slip past the suffix check', () => {
+    expect(() =>
+      assertSafeWebhookUrl('https://environment.api.powerplatform.com.evil.test/x'),
+    ).toThrow(/is not a Microsoft Teams webhook host/);
   });
 
   it('does not let a lookalike host slip past the suffix check', () => {

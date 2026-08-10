@@ -48,6 +48,14 @@ connector configuration in Teams.
 Outbound URLs are validated before any request is made; that check is deliberate and
 not something to work around.
 
+Teams hands out one of two webhook URL shapes depending on the age of the tenant's
+Power Platform environment, and both are accepted:
+
+```
+https://<env-id>.<region>.environment.api.powerplatform.com:443/powerautomate/…   ← current
+https://prod-12.westus.logic.azure.com/workflows/…                                ← older tenants
+```
+
 <Callout type="info">
   Requests to Teams leave from WorkHub Cloud, so the webhook URL must be reachable from
   the internet. Microsoft-hosted webhook URLs always are.

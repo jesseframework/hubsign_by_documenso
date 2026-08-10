@@ -14,6 +14,7 @@ import {
   CircleDashedIcon,
   CoinsIcon,
   DollarSignIcon,
+  FileSpreadsheetIcon,
   InboxIcon,
   MinusCircleIcon,
   PenLineIcon,
@@ -31,7 +32,15 @@ import {
 import { Link } from 'react-router';
 
 import { INBOUND_EMAIL_DOMAIN } from '@documenso/lib/constants/app';
-import { ocrFieldNames, ocrSearchText } from '@documenso/lib/utils/ocr-fields';
+// Shared with the spreadsheet exporter, so what the grid shows and what the
+// export writes are resolved by the same code.
+import type { TExportFilterValue } from '@documenso/lib/types/export';
+import {
+  invoiceAmount,
+  invoiceFields,
+  parseAmount,
+} from '@documenso/lib/universal/inbox-invoice-fields';
+import { ocrSearchText } from '@documenso/lib/utils/ocr-fields';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import {
@@ -41,6 +50,8 @@ import {
 } from '@documenso/ui/primitives/hover-card';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
+import { ExportBuilderDialog } from '~/components/general/export/export-builder-dialog';
+import { ResponsibilityCell } from '~/components/general/inbox/responsibility-cell';
 import { useInboxEvents } from '~/hooks/use-inbox-events';
 import { formatRelativeTime } from '~/utils/format-relative-time';
 import {
@@ -251,34 +262,6 @@ const overdueLabel = (minutes: number): string => {
   return h ? `${d}d ${h}h` : `${d}d`;
 };
 
-/** Read the first non-empty value among the given OCR field names. */
-const fieldStr = (item: { extractedData?: unknown }, keys: string[]): string => {
-  const data = (item.extractedData ?? {}) as Record<string, unknown>;
-  for (const k of keys) {
-    const v = data[k];
-    if (v != null && String(v).trim() !== '') return String(v);
-  }
-  return '';
-};
-
-/** Best-effort numeric amount from the OCR fields (currency-agnostic). */
-const amountOf = (item: { extractedData?: unknown }): number | null => {
-  // Wider than OCR_FIELD_ALIASES on purpose: this drives the high/low amount
-  // filter, where an approximate figure beats none. `subtotal` is a last resort
-  // and must never be treated as a synonym for the total elsewhere.
-  const raw = fieldStr(item, [
-    ...ocrFieldNames('total_amount'),
-    'invoice_amount',
-    'totalAmount',
-    'amount',
-    'grand_total',
-    'subtotal',
-  ]);
-  if (!raw) return null;
-  const n = Number(raw.replace(/[^0-9.\-]/g, ''));
-  return Number.isFinite(n) ? n : null;
-};
-
 /** Format an OCR date value to YYYY-MM-DD (leaves unparseable values as-is). */
 const fmtDate = (raw: string | Date): string => {
   const s = typeof raw === 'string' ? raw : raw.toISOString();
@@ -292,30 +275,14 @@ const fmtDate = (raw: string | Date): string => {
 /** Format a money value with the single currency the ML returned. */
 const fmtMoney = (currency: string, raw: string): string => {
   if (!raw) return '';
-  const n = Number(raw.replace(/[^0-9.\-]/g, ''));
-  const s = Number.isFinite(n)
-    ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : raw;
+  // `parseAmount` rather than a local Number(): it returns null for a value
+  // with no digits, where this used to render "0.00". The spreadsheet export
+  // shows the raw text in that case, and the two must not disagree.
+  const n = parseAmount(raw);
+  const s =
+    n === null ? raw : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return currency ? `${currency} ${s}` : s;
 };
-
-/** All invoice fields we surface in the grid — sourced ONLY from BMS ML metadata. */
-const invoiceFields = (item: { extractedData?: unknown }) => ({
-  invoiceNumber: fieldStr(item, ['invoice_number', 'invoiceNumber', 'invoice_no']),
-  poNumber: fieldStr(item, ['po_number', 'purchase_order', 'poNumber']),
-  // `ocrFieldNames` supplies the extractor's real synonyms (e.g. merchant_name),
-  // which is why this column used to be blank for half the queue; the extra
-  // entries after it are display-only guesses that cost nothing to try.
-  vendorName: fieldStr(item, [...ocrFieldNames('vendor_name'), 'vendor_display_name']),
-  vendorEmail: fieldStr(item, ['vendor_email', 'vendorEmail', 'email', 'merchant_contact']),
-  currency: fieldStr(item, ['currency', 'currency_code', 'ccy']),
-  total: fieldStr(item, [...ocrFieldNames('total_amount'), 'invoice_amount', 'grand_total']),
-  tax: fieldStr(item, [...ocrFieldNames('tax_amount'), 'vat']),
-  net: fieldStr(item, ['subtotal', 'net_amount', 'net']),
-  invoiceDate: fieldStr(item, ['invoice_date', 'date', 'issue_date']),
-  dueDate: fieldStr(item, [...ocrFieldNames('due_date'), 'payment_due']),
-  customerName: fieldStr(item, ocrFieldNames('customer_name')),
-});
 
 const STATUS_FILTERS = [
   { key: 'READY', label: 'Ready', icon: CheckCircle2Icon },
@@ -380,6 +347,7 @@ export default function SignatureInboxPage() {
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [amountFilter, setAmountFilter] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const docTypes = useMemo(
     () =>
@@ -421,7 +389,7 @@ export default function SignatureInboxPage() {
         if (dateFilter === 'month' && t < now - 30 * 864e5) return false;
       }
       if (amountFilter) {
-        const amt = amountOf(it);
+        const amt = invoiceAmount(it);
         if (amt == null) return false;
         if (amountFilter === 'high' && !(amt > 10000)) return false;
         if (amountFilter === 'low' && !(amt < 1000)) return false;
@@ -429,6 +397,54 @@ export default function SignatureInboxPage() {
       return true;
     });
   }, [items, search, statusFilter, typeFilter, dateFilter, amountFilter]);
+
+  /**
+   * The grid's filters, translated into the export's vocabulary.
+   *
+   * Two of them cannot cross over faithfully, and it is better to drop those
+   * than to ship a spreadsheet that claims a filter it did not apply:
+   *
+   *   - "Needs review" is a flag on the item, not one of the statuses the
+   *     export filters on, so it is left off rather than mapped to something
+   *     adjacent.
+   *   - The date chips are relative to the grid's `createdAt`, while the export
+   *     filters on arrival (mail time where known). Same intent, and the
+   *     boundary can differ by the ingest lag — which is why the workbook
+   *     records the resolved dates on its notes sheet.
+   */
+  const exportFilters = useMemo(() => {
+    const seeded: { id: string; value: TExportFilterValue }[] = [];
+
+    if (search.trim()) {
+      seeded.push({ id: 'search', value: { kind: 'text', value: search.trim() } });
+    }
+
+    if (statusFilter && statusFilter !== 'needs-review') {
+      seeded.push({ id: 'status', value: { kind: 'select', value: [statusFilter] } });
+    }
+
+    if (typeFilter) {
+      seeded.push({ id: 'documentType', value: { kind: 'select', value: [typeFilter] } });
+    }
+
+    if (dateFilter) {
+      const from = new Date();
+      if (dateFilter === 'today') {
+        from.setHours(0, 0, 0, 0);
+      } else {
+        from.setTime(from.getTime() - (dateFilter === 'week' ? 7 : 30) * 864e5);
+      }
+      seeded.push({ id: 'received', value: { kind: 'dateRange', from: from.toISOString(), to: null } });
+    }
+
+    if (amountFilter === 'high') {
+      seeded.push({ id: 'amount', value: { kind: 'numberRange', min: 10000, max: null } });
+    } else if (amountFilter === 'low') {
+      seeded.push({ id: 'amount', value: { kind: 'numberRange', min: null, max: 1000 } });
+    }
+
+    return seeded;
+  }, [search, statusFilter, typeFilter, dateFilter, amountFilter]);
 
   const anyFilter = Boolean(search || statusFilter || typeFilter || dateFilter || amountFilter);
   const activeChipCount = [statusFilter, typeFilter, dateFilter, amountFilter].filter(Boolean).length;
@@ -575,14 +591,33 @@ export default function SignatureInboxPage() {
         <div className="space-y-3">
           {/* Search + quick filters */}
           <div className="space-y-3 rounded-[var(--r)] border border-border bg-card p-4">
-            <div className="relative">
-              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={_(msg`Search by document, vendor, invoice #, PO #, or amount`)}
-                className="h-9 w-full rounded-[var(--r)] border border-border bg-background pl-9 pr-3 text-[13px] outline-none focus:border-primary/50"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={_(msg`Search by document, vendor, invoice #, PO #, or amount`)}
+                  className="h-9 w-full rounded-[var(--r)] border border-border bg-background pl-9 pr-3 text-[13px] outline-none focus:border-primary/50"
+                />
+              </div>
+
+              {/*
+                The export re-runs the query server-side rather than serialising
+                what the grid holds — the list is capped at 100 rows and filtered
+                in the browser, so exporting the visible array would quietly
+                export a page. The filters are carried over so the file starts
+                out matching what is on screen.
+              */}
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 flex-shrink-0 text-[12px]"
+                onClick={() => setExportOpen(true)}
+              >
+                <FileSpreadsheetIcon className="mr-1.5 h-4 w-4" />
+                <Trans>Export to Excel</Trans>
+              </Button>
             </div>
 
             <button
@@ -728,6 +763,9 @@ export default function SignatureInboxPage() {
                 </th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   <Trans>Dates</Trans>
+                </th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                  <Trans>Responsibility</Trans>
                 </th>
                 <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   <Trans>Actions</Trans>
@@ -888,6 +926,14 @@ export default function SignatureInboxPage() {
                       </dl>
                     </td>
 
+                    {/* Responsibility — who owes a signature, and the chasing so far */}
+                    <td className="max-w-[13rem] px-4 py-3 align-top">
+                      <ResponsibilityCell
+                        responsibility={item.responsibility}
+                        documentStatus={item.signature.documentStatus}
+                      />
+                    </td>
+
                     {/* Actions */}
                     <td className="px-4 py-3 align-top">
                       <div className="flex items-center justify-end gap-1">
@@ -968,6 +1014,13 @@ export default function SignatureInboxPage() {
           )}
         </div>
       )}
+
+      <ExportBuilderDialog
+        datasetId="signature-inbox"
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        initialFilters={exportFilters}
+      />
     </div>
   );
 }

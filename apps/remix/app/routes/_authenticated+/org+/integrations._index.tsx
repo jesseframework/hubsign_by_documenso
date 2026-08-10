@@ -273,8 +273,8 @@ function IntegrationsPage() {
           <p className="mt-1 text-[13px] text-muted-foreground">
             <Trans>
               In Teams, open the channel → ⋯ → Workflows → "Post to a channel when a webhook request
-              is received". Copy the generated URL and paste it here. Do not use the legacy
-              "Incoming Webhook" connector — Microsoft is retiring it.
+              is received". Once the flow is saved, use "Copy webhook link" and paste the URL here.
+              Do not use the legacy "Incoming Webhook" connector — Microsoft is retiring it.
             </Trans>
           </p>
 

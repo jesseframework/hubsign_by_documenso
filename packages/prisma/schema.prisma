@@ -111,6 +111,8 @@ model User {
   createdWorkflows         Workflow[]             @relation("UserCreatedWorkflows")
   createdEmailTemplates    EmailTemplate[]        @relation("UserCreatedEmailTemplates")
   createdBusinessRules     BusinessRule[]         @relation("UserCreatedBusinessRules")
+  createdExportTemplates   ExportTemplate[]       @relation("UserCreatedExportTemplates")
+  sentReminders            RecipientReminder[]    @relation("UserSentReminders")
 
   @@index([email])
 }
@@ -607,15 +609,56 @@ model Recipient {
   supportingFiles      DocumentSupportingFile[]
   fieldSignedPositions FieldSignedPosition[]
 
-  // Sign reminder tracking
+  // Sign reminder tracking. `remindersSent` is the scheduler's own counter —
+  // it gates `signReminderMaxCount` and is deliberately NOT bumped by manual
+  // resends, so a person nudging someone by hand can't exhaust the automated
+  // quota. For the human-readable log of when nudges actually went out, see
+  // `reminderHistory`.
   remindersSent  Int       @default(0)
   lastReminderAt DateTime?
+
+  reminderHistory RecipientReminder[]
 
   @@unique([documentId, email])
   @@unique([templateId, email])
   @@index([documentId])
   @@index([templateId])
   @@index([token])
+}
+
+/// How a reminder came to be sent.
+enum ReminderKind {
+  /// The scheduled sweep (`sendPendingReminders`). These rows stay in step with
+  /// `Recipient.remindersSent`, which is what makes the "N sends have no
+  /// recorded time" figure computable rather than guessed.
+  AUTOMATIC
+  /// Someone pressed "Send reminder" (`resendDocument`).
+  MANUAL
+}
+
+/// One row per reminder email that was actually handed to the mailer.
+///
+/// Before this table the two reminder paths recorded themselves in different
+/// places and neither kept per-send times: the sweep incremented a counter and
+/// overwrote a single `lastReminderAt`, while a manual resend wrote only a
+/// `DocumentAuditLog` row. Sends that predate this table therefore cannot be
+/// recovered beyond the most recent one per recipient, and the UI says so
+/// rather than inventing timestamps.
+model RecipientReminder {
+  id           String       @id @default(cuid())
+  recipientId  Int
+  documentId   Int
+  sentAt       DateTime     @default(now())
+  kind         ReminderKind
+  /// Who pressed the button. Null for the scheduled sweep, and null once the
+  /// user is deleted — the send still happened.
+  sentByUserId Int?
+
+  recipient Recipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  sentBy    User?     @relation("UserSentReminders", fields: [sentByUserId], references: [id], onDelete: SetNull)
+
+  @@index([recipientId, sentAt])
+  @@index([documentId])
 }
 
 enum FieldType {
@@ -1706,6 +1749,7 @@ model Organization {
   documents              Document[]              @relation("OrgDocuments")
   emailTemplates         EmailTemplate[]         @relation("OrgEmailTemplates")
   businessRules          BusinessRule[]          @relation("OrgBusinessRules")
+  exportTemplates        ExportTemplate[]        @relation("OrgExportTemplates")
 }
 
 enum OrgSeatTier {
@@ -2438,6 +2482,34 @@ model SignatureInboxItem {
   @@index([organizationId, status])
   @@index([createdAt])
   @@index([externalMessageId])
+}
+
+/// A saved column layout for the export builder, scoped to one organization and
+/// one dataset (a key in the export dataset registry, e.g. "signature-inbox").
+///
+/// `config` holds the builder's whole state — the ordered column list with any
+/// renames, the joined reference tables, and the filters — and is validated by
+/// ZExportConfigSchema on the way in. It is stored as JSON rather than
+/// normalized into rows because the shape belongs to the dataset definition,
+/// which lives in code and changes with it; a column that no longer exists is
+/// dropped at run time with a warning instead of failing the export.
+model ExportTemplate {
+  id             String  @id @default(cuid())
+  organizationId Int
+  datasetId      String
+  name           String
+  description    String?
+  config         Json /// [ExportTemplateConfig]
+  createdById    Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation("OrgExportTemplates", fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("UserCreatedExportTemplates", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, datasetId, name])
+  @@index([organizationId, datasetId])
 }
 
 /// Org-scoped lookup directory (e.g. vendor name → email) that workflows resolve

@@ -173,6 +173,23 @@ export const ZWorkflowActionSchema = z.discriminatedUnion('action', [
      * the inbox payload's `document.id`). Supports {{templating}}.
      */
     documentId: z.union([z.string().min(1), z.number()]).optional(),
+    /**
+     * A path to a signer LIST on the run context, e.g.
+     * `"{{vars.vendor.signers}}"` for the chain on a matched metadata record.
+     *
+     * Needed because `recipients` below is a fixed array written into the
+     * workflow JSON, and `{{ }}` substitutes strings — it cannot expand to "one
+     * entry per signer this vendor happens to have". Entries are used in order.
+     *
+     * When both are given, `recipients` is appended after the resolved list.
+     */
+    recipientsFrom: z.string().min(1).optional(),
+    /**
+     * SEQUENTIAL asks each recipient only once the one before has signed;
+     * PARALLEL asks everyone at once. Omit to take the value from the resolved
+     * list's record, falling back to the document's existing setting.
+     */
+    signingOrder: z.enum(['SEQUENTIAL', 'PARALLEL']).optional(),
     /** Signers to add before sending. All three fields support {{templating}}. */
     recipients: z
       .array(
@@ -191,7 +208,15 @@ export const ZWorkflowActionSchema = z.discriminatedUnion('action', [
           role: z.string().default('SIGNER'),
         }),
       )
-      .min(1),
+      /**
+       * Optional now that a list can come from `recipientsFrom`.
+       *
+       * The "at least one source" check lives in the handler rather than in a
+       * `.refine()` here: a refinement makes this a ZodEffects, and
+       * `z.discriminatedUnion` only accepts plain objects — adding one silently
+       * collapsed every other action's type to `never`.
+       */
+      .default([]),
   }),
 ]);
 

@@ -20,11 +20,21 @@ import {
   buildMetadataTemplateCsv,
   parseKeywordsCell,
 } from '@documenso/lib/universal/metadata-import';
+import {
+  DEFAULT_SIGNING_ORDER,
+  type MetadataSigner,
+  type MetadataSigningOrder,
+  parseSignersCell,
+  readRecordSigners,
+  readRecordSigningOrder,
+  writeRecordSigners,
+} from '@documenso/lib/universal/metadata-signers';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
+import { SignerChainEditor } from '~/components/general/metadata/signer-chain-editor';
 import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
@@ -59,10 +69,10 @@ export default function MetadataPage() {
   const [keywords, setKeywords] = useState('');
   const [ocrTemplateId, setOcrTemplateId] = useState('');
   // Who signs documents from this vendor — kept on the same record so one row
-  // drives both the confirmation email and the signature request.
-  const [signerName, setSignerName] = useState('');
-  const [signerEmail, setSignerEmail] = useState('');
-  const [signerRole, setSignerRole] = useState('');
+  // drives both the confirmation email and the signature request. An ordered
+  // list, because an approval chain is the normal case, not the exception.
+  const [signers, setSigners] = useState<MetadataSigner[]>([]);
+  const [signingOrder, setSigningOrder] = useState<MetadataSigningOrder>(DEFAULT_SIGNING_ORDER);
   // Turnaround targets in business hours; blank = inherit the org default.
   const [slaInternalHours, setSlaInternalHours] = useState('');
   const [slaEndToEndHours, setSlaEndToEndHours] = useState('');
@@ -82,9 +92,8 @@ export default function MetadataPage() {
     setPhone('');
     setKeywords('');
     setOcrTemplateId('');
-    setSignerName('');
-    setSignerEmail('');
-    setSignerRole('');
+    setSigners([]);
+    setSigningOrder(DEFAULT_SIGNING_ORDER);
     setSlaInternalHours('');
     setSlaEndToEndHours('');
   };
@@ -218,6 +227,7 @@ export default function MetadataPage() {
               'phone',
               'keywords',
               'ocrTemplate',
+              'signers',
               'signerName',
               'signerEmail',
               'signerRole',
@@ -242,13 +252,32 @@ export default function MetadataPage() {
           if (phoneValue) extra.phone = phoneValue;
           if (keywordValues.length) extra.keywords = keywordValues;
 
-          const signerNameValue = value('signerName');
-          const signerEmailValue = value('signerEmail');
-          const signerRoleValue = value('signerRole');
+          // The whole chain from one cell. A file saved before this column
+          // existed still carries the three single-signer columns, so those are
+          // read as a one-entry chain rather than ignored.
+          const signersCell = value('signers');
+          const legacySigner = value('signerEmail');
 
-          if (signerNameValue) extra.signerName = signerNameValue;
-          if (signerEmailValue) extra.signerEmail = signerEmailValue;
-          if (signerRoleValue) extra.signerRole = signerRoleValue.toUpperCase();
+          const parsedSigners = signersCell
+            ? parseSignersCell(signersCell)
+            : parseSignersCell(
+                legacySigner
+                  ? [legacySigner, value('signerRole'), value('signerName')]
+                      .filter(Boolean)
+                      .join('|')
+                  : '',
+              );
+
+          // Reported per row, not thrown: a mistyped role in one row of two
+          // hundred should not cost the whole import. The row still lands with a
+          // usable address and the warning says what was assumed.
+          for (const warning of parsedSigners.warnings) {
+            localErrors.push({ row, label, message: warning });
+          }
+
+          if (parsedSigners.signers.length) {
+            Object.assign(extra, writeRecordSigners(parsedSigners.signers));
+          }
 
           const slaInternal = Number(value('slaInternalHours'));
           const slaEndToEnd = Number(value('slaEndToEndHours'));
@@ -325,9 +354,10 @@ export default function MetadataPage() {
           : '',
     );
     setOcrTemplateId(typeof d.ocrTemplateId === 'number' ? String(d.ocrTemplateId) : '');
-    setSignerName(typeof d.signerName === 'string' ? d.signerName : '');
-    setSignerEmail(typeof d.signerEmail === 'string' ? d.signerEmail : '');
-    setSignerRole(typeof d.signerRole === 'string' ? d.signerRole : '');
+    // Reads the legacy single-signer shape too, so an untouched record opens as
+    // a one-entry chain rather than losing its signer.
+    setSigners(readRecordSigners(d));
+    setSigningOrder(readRecordSigningOrder(d));
     setSlaInternalHours(typeof d.slaInternalHours === 'number' ? String(d.slaInternalHours) : '');
     setSlaEndToEndHours(typeof d.slaEndToEndHours === 'number' ? String(d.slaEndToEndHours) : '');
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -349,9 +379,13 @@ export default function MetadataPage() {
       .map((k) => k.trim())
       .filter(Boolean);
     if (kw.length) extra.keywords = kw;
-    if (signerName.trim()) extra.signerName = signerName.trim();
-    if (signerEmail.trim()) extra.signerEmail = signerEmail.trim();
-    if (signerRole.trim()) extra.signerRole = signerRole.trim().toUpperCase();
+    // Blank rows are the natural residue of an "Add signer" click that was
+    // thought better of; drop them rather than saving an empty recipient.
+    const cleanSigners = signers
+      .map((s) => ({ ...s, email: s.email.trim().toLowerCase(), name: s.name?.trim() || undefined }))
+      .filter((s) => s.email);
+
+    Object.assign(extra, writeRecordSigners(cleanSigners, signingOrder));
     if (Number(slaInternalHours) > 0) extra.slaInternalHours = Number(slaInternalHours);
     if (Number(slaEndToEndHours) > 0) extra.slaEndToEndHours = Number(slaEndToEndHours);
 
@@ -542,41 +576,6 @@ export default function MetadataPage() {
               placeholder="e.g. northgate, consulting, IT services"
             />
           </div>
-          <div className="min-w-[160px] flex-1">
-            <label className={label}>
-              <Trans>Signer name</Trans>
-            </label>
-            <Input
-              className="h-8 text-[13px]"
-              value={signerName}
-              onChange={(e) => setSignerName(e.target.value)}
-              placeholder="who signs"
-            />
-          </div>
-          <div className="min-w-[180px] flex-1">
-            <label className={label}>
-              <Trans>Signer email</Trans>
-            </label>
-            <Input
-              className="h-8 text-[13px]"
-              type="email"
-              value={signerEmail}
-              onChange={(e) => setSignerEmail(e.target.value)}
-              placeholder="signer@company.com"
-            />
-          </div>
-          <div className="w-[120px]">
-            <label className={label}>
-              <Trans>Signer role</Trans>
-            </label>
-            <Input
-              className="h-8 text-[13px]"
-              list="metadata-roles"
-              value={signerRole}
-              onChange={(e) => setSignerRole(e.target.value)}
-              placeholder="SIGNER"
-            />
-          </div>
           <div className="w-[110px]">
             <label className={label}>
               <Trans>SLA internal</Trans>
@@ -636,6 +635,15 @@ export default function MetadataPage() {
             </Button>
           )}
         </div>
+
+        <div className="mt-3">
+          <SignerChainEditor
+            signers={signers}
+            onChange={setSigners}
+            signingOrder={signingOrder}
+            onSigningOrderChange={setSigningOrder}
+          />
+        </div>
         <p className="mt-2 text-[11px] text-muted-foreground">
           <Trans>
             Only Category + Name are required. <strong>Name identifies the record and must be
@@ -649,9 +657,10 @@ export default function MetadataPage() {
         <p className="mt-1 text-[11px] text-muted-foreground">
           <Trans>
             One vendor record covers the whole invoice flow — <strong>Email</strong> receives the
-            "we received your invoice" confirmation, and <strong>Signer email</strong> is who the
-            document is then sent to for signature. Leave the signer blank to send only the
-            confirmation. A separate "signee" record is no longer needed.
+            "we received your invoice" confirmation, and the <strong>Signers</strong> list below is
+            who the document is then sent to. Add as many as the approval chain needs; with "In
+            order" they are asked one at a time, top to bottom, and each is only invited once the
+            one above has signed. Leave the list empty to send only the confirmation.
           </Trans>
         </p>
         <p className="mt-1 text-[11px] text-muted-foreground">
@@ -773,17 +782,34 @@ export default function MetadataPage() {
                           {typeof d.slaEndToEndHours === 'number' ? `${d.slaEndToEndHours}h` : '—'}
                         </p>
                       )}
-                      {typeof d.signerEmail === 'string' && d.signerEmail && (
-                        <p
-                          className="mt-1 text-[10px] text-muted-foreground"
-                          title={_(msg`Documents from this vendor are sent to this person.`)}
-                        >
-                          {typeof d.signerRole === 'string' && d.signerRole
-                            ? d.signerRole.toLowerCase()
-                            : 'signer'}
-                          : {d.signerEmail}
-                        </p>
-                      )}
+                      {(() => {
+                        // Shown as the chain it is, in order, so the approval
+                        // route is readable from the list without opening the
+                        // record. Reads legacy single-signer records too.
+                        const chain = readRecordSigners(d);
+                        if (chain.length === 0) return null;
+
+                        const ordered = readRecordSigningOrder(d) === 'SEQUENTIAL';
+
+                        return (
+                          <p
+                            className="mt-1 text-[10px] text-muted-foreground"
+                            title={_(
+                              ordered
+                                ? msg`Asked to sign one at a time, in this order.`
+                                : msg`All asked to sign at the same time.`,
+                            )}
+                          >
+                            {chain.map((signer, i) => (
+                              <span key={signer.email}>
+                                {i > 0 && <span className="mx-1">{ordered ? '→' : '+'}</span>}
+                                <span className="opacity-70">{signer.role.toLowerCase()}:</span>{' '}
+                                {signer.name || signer.email}
+                              </span>
+                            ))}
+                          </p>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-right align-top">
                       <div className="flex items-center justify-end gap-1">

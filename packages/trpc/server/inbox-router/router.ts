@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import { jobs } from '@documenso/lib/jobs/client';
+import { getDocumentResponsibility } from '@documenso/lib/server-only/document/responsibility';
 import { bmsMlGetTemplates } from '@documenso/lib/server-only/bms-ml/client';
 import { sendDocument } from '@documenso/lib/server-only/document/send-document';
 import { ensureSignatureFields } from '@documenso/lib/server-only/field/ensure-signature-fields';
@@ -15,15 +16,11 @@ import { nanoid } from '@documenso/lib/universal/id';
 import { vendorCoreName } from '@documenso/lib/universal/vendor-match';
 import { prisma } from '@documenso/prisma';
 
+import { requireOrgMember } from '../lib/require-org-member';
 import { authenticatedProcedure, router } from '../trpc';
 
-const requireOrgMember = async (userId: number) => {
-  const membership = await prisma.organizationMember.findFirst({ where: { userId } });
-  if (!membership) {
-    throw new TRPCError({ code: 'FORBIDDEN', message: 'You are not a member of an organization.' });
-  }
-  return membership;
-};
+// Shared with the export router so the spreadsheet always describes the same
+// organization as the grid it was exported from.
 
 /** Most inbox items the SLA dashboard will evaluate in one window. */
 const SLA_ITEM_LIMIT = 1000;
@@ -113,6 +110,10 @@ export const inboxRouter = router({
         }
       }
 
+      // Who each document is waiting on, and how often they've been chased.
+      // Two queries for the whole page rather than one per row.
+      const responsibility = await getDocumentResponsibility(items.map((item) => item.documentId));
+
       return items.map((item) => {
         const statuses = statusesByItem.get(item.id) ?? [];
         const recipients = item.document.recipients;
@@ -135,6 +136,8 @@ export const inboxRouter = router({
               .filter((r) => r.signingStatus === 'NOT_SIGNED')
               .map((r) => r.name || r.email),
           },
+          /** Who owes a signature, and the reminder log behind the count. */
+          responsibility: responsibility.get(item.documentId) ?? null,
         };
       });
     }),
