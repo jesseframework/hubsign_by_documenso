@@ -7,6 +7,7 @@ import { Link, useParams } from 'react-router';
 import { trpc } from '@documenso/trpc/react';
 
 import { appMetaTags } from '~/utils/meta';
+import { OrgAdminGuard } from '~/components/general/org-admin-guard';
 
 export function meta() {
   return appMetaTags('Workflow Runs');
@@ -82,7 +83,7 @@ function RunDetail({ runId }: { runId: string }) {
   );
 }
 
-export default function WorkflowRunsPage() {
+function WorkflowRunsPage() {
   const params = useParams();
   const id = params.id ?? '';
   const [openRunId, setOpenRunId] = useState<string | null>(null);
@@ -179,5 +180,17 @@ export default function WorkflowRunsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Administrative screen: withheld from ordinary members. The sidebar also
+ * hides the link, but that alone would leave the URL directly reachable.
+ */
+export default function WorkflowRunsPageRoute() {
+  return (
+    <OrgAdminGuard>
+      <WorkflowRunsPage />
+    </OrgAdminGuard>
   );
 }

@@ -15,6 +15,7 @@ export const METADATA_IMPORT_COLUMNS = [
   'Role',
   'Phone',
   'Keywords',
+  'OCR template',
 ] as const;
 
 /** The fields a parsed row can carry, keyed by our internal names. */
@@ -25,7 +26,8 @@ export type MetadataImportField =
   | 'email'
   | 'role'
   | 'phone'
-  | 'keywords';
+  | 'keywords'
+  | 'ocrTemplate';
 
 /**
  * Header text (lowercased, trimmed) → internal field. Generous on purpose:
@@ -67,6 +69,14 @@ export const METADATA_IMPORT_HEADER_ALIASES: Record<string, MetadataImportField>
   'keywords (comma-separated)': 'keywords',
   keyword: 'keywords',
   tags: 'keywords',
+
+  // Written as the template's NAME — the BMS ML API takes a numeric id, so the
+  // name is resolved against the org's template list on import.
+  'ocr template': 'ocrTemplate',
+  ocrtemplate: 'ocrTemplate',
+  template: 'ocrTemplate',
+  'template name': 'ocrTemplate',
+  'extraction template': 'ocrTemplate',
 };
 
 /**
@@ -86,9 +96,19 @@ const TEMPLATE_EXAMPLE_ROWS: string[][] = [
     'SIGNER',
     '+1 555 0100',
     'skidd, skidd view, consulting',
+    '',
   ],
-  ['vendor', 'Northgate Supplies', 'Sam Patel', 'accounts@northgate.com', '', '', 'northgate'],
-  ['signee', 'Finance Approver', 'Alex Kim', 'alex.kim@example.com', 'APPROVER', '', ''],
+  [
+    'vendor',
+    'Northgate Supplies',
+    'Sam Patel',
+    'accounts@northgate.com',
+    '',
+    '',
+    'northgate',
+    'Flow Bill v2.0',
+  ],
+  ['signee', 'Finance Approver', 'Alex Kim', 'alex.kim@example.com', 'APPROVER', '', '', ''],
 ];
 
 /** RFC 4180 quoting — only quote when the value would otherwise break the row. */

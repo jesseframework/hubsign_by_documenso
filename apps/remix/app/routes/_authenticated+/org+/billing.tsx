@@ -40,6 +40,7 @@ import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { EmbeddedCheckoutForm } from '~/components/general/embedded-checkout-form';
 import { appMetaTags } from '~/utils/meta';
+import { OrgAdminGuard } from '~/components/general/org-admin-guard';
 
 export function meta() {
   return appMetaTags('Organization Billing');
@@ -113,7 +114,7 @@ const DmsFeaturesHoverCard = () => (
 
 const dmsPriceFor = (interval: string) => (interval === 'year' ? DMS_ADDON_YEARLY_PRICE : DMS_ADDON_PRICE);
 
-export default function OrgBillingPage() {
+function OrgBillingPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const utils = trpc.useUtils();
@@ -750,5 +751,17 @@ export default function OrgBillingPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/**
+ * Administrative screen: withheld from ordinary members. The sidebar also
+ * hides the link, but that alone would leave the URL directly reachable.
+ */
+export default function OrgBillingPageRoute() {
+  return (
+    <OrgAdminGuard>
+      <OrgBillingPage />
+    </OrgAdminGuard>
   );
 }

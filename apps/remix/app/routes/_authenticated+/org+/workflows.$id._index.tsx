@@ -26,6 +26,7 @@ import {
   snippetFor,
 } from '~/components/workflows/step-visual-editor';
 import { appMetaTags } from '~/utils/meta';
+import { OrgAdminGuard } from '~/components/general/org-admin-guard';
 
 export function meta() {
   return appMetaTags('Edit Workflow');
@@ -103,7 +104,7 @@ const ModeToggle = ({
   </div>
 );
 
-export default function WorkflowEditorPage() {
+function WorkflowEditorPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -720,5 +721,17 @@ export default function WorkflowEditorPage() {
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Administrative screen: withheld from ordinary members. The sidebar also
+ * hides the link, but that alone would leave the URL directly reachable.
+ */
+export default function WorkflowEditorPageRoute() {
+  return (
+    <OrgAdminGuard>
+      <WorkflowEditorPage />
+    </OrgAdminGuard>
   );
 }

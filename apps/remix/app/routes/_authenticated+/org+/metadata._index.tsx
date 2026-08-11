@@ -57,7 +57,12 @@ export default function MetadataPage() {
   const [role, setRole] = useState('');
   const [phone, setPhone] = useState('');
   const [keywords, setKeywords] = useState('');
+  const [ocrTemplateId, setOcrTemplateId] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Extraction templates, so a vendor can be pinned to one — invoices from that
+  // sender then OCR with it instead of falling back to generic extraction.
+  const { data: ocrTemplates } = trpc.inbox.ocrTemplates.useQuery();
 
   const resetForm = () => {
     setEditingId(null);
@@ -68,6 +73,7 @@ export default function MetadataPage() {
     setRole('');
     setPhone('');
     setKeywords('');
+    setOcrTemplateId('');
   };
 
   const upsert = trpc.metadata.upsert.useMutation({
@@ -175,6 +181,7 @@ export default function MetadataPage() {
           label: string;
           email: string | null;
           data?: Record<string, unknown>;
+          ocrTemplate?: string;
           row: number;
         }[] = [];
         const localErrors: { row?: number; label: string; message: string }[] = [];
@@ -191,9 +198,14 @@ export default function MetadataPage() {
           if (!label) {
             // A blank name on an otherwise-populated line is a mistake worth
             // reporting; a fully blank line is just spreadsheet padding.
-            const hasAnyValue = ['contactName', 'email', 'role', 'phone', 'keywords'].some((f) =>
-              value(f),
-            );
+            const hasAnyValue = [
+              'contactName',
+              'email',
+              'role',
+              'phone',
+              'keywords',
+              'ocrTemplate',
+            ].some((f) => value(f));
 
             if (hasAnyValue) {
               localErrors.push({ row, label: '—', message: 'Name is required.' });
@@ -217,6 +229,8 @@ export default function MetadataPage() {
             label,
             email: value('email') || null,
             data: Object.keys(extra).length ? extra : undefined,
+            // Sent as the name; the server resolves it to the BMS ML id.
+            ocrTemplate: value('ocrTemplate') || undefined,
             row,
           });
         });
@@ -279,6 +293,7 @@ export default function MetadataPage() {
           ? d.keywords
           : '',
     );
+    setOcrTemplateId(typeof d.ocrTemplateId === 'number' ? String(d.ocrTemplateId) : '');
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -298,6 +313,12 @@ export default function MetadataPage() {
       .map((k) => k.trim())
       .filter(Boolean);
     if (kw.length) extra.keywords = kw;
+
+    if (ocrTemplateId) {
+      const chosen = ocrTemplates?.templates.find((t) => String(t.id) === ocrTemplateId);
+      extra.ocrTemplateId = Number(ocrTemplateId);
+      if (chosen) extra.ocrTemplateName = chosen.name;
+    }
 
     const payload = {
       category: category.trim() || 'vendor',
@@ -480,6 +501,26 @@ export default function MetadataPage() {
               placeholder="e.g. northgate, consulting, IT services"
             />
           </div>
+          {Boolean(ocrTemplates?.templates.length) && (
+            <div className="w-[170px]">
+              <label className={label}>
+                <Trans>OCR template</Trans>
+              </label>
+              <select
+                className="h-8 w-full rounded-md border border-input bg-background px-2 text-[13px]"
+                value={ocrTemplateId}
+                onChange={(e) => setOcrTemplateId(e.target.value)}
+                title={_(msg`Invoices from this vendor's email extract with this template.`)}
+              >
+                <option value="">{_(msg`None`)}</option>
+                {ocrTemplates?.templates.map((template) => (
+                  <option key={template.id} value={String(template.id)}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <Button size="sm" disabled={upsert.isPending || update.isPending} onClick={onSave}>
             <PlusIcon className="mr-1 h-3.5 w-3.5" />
             {editingId ? <Trans>Update</Trans> : <Trans>Save</Trans>}
@@ -550,6 +591,12 @@ export default function MetadataPage() {
                 const contact = typeof d.contactName === 'string' ? d.contactName : '';
                 const roleVal = typeof d.role === 'string' ? d.role : '';
                 const phoneVal = typeof d.phone === 'string' ? d.phone : '';
+                const templateLabel =
+                  typeof d.ocrTemplateName === 'string'
+                    ? d.ocrTemplateName
+                    : typeof d.ocrTemplateId === 'number'
+                      ? `Template #${d.ocrTemplateId}`
+                      : null;
                 const kw = Array.isArray(d.keywords)
                   ? (d.keywords as unknown[]).map(String)
                   : typeof d.keywords === 'string'
@@ -589,6 +636,14 @@ export default function MetadataPage() {
                         </span>
                       ) : (
                         <span className="text-[12px] text-muted-foreground">—</span>
+                      )}
+                      {templateLabel && (
+                        <p
+                          className="mt-1 text-[10px] text-muted-foreground"
+                          title={_(msg`Invoices from this email extract with this template.`)}
+                        >
+                          OCR: {templateLabel}
+                        </p>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right align-top">

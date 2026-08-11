@@ -6,6 +6,8 @@ const PROCESS_INBOX_OCR_JOB_DEFINITION_ID = 'internal.process-inbox-ocr';
 
 const PROCESS_INBOX_OCR_JOB_DEFINITION_SCHEMA = z.object({
   inboxItemId: z.string(),
+  /** Explicit BMS ML template, set when a user re-runs OCR with one chosen. */
+  templateId: z.number().int().positive().optional(),
 });
 
 export type TProcessInboxOcrJobDefinition = z.infer<

@@ -109,6 +109,7 @@ model User {
   dmsAiConversations       DmsAiConversation[]
   dmsAiUsage               DmsAiUsage[]
   createdWorkflows         Workflow[]             @relation("UserCreatedWorkflows")
+  createdEmailTemplates    EmailTemplate[]        @relation("UserCreatedEmailTemplates")
 
   @@index([email])
 }
@@ -404,6 +405,11 @@ model Document {
   templateId     Int?
   source         DocumentSource
 
+  /// Owning organization. Resolved at creation from the team's org, falling back
+  /// to the author's earliest membership. Nullable because personal accounts
+  /// legitimately have no organization — never treat null as "any org".
+  organizationId Int?
+
   useLegacyFieldInsertion Boolean @default(false)
 
   // PDF lock: when set, the password (encrypted at rest with the app's secondary key)
@@ -418,9 +424,10 @@ model Document {
   // unsealed docs, also 0 for legacy docs sealed before this column existed.
   certificatePageCount Int @default(0)
 
-  documentData DocumentData @relation(fields: [documentDataId], references: [id], onDelete: Cascade)
-  team         Team?        @relation(fields: [teamId], references: [id])
-  template     Template?    @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  documentData DocumentData  @relation(fields: [documentDataId], references: [id], onDelete: Cascade)
+  team         Team?         @relation(fields: [teamId], references: [id])
+  template     Template?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  organization Organization? @relation("OrgDocuments", fields: [organizationId], references: [id], onDelete: SetNull)
 
   auditLogs DocumentAuditLog[]
   folder    Folder?            @relation(fields: [folderId], references: [id], onDelete: Cascade)
@@ -438,6 +445,10 @@ model Document {
   @@index([userId])
   @@index([status])
   @@index([folderId])
+  @@index([organizationId])
+  /// The dashboard's hot path: every aggregate filters org + not-deleted, and
+  /// most also filter or group by status.
+  @@index([organizationId, deletedAt, status])
 }
 
 model DocumentAuditLog {
@@ -1611,6 +1622,8 @@ model Organization {
   seatPlans              OrgSeatPlan[]
   stamps                 Stamp[]
   workflows              Workflow[]              @relation("OrgWorkflows")
+  documents              Document[]              @relation("OrgDocuments")
+  emailTemplates         EmailTemplate[]         @relation("OrgEmailTemplates")
 }
 
 enum OrgSeatTier {
@@ -2326,6 +2339,41 @@ model MetadataRecord {
 
   @@unique([organizationId, category, key])
   @@index([organizationId, category])
+}
+
+/// Reusable HTML email body for workflow SEND_EMAIL steps.
+///
+/// Workflow steps used to carry their HTML inline in the step config, which put
+/// markup in a JSON editor and meant the same wording had to be re-pasted into
+/// every workflow that sent it. A step now references a template by `key` and
+/// the stored subject/html/text are rendered with the run's `{{ }}` context.
+///
+/// Named `EmailTemplate` rather than `Template` because `Template` in this
+/// schema already means a reusable *document* for signing.
+model EmailTemplate {
+  id             String  @id @default(cuid())
+  organizationId Int
+  /// Stable slug referenced from workflow JSON, e.g. "invoice-received".
+  /// Human-readable on purpose — this is what an author types into a step.
+  key            String
+  name           String
+  description    String?
+  /// Subject line. Supports the same {{ path }} templating as the body.
+  subject        String
+  /// HTML body. Supports {{ path }} templating.
+  html           String  @db.Text
+  /// Optional plaintext alternative; falls back to HTML with tags stripped.
+  text           String? @db.Text
+
+  createdById Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation("OrgEmailTemplates", fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy    User?        @relation("UserCreatedEmailTemplates", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

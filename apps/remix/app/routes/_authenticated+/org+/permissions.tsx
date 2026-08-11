@@ -10,6 +10,7 @@ import { Button } from '@documenso/ui/primitives/button';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { appMetaTags } from '~/utils/meta';
+import { OrgAdminGuard } from '~/components/general/org-admin-guard';
 
 export function meta() {
   return appMetaTags('DMS Permissions');
@@ -30,7 +31,7 @@ const ALL_ACTIONS = [
   { value: 'DMS_VIEW_AUDIT_TRAIL', label: 'View Audit Trail' },
 ];
 
-export default function OrgPermissionsPage() {
+function OrgPermissionsPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const utils = trpc.useUtils();
@@ -154,5 +155,17 @@ export default function OrgPermissionsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Administrative screen: withheld from ordinary members. The sidebar also
+ * hides the link, but that alone would leave the URL directly reachable.
+ */
+export default function OrgPermissionsPageRoute() {
+  return (
+    <OrgAdminGuard roles={['ORG_ADMIN', 'DMS_ADMIN']}>
+      <OrgPermissionsPage />
+    </OrgAdminGuard>
   );
 }

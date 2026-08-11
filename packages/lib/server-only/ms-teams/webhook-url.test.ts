@@ -71,6 +71,51 @@ describe('assertSafeWebhookUrl', () => {
   it('rejects malformed input', () => {
     expect(() => assertSafeWebhookUrl('nonsense')).toThrow(/valid URL/);
   });
+
+  it('rejects a "copy link to channel" URL with the correction, not a generic error', () => {
+    // The real-world failure: this passes every SSRF check, saves fine, then
+    // answers the first card with 405 Method Not Allowed.
+    const channelLink =
+      'https://teams.microsoft.com/l/channel/19%3aabc123%40thread.tacv2/Hubsign?groupId=1111-2222&tenantId=3333-a9ca';
+
+    expect(() => assertSafeWebhookUrl(channelLink)).toThrow(/link to the channel itself/);
+    expect(() => assertSafeWebhookUrl(channelLink)).toThrow(/Post to a channel when a webhook/);
+  });
+
+  it('rejects other Microsoft surfaces that are not webhook endpoints', () => {
+    expect(() => assertSafeWebhookUrl('https://contoso.sharepoint.com/sites/x')).toThrow(
+      /not a webhook endpoint/,
+    );
+    expect(() => assertSafeWebhookUrl('https://outlook.office.com/mail/')).toThrow(
+      /not a webhook endpoint/,
+    );
+  });
+
+  it('rejects an arbitrary public host, naming the expected one', () => {
+    expect(() => assertSafeWebhookUrl('https://example.com/hook')).toThrow(
+      /is not a Microsoft Teams webhook host/,
+    );
+    expect(() => assertSafeWebhookUrl('https://example.com/hook')).toThrow(/logic\.azure\.com/);
+  });
+
+  it('accepts the regional and legacy connector hosts', () => {
+    const accepted = [
+      'https://prod-12.westus.logic.azure.com/workflows/a/triggers/manual/paths/invoke?sig=x',
+      'https://prod-03.usgovvirginia.logic.azure.us/workflows/a/triggers/manual/paths/invoke?sig=x',
+      'https://contoso.webhook.office.com/webhookb2/abc@def/IncomingWebhook/ghi/jkl',
+    ];
+
+    for (const url of accepted) {
+      expect(() => assertSafeWebhookUrl(url), url).not.toThrow();
+    }
+  });
+
+  it('does not let a lookalike host slip past the suffix check', () => {
+    // Suffix matching must not accept an attacker-registered lookalike.
+    expect(() => assertSafeWebhookUrl('https://logic.azure.com.evil.test/x')).toThrow(
+      /is not a Microsoft Teams webhook host/,
+    );
+  });
 });
 
 describe('maskWebhookUrl', () => {

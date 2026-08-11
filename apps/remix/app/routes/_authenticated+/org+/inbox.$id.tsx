@@ -8,7 +8,7 @@ import { Link, useParams } from 'react-router';
 
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
-import { Input } from '@documenso/ui/primitives/input';
+import { RecipientEmailAutocomplete } from '@documenso/ui/primitives/recipient-email-autocomplete';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { useInboxEvents } from '~/hooks/use-inbox-events';
@@ -77,10 +77,21 @@ export default function InboxItemPage() {
     },
     onError: (e) => toast({ title: _(msg`Error`), description: e.message, variant: 'destructive' }),
   });
+  // BMS ML extraction templates — picking the right one is what lifts the
+  // extraction rate; without one the service extracts generically.
+  const { data: ocrTemplates } = trpc.inbox.ocrTemplates.useQuery();
+  const [templateChoice, setTemplateChoice] = useState<string>('');
+  const [rememberTemplate, setRememberTemplate] = useState(true);
+
   const reprocess = trpc.inbox.reprocessOcr.useMutation({
-    onSuccess: () => {
+    onSuccess: ({ remembered }) => {
       void utils.inbox.get.invalidate({ id });
-      toast({ title: _(msg`Re-running OCR…`) });
+      toast({
+        title: _(msg`Re-running OCR…`),
+        description: remembered
+          ? _(msg`Future invoices from ${remembered} will use this template.`)
+          : undefined,
+      });
     },
     onError: (e) => toast({ title: _(msg`Error`), description: e.message, variant: 'destructive' }),
   });
@@ -97,9 +108,33 @@ export default function InboxItemPage() {
   const ocrMeta = (item.ocrMeta ?? {}) as {
     fieldExtractions?: FieldExtraction[];
     completeness?: { score?: number } | null;
+    template?: {
+      id?: number | null;
+      name?: string | null;
+      source?: 'override' | 'vendor-email' | 'vendor-domain' | 'org-default' | 'none';
+      vendor?: string | null;
+      matched?: unknown;
+    } | null;
   };
   const fields = ocrMeta.fieldExtractions ?? [];
-  const templateName = fields.find((f) => f.template_name)?.template_name;
+  const usedTemplate = ocrMeta.template ?? null;
+  const templateName = usedTemplate?.name || fields.find((f) => f.template_name)?.template_name;
+
+  /** Plain-language explanation of why this template was used. */
+  const templateSourceLabel = (() => {
+    switch (usedTemplate?.source) {
+      case 'override':
+        return _(msg`chosen manually`);
+      case 'vendor-email':
+        return _(msg`matched ${usedTemplate.vendor ?? 'vendor'} by sender email`);
+      case 'vendor-domain':
+        return _(msg`matched ${usedTemplate.vendor ?? 'vendor'} by sender domain`);
+      case 'org-default':
+        return _(msg`organization default`);
+      default:
+        return null;
+    }
+  })();
   const completeness = typeof ocrMeta.completeness?.score === 'number' ? ocrMeta.completeness.score : null;
 
   return (
@@ -139,9 +174,75 @@ export default function InboxItemPage() {
             <h3 className="text-[14px] font-semibold">
               <Trans>Extracted data (OCR)</Trans>
             </h3>
-            <Button size="sm" variant="ghost" className="h-7 text-[11px]" onClick={() => reprocess.mutate({ id })}>
-              <Trans>Re-run OCR</Trans>
-            </Button>
+            {templateName ? (
+              <span className="rounded bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+                {templateName}
+                {templateSourceLabel ? ` · ${templateSourceLabel}` : ''}
+              </span>
+            ) : item.ocrProcessed ? (
+              <span
+                className="rounded bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300"
+                title={_(msg`Generic extraction — accuracy is much lower without a template.`)}
+              >
+                <Trans>No template</Trans>
+              </span>
+            ) : null}
+          </div>
+
+          {/* Template picker — the lever on extraction accuracy. */}
+          <div className="mb-3 rounded border border-border bg-muted/20 p-2.5">
+            <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+              <Trans>Extraction template</Trans>
+            </label>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                className="h-8 min-w-[190px] flex-1 rounded-md border border-input bg-background px-2 text-[13px]"
+                value={templateChoice}
+                onChange={(e) => setTemplateChoice(e.target.value)}
+              >
+                <option value="">
+                  {ocrTemplates?.templates.length
+                    ? _(msg`Auto (match vendor by sender)`)
+                    : _(msg`No templates available`)}
+                </option>
+                {ocrTemplates?.templates.map((template) => (
+                  <option key={template.id} value={String(template.id)}>
+                    {template.name}
+                    {template.id === ocrTemplates.defaultTemplateId ? ' (org default)' : ''}
+                  </option>
+                ))}
+              </select>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-8 text-[11px]"
+                disabled={reprocess.isPending || item.status === 'OCR_PROCESSING'}
+                onClick={() =>
+                  reprocess.mutate({
+                    id,
+                    templateId: templateChoice ? Number(templateChoice) : null,
+                    rememberForSender: Boolean(templateChoice) && rememberTemplate,
+                  })
+                }
+              >
+                {reprocess.isPending || item.status === 'OCR_PROCESSING' ? (
+                  <Trans>Running…</Trans>
+                ) : (
+                  <Trans>Re-run OCR</Trans>
+                )}
+              </Button>
+            </div>
+            {templateChoice && item.senderEmail && (
+              <label className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="h-3 w-3"
+                  checked={rememberTemplate}
+                  onChange={(e) => setRememberTemplate(e.target.checked)}
+                />
+                <Trans>Always use this template for {item.senderEmail}</Trans>
+              </label>
+            )}
           </div>
 
           {!item.ocrProcessed ? (
@@ -313,20 +414,47 @@ export default function InboxItemPage() {
               <div className="space-y-2">
                 {rows.map((row, i) => (
                   <div key={i} className="flex gap-2">
-                    <Input
-                      className="h-8 flex-1 text-[13px]"
+                    {/*
+                      Both halves search the same org directory, so a signer can
+                      be found by whichever identifier the sender happens to
+                      know. Picking a member from either side fills the whole
+                      row, and typing a non-member still works — these stay free
+                      text so external signers are not locked out.
+                    */}
+                    <RecipientEmailAutocomplete
+                      field="name"
+                      className="flex-1"
+                      inputClassName="h-8 text-[13px]"
                       placeholder="Name"
                       value={row.name}
-                      onChange={(e) =>
-                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, name: e.target.value } : r)))
+                      onChange={(value) =>
+                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, name: value } : r)))
+                      }
+                      onSelectMember={(m) =>
+                        setRows((prev) =>
+                          prev.map((r, idx) =>
+                            idx === i ? { ...r, name: m.name || m.email, email: m.email } : r,
+                          ),
+                        )
                       }
                     />
-                    <Input
-                      className="h-8 flex-1 text-[13px]"
+                    <RecipientEmailAutocomplete
+                      className="flex-1"
+                      inputClassName="h-8 text-[13px]"
                       placeholder="email@company.com"
                       value={row.email}
-                      onChange={(e) =>
-                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, email: e.target.value } : r)))
+                      onChange={(value) =>
+                        setRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, email: value } : r)))
+                      }
+                      onSelectMember={(m) =>
+                        setRows((prev) =>
+                          prev.map((r, idx) =>
+                            // Don't clobber a name the sender already typed.
+                            idx === i
+                              ? { ...r, email: m.email, name: r.name || m.name || '' }
+                              : r,
+                          ),
+                        )
                       }
                     />
                     {rows.length > 1 && (

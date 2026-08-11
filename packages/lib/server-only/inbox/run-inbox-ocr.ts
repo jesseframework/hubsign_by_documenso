@@ -15,6 +15,7 @@ import { getFileServerSide } from '../../universal/upload/get-file.server';
 import { bmsMlUploadDocument, isBmsMlConfigured } from '../bms-ml/client';
 import { triggerWorkflows } from '../workflow/trigger-workflows';
 import { publishInboxEvent } from './inbox-events';
+import { resolveOcrTemplate } from './resolve-ocr-template';
 
 const fireOcrCompleted = async (inboxItemId: string): Promise<void> => {
   const item = await prisma.signatureInboxItem.findUnique({
@@ -48,7 +49,14 @@ const fireOcrCompleted = async (inboxItemId: string): Promise<void> => {
   }).catch((err) => console.error('[inbox-ocr] workflow dispatch failed:', err));
 };
 
-export const runInboxOcr = async ({ inboxItemId }: { inboxItemId: string }): Promise<void> => {
+export const runInboxOcr = async ({
+  inboxItemId,
+  templateId: overrideTemplateId,
+}: {
+  inboxItemId: string;
+  /** Explicit template chosen by a user re-running OCR; beats vendor routing. */
+  templateId?: number;
+}): Promise<void> => {
   const item = await prisma.signatureInboxItem.findUnique({
     where: { id: inboxItemId },
     include: { document: { include: { documentData: true } } },
@@ -92,9 +100,18 @@ export const runInboxOcr = async ({ inboxItemId }: { inboxItemId: string }): Pro
     const baseName = item.document.title?.trim() || 'document';
     const fileName = /\.pdf$/i.test(baseName) ? baseName : `${baseName}.pdf`;
 
+    // Route to a vendor's extraction template via the sender address. Without
+    // one the service extracts generically and confidence sits far lower.
+    const template = await resolveOcrTemplate({
+      organizationId: item.organizationId,
+      senderEmail: item.senderEmail,
+      overrideTemplateId,
+      orgDefaultTemplateId: org?.ocrDefaultTemplateId,
+    });
+
     const result = await bmsMlUploadDocument(buffer, fileName, {
       orgConfig,
-      templateId: org?.ocrDefaultTemplateId ?? undefined,
+      templateId: template.templateId ?? undefined,
     });
 
     const extracted: Record<string, unknown> = {};
@@ -118,6 +135,20 @@ export const runInboxOcr = async ({ inboxItemId }: { inboxItemId: string }): Pro
           completeness: result.processing_details?.completeness ?? null,
           fieldExtractions: result.invoice.field_extractions ?? [],
           bmsMlInvoiceId: result.invoice.id,
+          // Which template was applied and why — drives the "Extracted using…"
+          // line on the item and makes a bad routing decision diagnosable.
+          template: {
+            id: template.templateId,
+            // Prefer the name the service echoes back; it confirms the
+            // template actually matched rather than just being requested.
+            name:
+              (result.invoice as { template_name?: unknown }).template_name ??
+              template.templateName ??
+              null,
+            source: template.source,
+            vendor: template.vendorLabel ?? null,
+            matched: (result.invoice as { template_matched?: unknown }).template_matched ?? null,
+          },
         } as Prisma.InputJsonValue,
         error: null,
       },

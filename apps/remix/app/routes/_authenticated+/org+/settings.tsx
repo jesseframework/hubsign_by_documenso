@@ -11,12 +11,13 @@ import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { appMetaTags } from '~/utils/meta';
+import { OrgAdminGuard } from '~/components/general/org-admin-guard';
 
 export function meta() {
   return appMetaTags('Organization Settings');
 }
 
-export default function OrgSettingsPage() {
+function OrgSettingsPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const utils = trpc.useUtils();
@@ -1156,5 +1157,21 @@ export default function OrgSettingsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Administrative screen: withheld from ordinary MEMBERS of an organization.
+ *
+ * `allowWithoutOrg` is deliberate — this page is also where an organization is
+ * created, and the page renders its own "Create Organization" form when the
+ * viewer has no membership. Guarding that away meant you had to already be an
+ * admin to reach the form that would have made you one.
+ */
+export default function OrgSettingsPageRoute() {
+  return (
+    <OrgAdminGuard allowWithoutOrg>
+      <OrgSettingsPage />
+    </OrgAdminGuard>
   );
 }

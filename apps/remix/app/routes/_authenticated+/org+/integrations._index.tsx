@@ -13,6 +13,7 @@ import { Switch } from '@documenso/ui/primitives/switch';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { appMetaTags } from '~/utils/meta';
+import { OrgAdminGuard } from '~/components/general/org-admin-guard';
 
 export function meta() {
   return appMetaTags('Integrations');
@@ -23,7 +24,7 @@ const label = 'mb-1 block text-[11px] font-medium text-muted-foreground';
 /** Group the workflow events the way the workflow builder does. */
 const EVENT_GROUPS = Array.from(new Set(WORKFLOW_EVENTS.map((e) => e.group)));
 
-export default function IntegrationsPage() {
+function IntegrationsPage() {
   const { toast } = useToast();
   const utils = trpc.useUtils();
 
@@ -379,5 +380,17 @@ export default function IntegrationsPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * Administrative screen: withheld from ordinary members. The sidebar also
+ * hides the link, but that alone would leave the URL directly reachable.
+ */
+export default function IntegrationsPageRoute() {
+  return (
+    <OrgAdminGuard>
+      <IntegrationsPage />
+    </OrgAdminGuard>
   );
 }
