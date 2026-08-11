@@ -12204,6 +12204,11 @@ msgstr "Twój zespół został pomyślnie usunięty."
 msgid "Your team has been successfully updated."
 msgstr "Twój zespół został pomyślnie zaktualizowany."
 
+#. placeholder {0}: routing.inactiveChain.name
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Your template \"{0}\" is not marked as the default, so it will never be used. Tick \"Default\" on it, or requests will keep going to whoever sent the document."
+msgstr ""
+
 #: apps/remix/app/routes/embed+/v1+/authoring_.completed.create.tsx
 msgid "Your template has been created successfully"
 msgstr ""

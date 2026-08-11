@@ -261,18 +261,36 @@ export const businessRuleRouter = router({
 
     if (!membership) return { chain: null };
 
-    const chain = await prisma.approvalTemplate.findFirst({
+    const candidates = await prisma.approvalTemplate.findFirst({
       where: {
         organizationId: membership.organizationId,
         entityType: RULE_OVERRIDE_ENTITY_TYPE,
         isActive: true,
       },
       orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
-      select: { id: true, name: true, _count: { select: { steps: true } } },
+      select: { id: true, name: true, isDefault: true, _count: { select: { steps: true } } },
     });
 
+    /*
+      Mirrors what findApprovalTemplate will actually pick.
+
+      An override has no rule set and no trigger status, so selection falls
+      through to its last case: an active template marked DEFAULT. A template that
+      is active but not default therefore never runs — and reporting it as "your
+      chain" would make this status line lie about the thing it exists to make
+      visible.
+    */
+    const usable = candidates?.isDefault ? candidates : null;
+
     return {
-      chain: chain ? { id: chain.id, name: chain.name, steps: chain._count.steps } : null,
+      chain: usable
+        ? { id: usable.id, name: usable.name, steps: usable._count.steps }
+        : null,
+      /** An active chain that will never be selected, so the reason can be shown. */
+      inactiveChain:
+        candidates && !candidates.isDefault
+          ? { id: candidates.id, name: candidates.name }
+          : null,
       entityType: RULE_OVERRIDE_ENTITY_TYPE,
     };
   }),

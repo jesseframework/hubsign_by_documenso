@@ -55,6 +55,14 @@ export const RuleOverrideQueue = () => {
         {routing.chain.steps === 1 ? 'step' : 'steps'}), and are granted automatically when it
         approves.
       </Trans>
+    ) : routing.inactiveChain ? (
+      // Active but not default, so selection never reaches it. Said plainly,
+      // because from the templates list it looks configured and working.
+      <Trans>
+        Your template "{routing.inactiveChain.name}" is not marked as the default, so it will
+        never be used. Tick "Default" on it, or requests will keep going to whoever sent the
+        document.
+      </Trans>
     ) : (
       <Trans>
         Requests go to whoever sent the document, who is emailed and decides here. To route them
