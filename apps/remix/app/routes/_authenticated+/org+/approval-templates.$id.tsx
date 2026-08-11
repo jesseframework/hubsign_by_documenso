@@ -11,6 +11,7 @@ import {
   APPROVAL_ON_APPROVE_ACTIONS,
   ORGANIZATION_ROLES,
 } from '@documenso/lib/types/approval';
+import { APPROVAL_ENTITY_TYPES } from '@documenso/lib/constants/rule-overrides';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import { Input } from '@documenso/ui/primitives/input';
@@ -215,15 +216,33 @@ export default function ApprovalTemplateEditor() {
             </label>
             <Input className="h-8 text-[13px]" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
+          {/*
+            A list, not a text box.
+
+            The value has to match what the caller asks for exactly, so typing it
+            by hand meant "Rule Override" or "ruleoverride" produced a template
+            that silently never matched — an override chain that looked configured
+            and never ran. Any value already saved is kept as an option so an
+            existing template cannot be silently retyped by opening this page.
+          */}
           <div>
             <label className={label}>
-              <Trans>Entity type</Trans>
+              <Trans>What this chain approves</Trans>
             </label>
-            <Input
-              className="h-8 text-[13px]"
+            <select
+              className={field}
               value={entityType}
               onChange={(e) => setEntityType(e.target.value)}
-            />
+            >
+              {APPROVAL_ENTITY_TYPES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+              {!APPROVAL_ENTITY_TYPES.some((option) => option.value === entityType) && (
+                <option value={entityType}>{entityType}</option>
+              )}
+            </select>
           </div>
           <div className="sm:col-span-2">
             <label className={label}>

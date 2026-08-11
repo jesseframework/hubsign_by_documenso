@@ -2142,6 +2142,10 @@ msgstr "Black"
 msgid "Blocked senders"
 msgstr "Blocked senders"
 
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Blocked signers:"
+msgstr "Blocked signers:"
+
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Blocked subjects"
 msgstr "Blocked subjects"
@@ -4660,8 +4664,8 @@ msgid "Entity"
 msgstr "Entity"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
-msgid "Entity type"
-msgstr "Entity type"
+#~ msgid "Entity type"
+#~ msgstr "Entity type"
 
 #: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
 #: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
@@ -7923,6 +7927,17 @@ msgstr "Request transfer"
 #: apps/remix/app/routes/_authenticated+/dms+/retrievals.tsx
 msgid "Requests are created from the document detail page for physical documents."
 msgstr "Requests are created from the document detail page for physical documents."
+
+#. placeholder {0}: routing.chain.name
+#. placeholder {1}: routing.chain.steps
+#. placeholder {2}: routing.chain.steps === 1 ? 'step' : 'steps'
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Requests go through your approval chain \"{0}\" ({1} {2}), and are granted automatically when it approves."
+msgstr "Requests go through your approval chain \"{0}\" ({1} {2}), and are granted automatically when it approves."
+
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Requests go to whoever sent the document, who is emailed and decides here. To route them through an approval chain instead, create an approval template whose \"what this chain approves\" is set to rule override."
+msgstr "Requests go to whoever sent the document, who is emailed and decides here. To route them through an approval chain instead, create an approval template whose \"what this chain approves\" is set to rule override."
 
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/radio-field.tsx
@@ -11457,6 +11472,10 @@ msgstr "What blocked them"
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 msgid "What is actually holding them up"
 msgstr "What is actually holding them up"
+
+#: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
+msgid "What this chain approves"
+msgstr "What this chain approves"
 
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 msgid "When"

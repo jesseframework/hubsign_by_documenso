@@ -1,6 +1,7 @@
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import { RULE_OVERRIDE_ENTITY_TYPE } from '@documenso/lib/constants/rule-overrides';
 import { evaluateGate } from '@documenso/lib/server-only/rules/evaluate-gate';
 import { decideRuleOverride, requestRuleOverride } from '@documenso/lib/server-only/rules/overrides';
 import { buildRuleContext, ruleFieldCatalogue } from '@documenso/lib/server-only/rules/registry';
@@ -243,6 +244,38 @@ export const businessRuleRouter = router({
         })),
       });
     }),
+
+  /**
+   * Where an override request will go if a signer makes one now.
+   *
+   * Configuration whose effect is invisible is configuration nobody trusts: an
+   * admin has no way to tell whether their chain is wired up until a real signer
+   * gets stuck, and if the entityType is wrong the request quietly takes the
+   * fallback instead. This answers it directly.
+   */
+  overrideRouting: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await prisma.organizationMember.findFirst({
+      where: { userId: ctx.user.id },
+      orderBy: { joinedAt: 'asc' },
+    });
+
+    if (!membership) return { chain: null };
+
+    const chain = await prisma.approvalTemplate.findFirst({
+      where: {
+        organizationId: membership.organizationId,
+        entityType: RULE_OVERRIDE_ENTITY_TYPE,
+        isActive: true,
+      },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+      select: { id: true, name: true, _count: { select: { steps: true } } },
+    });
+
+    return {
+      chain: chain ? { id: chain.id, name: chain.name, steps: chain._count.steps } : null,
+      entityType: RULE_OVERRIDE_ENTITY_TYPE,
+    };
+  }),
 
   /** Override requests awaiting a decision, for the organization's queue. */
   listOverrides: authenticatedProcedure

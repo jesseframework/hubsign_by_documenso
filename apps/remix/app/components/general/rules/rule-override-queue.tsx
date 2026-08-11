@@ -26,6 +26,7 @@ export const RuleOverrideQueue = () => {
   const utils = trpc.useUtils();
 
   const { data: pending } = trpc.businessRule.listOverrides.useQuery();
+  const { data: routing } = trpc.businessRule.overrideRouting.useQuery();
   const [notes, setNotes] = useState<Record<string, string>>({});
 
   const decide = trpc.businessRule.decideOverride.useMutation({
@@ -40,8 +41,39 @@ export const RuleOverrideQueue = () => {
     onError: (e) => toast({ title: e.message, variant: 'destructive' }),
   });
 
+  /*
+    Where a request would go if one arrived now.
+
+    Shown even with an empty queue — an admin configuring this has no other way to
+    tell whether their chain is actually wired up, and a template with the wrong
+    entity type silently takes the fallback instead.
+  */
+  const routingLine = routing ? (
+    routing.chain ? (
+      <Trans>
+        Requests go through your approval chain "{routing.chain.name}" ({routing.chain.steps}{' '}
+        {routing.chain.steps === 1 ? 'step' : 'steps'}), and are granted automatically when it
+        approves.
+      </Trans>
+    ) : (
+      <Trans>
+        Requests go to whoever sent the document, who is emailed and decides here. To route them
+        through an approval chain instead, create an approval template whose "what this chain
+        approves" is set to rule override.
+      </Trans>
+    )
+  ) : null;
+
   if (!pending || pending.length === 0) {
-    return null;
+    // Nothing waiting: just say where requests would land, quietly.
+    return routingLine ? (
+      <p className="text-[12px] text-muted-foreground">
+        <span className="font-medium">
+          <Trans>Blocked signers:</Trans>
+        </span>{' '}
+        {routingLine}
+      </p>
+    ) : null;
   }
 
   return (
@@ -58,6 +90,7 @@ export const RuleOverrideQueue = () => {
               the rules listed, and only for that document.
             </Trans>
           </p>
+          <p className="mt-1 text-[11px] text-muted-foreground/80">{routingLine}</p>
         </div>
       </div>
 

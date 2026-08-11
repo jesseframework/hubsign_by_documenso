@@ -2,6 +2,7 @@ import { BusinessRuleOverrideStatus } from '@prisma/client';
 
 import { prisma } from '@documenso/prisma';
 
+import { RULE_OVERRIDE_ENTITY_TYPE } from '../../constants/rule-overrides';
 import { AppError, AppErrorCode } from '../../errors/app-error';
 
 /**
@@ -13,12 +14,14 @@ import { AppError, AppErrorCode } from '../../errors/app-error';
  * way out, and it is deliberately not a bypass — the signer can only ASK, and
  * only rules that were actually blocking them can be waived.
  *
- * The entity type an override's approval chain runs under. An organization gets a
- * multi-step chain for overrides by creating an approval template with this
- * entityType; `findApprovalTemplate` already selects on it, so no new setting is
- * needed. With no such template the request waits on the document owner instead.
+ * The entity type an override's approval chain runs under lives in
+ * `constants/rule-overrides` so the template editor can offer it without pulling
+ * this module — and therefore Prisma — into the browser bundle. An organization
+ * gets a multi-step chain by creating a template with that entityType;
+ * `findApprovalTemplate` already selects on it. With no such template the request
+ * waits on the document owner instead.
  */
-export const RULE_OVERRIDE_ENTITY_TYPE = 'RuleOverride';
+export { RULE_OVERRIDE_ENTITY_TYPE };
 
 /**
  * Rule ids waived for this document by an approved override.

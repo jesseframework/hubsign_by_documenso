@@ -2147,6 +2147,10 @@ msgstr "Noir"
 msgid "Blocked senders"
 msgstr ""
 
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Blocked signers:"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Blocked subjects"
 msgstr ""
@@ -4665,8 +4669,8 @@ msgid "Entity"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
-msgid "Entity type"
-msgstr ""
+#~ msgid "Entity type"
+#~ msgstr ""
 
 #: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
 #: apps/remix/app/routes/embed+/v1+/authoring+/template.edit.$id.tsx
@@ -7927,6 +7931,17 @@ msgstr "Demander le transfert"
 
 #: apps/remix/app/routes/_authenticated+/dms+/retrievals.tsx
 msgid "Requests are created from the document detail page for physical documents."
+msgstr ""
+
+#. placeholder {0}: routing.chain.name
+#. placeholder {1}: routing.chain.steps
+#. placeholder {2}: routing.chain.steps === 1 ? 'step' : 'steps'
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Requests go through your approval chain \"{0}\" ({1} {2}), and are granted automatically when it approves."
+msgstr ""
+
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Requests go to whoever sent the document, who is emailed and decides here. To route them through an approval chain instead, create an approval template whose \"what this chain approves\" is set to rule override."
 msgstr ""
 
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
@@ -11459,6 +11474,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 msgid "What is actually holding them up"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
+msgid "What this chain approves"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
