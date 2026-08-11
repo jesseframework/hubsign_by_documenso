@@ -1,18 +1,38 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Trans } from '@lingui/react/macro';
-import { FileIcon, Loader2Icon, PaperclipIcon, Trash2Icon } from 'lucide-react';
+import {
+  CheckCircle2Icon,
+  FileIcon,
+  Loader2Icon,
+  PaperclipIcon,
+  ScanLineIcon,
+  Trash2Icon,
+} from 'lucide-react';
 
 import {
   MAX_SUPPORTING_FILES_PER_RECIPIENT,
   SUPPORTING_FILE_ACCEPT,
 } from '@documenso/lib/server-only/document/supporting-file-types';
 
+/** What the extraction service found in an attachment, if it was read. */
+export type AttachmentOcr = {
+  ran: boolean;
+  ok: boolean;
+  error: string | null;
+  documentType: string | null;
+  poNumber: string | null;
+  vendorName: string | null;
+  total: string | null;
+  appliedToInvoice?: 'applied' | 'already-present' | 'document-closed' | 'not-an-inbox-item' | null;
+};
+
 export type SupportingFile = {
   id: string;
   fileName: string;
   contentType: string;
   sizeBytes: number;
+  ocr?: AttachmentOcr | null;
 };
 
 const formatSize = (bytes: number): string =>
@@ -43,6 +63,38 @@ export const SupportingFileUpload = ({
   const inputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Load what this token has already attached. Without this the list starts
+  // empty on every visit, so a signer who refreshed could not see or remove
+  // what they had sent and would attach the same PO a second time.
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/files/supporting/${token}`);
+        if (!response.ok) return;
+
+        const existing = (await response.json()) as SupportingFile[];
+
+        if (!cancelled && Array.isArray(existing) && existing.length > 0) {
+          onChange(existing);
+        }
+      } catch {
+        // A failed load is not worth an error message: the signer can still
+        // attach, and the server enforces the cap either way.
+      }
+    };
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
+    // Only on mount, and only keyed by the token — `onChange` is recreated by
+    // the parent each render and would loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
 
   const atLimit = files.length >= MAX_SUPPORTING_FILES_PER_RECIPIENT;
 
@@ -115,7 +167,8 @@ export const SupportingFileUpload = ({
       <p className="mt-0.5 text-[11px] text-muted-foreground">
         <Trans>
           Attach a purchase order, spec sheet or photo. PDF, Word, Excel, images, CSV — up to 15 MB
-          each.
+          each. A PDF or image is read automatically, so an attached purchase order can satisfy a
+          rule that is holding up your signature.
         </Trans>
       </p>
 
@@ -124,8 +177,9 @@ export const SupportingFileUpload = ({
           {files.map((file) => (
             <li
               key={file.id}
-              className="flex items-center gap-2 rounded-[var(--r-sm)] border border-border bg-muted/30 px-2 py-1.5"
+              className="rounded-[var(--r-sm)] border border-border bg-muted/30 px-2 py-1.5"
             >
+              <div className="flex items-center gap-2">
               <FileIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate text-[12px]">{file.fileName}</span>
               <span className="flex-shrink-0 text-[11px] text-muted-foreground">
@@ -140,6 +194,44 @@ export const SupportingFileUpload = ({
                 >
                   <Trash2Icon className="h-3.5 w-3.5" />
                 </button>
+              )}
+              </div>
+
+              {/*
+                Say what was read. Being told the upload "succeeded" and left to
+                guess whether the PO number came through is the difference
+                between clearing a block and pressing Sign hopefully.
+              */}
+              {file.ocr?.ran && (
+                <div className="mt-1 flex items-start gap-1.5 pl-5 text-[11px]">
+                  {file.ocr.ok && file.ocr.poNumber ? (
+                    <>
+                      <CheckCircle2Icon className="mt-0.5 h-3 w-3 flex-shrink-0 text-emerald-600" />
+                      <span className="text-emerald-700 dark:text-emerald-400">
+                        <Trans>PO number {file.ocr.poNumber} read from this file</Trans>
+                        {file.ocr.appliedToInvoice === 'already-present' && (
+                          <span className="block opacity-80">
+                            <Trans>The document already had a PO number, so this one was not applied.</Trans>
+                          </span>
+                        )}
+                      </span>
+                    </>
+                  ) : file.ocr.ok ? (
+                    <>
+                      <ScanLineIcon className="mt-0.5 h-3 w-3 flex-shrink-0 text-muted-foreground" />
+                      <span className="text-muted-foreground">
+                        <Trans>Read, but no PO number was found in this file.</Trans>
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <ScanLineIcon className="mt-0.5 h-3 w-3 flex-shrink-0 text-amber-600" />
+                      <span className="text-amber-700 dark:text-amber-400">
+                        <Trans>This file could not be read automatically.</Trans>
+                      </span>
+                    </>
+                  )}
+                </div>
               )}
             </li>
           ))}
@@ -166,7 +258,7 @@ export const SupportingFileUpload = ({
         {busy ? (
           <>
             <Loader2Icon className="h-3.5 w-3.5 animate-spin" />
-            <Trans>Uploading...</Trans>
+            <Trans>Uploading and reading…</Trans>
           </>
         ) : atLimit ? (
           <Trans>Attachment limit reached</Trans>

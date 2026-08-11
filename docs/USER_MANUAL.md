@@ -434,6 +434,73 @@ why it was chosen ("matched *vendor* by sender email"), or an amber **No
 template** badge when extraction ran generically. If items are extracting poorly,
 that badge is the first thing to check.
 
+### 4.4.1a Correcting what OCR read
+
+Every extracted field on the review screen can be corrected. Click the pencil
+beside a value to change it, or **Correct or add a field** to supply one the
+extractor never found at all — a PO number, most often.
+
+This matters more than it sounds. Until now `extractedData` had exactly one
+writer, the OCR job, so a misread value could not be fixed by anybody. A
+business rule reading that value would refuse signing permanently with no way
+out. In this deployment every extracted `po_number` is noise, so a rule
+requiring one could never be satisfied from OCR alone.
+
+A corrected value is marked with a person icon and the word **entered**, and it
+loses its confidence percentage. That is deliberate: a figure somebody typed and
+a figure the extractor read are different kinds of evidence, and showing "90%"
+beside a hand-entered value would be an invention. Hovering shows who entered it
+and when, and the change is recorded on the document's timeline with both the
+old and new values.
+
+Corrections are refused once a document is complete — it was signed against the
+data as it stood, and rewriting that afterwards would falsify the record.
+
+### 4.4.1b The signer supplies a missing PO number
+
+A rule that requires a PO number is usually enforced against an external signer
+— somebody who has a signing link and nothing else. They cannot open the
+Signature Inbox, so the block has to be clearable from the signing page itself.
+
+**Attaching the purchase order.** Under **Supporting documents** on the signing
+page, the signer attaches the PO. If it is a PDF or an image, HubSign reads it
+immediately and tells them what it found: *"PO number MER-PO-5023 read from this
+file"*. Pressing **Sign** again re-evaluates the rules against the new
+information, and the signature goes through.
+
+Nothing needs to happen in your office for this to work — that is the point.
+The read is bounded rather than open: only PDFs and images are sent, only after
+the upload's magic-byte validation has passed, and only when your organization
+has an extraction service configured.
+
+The signer's attachments now also survive a page refresh, so they can see and
+remove what they have already sent instead of attaching the same file twice.
+
+**Typing it instead.** If the sender placed a text field labelled "PO Number" on
+the document, whatever the signer types into it is visible to rules as
+`fields.po_number`. Any document field works this way — the label becomes the
+path, lowercased with underscores — and a numeric field also gets a
+`fields.<name>_number` form so threshold comparisons behave.
+
+**Reading it from your side.** An org member can still read any attachment by
+hand: it appears under **Attachments from the signer** on the review screen with
+a **Read with OCR** button.
+
+Once read, the attachment's own fields become available to business rules under
+`attachedPo.*` — `attachedPo.po_number`, `attachedPo.vendor_name`,
+`attachedPo.total_amount`, plus `attachedPo.applicable`, which tells a rule
+whether anything was read at all. The **Attached PO must match the invoice**
+preset uses them to block signing when the two PO numbers disagree, and it
+deliberately stays silent when either number is missing — silence is not
+disagreement.
+
+Two honest limits. The extraction service is an invoice extractor: it has never
+returned a `purchase_order` classification in this deployment, so do not gate on
+`attachedPo.documentType` without checking what it actually returns for your
+documents. And this compares header fields only — line-item matching, the third
+leg of a true three-way match, is not built, and there is no goods-receipt
+concept in HubSign at all.
+
 ### 4.4.2 Responsibility — who owes a signature
 
 The **Responsibility** column answers the question the queue is usually opened

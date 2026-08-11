@@ -4,7 +4,7 @@ import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import { type Document, DocumentStatus, FieldType, RecipientRole } from '@prisma/client';
-import { CheckCircle2, Clock8, FileSearch } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Clock8, FileSearch } from 'lucide-react';
 import { Link, useRevalidator } from 'react-router';
 import { match } from 'ts-pattern';
 
@@ -87,6 +87,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   return {
     isDocumentAccessValid: true,
     canSignUp,
+    // Distinguishes "no sign-up panel because they already have an account"
+    // from "no sign-up panel because sign-up is switched off" — the page offers
+    // a different next step for each.
+    isExistingUser,
     recipientName,
     recipientEmail: recipient.email,
     signatures,
@@ -104,6 +108,7 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
   const {
     isDocumentAccessValid,
     canSignUp,
+    isExistingUser,
     recipientName,
     signatures,
     document,
@@ -230,6 +235,37 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
         </div>
 
         <div className="flex flex-col items-center">
+          {/*
+            Without this the page dead-ends. A signer who already has an account
+            gets no sign-up panel (canSignUp is false for them), which used to
+            leave nothing below the Download button but empty space and no way
+            onward. What is useful depends on who they are, so each case gets
+            its own offer rather than one generic link.
+          */}
+          {!canSignUp && !user && (
+            <div className="mt-8 flex max-w-md flex-col items-center px-4 text-center">
+              {isExistingUser ? (
+                <>
+                  <p className="text-muted-foreground text-sm">
+                    <Trans>
+                      You already have a HubSign account. Sign in to keep this document and your
+                      signature with the rest of your records.
+                    </Trans>
+                  </p>
+                  <Button asChild variant="outline" className="mt-4">
+                    <Link to={`/signin?email=${encodeURIComponent(recipient.email)}`}>
+                      <Trans>Sign in to save your signature</Trans>
+                    </Link>
+                  </Button>
+                </>
+              ) : (
+                <p className="text-muted-foreground text-sm">
+                  <Trans>A copy of the signed document will be emailed to you.</Trans>
+                </p>
+              )}
+            </div>
+          )}
+
           {canSignUp && (
             <div className="flex max-w-xl flex-col items-center justify-center p-4 md:p-12">
               <h2 className="mt-8 text-center text-xl font-semibold md:mt-0">
@@ -247,9 +283,12 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
           )}
 
           {user && (
-            <Link to="/documents" className="text-primary hover:text-primary/80 mt-2">
-              <Trans>Go Back Home</Trans>
-            </Link>
+            <Button asChild variant="outline" className="mt-8">
+              <Link to="/documents">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                <Trans>Back to my documents</Trans>
+              </Link>
+            </Button>
           )}
         </div>
       </div>

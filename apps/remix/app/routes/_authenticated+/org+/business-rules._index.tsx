@@ -21,13 +21,70 @@ const label = 'mb-1 block text-[11px] font-medium text-muted-foreground';
 const control =
   'w-full rounded-[var(--r-sm)] border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary';
 
-/** Starting points, so nobody has to write JSONLogic from a blank box. */
+/**
+ * Gates that are offered by the catalogue but have no enforcement call site.
+ *
+ * `INBOX_READY` is declared in `RULE_GATES` and appears in the dropdown, but
+ * nothing evaluates it — a rule saved against it is silently inert, which is
+ * worse than not offering it at all. Disabled here rather than removed from the
+ * catalogue, because the gate is a real intention that just isn't wired up;
+ * delete this entry when it is.
+ */
+const UNENFORCED_GATES = new Set(['INBOX_READY']);
+
+/**
+ * Starting points, so nobody has to write JSONLogic from a blank box.
+ *
+ * Every OCR-based preset is guarded by `ocr.hasData`. Without it the rule fires
+ * on documents that never came from the inbox: the OCR provider reports no data
+ * for those, a missing value reads as absent, and a "PO number is missing" rule
+ * then refuses signing on contracts and NDAs that never had a PO to begin with.
+ * The same trap catches numeric comparisons, where a null confidence coerces to
+ * 0 and satisfies `< 0.7`.
+ */
 const PRESETS = [
   {
     name: 'PO number required',
     gate: 'DOCUMENT_SIGN' as const,
-    message: 'This invoice has no PO number. Add one before signing.',
-    condition: { '!': [{ var: 'ocr.po_number' }] },
+    // Written for the person who will actually read it — an external signer,
+    // not somebody with access to the Signature Inbox.
+    message:
+      'A PO number is required. Attach the purchase order under "Supporting documents" below and it will be read automatically, then press Sign again.',
+    // Satisfied by any of the three routes a PO number can arrive by, so the
+    // block is something the person in front of it can actually clear.
+    condition: {
+      and: [
+        { var: 'ocr.hasData' },
+        { '!': [{ var: 'ocr.has_plausible_po' }] },
+        { '!': [{ var: 'fields.po_number' }] },
+        { '!': [{ var: 'attachedPo.po_number' }] },
+      ],
+    },
+  },
+  {
+    name: 'Attached PO must match the invoice',
+    gate: 'DOCUMENT_SIGN' as const,
+    message:
+      'The PO number on the attached purchase order does not match the one on the invoice. Check you have attached the right purchase order.',
+    // One fact, because it already carries the whole answer: true only when
+    // both numbers exist and differ once case, spacing and punctuation are
+    // ignored. Writing this as `!(a == b)` would flag MER-PO-5023 against
+    // "mer po 5023", and would also fire when nothing was attached at all.
+    condition: { var: 'attachedPo.po_differs_from_invoice' },
+  },
+  {
+    name: 'Attached PO amount must match the invoice',
+    gate: 'DOCUMENT_SIGN' as const,
+    message:
+      'The total on the attached purchase order differs from the invoice total by more than the allowed tolerance.',
+    // The tolerance is the number in this condition — edit it to suit. Guarded
+    // by `total_comparable` so an unreadable total is never read as agreement.
+    condition: {
+      and: [
+        { var: 'attachedPo.total_comparable' },
+        { '>': [{ var: 'attachedPo.total_difference' }, 1] },
+      ],
+    },
   },
   {
     name: 'High-value invoice needs a second approver',
@@ -39,7 +96,7 @@ const PRESETS = [
     name: 'Low OCR confidence — review before signing',
     gate: 'DOCUMENT_SIGN' as const,
     message: 'The extracted data has low confidence. Check the figures before signing.',
-    condition: { '<': [{ var: 'ocr.confidence' }, 0.7] },
+    condition: { and: [{ var: 'ocr.hasData' }, { '<': [{ var: 'ocr.confidence' }, 0.7] }] },
   },
   {
     name: 'Supporting document required',
@@ -240,11 +297,20 @@ function BusinessRulesPage() {
                   onChange={(e) => setDraft({ ...draft, gate: e.target.value })}
                 >
                   {(catalogue?.gates ?? []).map((g) => (
-                    <option key={g.gate} value={g.gate}>
+                    <option key={g.gate} value={g.gate} disabled={UNENFORCED_GATES.has(g.gate)}>
                       {g.label}
+                      {UNENFORCED_GATES.has(g.gate) ? ' — not yet enforced' : ''}
                     </option>
                   ))}
                 </select>
+                {UNENFORCED_GATES.has(draft.gate) && (
+                  <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                    <Trans>
+                      This gate has no enforcement point yet, so a rule saved against it will never
+                      run.
+                    </Trans>
+                  </p>
+                )}
               </div>
               <div>
                 <label className={label}>

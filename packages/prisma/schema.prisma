@@ -113,6 +113,8 @@ model User {
   createdBusinessRules     BusinessRule[]         @relation("UserCreatedBusinessRules")
   createdExportTemplates   ExportTemplate[]       @relation("UserCreatedExportTemplates")
   sentReminders            RecipientReminder[]    @relation("UserSentReminders")
+  inboxFieldEdits          InboxFieldEdit[]       @relation("UserInboxFieldEdits")
+  attachmentOcrRuns        DocumentSupportingFile[] @relation("UserRanAttachmentOcr")
 
   @@index([email])
 }
@@ -488,11 +490,59 @@ model DocumentSupportingFile {
 
   createdAt DateTime @default(now())
 
+  // OCR of the attachment itself — used to read a purchase order a signer
+  // attached alongside the invoice.
+  //
+  // Never automatic. These bytes are uploaded by whoever holds a signing token,
+  // with no account behind them, so sending them to an external extraction
+  // service is an egress decision a member of the organization makes
+  // deliberately rather than something the upload triggers.
+  ocrRanAt      DateTime?
+  ocrRanById    Int?
+  ocrError      String?
+  /// What the extractor called it, e.g. "purchase_order". Verbatim.
+  ocrDocumentType String?
+  extractedData Json?
+  ocrMeta       Json?
+
   document  Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
   recipient Recipient? @relation(fields: [recipientId], references: [id], onDelete: SetNull)
+  ocrRanBy  User?      @relation("UserRanAttachmentOcr", fields: [ocrRanById], references: [id], onDelete: SetNull)
 
   @@index([documentId])
   @@index([recipientId])
+}
+
+/// A human correction to an OCR-extracted field on an inbox item.
+///
+/// Extraction is wrong often enough that a value nobody can correct is a dead
+/// end — a misread PO number used to block signing permanently, because the
+/// only writer of `extractedData` was the OCR job. Corrections are recorded
+/// rather than applied silently: a figure a person typed and a figure the
+/// extractor read are different kinds of evidence, and anyone auditing the
+/// document later needs to be able to tell them apart.
+model InboxFieldEdit {
+  id            String   @id @default(cuid())
+  inboxItemId   String
+  /// The key inside `extractedData`, e.g. "po_number".
+  field         String
+  previousValue String?
+  newValue      String?
+  editedById    Int?
+  editedAt      DateTime @default(now())
+
+  /// Where the value came from: "HUMAN" when somebody typed it, or
+  /// "ATTACHMENT_OCR" when it was read out of a document the signer attached.
+  /// The distinction is shown on screen — a number lifted from an attached
+  /// purchase order is not the same evidence as one a person vouched for.
+  source     String  @default("HUMAN")
+  /// Free text qualifying the source, e.g. the attachment's file name.
+  sourceDetail String?
+
+  inboxItem SignatureInboxItem @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
+  editedBy  User?              @relation("UserInboxFieldEdits", fields: [editedById], references: [id], onDelete: SetNull)
+
+  @@index([inboxItemId, editedAt])
 }
 
 model DocumentAuditLog {
@@ -2476,7 +2526,8 @@ model SignatureInboxItem {
   viewedAt   DateTime? /// Set when a user first opens the item. Null = unread (Outlook-style, shared across the org).
   emailReadAt DateTime? /// Set once WorkHub has confirmed the source message marked read. Makes the call idempotent across its several triggers (import, first open, SLA breach).
 
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document   Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  fieldEdits InboxFieldEdit[]
 
   @@index([organizationId])
   @@index([organizationId, status])

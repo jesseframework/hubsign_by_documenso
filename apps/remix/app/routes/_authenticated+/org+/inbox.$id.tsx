@@ -11,6 +11,12 @@ import { Button } from '@documenso/ui/primitives/button';
 import { RecipientEmailAutocomplete } from '@documenso/ui/primitives/recipient-email-autocomplete';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
+import { AttachmentOcrPanel } from '~/components/general/inbox/attachment-ocr-panel';
+import {
+  DocumentTimeline,
+  SigningStatusBanner,
+} from '~/components/general/inbox/document-timeline';
+import { ExtractedFields } from '~/components/general/inbox/extracted-fields';
 import { useInboxEvents } from '~/hooks/use-inbox-events';
 import { appMetaTags } from '~/utils/meta';
 
@@ -117,6 +123,13 @@ export default function InboxItemPage() {
     } | null;
   };
   const fields = ocrMeta.fieldExtractions ?? [];
+
+  // What the rules actually read. Shown in preference to the extractor's own
+  // reported value, so a correction is visible the moment it is saved.
+  const extractedMap =
+    item.extractedData && typeof item.extractedData === 'object' && !Array.isArray(item.extractedData)
+      ? (item.extractedData as Record<string, unknown>)
+      : {};
   const usedTemplate = ocrMeta.template ?? null;
   const templateName = usedTemplate?.name || fields.find((f) => f.template_name)?.template_name;
 
@@ -294,59 +307,15 @@ export default function InboxItemPage() {
                 )}
               </div>
 
-              {fields.length > 0 ? (
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[12px] font-medium text-muted-foreground">
-                      <Trans>Extracted fields</Trans>
-                    </span>
-                    {templateName && (
-                      <span className="text-[10px] text-muted-foreground">Template: {templateName}</span>
-                    )}
-                  </div>
-                  <div className="mt-1.5 space-y-1">
-                    {fields.map((field, i) => {
-                      const isLow = field.confidence_score < 0.5;
-                      const needsReview = field.requires_review || isLow || field.extracted_value == null;
-                      return (
-                        <div
-                          key={`${field.field_name}-${i}`}
-                          className={`flex items-center gap-2 rounded border px-2.5 py-1.5 ${
-                            needsReview
-                              ? 'border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/30'
-                              : 'border-border bg-muted/20'
-                          }`}
-                        >
-                          <div
-                            className={`h-2 w-2 flex-shrink-0 rounded-full ${
-                              field.confidence_score >= 0.7
-                                ? 'bg-green-500'
-                                : field.confidence_score >= 0.4
-                                  ? 'bg-amber-500'
-                                  : 'bg-red-500'
-                            }`}
-                            title={`${pct(field.confidence_score)}% confidence`}
-                          />
-                          <span className="min-w-[100px] text-[11px] font-medium capitalize text-muted-foreground">
-                            {field.field_name.replace(/_/g, ' ')}
-                          </span>
-                          <span className="flex-1 text-[12px] font-medium">
-                            {field.extracted_value != null ? String(field.extracted_value) : '—'}
-                          </span>
-                          <span className="text-[9px] text-muted-foreground">
-                            {pct(field.confidence_score)}%
-                            {field.extraction_method === 'ml+ai' || field.ai_fallback_used ? ' · AI' : ''}
-                          </span>
-                          {needsReview && (
-                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                              <Trans>Review</Trans>
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
+              {fields.length > 0 || Object.keys(extractedMap).length > 0 ? (
+                <ExtractedFields
+                  inboxItemId={id}
+                  fields={fields}
+                  extractedData={extractedMap}
+                  fieldEdits={item.fieldEdits ?? []}
+                  templateName={templateName}
+                  readOnly={item.document.status === 'COMPLETED'}
+                />
               ) : (
                 <p className="text-[12px] text-muted-foreground">
                   <Trans>OCR ran but the template extracted no fields.</Trans>
@@ -378,7 +347,8 @@ export default function InboxItemPage() {
           )}
         </div>
 
-        {/* Send for signature */}
+        {/* Right column: the send box, then the document's history beneath it. */}
+        <div className="space-y-4">
         <div className="rounded-[var(--r)] border border-border bg-card p-4">
           <h3 className="mb-2 text-[14px] font-semibold">
             <Trans>Send for signature</Trans>
@@ -403,9 +373,11 @@ export default function InboxItemPage() {
           )}
 
           {alreadySent ? (
-            <p className="rounded-md bg-violet-50 px-3 py-2 text-[12px] text-violet-700 dark:bg-violet-950 dark:text-violet-300">
-              <Trans>This document has been sent for signature.</Trans>
-            </p>
+            <SigningStatusBanner
+              documentStatus={item.document.status}
+              recipients={item.document.recipients}
+              completedAt={item.document.completedAt}
+            />
           ) : (
             <>
               <p className={label}>
@@ -528,6 +500,20 @@ export default function InboxItemPage() {
               </div>
             </>
           )}
+        </div>
+
+        {/*
+          The history goes under the send box rather than beside it: once a
+          document has been sent, the send box collapses to a one-line status
+          and this column is otherwise empty, which is exactly when someone is
+          looking for what happened to it.
+        */}
+        <AttachmentOcrPanel
+          inboxItemId={id}
+          files={item.document.supportingFiles ?? []}
+        />
+
+        <DocumentTimeline inboxItemId={id} />
         </div>
       </div>
     </div>

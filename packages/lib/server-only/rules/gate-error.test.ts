@@ -68,6 +68,8 @@ describe('gate refusal → signer', () => {
       evaluated: 2,
     };
 
-    expect(describeBlocks(verdict)).toBe('Add a PO number. Needs a second approver.');
+    // One rule per line, so the signer can be shown a list rather than a
+    // run-on sentence stacking every policy that fired.
+    expect(describeBlocks(verdict)).toBe('Add a PO number.\nNeeds a second approver.');
   });
 });

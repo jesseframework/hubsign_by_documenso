@@ -23,7 +23,12 @@ import {
 } from '@documenso/lib/universal/upload/server-actions';
 import { prisma } from '@documenso/prisma';
 
+import { runAttachmentOcr } from '@documenso/lib/server-only/inbox/run-attachment-ocr';
+import { readOcrField } from '@documenso/lib/universal/ocr-fields';
+import { stripFieldLabel } from '@documenso/lib/universal/reference-number';
+
 import type { HonoEnv } from '../router';
+
 import { buildSignedResponse } from './files.helpers';
 import {
   type TGetPresignedGetUrlResponse,
@@ -32,6 +37,75 @@ import {
   ZGetPresignedPostUrlRequestSchema,
   ZUploadPdfRequestSchema,
 } from './files.types';
+
+/** The headline values from an attachment's extraction, for the signer's eyes. */
+const summariseAttachment = (extractedData: unknown) => {
+  const text = (value: string | null) => {
+    if (value === null) return null;
+    const cleaned = stripFieldLabel(String(value));
+
+    return cleaned === '' ? null : cleaned;
+  };
+
+  return {
+    poNumber: text(readOcrField(extractedData, 'poNumber')),
+    vendorName: text(readOcrField(extractedData, 'vendorName')),
+    total: text(readOcrField(extractedData, 'totalAmount')),
+  };
+};
+
+/**
+ * Run OCR over a just-uploaded attachment without ever failing the upload.
+ *
+ * The file is already stored by the time this runs. An extraction service that
+ * is down, slow or misconfigured must show up as "we could not read it", not as
+ * a lost attachment.
+ */
+const readAttachmentQuietly = async ({
+  supportingFileId,
+  organizationId,
+  fileName,
+}: {
+  supportingFileId: string;
+  organizationId: number | null;
+  fileName: string;
+}) => {
+  // A personal document has no organization, so no extraction service either.
+  if (organizationId === null) return null;
+
+  // Saves a pointless round trip for the file types the extractor cannot read.
+  if (!/\.(pdf|png|jpe?g|tiff?)$/i.test(fileName)) return null;
+
+  try {
+    const result = await runAttachmentOcr({ supportingFileId, organizationId, userId: null });
+
+    return {
+      ran: true,
+      ok: result.ok,
+      error: result.error,
+      documentType: result.documentType,
+      poNumber: result.poNumber,
+      vendorName: result.vendorName,
+      total: result.total,
+      // Whether the number was carried onto the invoice, so the signer can be
+      // told "this cleared it" rather than just "we read your file".
+      appliedToInvoice: result.appliedToInvoice,
+    };
+  } catch (error) {
+    console.error('[supporting-file] OCR failed after upload:', error);
+
+    return {
+      ran: true,
+      ok: false,
+      error: 'Could not read this file.',
+      documentType: null,
+      poNumber: null,
+      vendorName: null,
+      total: null,
+      appliedToInvoice: null,
+    };
+  }
+};
 
 export const filesRoute = new Hono<HonoEnv>()
   /**
@@ -152,6 +226,55 @@ export const filesRoute = new Hono<HonoEnv>()
    *     bytes; executables and archives refused),
    *   - a per-recipient count cap bounds abuse of an unauthenticated endpoint.
    */
+  /**
+   * The attachments this signing token has already uploaded.
+   *
+   * Without it the signing page starts from an empty list every time, so a
+   * signer who refreshed could not see what they had sent, could not remove it,
+   * and could re-upload the same file until the per-recipient cap tripped.
+   */
+  .get('/supporting/:token', async (c) => {
+    const token = c.req.param('token');
+
+    const recipient = await prisma.recipient.findFirst({
+      where: { token },
+      select: { id: true },
+    });
+
+    if (!recipient) {
+      return c.json({ error: 'Invalid signing link.' }, 404);
+    }
+
+    const files = await prisma.documentSupportingFile.findMany({
+      where: { recipientId: recipient.id },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        fileName: true,
+        contentType: true,
+        sizeBytes: true,
+        ocrRanAt: true,
+        ocrError: true,
+        ocrDocumentType: true,
+        extractedData: true,
+      },
+    });
+
+    return c.json(
+      files.map(({ extractedData, ocrRanAt, ocrError, ocrDocumentType, ...file }) => ({
+        ...file,
+        ocr: ocrRanAt
+          ? {
+              ran: true,
+              ok: ocrError === null,
+              error: ocrError,
+              documentType: ocrDocumentType,
+              ...summariseAttachment(extractedData),
+            }
+          : null,
+      })),
+    );
+  })
   .post('/supporting/:token', async (c) => {
     try {
       const token = c.req.param('token');
@@ -162,7 +285,7 @@ export const filesRoute = new Hono<HonoEnv>()
           id: true,
           documentId: true,
           signingStatus: true,
-          document: { select: { id: true, status: true } },
+          document: { select: { id: true, status: true, organizationId: true } },
         },
       });
 
@@ -234,7 +357,24 @@ export const filesRoute = new Hono<HonoEnv>()
         select: { id: true, fileName: true, contentType: true, sizeBytes: true, createdAt: true },
       });
 
-      return c.json(created);
+      // Read the attachment straight away.
+      //
+      // This is what makes "attach the PO and carry on signing" work: the
+      // signer is an external party who cannot reach the Signature Inbox, so
+      // waiting for someone in the office to press a button would leave them
+      // blocked with no way forward. The extracted fields become available to
+      // the business rules as `attachedPo.*`, and the next press of Sign is
+      // evaluated against them.
+      //
+      // Never allowed to fail the upload — the file is already stored, and a
+      // extraction service being down must not look like a failed attachment.
+      const ocr = await readAttachmentQuietly({
+        supportingFileId: created.id,
+        organizationId: recipient.document.organizationId,
+        fileName: created.fileName,
+      });
+
+      return c.json({ ...created, ocr });
     } catch (error) {
       console.error('Supporting file upload failed:', error);
 

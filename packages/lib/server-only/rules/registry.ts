@@ -13,7 +13,9 @@ import {
   organizationProvider,
   recipientsProvider,
 } from './providers/entity';
+import { attachmentOcrProvider } from './providers/attachment-ocr';
 import { duplicateProvider } from './providers/duplicate';
+import { fieldsProvider } from './providers/fields';
 import { ocrProvider } from './providers/ocr';
 import type { RuleContext, RuleField, RuleFactProvider, RuleSubject } from './types';
 
@@ -25,6 +27,10 @@ export const PROVIDERS: RuleFactProvider[] = [
   organizationProvider,
   actorProvider,
   attachmentsProvider,
+  // What the signer typed, and what OCR read out of what they attached — the
+  // two routes by which a missing PO number can now reach a rule.
+  fieldsProvider,
+  attachmentOcrProvider,
 ];
 
 /**

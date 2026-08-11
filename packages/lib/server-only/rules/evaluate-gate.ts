@@ -108,6 +108,14 @@ export const evaluateGate = async ({
   }
 };
 
-/** Single message summarising why an action was refused. */
+/**
+ * Why an action was refused, one rule per line.
+ *
+ * Newline-separated rather than space-joined: two rules firing together used to
+ * arrive as a single run-on sentence of stacked policy text, which is hard to
+ * read and impossible to act on one item at a time. Callers that render this to
+ * a person should split on the newline and show a list; callers that log it get
+ * a multi-line entry, which is also an improvement.
+ */
 export const describeBlocks = (verdict: GateVerdict): string =>
-  verdict.blocks.map((b) => b.message).join(' ');
+  verdict.blocks.map((b) => b.message).join('\n');

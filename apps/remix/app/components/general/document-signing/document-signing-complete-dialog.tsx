@@ -308,7 +308,16 @@ export const DocumentSigningCompleteDialog = ({
                   className="border-destructive/30 bg-destructive/10 mt-4 flex gap-2 rounded-md border p-3"
                 >
                   <AlertTriangleIcon className="text-destructive mt-0.5 h-4 w-4 flex-shrink-0" />
-                  <p className="text-destructive text-sm">{submissionError}</p>
+                  {/*
+              One rule per line. Several blocking rules used to arrive joined
+              into a single sentence, which read as one long piece of policy
+              prose rather than a list of things to fix.
+            */}
+            <div className="text-destructive space-y-1 text-sm">
+              {submissionError.split('\n').filter(Boolean).map((line, index) => (
+                <p key={index}>{line}</p>
+              ))}
+            </div>
                 </div>
               )}
 

@@ -225,6 +225,12 @@ msgstr ""
 msgid "{0} documents archived"
 msgstr ""
 
+#. placeholder {0}: result.fieldCount
+#. placeholder {1}: result.fileName
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "{0} field(s) extracted from {1}."
+msgstr ""
+
 #. placeholder {0}: team.name
 #. placeholder {1}: document.title
 #: packages/lib/jobs/definitions/emails/send-signing-email.handler.ts
@@ -342,6 +348,12 @@ msgstr ""
 #. placeholder {0}: importErrors.length
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "{0} row(s) were skipped"
+msgstr ""
+
+#. placeholder {0}: String(detail ?? 'a field').replace(/_/g, ' ')
+#. placeholder {1}: note ? `: ${note}` : ''
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "{0} taken from the attached “{who}”{1}"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
@@ -634,6 +646,16 @@ msgstr "{userName} vio el documento"
 msgid "{visibleRows, plural, one {Showing # result.} other {Showing # results.}}"
 msgstr "{visibleRows, plural, one {Mostrando # resultado.} other {Mostrando # resultados.}}"
 
+#. placeholder {0}: String(detail ?? 'a field').replace(/_/g, ' ')
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "{who} corrected {0}"
+msgstr ""
+
+#. placeholder {0}: String(detail ?? 'a field').replace(/_/g, ' ')
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "{who} set {0} to {note}"
+msgstr ""
+
 #. placeholder {0}: config.joins.length
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
 msgid "+{0} joined"
@@ -784,6 +806,10 @@ msgstr "7 días"
 #: apps/remix/app/components/forms/send-confirmation-email.tsx
 msgid "A confirmation email has been sent, and it should arrive in your inbox shortly."
 msgstr "Se ha enviado un correo electrónico de confirmación y debería llegar a tu bandeja de entrada en breve."
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+msgid "A copy of the signed document will be emailed to you."
+msgstr ""
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "A device capable of accessing, opening, and reading documents"
@@ -1039,6 +1065,7 @@ msgstr ""
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 #: apps/remix/app/components/general/subscription-addons.tsx
+#: apps/remix/app/components/general/inbox/extracted-fields.tsx
 #: apps/remix/app/components/dialogs/team-email-add-dialog.tsx
 msgid "Add"
 msgstr "Agregar"
@@ -1921,15 +1948,32 @@ msgid "Attach a file"
 msgstr ""
 
 #: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
-msgid "Attach a purchase order, spec sheet or photo. PDF, Word, Excel, images, CSV — up to 15 MB each."
+#~ msgid "Attach a purchase order, spec sheet or photo. PDF, Word, Excel, images, CSV — up to 15 MB each."
+#~ msgstr ""
+
+#: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
+msgid "Attach a purchase order, spec sheet or photo. PDF, Word, Excel, images, CSV — up to 15 MB each. A PDF or image is read automatically, so an attached purchase order can satisfy a rule that is holding up your signature."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Attach the audit certificate to signed documents"
 msgstr ""
 
+#. placeholder {0}: note ?? 'file'
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Attachment “{0}” read by OCR ({who})"
+msgstr ""
+
 #: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
 msgid "Attachment limit reached"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "Attachment read"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "Attachments from the signer"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
@@ -1969,6 +2013,10 @@ msgstr ""
 msgid "automatic"
 msgstr ""
 
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Automatic reminder sent to {who}"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Automatically email recipients who haven't signed yet after the chosen number of days. Reminders stop after the maximum count is reached."
 msgstr ""
@@ -1987,6 +2035,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
 msgid "Available placeholders"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "Available to rules as attachedPo.po_number, attachedPo.vendor_name and attachedPo.total_amount."
 msgstr ""
 
 #: apps/remix/app/components/forms/avatar-image.tsx
@@ -2023,6 +2075,10 @@ msgstr "Atrás"
 #: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
 msgid "Back to Documents"
 msgstr "Volver a Documentos"
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+msgid "Back to my documents"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 #: apps/remix/app/components/general/billing-plans.tsx
@@ -2463,6 +2519,11 @@ msgstr ""
 msgid "Classifications"
 msgstr ""
 
+#. placeholder {0}: file.ocrDocumentType
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "classified as {0}"
+msgstr ""
+
 #: apps/remix/app/components/general/export/export-builder-dialog.tsx
 msgid "Clear"
 msgstr ""
@@ -2602,6 +2663,11 @@ msgstr "Completar Visualización"
 #: packages/email/template-components/template-document-completed.tsx
 msgid "Completed"
 msgstr "Completado"
+
+#. placeholder {0}: at.toLocaleString()
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Completed {0}"
+msgstr ""
 
 #: apps/remix/app/routes/_share+/verify.$token.tsx
 msgid "Completed at"
@@ -2923,12 +2989,25 @@ msgstr "Copiar enlaces de firma"
 msgid "Copy token"
 msgstr "Copiar token"
 
+#: apps/remix/app/components/general/inbox/extracted-fields.tsx
+msgid "Correct or add a field"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
 msgid "Could not delete the layout"
 msgstr ""
 
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "Could not read the attachment"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "Could not read the file"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/extracted-fields.tsx
+msgid "Could not save"
 msgstr ""
 
 #: apps/remix/app/components/general/export/export-builder-dialog.tsx
@@ -3263,6 +3342,19 @@ msgstr "Rechazar"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "declined"
+msgstr ""
+
+#. placeholder {0}: rejected[0].name || rejected[0].email
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Declined by {0}. Nothing further will be sent."
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Declined by {who}"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Declined by {who} — {note}"
 msgstr ""
 
 #: apps/remix/app/components/general/teams/team-invitations.tsx
@@ -4352,6 +4444,10 @@ msgstr "Dirección de correo electrónico"
 msgid "Email already confirmed"
 msgstr "Correo electrónico ya confirmado"
 
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Email arrived"
+msgstr ""
+
 #: apps/remix/app/components/general/direct-template/direct-template-configure-form.tsx
 msgid "Email cannot already exist in the template"
 msgstr "El correo electrónico no puede existir ya en la plantilla"
@@ -4362,6 +4458,10 @@ msgstr "¡Correo electrónico confirmado!"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Email Domain Restriction"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Email ingested (no mail-server time available)"
 msgstr ""
 
 #: packages/ui/primitives/template-flow/add-template-settings.tsx
@@ -4525,6 +4625,10 @@ msgstr "Ingresa tu nombre"
 msgid "Enter your text here"
 msgstr "Ingresa tu texto aquí"
 
+#: apps/remix/app/components/general/inbox/extracted-fields.tsx
+msgid "entered"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 msgid "Entity"
 msgstr ""
@@ -4659,6 +4763,10 @@ msgstr "¡Todos han firmado! Recibirás una copia por correo electrónico del do
 msgid "Everyone is asked at the same time."
 msgstr ""
 
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Everyone signed — document completed"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
 msgid "Exceeded timeout"
 msgstr "Tiempo de espera excedido"
@@ -4717,7 +4825,7 @@ msgstr "ID externo"
 msgid "Extracted data (OCR)"
 msgstr ""
 
-#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+#: apps/remix/app/components/general/inbox/extracted-fields.tsx
 msgid "Extracted fields"
 msgstr ""
 
@@ -4790,6 +4898,10 @@ msgstr "Formato de campo"
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/checkbox-field.tsx
 msgid "Field label"
 msgstr "Etiqueta de campo"
+
+#: apps/remix/app/components/general/inbox/extracted-fields.tsx
+msgid "Field name, e.g. po_number"
+msgstr ""
 
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
 msgid "Field placeholder"
@@ -4914,8 +5026,13 @@ msgid "Freeform labels for quick document tagging"
 msgstr ""
 
 #. placeholder {0}: file.recipient.name || file.recipient.email
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
 #: apps/remix/app/components/general/document/document-supporting-files.tsx
 msgid "from {0}"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/extracted-fields.tsx
+msgid "from attachment"
 msgstr ""
 
 #: apps/remix/app/components/general/document-signing/document-signing-name-field.tsx
@@ -5000,7 +5117,6 @@ msgstr "Regresar"
 msgid "Go back home"
 msgstr "Regresar a casa"
 
-#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
 #: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
 msgid "Go Back Home"
 msgstr "Regresar a casa"
@@ -5659,6 +5775,7 @@ msgid "Loading..."
 msgstr "Cargando..."
 
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "Loading…"
 msgstr ""
 
@@ -5807,6 +5924,10 @@ msgstr "Marcar como visto"
 #: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
 msgid "Mark as Viewed"
 msgstr "Marcar como visto"
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Marked read in the mailbox"
+msgstr ""
 
 #. placeholder {0}: usedTemplate.vendor ?? 'vendor'
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
@@ -6213,6 +6334,11 @@ msgstr ""
 msgid "No favorites yet. Star documents from their detail page."
 msgstr ""
 
+#. placeholder {0}: result.fileName
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "No fields could be extracted from {0}."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
 msgid "No filing locations configured."
 msgstr ""
@@ -6253,6 +6379,10 @@ msgstr ""
 #: apps/remix/app/components/tables/settings-public-profile-templates-table.tsx
 msgid "No public profile templates found"
 msgstr "No se encontraron plantillas de perfil público"
+
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "No purchase-order fields were found in this attachment."
+msgstr ""
 
 #: apps/remix/app/components/general/document/document-page-view-recent-activity.tsx
 msgid "No recent activity"
@@ -6414,6 +6544,10 @@ msgstr ""
 msgid "Nothing outstanding beyond 90 days"
 msgstr ""
 
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Nothing recorded for this document yet."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "nothing scored yet"
 msgstr ""
@@ -6461,8 +6595,21 @@ msgstr "Formato de número"
 msgid "OCR & Document Processing"
 msgstr ""
 
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "OCR can only read PDF and image attachments."
+msgstr ""
+
+#. placeholder {0}: note ?? 'file'
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "OCR could not read the attachment “{0}”"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "OCR failed — you can re-run it or proceed manually."
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "OCR finished reading the document"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
@@ -6675,6 +6822,14 @@ msgstr ""
 #: apps/remix/app/components/general/stack-avatars-with-tooltip.tsx
 msgid "Opened"
 msgstr "Abierto"
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Opened by {who}"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Opened in HubSign"
+msgstr ""
 
 #: packages/ui/components/document/document-download-button.tsx
 msgid "Opens print dialog including the cert"
@@ -7167,6 +7322,11 @@ msgstr "Por favor, escribe <0>{0}</0> para confirmar."
 msgid "PNG · JPEG · SVG · 2 MB max"
 msgstr ""
 
+#. placeholder {0}: file.ocr.poNumber
+#: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
+msgid "PO number {0} read from this file"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 msgid "Post a recurring digest"
 msgstr ""
@@ -7330,6 +7490,20 @@ msgstr ""
 msgid "Re-running OCR…"
 msgstr ""
 
+#. placeholder {0}: new Date(file.ocrRanAt).toLocaleString()
+#. placeholder {1}: file.ocrRanBy?.name || file.ocrRanBy?.email || 'a user'
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "Read {0} by {1}"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "Read a purchase order here to make its fields available to business rules. Sent by whoever signed, so nothing is read automatically."
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "Read again"
+msgstr ""
+
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/radio-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
@@ -7345,6 +7519,14 @@ msgstr "Campo de solo lectura"
 #: apps/remix/app/components/general/document-signing/document-signing-disclosure.tsx
 msgid "Read the full <0>signature disclosure</0>."
 msgstr "Lea la <0>divulgación de firma</0> completa."
+
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "Read with OCR"
+msgstr ""
+
+#: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
+msgid "Read, but no PO number was found in this file."
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/doc-merge.tsx
 msgid "Reading PDFs…"
@@ -7585,6 +7767,11 @@ msgstr ""
 msgid "Reminder received"
 msgstr ""
 
+#. placeholder {0}: note ?? 'a user'
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Reminder sent to {who} by {0}"
+msgstr ""
+
 #. placeholder {0}: customEmail.subject
 #: packages/lib/server-only/document/resend-document.tsx
 msgid "Reminder: {0}"
@@ -7806,7 +7993,6 @@ msgid "Reusable image stamps you can drop onto any document before signing. PNG,
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-#: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "Review"
 msgstr ""
 
@@ -8224,7 +8410,19 @@ msgid "Sent"
 msgstr "Enviado"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "Sent for signature"
+msgstr ""
+
+#. placeholder {0}: signed.length
+#. placeholder {1}: recipients.length
+#. placeholder {2}: pending.map((r) => r.name || r.email).join(', ') || '—'
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Sent for signature — {0} of {1} signed, waiting on {2}."
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Sent for signature by {who}"
 msgstr ""
 
 #: apps/remix/app/components/general/claim-account.tsx
@@ -8395,6 +8593,10 @@ msgstr "Firmar aquí"
 msgid "Sign In"
 msgstr "Iniciar sesión"
 
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+msgid "Sign in to save your signature"
+msgstr ""
+
 #: apps/remix/app/routes/_unauthenticated+/signin.tsx
 msgid "Sign in to your account"
 msgstr "Inicia sesión en tu cuenta"
@@ -8496,6 +8698,14 @@ msgstr "Firmado"
 msgid "signed {signed}/{total}"
 msgstr ""
 
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Signed by {who}"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Signed copy emailed to {who}"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Signed Documents"
 msgstr ""
@@ -8546,6 +8756,11 @@ msgstr "Firmando"
 msgid "Signing certificate provided by"
 msgstr "Certificado de firma proporcionado por"
 
+#. placeholder {0}: recipients.length
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Signing complete — all {0} recipient(s) have signed."
+msgstr ""
+
 #: packages/lib/server-only/document/send-completed-email.ts
 #: packages/lib/server-only/document/send-completed-email.ts
 msgid "Signing Complete!"
@@ -8577,6 +8792,10 @@ msgstr "Se han generado enlaces de firma para este documento."
 #: packages/ui/primitives/document-flow/add-signers.tsx
 msgid "Signing order is enabled."
 msgstr "El orden de firma está habilitado."
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Signing request emailed to {who}"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/admin+/leaderboard.tsx
 #: apps/remix/app/components/tables/admin-leaderboard-table.tsx
@@ -9315,6 +9534,10 @@ msgstr "El contenido que se mostrará en el banner, se permite HTML"
 msgid "The direct link has been copied to your clipboard"
 msgstr "El enlace directo ha sido copiado a tu portapapeles"
 
+#: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
+msgid "The document already had a PO number, so this one was not applied."
+msgstr ""
+
 #: apps/remix/app/components/dialogs/document-move-to-folder-dialog.tsx
 msgid "The document has been moved successfully."
 msgstr ""
@@ -9679,8 +9902,8 @@ msgid "This document has been rejected by a recipient"
 msgstr "Este documento ha sido rechazado por un destinatario"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
-msgid "This document has been sent for signature."
-msgstr ""
+#~ msgid "This document has been sent for signature."
+#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/documents.$id._index.tsx
@@ -9693,6 +9916,10 @@ msgstr ""
 
 #: apps/remix/app/components/general/document/document-certificate-qr-view.tsx
 msgid "This document is available in your HubSign account. You can view more details, recipients, and audit logs there."
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/extracted-fields.tsx
+msgid "This document is complete, so its extracted data can no longer be changed."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id._index.tsx
@@ -9752,6 +9979,10 @@ msgstr "Este correo electrónico se enviará al destinatario que acaba de firmar
 msgid "This field cannot be modified or deleted. When you share this template's direct link or add it to your public profile, anyone who accesses it can input their name and email, and fill in the fields assigned to them."
 msgstr "Este campo no se puede modificar ni eliminar. Cuando comparta el enlace directo de esta plantilla o lo agregue a su perfil público, cualquiera que acceda podrá ingresar su nombre y correo electrónico, y completar los campos que se le hayan asignado."
 
+#: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
+msgid "This file could not be read automatically."
+msgstr ""
+
 #. placeholder {0}: records.length
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "This file has {0} rows; the limit is {MAX_METADATA_IMPORT_ROWS} per import. Split it into smaller files."
@@ -9760,6 +9991,10 @@ msgstr ""
 #: apps/remix/app/components/dialogs/template-folder-create-dialog.tsx
 #: apps/remix/app/components/dialogs/folder-create-dialog.tsx
 msgid "This folder name is already taken."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "This gate has no enforcement point yet, so a rule saved against it will never run."
 msgstr ""
 
 #: apps/remix/app/routes/_share+/verify.$token.tsx
@@ -9875,6 +10110,10 @@ msgstr "Zona horaria"
 #: packages/ui/primitives/document-flow/add-settings.tsx
 msgid "Time Zone"
 msgstr "Zona horaria"
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Timeline"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
@@ -10483,8 +10722,11 @@ msgstr "El archivo subido es demasiado pequeño"
 msgid "Uploaded file not an allowed file type"
 msgstr "El archivo subido no es un tipo de archivo permitido"
 
-#: apps/remix/app/routes/_authenticated+/dms+/documents.tsx
 #: apps/remix/app/components/general/document-signing/supporting-file-upload.tsx
+msgid "Uploading and reading…"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/documents.tsx
 msgid "Uploading..."
 msgstr ""
 
@@ -10569,6 +10811,7 @@ msgid "Validation rules (block/warn before this step)"
 msgstr ""
 
 #: apps/remix/app/components/tables/admin-document-recipient-item-table.tsx
+#: apps/remix/app/components/general/inbox/extracted-fields.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
 msgid "Value"
@@ -11137,6 +11380,12 @@ msgstr ""
 msgid "Withdrawing Consent"
 msgstr "Retirar Consentimiento"
 
+#. placeholder {0}: note ?? 'workflow'
+#. placeholder {1}: String(detail ?? '').toLowerCase()
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Workflow “{0}” {1}"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Workflow created"
 msgstr ""
@@ -11220,6 +11469,10 @@ msgstr ""
 #: packages/lib/utils/document-audit-logs.ts
 msgid "You"
 msgstr "Tú"
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+msgid "You already have a HubSign account. Sign in to keep this document and your signature with the rest of your records."
+msgstr ""
 
 #: apps/remix/app/components/dialogs/document-delete-dialog.tsx
 msgid "You are about to delete <0>\"{documentTitle}\"</0>"

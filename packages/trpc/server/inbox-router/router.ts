@@ -10,8 +10,10 @@ import { describeBlocks, evaluateGate } from '@documenso/lib/server-only/rules/e
 import { publishInboxEvent } from '@documenso/lib/server-only/inbox/inbox-events';
 import { markInboxEmailRead } from '@documenso/lib/server-only/inbox/mark-email-read';
 import { pollWorkHubInboxForOrg } from '@documenso/lib/server-only/inbox/poll-workhub-inbox';
+import { runAttachmentOcr } from '@documenso/lib/server-only/inbox/run-attachment-ocr';
 import { rememberTemplateForSender } from '@documenso/lib/server-only/inbox/resolve-ocr-template';
 import { SLA_ORG_SELECT, evaluateItemsSla, slaClockStart } from '@documenso/lib/server-only/inbox/sla';
+import { getInboxItemTimeline } from '@documenso/lib/server-only/inbox/timeline';
 import { nanoid } from '@documenso/lib/universal/id';
 import { vendorCoreName } from '@documenso/lib/universal/vendor-match';
 import { prisma } from '@documenso/prisma';
@@ -175,6 +177,18 @@ export const inboxRouter = router({
       });
     }),
 
+  /** Merged history for one inbox item — arrival, OCR, signing, reminders, workflows. */
+  timeline: authenticatedProcedure
+    .input(z.object({ inboxItemId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const membership = await requireOrgMember(ctx.user.id);
+
+      return getInboxItemTimeline({
+        inboxItemId: input.inboxItemId,
+        organizationId: membership.organizationId,
+      });
+    }),
+
   get: authenticatedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
@@ -188,6 +202,37 @@ export const inboxRouter = router({
                 select: { id: true, email: true, name: true, role: true, signingStatus: true },
               },
               documentMeta: { select: { subject: true } },
+              // Attachments, with whatever OCR has been run over them — this is
+              // how an attached purchase order gets read.
+              supportingFiles: {
+                orderBy: { createdAt: 'asc' },
+                select: {
+                  id: true,
+                  fileName: true,
+                  contentType: true,
+                  sizeBytes: true,
+                  createdAt: true,
+                  ocrRanAt: true,
+                  ocrError: true,
+                  ocrDocumentType: true,
+                  extractedData: true,
+                  ocrRanBy: { select: { name: true, email: true } },
+                  recipient: { select: { name: true, email: true } },
+                },
+              },
+            },
+          },
+          // Lets the review screen mark which values a person typed, so a
+          // human correction is never mistaken for an extractor reading.
+          fieldEdits: {
+            orderBy: { editedAt: 'desc' },
+            select: {
+              field: true,
+              newValue: true,
+              editedAt: true,
+              source: true,
+              sourceDetail: true,
+              editedBy: { select: { name: true, email: true } },
             },
           },
         },
@@ -223,6 +268,121 @@ export const inboxRouter = router({
       }
 
       return item;
+    }),
+
+  /**
+   * Correct or supply an extracted field.
+   *
+   * The only writer of `extractedData` used to be the OCR job, which made a
+   * misread value unfixable by anyone — and a rule reading that value would
+   * refuse signing forever with no remedy. Corrections are logged rather than
+   * applied silently, because a figure a person typed is different evidence
+   * from a figure the extractor read.
+   */
+  updateExtractedField: authenticatedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        field: z
+          .string()
+          .trim()
+          .min(1)
+          .max(80)
+          .regex(/^[A-Za-z0-9_.-]+$/, 'Field names may contain letters, digits, dot, dash and underscore.'),
+        value: z.string().max(2000),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireOrgMember(ctx.user.id);
+
+      const item = await prisma.signatureInboxItem.findFirst({
+        where: { id: input.id, organizationId: membership.organizationId },
+        select: { id: true, extractedData: true, document: { select: { status: true } } },
+      });
+
+      if (!item) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Inbox item not found.' });
+      }
+
+      // A completed document was signed against the data as it stood. Editing
+      // it afterwards would rewrite the record the signature was given on, and
+      // nothing downstream can act on the change anyway.
+      if (item.document.status === 'COMPLETED') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This document is complete, so its extracted data can no longer be changed.',
+        });
+      }
+
+      const current =
+        item.extractedData && typeof item.extractedData === 'object' && !Array.isArray(item.extractedData)
+          ? { ...(item.extractedData as Record<string, unknown>) }
+          : {};
+
+      const before = current[input.field];
+      const previousValue = before === null || before === undefined ? null : String(before);
+      const next = input.value.trim();
+
+      // An empty value removes the key rather than storing "". A rule written
+      // as "PO number is missing" tests for absence, and an empty string is
+      // present — so storing one would quietly satisfy the rule it should trip.
+      if (next === '') {
+        delete current[input.field];
+      } else {
+        current[input.field] = next;
+      }
+
+      await prisma.$transaction([
+        prisma.signatureInboxItem.update({
+          where: { id: item.id },
+          data: { extractedData: current as never },
+        }),
+        prisma.inboxFieldEdit.create({
+          data: {
+            inboxItemId: item.id,
+            field: input.field,
+            previousValue,
+            newValue: next === '' ? null : next,
+            editedById: ctx.user.id,
+          },
+        }),
+      ]);
+
+      return { field: input.field, value: next === '' ? null : next };
+    }),
+
+  /**
+   * Read an attached file with OCR — the purchase order a signer attached, in
+   * practice. Explicitly triggered by an org member; see `runAttachmentOcr` for
+   * why this is never automatic.
+   */
+  readAttachment: authenticatedProcedure
+    .input(
+      z.object({
+        supportingFileId: z.string(),
+        templateId: z.number().int().positive().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireOrgMember(ctx.user.id);
+
+      // Checked here so an unknown or out-of-tenant id answers 404 rather than
+      // surfacing the runner's throw as an opaque 500.
+      const exists = await prisma.documentSupportingFile.findFirst({
+        where: { id: input.supportingFileId, document: { organizationId: membership.organizationId } },
+        select: { id: true },
+      });
+
+      if (!exists) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Attachment not found.' });
+      }
+
+      return runAttachmentOcr({
+        supportingFileId: input.supportingFileId,
+        organizationId: membership.organizationId,
+        userId: ctx.user.id,
+        templateId: input.templateId,
+      });
     }),
 
   /** Count of unread items for the sidebar badge. */
