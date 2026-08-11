@@ -62,6 +62,25 @@ const PRESETS = [
     },
   },
   {
+    name: 'Attached file must be a purchase order',
+    gate: 'DOCUMENT_SIGN' as const,
+    message:
+      'We could not read a PO number from the file you attached. Attach the purchase order itself, as a PDF or a clear photo — Word and Excel files cannot be read.',
+    // Pairs with "Supporting document required", which only counts files and is
+    // therefore satisfied by a photo of anything. This one checks that what was
+    // attached is actually the purchase order.
+    //
+    // The `count > 0` guard is what keeps both messages truthful. Without it
+    // this fires on a document with nothing attached too, and the signer is told
+    // we could not read a file they never sent.
+    condition: {
+      and: [
+        { '>': [{ var: 'attachments.count' }, 0] },
+        { '!': [{ var: 'attachedPo.po_number' }] },
+      ],
+    },
+  },
+  {
     name: 'Attached PO must match the invoice',
     gate: 'DOCUMENT_SIGN' as const,
     message:
@@ -83,6 +102,31 @@ const PRESETS = [
       and: [
         { var: 'attachedPo.total_comparable' },
         { '>': [{ var: 'attachedPo.total_difference' }, 1] },
+      ],
+    },
+  },
+  {
+    name: 'Attached PO required and must match',
+    gate: 'DOCUMENT_SIGN' as const,
+    message:
+      'Attach the purchase order for this invoice before signing. It must show the same PO number as the invoice, and be a PDF or a clear photo so it can be read.',
+    // The strict form of the three PO presets above, collapsed into one rule:
+    // nothing attached, an attachment carrying no PO number, and an attachment
+    // whose PO number disagrees all fail it. Use it INSTEAD of them rather than
+    // alongside — the trade-off for one rule is one message covering three
+    // different causes, which is why the layered version exists as well.
+    //
+    // Attaching a PO to an invoice that had no PO number of its own clears this:
+    // the attachment's number is copied onto the invoice, so the two then agree.
+    //
+    // The `fromInbox` guard is not optional. `po_matches_invoice` needs a number
+    // on BOTH sides, and the invoice's side comes from the inbox item's extracted
+    // data — on a hand-uploaded document there is none, nothing can ever match,
+    // and every signer is blocked with no way through.
+    condition: {
+      and: [
+        { var: 'document.fromInbox' },
+        { '!': [{ var: 'attachedPo.po_matches_invoice' }] },
       ],
     },
   },
