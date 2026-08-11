@@ -5773,6 +5773,10 @@ msgstr "Login"
 msgid "Longest wait: <0>{0}</0>, {1}"
 msgstr "Longest wait: <0>{0}</0>, {1}"
 
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Lower numbers are listed first. Priority only orders the messages when several rules fire together — it does not decide which rule wins. Every active rule is checked, and one blocking rule is enough to refuse the action."
+msgstr "Lower numbers are listed first. Priority only orders the messages when several rules fire together — it does not decide which rule wins. Every active rule is checked, and one blocking rule is enough to refuse the action."
+
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Mailbox ID (optional)"
 msgstr "Mailbox ID (optional)"
@@ -7356,6 +7360,19 @@ msgstr "Print with audit certificate"
 #: packages/ui/components/document/document-download-button.tsx
 msgid "Print without audit certificate"
 msgstr "Print without audit certificate"
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Priority"
+msgstr "Priority"
+
+#. placeholder {0}: rule.priority
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "priority {0}"
+msgstr "priority {0}"
+
+#: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+msgid "Priority must be a whole number between 0 and 1000"
+msgstr "Priority must be a whole number between 0 and 1000"
 
 #: apps/remix/app/components/tables/templates-table.tsx
 #: apps/remix/app/components/general/template/template-type.tsx

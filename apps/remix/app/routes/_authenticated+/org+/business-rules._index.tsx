@@ -166,6 +166,8 @@ function BusinessRulesPage() {
     outcome: string;
     message: string;
     condition: string;
+    /** Held as text so clearing the box isn't NaN mid-edit; parsed on submit. */
+    priority: string;
   } | null>(null);
 
   const [testDocumentId, setTestDocumentId] = useState('');
@@ -218,6 +220,18 @@ function BusinessRulesPage() {
       return;
     }
 
+    // Bounds match the API's own, so an out-of-range number says what's wrong
+    // here instead of coming back as a raw validation error.
+    const priority = draft.priority.trim() === '' ? 0 : Number(draft.priority);
+
+    if (!Number.isInteger(priority) || priority < 0 || priority > 1000) {
+      toast({
+        title: _(msg`Priority must be a whole number between 0 and 1000`),
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const payload = {
       name: draft.name,
       gate: draft.gate as 'DOCUMENT_SIGN',
@@ -225,7 +239,7 @@ function BusinessRulesPage() {
       outcome: draft.outcome as 'BLOCK',
       message: draft.message,
       conditionConfig,
-      priority: 0,
+      priority,
     };
 
     if (draft.id) {
@@ -263,6 +277,7 @@ function BusinessRulesPage() {
                 outcome: 'BLOCK',
                 message: '',
                 condition: '{\n  "!": [{ "var": "ocr.po_number" }]\n}',
+                priority: '0',
               })
             }
           >
@@ -309,6 +324,7 @@ function BusinessRulesPage() {
                       outcome: 'BLOCK',
                       message: preset.message,
                       condition: JSON.stringify(preset.condition, null, 2),
+                      priority: '0',
                     })
                   }
                 >
@@ -372,17 +388,47 @@ function BusinessRulesPage() {
             </div>
           </div>
 
-          <div className="mt-3">
-            <label className={label}>
-              <Trans>Message shown when it fires</Trans>
-            </label>
-            <Input
-              className="h-8 text-[13px]"
-              placeholder="This invoice has no PO number. Add one before signing."
-              value={draft.message}
-              onChange={(e) => setDraft({ ...draft, message: e.target.value })}
-            />
+          {/*
+            Priority sits next to the message because that is all it affects.
+            Naming it "priority" invites the reading that it decides which rule
+            wins, so the hint below says plainly that it does not.
+          */}
+          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_140px]">
+            <div>
+              <label className={label}>
+                <Trans>Message shown when it fires</Trans>
+              </label>
+              <Input
+                className="h-8 text-[13px]"
+                placeholder="This invoice has no PO number. Add one before signing."
+                value={draft.message}
+                onChange={(e) => setDraft({ ...draft, message: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className={label}>
+                <Trans>Priority</Trans>
+              </label>
+              <Input
+                className="h-8 text-[13px]"
+                type="number"
+                min={0}
+                max={1000}
+                step={1}
+                value={draft.priority}
+                onChange={(e) => setDraft({ ...draft, priority: e.target.value })}
+              />
+            </div>
           </div>
+
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            <Trans>
+              Lower numbers are listed first. Priority only orders the messages when several rules
+              fire together — it does not decide which rule wins. Every active rule is checked, and
+              one blocking rule is enough to refuse the action.
+            </Trans>
+          </p>
 
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             <div>
@@ -480,6 +526,16 @@ function BusinessRulesPage() {
                         <Trans>off</Trans>
                       </span>
                     )}
+                    {/*
+                      Only when it has been changed from the default. The list is
+                      already sorted by it, so on an all-zero set the badge would
+                      be noise on every row and tell nobody anything.
+                    */}
+                    {rule.priority !== 0 && (
+                      <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        <Trans>priority {rule.priority}</Trans>
+                      </span>
+                    )}
                   </p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">{rule.message}</p>
                   <code className="mt-1 block overflow-x-auto font-mono text-[10px] text-muted-foreground">
@@ -500,6 +556,7 @@ function BusinessRulesPage() {
                         outcome: rule.outcome,
                         message: rule.message,
                         condition: JSON.stringify(rule.conditionConfig, null, 2),
+                        priority: String(rule.priority),
                       })
                     }
                   >
