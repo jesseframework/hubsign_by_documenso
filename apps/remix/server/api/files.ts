@@ -422,8 +422,16 @@ export const filesRoute = new Hono<HonoEnv>()
    * Two ways in, mirroring who legitimately needs it: a signed-in user with
    * access to the parent document, or a recipient holding a signing token for
    * it. Anything else is a 404 — never "forbidden", which would confirm the id.
+   *
+   * The path carries a literal `file/` segment, and must keep it. This route was
+   * originally `/supporting/:id`, which `GET /supporting/:token` above matches
+   * just as well — so every download was answered by the list handler, which
+   * read the file id as a signing token, found no recipient, and returned
+   * `{"error":"Invalid signing link."}` with a 404. Two single-segment GETs
+   * under the same prefix cannot be told apart by ordering; only a distinct
+   * path fixes it.
    */
-  .get('/supporting/:id', async (c) => {
+  .get('/supporting/file/:id', async (c) => {
     try {
       const id = c.req.param('id');
       const recipientToken = new URL(c.req.url).searchParams.get('recipientToken');

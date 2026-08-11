@@ -56,7 +56,7 @@ export const DocumentSupportingFiles = ({ documentId }: { documentId: number }) 
               the sanitized filename and no JS has to touch the bytes.
             */}
             <a
-              href={`/api/files/supporting/${file.id}`}
+              href={`/api/files/supporting/file/${file.id}`}
               download={file.fileName}
               className="flex flex-shrink-0 items-center gap-1 rounded-[var(--r-sm)] border border-border px-2 py-1 text-[11px] hover:bg-muted"
             >
