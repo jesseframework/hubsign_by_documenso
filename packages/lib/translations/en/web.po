@@ -9765,6 +9765,12 @@ msgstr "The token was deleted successfully."
 msgid "The token you have used to reset your password is either expired or it never existed. If you have still forgotten your password, please request a new reset link."
 msgstr "The token you have used to reset your password is either expired or it never existed. If you have still forgotten your password, please request a new reset link."
 
+#. placeholder {0}: String(totalRead)
+#. placeholder {1}: String(subtotalRead)
+#: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
+msgid "The total read ({0}) is less than the subtotal ({1}), which no real document can be — the extractor has most likely picked up a line-item price. The amount comparison was skipped for this attachment, so an amount rule did not check it. The PO number is unaffected."
+msgstr "The total read ({0}) is less than the subtotal ({1}), which no real document can be — the extractor has most likely picked up a line-item price. The amount comparison was skipped for this attachment, so an amount rule did not check it. The PO number is unaffected."
+
 #: apps/remix/app/components/forms/signin.tsx
 msgid "The two-factor authentication code provided is incorrect"
 msgstr "The two-factor authentication code provided is incorrect"

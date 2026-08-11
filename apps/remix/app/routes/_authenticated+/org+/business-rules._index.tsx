@@ -106,6 +106,20 @@ const PRESETS = [
     },
   },
   {
+    name: 'PO figures could not be verified',
+    gate: 'DOCUMENT_SIGN' as const,
+    message:
+      'The purchase order total could not be read reliably, so it was not checked against the invoice. Verify the figures manually before signing.',
+    // The fail-closed counterpart to the amount rule above.
+    //
+    // When an attachment's total comes back below its own subtotal the
+    // extraction is provably wrong, so the amount comparison is withheld rather
+    // than blocking on a misread. That protects the signer from a false block,
+    // but it also means nothing checked the figures. Turn this on if unverified
+    // is worse than inconvenient for your organization.
+    condition: { var: 'attachedPo.total_unreliable' },
+  },
+  {
     name: 'Attached PO required and must match',
     gate: 'DOCUMENT_SIGN' as const,
     message:

@@ -103,6 +103,25 @@ export function AttachmentOcrPanel({
           const readable = READABLE.test(file.fileName);
           const isPending = read.isPending && read.variables?.supportingFileId === file.id;
 
+          /*
+            Mirrors the rule provider's own check: a total below its own subtotal
+            cannot be a real total, because tax and charges only add. Shown here
+            because the figure is displayed either way, and an org reading
+            "Total Amount 28.95" off this panel has no other way to know the
+            amount comparison was withheld rather than passed.
+          */
+          const num = (value: unknown) => {
+            const cleaned = String(value ?? '').replace(/[^0-9.-]/g, '');
+            if (!/\d/.test(cleaned)) return null;
+            const parsed = Number(cleaned);
+
+            return Number.isFinite(parsed) ? parsed : null;
+          };
+          const totalRead = num(extracted.total_amount ?? extracted.total);
+          const subtotalRead = num(extracted.subtotal ?? extracted.sub_total);
+          const totalUnreliable =
+            totalRead !== null && subtotalRead !== null && totalRead < subtotalRead;
+
           return (
             <div key={file.id} className="rounded-[var(--r-sm)] border border-border bg-muted/20 p-2.5">
               <div className="flex items-start gap-2">
@@ -173,6 +192,21 @@ export function AttachmentOcrPanel({
                   ) : (
                     <p className="text-[11px] text-muted-foreground">
                       <Trans>No purchase-order fields were found in this attachment.</Trans>
+                    </p>
+                  )}
+
+                  {totalUnreliable && (
+                    <p className="mt-1 flex items-start gap-1 rounded-[var(--r-sm)] bg-status-pending-bg p-1.5 text-[10px] text-status-pending-text">
+                      <AlertTriangleIcon className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                      <span>
+                        <Trans>
+                          The total read ({String(totalRead)}) is less than the subtotal (
+                          {String(subtotalRead)}), which no real document can be — the extractor has
+                          most likely picked up a line-item price. The amount comparison was skipped
+                          for this attachment, so an amount rule did not check it. The PO number is
+                          unaffected.
+                        </Trans>
+                      </span>
                     </p>
                   )}
 
