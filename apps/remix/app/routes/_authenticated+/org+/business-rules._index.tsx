@@ -11,6 +11,7 @@ import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { OrgAdminGuard } from '~/components/general/org-admin-guard';
+import { RuleOverrideQueue } from '~/components/general/rules/rule-override-queue';
 import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
@@ -300,6 +301,12 @@ function BusinessRulesPage() {
           </Button>
         )}
       </div>
+
+      {/*
+        Above the rest: somebody is stuck right now and cannot proceed without an
+        answer, which outranks anything else on this page.
+      */}
+      <RuleOverrideQueue />
 
       {/*
         Stated up front because it changes how rules should be written: these

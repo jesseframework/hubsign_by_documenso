@@ -918,6 +918,10 @@ msgstr "A secret that will be sent to your URL so you can verify that the reques
 msgid "A secret that will be sent to your URL so you can verify that the request has been sent by HubSign."
 msgstr "A secret that will be sent to your URL so you can verify that the request has been sent by HubSign."
 
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "A signer was stopped by a rule and cannot fix it themselves. Approving waives only the rules listed, and only for that document."
+msgstr "A signer was stopped by a rule and cannot fix it themselves. Approving waives only the rules listed, and only for that document."
+
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "A stable internet connection"
 msgstr "A stable internet connection"
@@ -1816,6 +1820,10 @@ msgstr "Approve"
 msgid "Approve Document"
 msgstr "Approve Document"
 
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Approve exception"
+msgstr "Approve exception"
+
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
 #: apps/remix/app/components/general/document/document-page-view-recipients.tsx
 #: packages/lib/constants/recipient-roles.ts
@@ -1879,6 +1887,15 @@ msgstr "Arrange the columns you want once, save the layout, and it will be here 
 #: apps/remix/app/routes/_authenticated+/dms+/ai.tsx
 msgid "Ask questions about your documents, generate reports, and get insights."
 msgstr "Ask questions about your documents, generate reports, and get insights."
+
+#: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
+msgid "Ask the sender to approve an exception for this document. They will see what blocked you."
+msgstr "Ask the sender to approve an exception for this document. They will see what blocked you."
+
+#. placeholder {0}: item.recipient?.name || item.recipient?.email || 'a signer'
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "asked by {0}"
+msgstr "asked by {0}"
 
 #: apps/remix/app/components/general/metadata/signer-chain-editor.tsx
 msgid "Asked one at a time, top to bottom. Drag order = signing order."
@@ -2356,6 +2373,10 @@ msgstr "Cancelled"
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
 msgid "Cancelled by user"
 msgstr "Cancelled by user"
+
+#: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
+msgid "Cannot fix this?"
+msgstr "Cannot fix this?"
 
 #: apps/remix/app/components/embed/authoring/configure-document-upload.tsx
 msgid "Cannot remove document"
@@ -3327,6 +3348,7 @@ msgid "Decision recorded"
 msgstr "Decision recorded"
 
 #: apps/remix/app/components/general/teams/team-invitations.tsx
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
 #: packages/email/templates/team-invite.tsx
 msgid "Decline"
 msgstr "Decline"
@@ -4784,6 +4806,10 @@ msgstr "Exceeded timeout"
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "Excel workbooks (.xlsx) aren't supported. In Excel choose File → Save As → CSV UTF-8, then upload that file."
 msgstr "Excel workbooks (.xlsx) aren't supported. In Excel choose File → Save As → CSV UTF-8, then upload that file."
+
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Exception approved — the signer can now sign"
+msgstr "Exception approved — the signer can now sign"
 
 #. placeholder {0}: data.domains.join(', ')
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
@@ -7874,9 +7900,17 @@ msgstr "Renews: {formattedDate}"
 msgid "Repeat Password"
 msgstr "Repeat Password"
 
+#: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
+msgid "Request approval to sign"
+msgstr "Request approval to sign"
+
 #: apps/remix/app/routes/_authenticated+/org+/approvals.$id.tsx
 msgid "Request cancelled"
 msgstr "Request cancelled"
+
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Request declined"
+msgstr "Request declined"
 
 #: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
 msgid "Request Document Retrieval"
@@ -9859,6 +9893,10 @@ msgstr "The webhook has been updated successfully."
 msgid "The webhook was successfully created."
 msgstr "The webhook was successfully created."
 
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Their reason"
+msgstr "Their reason"
+
 #: apps/remix/app/components/general/app-topbar-preferences.tsx
 msgid "Theme"
 msgstr "Theme"
@@ -10070,6 +10108,10 @@ msgstr "This is how the document will reach the recipients once the document is 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "This is what reads the inbox. Generate it in WorkHub with email.read permission."
 msgstr "This is what reads the inbox. Generate it in WorkHub with email.read permission."
+
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "This is with an approval chain. It will be granted automatically when the chain approves."
+msgstr "This is with an approval chain. It will be granted automatically when the chain approves."
 
 #: apps/remix/app/routes/_unauthenticated+/team.verify.transfer.$token.tsx
 msgid "This link is invalid or has expired. Please contact your team to resend a transfer request."
@@ -11064,6 +11106,14 @@ msgstr "Waiting on"
 msgid "Waiting on you"
 msgstr "Waiting on you"
 
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Waiting on you — requests to sign despite a block"
+msgstr "Waiting on you — requests to sign despite a block"
+
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Waives:"
+msgstr "Waives:"
+
 #: packages/email/templates/subscription-renewal-reminder.tsx
 msgid "Want to make changes first? Update or cancel your plan from your <0>billing settings</0>."
 msgstr "Want to make changes first? Update or cancel your plan from your <0>billing settings</0>."
@@ -11222,6 +11272,10 @@ msgstr "We encountered an unknown error while attempting update the team email. 
 #: apps/remix/app/components/forms/profile.tsx
 msgid "We encountered an unknown error while attempting update your profile. Please try again later."
 msgstr "We encountered an unknown error while attempting update your profile. Please try again later."
+
+#: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
+msgid "We have asked the sender to approve an exception. You can close this page — come back to this link and press Sign again once they have."
+msgstr "We have asked the sender to approve an exception. You can close this page — come back to this link and press Sign again once they have."
 
 #: apps/remix/app/components/dialogs/team-email-add-dialog.tsx
 msgid "We have sent a confirmation email for verification."
@@ -11395,6 +11449,10 @@ msgstr "Welcome to HubSign!"
 #: apps/remix/app/routes/_recipient+/sign.$token+/waiting.tsx
 msgid "Were you trying to edit this document instead?"
 msgstr "Were you trying to edit this document instead?"
+
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "What blocked them"
+msgstr "What blocked them"
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 msgid "What is actually holding them up"
@@ -12094,6 +12152,10 @@ msgstr "Your recovery code has been copied to your clipboard."
 #: apps/remix/app/components/forms/2fa/enable-authenticator-app-dialog.tsx
 msgid "Your recovery codes are listed below. Please store them in a safe place."
 msgstr "Your recovery codes are listed below. Please store them in a safe place."
+
+#: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
+msgid "Your request has been sent"
+msgstr "Your request has been sent"
 
 #: apps/remix/app/routes/_unauthenticated+/signin.tsx
 msgid "Your session has ended. This can happen if your session expired or you signed in from another device. Please sign in again to continue."

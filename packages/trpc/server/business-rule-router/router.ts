@@ -2,11 +2,13 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import { evaluateGate } from '@documenso/lib/server-only/rules/evaluate-gate';
+import { decideRuleOverride, requestRuleOverride } from '@documenso/lib/server-only/rules/overrides';
 import { buildRuleContext, ruleFieldCatalogue } from '@documenso/lib/server-only/rules/registry';
 import { RULE_GATES, RULE_GATE_LABELS, RULE_OUTCOMES } from '@documenso/lib/server-only/rules/types';
 import { prisma } from '@documenso/prisma';
+import { BusinessRuleOverrideStatus } from '@prisma/client';
 
-import { authenticatedProcedure, router } from '../trpc';
+import { authenticatedProcedure, procedure, router } from '../trpc';
 
 const requireOrgAdmin = async (userId: number) => {
   const membership = await prisma.organizationMember.findFirst({
@@ -174,5 +176,164 @@ export const businessRuleRouter = router({
       const verdict = await evaluateGate({ gate: input.gate, subject, context });
 
       return { document, context, verdict };
+    }),
+
+  /**
+   * A signer asking to be let past the rules blocking them.
+   *
+   * Unauthenticated on purpose — the signer holds a signing token, not an account,
+   * which is exactly the person this exists for. The token is the authorisation:
+   * it identifies the recipient AND the document, so neither is taken from input.
+   */
+  requestOverride: procedure
+    .input(z.object({ token: z.string().min(1), reason: z.string().max(1000).optional() }))
+    .mutation(async ({ input }) => {
+      const recipient = await prisma.recipient.findFirst({
+        where: { token: input.token },
+        select: {
+          id: true,
+          documentId: true,
+          document: { select: { id: true, organizationId: true, status: true, deletedAt: true } },
+        },
+      });
+
+      if (!recipient?.document || recipient.document.deletedAt) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Signing link not found.' });
+      }
+
+      const { document } = recipient;
+
+      if (!document.organizationId) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This document has no organization, so it has no rules to override.',
+        });
+      }
+
+      if (document.status === 'COMPLETED') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This document is already complete.',
+        });
+      }
+
+      // Re-evaluated here rather than trusted from the client: what gets waived is
+      // decided by what is actually blocking on the server, not by whatever a
+      // caller says was on their screen.
+      const verdict = await evaluateGate({
+        gate: 'DOCUMENT_SIGN',
+        subject: {
+          organizationId: document.organizationId,
+          entityType: 'Document',
+          entityId: String(document.id),
+          actorUserId: null,
+          recipientId: recipient.id,
+        },
+      });
+
+      return requestRuleOverride({
+        documentId: document.id,
+        organizationId: document.organizationId,
+        recipientId: recipient.id,
+        reason: input.reason,
+        blocks: verdict.blocks.map((b) => ({
+          ruleId: b.ruleId,
+          name: b.name,
+          message: b.message,
+        })),
+      });
+    }),
+
+  /** Override requests awaiting a decision, for the organization's queue. */
+  listOverrides: authenticatedProcedure
+    .input(z.object({ status: z.nativeEnum(BusinessRuleOverrideStatus).optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id },
+        orderBy: { joinedAt: 'asc' },
+      });
+
+      if (!membership) return [];
+
+      return prisma.businessRuleOverride.findMany({
+        where: {
+          organizationId: membership.organizationId,
+          status: input?.status ?? BusinessRuleOverrideStatus.PENDING,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        include: {
+          rules: true,
+          document: { select: { id: true, title: true, userId: true } },
+          recipient: { select: { email: true, name: true } },
+          decidedBy: { select: { name: true, email: true } },
+        },
+      });
+    }),
+
+  /**
+   * Approve or decline an override directly.
+   *
+   * The path used when no approval template covers overrides: the request waits on
+   * the document's own sender. Restricted to an org admin or the person who sent
+   * the document — a waiver of a payment control is not something any member of
+   * the organization should be able to grant themselves.
+   */
+  decideOverride: authenticatedProcedure
+    .input(
+      z.object({
+        overrideId: z.string().min(1),
+        approved: z.boolean(),
+        note: z.string().max(1000).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id },
+        orderBy: { joinedAt: 'asc' },
+      });
+
+      if (!membership) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'You are not a member of an organization.' });
+      }
+
+      const override = await prisma.businessRuleOverride.findFirst({
+        where: { id: input.overrideId, organizationId: membership.organizationId },
+        select: {
+          id: true,
+          approvalRequestId: true,
+          document: { select: { userId: true } },
+        },
+      });
+
+      if (!override) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Override request not found.' });
+      }
+
+      const isSender = override.document.userId === ctx.user.id;
+
+      if (membership.role !== 'ORG_ADMIN' && !isSender) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only an organization administrator or the sender can decide this.',
+        });
+      }
+
+      // An approval chain owns this one. Deciding it here would leave the chain
+      // running and its approvers still holding live links.
+      if (override.approvalRequestId) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message:
+            'This request is with an approval chain. Decide it from the approval, not here.',
+        });
+      }
+
+      return decideRuleOverride({
+        overrideId: override.id,
+        approved: input.approved,
+        decidedByUserId: ctx.user.id,
+        note: input.note,
+      });
     }),
 });

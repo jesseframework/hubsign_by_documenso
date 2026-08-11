@@ -81,10 +81,19 @@ export type RuleHit = {
 };
 
 export type GateVerdict = {
-  /** False when at least one BLOCK rule fired. */
+  /** False when at least one BLOCK rule fired and was not waived. */
   allowed: boolean;
   blocks: RuleHit[];
   warnings: RuleHit[];
+  /**
+   * BLOCK rules that fired but were let through by an approved override.
+   *
+   * Kept separate from `warnings` rather than folded in, because the difference
+   * matters when answering why a signature was allowed: a warning was never going
+   * to stop anything, whereas one of these DID stop it until somebody with
+   * authority signed off. Callers log these.
+   */
+  waived: RuleHit[];
   /** Rules evaluated, for logging and for the "why was this allowed" question. */
   evaluated: number;
 };

@@ -247,6 +247,7 @@ export const DocumentSigningForm = ({
                       await completeDocument(undefined, nextSigner);
                     }}
                     role={recipient.role}
+                    signingToken={recipient.token}
                     allowDictateNextSigner={document.documentMeta?.allowDictateNextSigner}
                     defaultNextSigner={
                       nextRecipient
@@ -439,6 +440,7 @@ export const DocumentSigningForm = ({
                       await completeDocument(undefined, nextSigner);
                     }}
                     role={recipient.role}
+                    signingToken={recipient.token}
                     allowDictateNextSigner={
                       nextRecipient && document.documentMeta?.allowDictateNextSigner
                     }

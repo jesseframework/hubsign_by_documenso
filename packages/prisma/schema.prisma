@@ -115,6 +115,7 @@ model User {
   sentReminders            RecipientReminder[]    @relation("UserSentReminders")
   inboxFieldEdits          InboxFieldEdit[]       @relation("UserInboxFieldEdits")
   attachmentOcrRuns        DocumentSupportingFile[] @relation("UserRanAttachmentOcr")
+  decidedRuleOverrides     BusinessRuleOverride[]   @relation("UserDecidedRuleOverrides")
 
   @@index([email])
 }
@@ -456,6 +457,8 @@ model Document {
 
   supportingFiles DocumentSupportingFile[]
 
+  ruleOverrides BusinessRuleOverride[]
+
   @@unique([documentDataId])
   @@index([userId])
   @@index([status])
@@ -658,6 +661,7 @@ model Recipient {
   signatures           Signature[]
   supportingFiles      DocumentSupportingFile[]
   fieldSignedPositions FieldSignedPosition[]
+  ruleOverrideRequests BusinessRuleOverride[]
 
   // Sign reminder tracking. `remindersSent` is the scheduler's own counter —
   // it gates `signReminderMaxCount` and is deliberately NOT bumped by manual
@@ -2635,6 +2639,90 @@ model BusinessRule {
   @@index([organizationId])
   /// The evaluator's hot path: active rules for one org at one gate.
   @@index([organizationId, gate, isActive])
+
+  overrides BusinessRuleOverrideRule[]
+}
+
+enum BusinessRuleOverrideStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// A signer's request to be let past a blocking rule, and its outcome.
+///
+/// A BLOCK is a dead end by design — the signer cannot change the invoice, and
+/// before this there was no way forward at all: they closed the tab and the
+/// document sat unsigned with nobody in the organization aware. This is the
+/// documented way out, and it deliberately is not a bypass: nothing changes
+/// until somebody with authority approves it, and what they approved is kept.
+///
+/// Waives ONLY the rules that were blocking when it was asked for, recorded in
+/// `rules`. A rule that starts blocking later is not covered — the approver
+/// cannot sign off on something that had not happened yet.
+model BusinessRuleOverride {
+  id             String                     @id @default(cuid())
+  organizationId Int
+  documentId     Int
+  status         BusinessRuleOverrideStatus  @default(PENDING)
+
+  /// Why the signer says it should be waived. Shown to the approver.
+  reason String?
+
+  /// The block text as it read when requested, kept verbatim.
+  ///
+  /// Denormalised on purpose: rules get reworded and deleted, and an approval
+  /// record that can silently change meaning afterwards is not an audit trail.
+  blockedReason String
+
+  /// Which recipient asked. Null if the row outlives the recipient.
+  requestedByRecipientId Int?
+
+  /// The approval chain handling this, when the org has a template for it.
+  /// Null means it is waiting on the document owner directly.
+  approvalRequestId String?
+
+  decidedById Int?
+  decidedAt   DateTime?
+  /// The approver's note when declining, so the signer is told why.
+  decisionNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  document    Document                   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  recipient   Recipient?                 @relation(fields: [requestedByRecipientId], references: [id], onDelete: SetNull)
+  decidedBy   User?                      @relation("UserDecidedRuleOverrides", fields: [decidedById], references: [id], onDelete: SetNull)
+  rules       BusinessRuleOverrideRule[]
+
+  /// The signing gate's lookup: approved waivers for one document.
+  @@index([documentId, status])
+  @@index([organizationId, status])
+  @@index([approvalRequestId])
+}
+
+/// Join row naming one rule waived by an override.
+///
+/// A table rather than a `String[]` of ids so the rule can be joined for display
+/// and so deleting a rule cannot leave a dangling id behind that reads as a
+/// waiver of something unknown. `ruleName` is kept alongside for the same reason
+/// `blockedReason` is.
+model BusinessRuleOverrideRule {
+  id         String @id @default(cuid())
+  overrideId String
+  /// Nullable so deleting a rule can null it rather than cascade-deleting the
+  /// audit row. A waiver of a rule that no longer exists then matches nothing at
+  /// the gate, which is correct — there is nothing left to waive.
+  ruleId     String?
+  /// The rule's name when waived, so a deleted rule still reads correctly.
+  ruleName   String
+
+  override BusinessRuleOverride @relation(fields: [overrideId], references: [id], onDelete: Cascade)
+  rule     BusinessRule?        @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@unique([overrideId, ruleId])
+  @@index([ruleId])
 }
 
 /// Reusable HTML email body for workflow SEND_EMAIL steps.
