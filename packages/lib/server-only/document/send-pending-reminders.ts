@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 
 import { msg } from '@lingui/core/macro';
-import { DocumentStatus, SendStatus, SigningStatus } from '@prisma/client';
+import { DocumentStatus, ReminderKind, SendStatus, SigningStatus } from '@prisma/client';
 
 import { mailer } from '@documenso/email/mailer';
 import { DocumentReminderEmailTemplate } from '@documenso/email/templates/document-reminder';
@@ -123,13 +123,29 @@ export const sendPendingReminders = async (): Promise<SendPendingRemindersResult
           text,
         });
 
-        await prisma.recipient.update({
-          where: { id: recipient.id },
-          data: {
-            remindersSent: { increment: 1 },
-            lastReminderAt: new Date(),
-          },
-        });
+        const sentAt = new Date();
+
+        // Counter and log written together. The scheduler reads the counter to
+        // decide whether to send again; the inbox reads the log to say when the
+        // nudges went out. If the two drifted apart, a row would either claim a
+        // reminder it can't date or hide one it did send.
+        await prisma.$transaction([
+          prisma.recipient.update({
+            where: { id: recipient.id },
+            data: {
+              remindersSent: { increment: 1 },
+              lastReminderAt: sentAt,
+            },
+          }),
+          prisma.recipientReminder.create({
+            data: {
+              recipientId: recipient.id,
+              documentId: recipient.document.id,
+              sentAt,
+              kind: ReminderKind.AUTOMATIC,
+            },
+          }),
+        ]);
 
         result.sent += 1;
       } catch (err) {

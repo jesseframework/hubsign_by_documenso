@@ -1,7 +1,7 @@
 import { createElement } from 'react';
 
 import { msg } from '@lingui/core/macro';
-import { DocumentStatus, RecipientRole, SigningStatus } from '@prisma/client';
+import { DocumentStatus, RecipientRole, ReminderKind, SigningStatus } from '@prisma/client';
 import type { Prisma } from '@prisma/client';
 
 import { mailer } from '@documenso/email/mailer';
@@ -212,6 +212,22 @@ export const resendDocument = async ({
                 isResending: true,
               },
             }),
+          });
+
+          // The human-readable reminder log, written inside the same
+          // transaction as the audit row so the two can never disagree.
+          //
+          // `remindersSent` is deliberately left alone: it is the scheduler's
+          // budget against `signReminderMaxCount`, and spending it here would
+          // mean that nudging three people by hand silently switched the
+          // automated reminders off for them.
+          await tx.recipientReminder.create({
+            data: {
+              recipientId: recipient.id,
+              documentId: document.id,
+              kind: ReminderKind.MANUAL,
+              sentByUserId: user.id,
+            },
           });
         },
         { timeout: 30_000 },

@@ -36,6 +36,7 @@ export const SCHEDULER_LOCK_KEYS = {
   signReminders: 8_801_003,
   approvalReminders: 8_801_004,
   subscriptionRenewals: 8_801_005,
+  slaBreachSweep: 8_801_006,
 } as const;
 
 export type ScheduledJob = {

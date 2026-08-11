@@ -1,0 +1,42 @@
+---
+title: Teams vs Organization
+description: Which grouping HubSign uses, and where the settings you are looking for actually live.
+---
+
+import { Callout } from 'nextra/components';
+
+# Teams vs Organization
+
+HubSign has two ways of grouping people. Knowing which one you use saves looking for
+settings in the wrong place.
+
+| | Organization | Team |
+|---|---|---|
+| **What it is** | Your company as a whole — the tenant | An optional sub-group within it |
+| **Holds** | Members, seats, branding, rules, workflows, the inbox, DMS | A narrower document scope with its own preferences |
+| **You use** | **This one** | Not in use |
+
+<Callout type="info">
+  Your deployment is organization-based. Every document belongs to the organization, and
+  the settings you are likely looking for are under **Organization**, not under a team.
+</Callout>
+
+## Where to go instead
+
+| Looking for | Go to |
+|---|---|
+| Branding and colours | [Organization → Settings & Branding](/organization/settings) |
+| Who can see which documents | [Organization → Settings](/organization/settings) (confidentiality), and [DMS Permissions](/dms/permissions) |
+| Adding and removing people | [Organization → Members & Seats](/organization/members) |
+| Email wording and sender behaviour | [Organization → Email Templates](/organization/email-templates) |
+| Everything else | [Organization Overview](/organization) |
+
+## If you do add teams later
+
+Teams carry their own document visibility, email sender details and branding preferences,
+which override the organization's for documents in that team's scope. That is worth knowing
+before creating one: a team with unset preferences does not inherit silently in every case,
+and it becomes a second place to check when a setting appears not to apply.
+
+Unless you have a clear reason to separate a group's documents from the rest of the
+organization, the organization on its own is simpler to administer.

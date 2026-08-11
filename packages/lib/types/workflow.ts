@@ -47,6 +47,11 @@ export const WORKFLOW_EVENTS = [
   // Signature inbox (email-to-sign)
   { key: 'INBOX_EMAIL_RECEIVED', label: 'Inbox email received', group: 'Inbox' },
   { key: 'INBOX_OCR_COMPLETED', label: 'Inbox OCR completed', group: 'Inbox' },
+  {
+    key: 'INBOX_DUPLICATE_DETECTED',
+    label: 'Inbox duplicate invoice detected',
+    group: 'Inbox',
+  },
 ] as const;
 
 export type WorkflowEventKey = (typeof WORKFLOW_EVENTS)[number]['key'];
@@ -138,10 +143,20 @@ export const ZWorkflowActionSchema = z.discriminatedUnion('action', [
     /** Lookup grouping, e.g. "vendor" or "signee". */
     category: z.string().min(1),
     /**
-     * EXACT-match mode: look up by normalized name. Supports {{templating}},
-     * e.g. "{{payload.extractedData.vendor_name}}". Omit to use keyword mode.
+     * NAME-match mode: look up by name. Supports {{templating}}, e.g.
+     * "{{payload.vendorName}}". Omit to use keyword mode.
+     *
+     * Tried exactly first, then fuzzily — the name on an invoice rarely matches
+     * the directory character for character ("Company Ltd." vs "Company
+     * Limited"). The result carries `matchScore` and `matchMethod` so a later
+     * step can treat a fuzzy hit differently from an exact one.
      */
     key: z.string().min(1).optional(),
+    /**
+     * Minimum fuzzy confidence, as a percentage. Below this, the lookup reports
+     * not-found rather than guessing. Exact and legal-form matches always pass.
+     */
+    minScore: z.number().int().min(50).max(100).default(85).optional(),
     /**
      * KEYWORD mode (when `key` is omitted): scan this text for each record's
      * keywords and return the first match. Supports {{templating}}. Defaults to
@@ -158,16 +173,50 @@ export const ZWorkflowActionSchema = z.discriminatedUnion('action', [
      * the inbox payload's `document.id`). Supports {{templating}}.
      */
     documentId: z.union([z.string().min(1), z.number()]).optional(),
-    /** Signers to add before sending. `email`/`name` support {{templating}}. */
+    /**
+     * A path to a signer LIST on the run context, e.g.
+     * `"{{vars.vendor.signers}}"` for the chain on a matched metadata record.
+     *
+     * Needed because `recipients` below is a fixed array written into the
+     * workflow JSON, and `{{ }}` substitutes strings — it cannot expand to "one
+     * entry per signer this vendor happens to have". Entries are used in order.
+     *
+     * When both are given, `recipients` is appended after the resolved list.
+     */
+    recipientsFrom: z.string().min(1).optional(),
+    /**
+     * SEQUENTIAL asks each recipient only once the one before has signed;
+     * PARALLEL asks everyone at once. Omit to take the value from the resolved
+     * list's record, falling back to the document's existing setting.
+     */
+    signingOrder: z.enum(['SEQUENTIAL', 'PARALLEL']).optional(),
+    /** Signers to add before sending. All three fields support {{templating}}. */
     recipients: z
       .array(
         z.object({
           email: z.string().min(1),
           name: z.string().optional(),
-          role: z.enum(['SIGNER', 'APPROVER', 'CC', 'VIEWER']).default('SIGNER'),
+          /**
+           * SIGNER | APPROVER | CC | VIEWER, or a {{template}} resolving to one
+           * — e.g. `{{vars.vendor.signerRole}}` to take the role from the
+           * matched metadata record.
+           *
+           * Typed as a string rather than an enum precisely so a placeholder
+           * can be stored here; the rendered value is validated against
+           * `RECIPIENT_ROLES` at run time and falls back to SIGNER.
+           */
+          role: z.string().default('SIGNER'),
         }),
       )
-      .min(1),
+      /**
+       * Optional now that a list can come from `recipientsFrom`.
+       *
+       * The "at least one source" check lives in the handler rather than in a
+       * `.refine()` here: a refinement makes this a ZodEffects, and
+       * `z.discriminatedUnion` only accepts plain objects — adding one silently
+       * collapsed every other action's type to `never`.
+       */
+      .default([]),
   }),
 ]);
 

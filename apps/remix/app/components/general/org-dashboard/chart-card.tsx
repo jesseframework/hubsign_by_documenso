@@ -1,3 +1,4 @@
+import { ChevronRightIcon } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react/dist/lucide-react';
 
 import { cn } from '@documenso/ui/lib/utils';
@@ -14,6 +15,12 @@ export type ChartCardProps = {
   iconColor?: string;
   /** Caption pinned to the bottom of the card, below the plot. */
   footer?: React.ReactNode;
+  /**
+   * Makes the whole card a button. Used where the plot is a summary and the
+   * detail is worth a panel of its own — the card stays the height of its row
+   * instead of growing a list that breaks the grid.
+   */
+  onClick?: () => void;
   className?: string;
   children: React.ReactNode;
 };
@@ -31,13 +38,19 @@ export const ChartCard = ({
   iconBgColor,
   iconColor,
   footer,
+  onClick,
   className,
   children,
 }: ChartCardProps) => {
+  const Wrapper = onClick ? 'button' : 'div';
+
   return (
-    <div
+    <Wrapper
+      {...(onClick ? { type: 'button' as const, onClick } : {})}
       className={cn(
         'flex flex-col rounded-[var(--r)] border border-border bg-card p-4',
+        onClick &&
+          'group cursor-pointer text-left transition-colors hover:border-primary/40 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
         className,
       )}
     >
@@ -65,7 +78,14 @@ export const ChartCard = ({
 
       <div className="mt-3 flex-1">{children}</div>
 
-      {footer && <div className="mt-3 text-[11px] text-muted-foreground">{footer}</div>}
-    </div>
+      {footer && (
+        <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <span className="min-w-0 truncate">{footer}</span>
+          {onClick && (
+            <ChevronRightIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-40 transition-opacity group-hover:opacity-100" />
+          )}
+        </div>
+      )}
+    </Wrapper>
   );
 };

@@ -40,6 +40,18 @@ export const SCHEDULED_JOBS: ScheduledJob[] = [
     },
   },
   {
+    id: 'sla-breach-sweep',
+    lockKey: SCHEDULER_LOCK_KEYS.slaBreachSweep,
+    // SLA state is computed rather than stored, so nothing fires at the instant
+    // a target elapses. Fifteen minutes is well inside the shortest sensible
+    // target (hours) and costs one query per SLA-enabled organization.
+    intervalMs: 15 * ONE_MINUTE,
+    run: async () => {
+      const { sweepSlaBreaches } = await import('../inbox/sla-breach-sweep');
+      return sweepSlaBreaches();
+    },
+  },
+  {
     id: 'sign-reminders',
     lockKey: SCHEDULER_LOCK_KEYS.signReminders,
     // Reminder cadence is configured in days, so hourly is ample resolution.

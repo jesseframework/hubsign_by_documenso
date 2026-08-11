@@ -1,8 +1,10 @@
 import { useState } from 'react';
 
 import { Trans } from '@lingui/react/macro';
-import { HomeIcon, ChevronRightIcon, MenuIcon, SearchIcon } from 'lucide-react';
+import { HomeIcon, ChevronRightIcon, LogOutIcon, MenuIcon, SearchIcon } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
+
+import { authClient } from '@documenso/auth/client';
 
 import { AppCommandMenu } from './app-command-menu';
 import { TopbarPreferences } from './app-topbar-preferences';
@@ -14,7 +16,25 @@ export type AppTopbarProps = {
 
 export const AppTopbar = ({ onHamburgerClick, title }: AppTopbarProps) => {
   const [isCommandMenuOpen, setIsCommandMenuOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const location = useLocation();
+
+  /**
+   * Sign out is also in the sidebar footer, but that is off-screen on mobile and
+   * scrolls out of reach on a long nav — so the one control that ends a session
+   * was sometimes unreachable. This copy lives in the topbar, which is sticky on
+   * every page and every breakpoint.
+   */
+  const onSignOutClick = () => {
+    if (isSigningOut) {
+      return;
+    }
+
+    // Latched rather than reset: signOut navigates away, so there is no state to
+    // restore, and latching stops a second click firing during the redirect.
+    setIsSigningOut(true);
+    void authClient.signOut();
+  };
 
   // Derive readable page name from path
   const pathParts = location.pathname.split('/').filter(Boolean);
@@ -123,6 +143,20 @@ export const AppTopbar = ({ onHamburgerClick, title }: AppTopbarProps) => {
             onClick={() => setIsCommandMenuOpen(true)}
           >
             <SearchIcon className="h-4 w-4" />
+          </button>
+
+          {/* Sign out — labelled where there is room, icon-only on mobile. */}
+          <button
+            className="flex h-9 items-center justify-center gap-1.5 rounded-md border border-border px-2.5 text-[13px] text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive disabled:opacity-60 sm:px-3"
+            onClick={onSignOutClick}
+            disabled={isSigningOut}
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <LogOutIcon className="h-4 w-4 flex-shrink-0" />
+            <span className="hidden sm:inline">
+              <Trans>Sign out</Trans>
+            </span>
           </button>
         </div>
       </div>

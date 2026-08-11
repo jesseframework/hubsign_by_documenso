@@ -1,0 +1,86 @@
+---
+title: Filing a Document
+description: Upload, classify and file a single record, digital or physical.
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Filing a Document
+
+**Doc Manager → Documents** lists your records. A document page shows the file, its
+metadata, its filing location, its versions, comments and audit history.
+
+## Filing one
+
+<Steps>
+### Upload
+
+Add the file. A document starts as `DRAFT`.
+
+### Set the format
+
+| Format | Use when |
+|---|---|
+| `DIGITAL` | Born digital, no paper exists |
+| `PHYSICAL` | Paper only — the record here is the *index card* for it |
+| `BOTH` | You hold both a scan and the original |
+
+`BOTH` and `PHYSICAL` are the ones that need a filing location, because someone may have
+to go and fetch the paper. See [Retrieval Requests](/dms/retrievals).
+
+### Classify
+
+Set the document type and classification, and add tags. This is what determines the
+retention schedule — see [Compliance Templates](/dms/compliance).
+
+### File it
+
+Choose the Location → Cabinet → Shelf → Bin. For physical records, this must match where
+the paper actually went.
+
+### Set confidentiality
+
+The default comes from your organization settings. Raise it for anything sensitive — see
+[Permissions & Confidentiality](/dms/permissions).
+</Steps>
+
+Once filed and classified, the document becomes `ACTIVE`.
+
+<Callout type="warning">
+  For a `PHYSICAL` or `BOTH` record, file the paper and record the location in the same
+  sitting. A record whose location is wrong is worse than one with no location at all — it
+  sends someone to the wrong shelf and they conclude the document is lost.
+</Callout>
+
+## Versions
+
+A document keeps a version history, so superseding a record does not destroy what came
+before. Where a signed agreement is later amended, the amendment is a new version rather
+than a replacement — the earlier text remains available, which is normally the point of
+keeping it.
+
+## Links between documents
+
+Records can be linked to one another. An invoice to its purchase order, an amendment to the
+original contract, a certificate to the asset it covers.
+
+Worth doing at filing time. Links are the difference between finding *a* document and
+finding the *set* that explains a transaction.
+
+## Comments
+
+Comments on a record are for context that is not metadata — why a document was retained
+after review, or what a discrepancy turned out to be. They appear in the record's history.
+
+## Favourites
+
+Star records you return to. See [Search & Favourites](/dms/search).
+
+## From E-Sign to Doc Manager
+
+A signed document can be filed here as its permanent record. When it is,
+`DMS_DOCUMENT_FILED` fires, so a [workflow](/organization/workflows) can act on it —
+notify a team, or post a reference to another system.
+
+For the evidentiary copy, file the **full sealed PDF including the audit certificate**.
+The version without the certificate is for circulation, not for the archive.

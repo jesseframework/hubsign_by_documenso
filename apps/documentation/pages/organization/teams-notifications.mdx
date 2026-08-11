@@ -1,0 +1,62 @@
+---
+title: Microsoft Teams
+description: Post signing activity to Teams channels as Adaptive Cards.
+---
+
+import { Callout, Steps } from 'nextra/components';
+
+# Microsoft Teams
+
+**Organization → Integrations** connects one Microsoft Teams destination per
+organization and posts signing activity to channels as Adaptive Cards.
+
+## Choosing a transport
+
+| | Power Automate webhook | Azure bot |
+|---|---|---|
+| **Setup** | Paste an incoming webhook URL | Register a bot application |
+| **Effort** | Minutes | Involves Azure |
+| **Cards update in place** | No — each event is a new message | Yes |
+| **Best for** | Getting started, low volume | Busy channels where a thread per document is noise |
+
+The bot's ability to update a card in place matters more than it sounds. Without it, a
+document with four recipients posts five separate messages. With it, one card tracks
+the document through to completion.
+
+<Steps>
+### Connect
+
+Pick a transport and enter its details. One connection serves the whole organization.
+
+### Add channels
+
+Each channel subscribes either to all events or to a chosen subset. Keep noisy events
+out of channels people need to read.
+
+### Test
+
+Send a test card before relying on it.
+</Steps>
+
+## If a test card is rejected
+
+**A 405 response** usually means the URL is not an incoming-webhook URL — a Teams
+channel link or an Office portal URL will produce it. Re-copy the URL from the
+connector configuration in Teams.
+
+**A rejected host** means the URL is not on the allow-list of permitted destinations.
+Outbound URLs are validated before any request is made; that check is deliberate and
+not something to work around.
+
+Teams hands out one of two webhook URL shapes depending on the age of the tenant's
+Power Platform environment, and both are accepted:
+
+```
+https://<env-id>.<region>.environment.api.powerplatform.com:443/powerautomate/…   ← current
+https://prod-12.westus.logic.azure.com/workflows/…                                ← older tenants
+```
+
+<Callout type="info">
+  Requests to Teams leave from WorkHub Cloud, so the webhook URL must be reachable from
+  the internet. Microsoft-hosted webhook URLs always are.
+</Callout>

@@ -22,15 +22,18 @@ import {
   CpuIcon,
   CreditCardIcon,
   DatabaseIcon,
+  FileSpreadsheetIcon,
   FileSearchIcon,
   FileStackIcon,
   FileTextIcon,
   FolderArchiveIcon,
   FolderTreeIcon,
+  GaugeIcon,
   Globe2Icon,
   HeartIcon,
   InboxIcon,
   MailIcon,
+  ScaleIcon,
   LayoutDashboardIcon,
   ListChecksIcon,
   LockIcon,
@@ -226,6 +229,7 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
 
   const orgNav: SubNavItem[] = [
     { to: '/org', icon: LayoutDashboardIcon, label: <Trans>Dashboard</Trans>, exact: true },
+    { to: '/org/sla', icon: GaugeIcon, label: <Trans>SLA</Trans> },
     // `alsoWithoutOrg`: this is the only route to the "Create Organization"
     // form, so it has to stay reachable for someone who isn't in an org yet.
     {
@@ -253,7 +257,9 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
     { to: '/org/permissions', icon: ShieldIcon, label: <Trans>DMS Permissions</Trans>, roles: DMS_ADMIN_TOO },
     { to: '/org/workflows', icon: WorkflowIcon, label: <Trans>Workflows</Trans>, roles: ORG_ADMIN_ONLY },
     { to: '/org/email-templates', icon: MailIcon, label: <Trans>Email Templates</Trans>, roles: ORG_ADMIN_ONLY },
+    { to: '/org/business-rules', icon: ScaleIcon, label: <Trans>Business Rules</Trans>, roles: ORG_ADMIN_ONLY },
     { to: '/org/metadata', icon: DatabaseIcon, label: <Trans>Metadata</Trans> },
+    { to: '/org/exports', icon: FileSpreadsheetIcon, label: <Trans>Exports</Trans> },
     { to: '/org/integrations', icon: PlugIcon, label: <Trans>Integrations</Trans>, roles: ORG_ADMIN_ONLY },
     { to: '/org/approvals', icon: ClipboardCheckIcon, label: <Trans>Approvals</Trans> },
     { to: '/org/approval-templates', icon: ListChecksIcon, label: <Trans>Approval Setup</Trans> },

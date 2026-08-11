@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import { BuildingIcon, PencilIcon, PlusIcon } from 'lucide-react';
+import { BuildingIcon, CopyIcon, PencilIcon, PlusIcon } from 'lucide-react';
 
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
@@ -16,6 +16,31 @@ import { OrgAdminGuard } from '~/components/general/org-admin-guard';
 export function meta() {
   return appMetaTags('Organization Settings');
 }
+
+/**
+ * Newline-delimited textarea → the string[] the DB stores.
+ *
+ * Blank lines are dropped deliberately: an empty pattern is a substring of every
+ * value, so one stray newline would match all inbound mail and silently switch
+ * the whole inbox off. The server-side matcher skips blanks too — this is the
+ * belt to that braces.
+ */
+const toPatternList = (value: string): string[] =>
+  value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+/** ISO weekday numbers (1 = Monday), as the SLA calendar stores them. */
+const WEEKDAYS = [
+  { iso: 1, label: 'Mon' },
+  { iso: 2, label: 'Tue' },
+  { iso: 3, label: 'Wed' },
+  { iso: 4, label: 'Thu' },
+  { iso: 5, label: 'Fri' },
+  { iso: 6, label: 'Sat' },
+  { iso: 7, label: 'Sun' },
+];
 
 function OrgSettingsPage() {
   const { _ } = useLingui();
@@ -51,6 +76,20 @@ function OrgSettingsPage() {
   const [reminderMaxCount, setReminderMaxCount] = useState(3);
   const [remindersInitialized, setRemindersInitialized] = useState(false);
 
+  // SLA — targets are in BUSINESS hours, counted on the working calendar below.
+  const [slaEnabled, setSlaEnabled] = useState(false);
+  const [slaTimezone, setSlaTimezone] = useState('UTC');
+  const [slaWorkingDays, setSlaWorkingDays] = useState<number[]>([1, 2, 3, 4, 5]);
+  const [slaWorkdayStart, setSlaWorkdayStart] = useState('09:00');
+  const [slaWorkdayEnd, setSlaWorkdayEnd] = useState('17:00');
+  const [slaHolidaysText, setSlaHolidaysText] = useState('');
+  const [slaInternalHours, setSlaInternalHours] = useState('8');
+  const [slaEndToEndHours, setSlaEndToEndHours] = useState('72');
+  const [slaInitialized, setSlaInitialized] = useState(false);
+
+  const [includeCertificate, setIncludeCertificate] = useState(true);
+  const [certificateInitialized, setCertificateInitialized] = useState(false);
+
   // SSO / OIDC
   const [oidcEnabled, setOidcEnabled] = useState(false);
   const [oidcClientId, setOidcClientId] = useState('');
@@ -66,6 +105,10 @@ function OrgSettingsPage() {
   // Per-org WorkHub signature-inbox (receive) config
   const [inboxEmail, setInboxEmail] = useState('');
   const [workhubApiKey, setWorkhubApiKey] = useState('');
+  // Kept as raw newline-delimited text while editing so a half-typed line
+  // isn't destroyed by round-tripping through an array on every keystroke.
+  const [inboxBlockedSenders, setInboxBlockedSenders] = useState('');
+  const [inboxBlockedSubjects, setInboxBlockedSubjects] = useState('');
   const [workhubUsername, setWorkhubUsername] = useState('');
   const [workhubPassword, setWorkhubPassword] = useState('');
   const [workhubMailboxId, setWorkhubMailboxId] = useState('');
@@ -179,6 +222,32 @@ function OrgSettingsPage() {
     setRemindersInitialized(true);
   }
 
+  if (!slaInitialized && org) {
+    const orgRec = org as Record<string, unknown>;
+    setSlaEnabled(Boolean(orgRec.slaEnabled));
+    setSlaTimezone((orgRec.slaTimezone as string) || 'UTC');
+    const days = orgRec.slaWorkingDays;
+    if (Array.isArray(days) && days.length) setSlaWorkingDays(days as number[]);
+    setSlaWorkdayStart((orgRec.slaWorkdayStart as string) || '09:00');
+    setSlaWorkdayEnd((orgRec.slaWorkdayEnd as string) || '17:00');
+    setSlaHolidaysText(Array.isArray(orgRec.slaHolidays) ? (orgRec.slaHolidays as string[]).join('\n') : '');
+    setSlaInternalHours(
+      typeof orgRec.slaDefaultInternalHours === 'number' ? String(orgRec.slaDefaultInternalHours) : '',
+    );
+    setSlaEndToEndHours(
+      typeof orgRec.slaDefaultEndToEndHours === 'number' ? String(orgRec.slaDefaultEndToEndHours) : '',
+    );
+    setSlaInitialized(true);
+  }
+
+  if (!certificateInitialized && org) {
+    const orgRec = org as Record<string, unknown>;
+    // Default on when the column is absent, matching the server-side default —
+    // an unset value must not read as "turned off".
+    setIncludeCertificate(orgRec.includeSigningCertificate !== false);
+    setCertificateInitialized(true);
+  }
+
   if (!ssoInitialized && org) {
     const orgRec = org as Record<string, unknown>;
     setOidcEnabled(Boolean(orgRec.oidcEnabled));
@@ -195,6 +264,8 @@ function OrgSettingsPage() {
     setEmailToSignEnabled(Boolean(o.emailToSignEnabled));
     setInboxEmail((o.inboxEmail as string) ?? '');
     setWorkhubApiKey((o.workhubApiKey as string) ?? '');
+    setInboxBlockedSenders(((o.inboxBlockedSenders as string[]) ?? []).join('\n'));
+    setInboxBlockedSubjects(((o.inboxBlockedSubjects as string[]) ?? []).join('\n'));
     setWorkhubUsername((o.workhubUsername as string) ?? '');
     setWorkhubPassword((o.workhubPassword as string) ?? '');
     setWorkhubMailboxId((o.workhubMailboxId as string) ?? '');
@@ -318,6 +389,29 @@ function OrgSettingsPage() {
             <div>
               <label className="text-[12px] font-medium text-muted-foreground">Domain</label>
               <p className="mt-0.5 text-[13px]">{org.domain || 'Not set'}</p>
+            </div>
+            <div>
+              <label className="text-[12px] font-medium text-muted-foreground">
+                Organization ID
+              </label>
+              <div className="mt-0.5 flex items-center gap-1.5">
+                <p className="font-mono text-[13px] tabular-nums">{org.id}</p>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-1.5 text-muted-foreground"
+                  title={_(msg`Copy organization ID`)}
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(String(org.id));
+                    toast({ title: _(msg`Organization ID copied`) });
+                  }}
+                >
+                  <CopyIcon className="h-3 w-3" />
+                </Button>
+              </div>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                <Trans>Quote this when generating a license key or raising support.</Trans>
+              </p>
             </div>
           </div>
         )}
@@ -678,6 +772,68 @@ function OrgSettingsPage() {
         </div>
       )}
 
+      {/* Signed documents — audit certificate */}
+      {isAdmin && (
+        <div className="rounded-[var(--r)] border border-border bg-card p-5">
+          <h2 className="text-[15px] font-semibold">
+            <Trans>Signed Documents</Trans>
+          </h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            <Trans>
+              Controls the Final Audit Report page appended to completed documents.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+            <div className="flex-1 pr-4">
+              <label className="text-[13px] font-medium">
+                <Trans>Attach the audit certificate to signed documents</Trans>
+              </label>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                <Trans>
+                  The certificate is the signing audit trail, so it is normally kept. Turn this
+                  off only if your documents are circulated externally and the extra page is
+                  unwanted — recipients can still download either version.
+                </Trans>
+              </p>
+            </div>
+            <label className="relative inline-flex cursor-pointer items-center">
+              <input
+                type="checkbox"
+                className="peer sr-only"
+                checked={includeCertificate}
+                onChange={(e) => setIncludeCertificate(e.target.checked)}
+              />
+              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+            </label>
+          </div>
+
+          {/*
+            Stated plainly because it is the one thing that surprises people: the
+            certificate is baked into the PDF when the document is sealed, so this
+            setting cannot retroactively add or remove it.
+          */}
+          <p className="mt-3 text-[12px] text-muted-foreground">
+            <Trans>
+              Applies to documents completed from now on. Documents already signed keep the
+              pages they were sealed with — use the Download menu on those to get a copy
+              without the certificate.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() =>
+                void updateOrg.mutateAsync({ includeSigningCertificate: includeCertificate })
+              }
+              loading={updateOrg.isPending}
+            >
+              <Trans>Save Document Settings</Trans>
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Sign Reminders */}
       {isAdmin && (
         <div className="rounded-[var(--r)] border border-border bg-card p-5">
@@ -758,6 +914,192 @@ function OrgSettingsPage() {
               loading={updateOrg.isPending}
             >
               <Trans>Save Reminder Settings</Trans>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* SLA */}
+      {isAdmin && (
+        <div className="rounded-[var(--r)] border border-border bg-card p-5">
+          <h2 className="text-[15px] font-semibold"><Trans>SLA Setup</Trans></h2>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            <Trans>
+              Turnaround targets for Signature Inbox items, measured from the moment the email
+              arrives. Targets are in <strong>business hours</strong> — an invoice arriving Friday
+              evening does not burn the weekend. A vendor's own target on its Metadata record
+              overrides the defaults here.
+            </Trans>
+          </p>
+
+          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+            <div className="flex-1 pr-4">
+              <label className="text-[13px] font-medium"><Trans>Track SLA</Trans></label>
+              <p className="mt-0.5 text-[12px] text-muted-foreground">
+                <Trans>Shows SLA performance on the dashboard and flags overdue items.</Trans>
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={slaEnabled}
+              onClick={() => setSlaEnabled(!slaEnabled)}
+              className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
+                slaEnabled ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  slaEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          {slaEnabled && (
+            <>
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Default internal target (business hours)</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 text-[13px]"
+                    type="number"
+                    min={1}
+                    value={slaInternalHours}
+                    onChange={(e) => setSlaInternalHours(e.target.value)}
+                    placeholder="8"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    <Trans>Received → sent for signature. What your team controls.</Trans>
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Default end-to-end target (business hours)</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 text-[13px]"
+                    type="number"
+                    min={1}
+                    value={slaEndToEndHours}
+                    onChange={(e) => setSlaEndToEndHours(e.target.value)}
+                    placeholder="72"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    <Trans>Received → fully signed. Includes the signer's time.</Trans>
+                  </p>
+                </div>
+              </div>
+
+              <p className="mt-5 text-[12px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <Trans>The clock</Trans>
+              </p>
+
+              <div className="mt-2 grid grid-cols-3 gap-4">
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Timezone</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 text-[13px]"
+                    value={slaTimezone}
+                    onChange={(e) => setSlaTimezone(e.target.value)}
+                    placeholder="America/Jamaica"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">IANA name</p>
+                </div>
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Day starts</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 text-[13px]"
+                    value={slaWorkdayStart}
+                    onChange={(e) => setSlaWorkdayStart(e.target.value)}
+                    placeholder="09:00"
+                  />
+                </div>
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Day ends</Trans>
+                  </label>
+                  <Input
+                    className="mt-1 h-9 text-[13px]"
+                    value={slaWorkdayEnd}
+                    onChange={(e) => setSlaWorkdayEnd(e.target.value)}
+                    placeholder="17:00"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>Working days</Trans>
+                </label>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {WEEKDAYS.map((day) => {
+                    const on = slaWorkingDays.includes(day.iso);
+                    return (
+                      <button
+                        key={day.iso}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() =>
+                          setSlaWorkingDays(
+                            on
+                              ? slaWorkingDays.filter((d) => d !== day.iso)
+                              : [...slaWorkingDays, day.iso].sort((a, b) => a - b),
+                          )
+                        }
+                        className={`h-8 w-12 rounded-md border text-[12px] font-medium transition-colors ${
+                          on
+                            ? 'border-primary bg-primary text-primary-foreground'
+                            : 'border-border text-muted-foreground hover:bg-muted'
+                        }`}
+                      >
+                        {day.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="mt-4">
+                <label className="text-[12px] font-medium text-muted-foreground">
+                  <Trans>Holidays</Trans>
+                </label>
+                <textarea
+                  className="mt-1 min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-[12px]"
+                  value={slaHolidaysText}
+                  onChange={(e) => setSlaHolidaysText(e.target.value)}
+                  placeholder={'2026-12-25\n2027-01-01'}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  <Trans>One yyyy-MM-dd date per line. The clock pauses on these days.</Trans>
+                </p>
+              </div>
+            </>
+          )}
+
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() =>
+                void updateOrg.mutateAsync({
+                  slaEnabled,
+                  slaTimezone: slaTimezone.trim() || null,
+                  slaWorkingDays,
+                  slaWorkdayStart: slaWorkdayStart.trim() || null,
+                  slaWorkdayEnd: slaWorkdayEnd.trim() || null,
+                  slaHolidays: toPatternList(slaHolidaysText),
+                  slaDefaultInternalHours: slaInternalHours ? Number(slaInternalHours) : null,
+                  slaDefaultEndToEndHours: slaEndToEndHours ? Number(slaEndToEndHours) : null,
+                })
+              }
+              loading={updateOrg.isPending}
+            >
+              <Trans>Save SLA Settings</Trans>
             </Button>
           </div>
         </div>
@@ -1029,6 +1371,51 @@ function OrgSettingsPage() {
                 the Signature Inbox after OCR. The BulkSender fields are an optional fallback.
               </Trans>
             </p>
+
+            {/*
+              Loop prevention. Mail from HubSign's own address and from this org's
+              own inbox address is always refused in code — these are the extra
+              org-specific rules on top.
+            */}
+            <div className="mt-4 border-t border-border pt-4">
+              <h3 className="text-[13px] font-semibold">
+                <Trans>Inbound filtering</Trans>
+              </h3>
+              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                <Trans>
+                  One rule per line, matched anywhere in the value and case-insensitively. Mail sent
+                  by HubSign itself, or from this org's own inbox address, is always ignored — you
+                  don't need to list those.
+                </Trans>
+              </p>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Blocked senders</Trans>
+                  </label>
+                  <textarea
+                    className="mt-1 block h-24 w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] outline-none focus:border-primary"
+                    value={inboxBlockedSenders}
+                    onChange={(e) => setInboxBlockedSenders(e.target.value)}
+                    placeholder={'no-reply@\nnotifications@'}
+                    spellCheck={false}
+                  />
+                </div>
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    <Trans>Blocked subjects</Trans>
+                  </label>
+                  <textarea
+                    className="mt-1 block h-24 w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] outline-none focus:border-primary"
+                    value={inboxBlockedSubjects}
+                    onChange={(e) => setInboxBlockedSubjects(e.target.value)}
+                    placeholder={'Signing Complete\nOut of office'}
+                    spellCheck={false}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mt-4 flex justify-end">
@@ -1042,6 +1429,8 @@ function OrgSettingsPage() {
                   workhubPassword: workhubPassword || null,
                   workhubMailboxId: workhubMailboxId || null,
                   workhubApiBase: workhubApiBase || null,
+                  inboxBlockedSenders: toPatternList(inboxBlockedSenders),
+                  inboxBlockedSubjects: toPatternList(inboxBlockedSubjects),
                 })
               }
               loading={updateOrg.isPending}

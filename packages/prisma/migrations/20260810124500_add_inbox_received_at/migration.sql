@@ -1,0 +1,13 @@
+-- True mailbox arrival time for an inbound invoice.
+--
+-- SLA clocks previously started at `createdAt`, which is when the poller
+-- INSERTed the row. That equals arrival only while polling is healthy; after an
+-- outage it does not. In this deployment a 25-day gap ended with ten June
+-- messages ingested inside ten seconds on 4 August, each measured as having
+-- arrived that evening.
+--
+-- Nullable with no backfill: the real arrival time of existing rows is not
+-- recoverable, and inventing one would be worse than the honest fallback to
+-- `createdAt`. Rows keep NULL, the dashboard says how many, and new rows carry
+-- the mail server's own timestamp.
+ALTER TABLE "SignatureInboxItem" ADD COLUMN "receivedAt" TIMESTAMP(3);

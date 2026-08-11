@@ -1,38 +1,67 @@
 ---
 title: Support
-description: Learn what types of support we offer.
+description: Who to contact about HubSign, and what to include so it can be answered quickly.
 ---
+
+import { Callout } from 'nextra/components';
+import { SUPPORT_EMAIL } from '../../site';
 
 # Support
 
-## Community Support
+## Start with your own administrators
 
-If you are a developer or free user, you can reach out to the community or raise an issue:
+Most questions are answered fastest by an **Org Admin** in your organization, because
+most of what people get stuck on is configuration rather than a fault:
 
-### [Create Github Issues](https://github.com/documenso/documenso/issues)
+| Question | They control it under |
+|---|---|
+| I cannot sign in, or I need access | [Members & Seats](/organization/members) |
+| A rule is blocking my signature | [Business Rules](/organization/business-rules) |
+| My approval is stuck with someone | [Approvals](/organization/approvals) |
+| Invoices are not arriving in the inbox | [Signature Inbox](/organization/signature-inbox) |
+| The wrong logo or colours are showing | [Settings & Branding](/organization/settings) |
+| I need a document restored | [Recycle Bin](/organization/recycle-bin) |
 
-The community and the core team address GitHub issues. Be sure to check if a similar issue already exists. Please note that while we want to address everything immediately, we must prioritize.
+## Tenant-level requests
 
-### [Join our Discord](https://documen.so/discord)
+Seats, mailboxes, domains and single sign-on are provisioned in the **WorkHub
+console** rather than in HubSign. An Org Admin with access there can handle:
 
-You can ask for help in the [community help channel](https://discord.com/channels/1132216843537485854/1133419426524430376).
+- buying or reassigning seats
+- creating the mailbox the Signature Inbox reads from
+- adding a domain
 
-## Paid Account Support
+## Contact support
 
-### Email: support@documenso.com
+For anything that is not configuration — something behaving incorrectly, or a
+tenant-level change your administrators cannot make:
 
-If you are paying customers facing issues, email our customer support, especially in urgent cases.
+**Email:** <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
 
-### Private Discord channel
+<Callout type="info">
+  Include the **document ID or reference number**, what you expected, and what
+  happened instead. For a signing problem, say whether you were the sender or a
+  recipient — the two follow different paths through the system and the answer
+  usually differs.
+</Callout>
 
-If you prefer Discord, we can invite you to a private channel. Message support to make this happen.
+### What helps most
 
-## Enterprise Support
+- **The exact message.** A refused signature usually carries a message written by
+  your own organization; quoting it identifies the rule immediately.
+- **When it happened.** Every document keeps an audit log, so a time narrows it down.
+- **Whether it ever worked.** A thing that stopped working points somewhere very
+  different from a thing that never worked.
 
-### Email: support@documenso.com
+## Before reporting a data problem
 
-If you are paying customers facing issues, email our customer support, especially in urgent cases.
+If a figure looks wrong on an invoice, check the extracted data first. OCR is a
+machine's guess, and a misread is far more common than a fault — see
+[OCR Queue & AI](/dms/ocr-ai) and the review step in the
+[Signature Inbox](/organization/signature-inbox).
 
-### Slack
+## Known limitations
 
-If your team is on Slack, we can create a private workspace to support you more closely.
+Some behaviour is a current limitation rather than a fault, and is documented as
+such. Check [Known gaps](/manual#appendix-b--known-gaps) before raising it — it will
+save you a round trip.

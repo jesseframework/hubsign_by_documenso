@@ -178,6 +178,13 @@ function OrgMembersPage() {
         </div>
       )}
 
+      {/*
+        Domain-matched accounts that already exist but belong to no organization.
+        Deliberately a separate list rather than rows in the members table: these
+        people are NOT members yet and must not be counted as such.
+      */}
+      {isAdmin && <DomainCandidates />}
+
       {/* Members list */}
       <div className="rounded-[var(--r)] border border-border bg-card">
         <table className="w-full">
@@ -239,6 +246,182 @@ function OrgMembersPage() {
     </div>
   );
 }
+
+/**
+ * Existing HubSign accounts on one of the org's configured email domains that
+ * aren't in any organization yet — adoptable in one click instead of re-inviting
+ * someone who already has an account.
+ *
+ * Rendered separately from the members table on purpose: "pending" here means
+ * *not a member*, and folding them into that table would inflate the member
+ * count and imply access they do not have.
+ */
+const DomainCandidates = () => {
+  const { _ } = useLingui();
+  const { toast } = useToast();
+  const utils = trpc.useUtils();
+
+  const { data, isLoading } = trpc.org.listDomainCandidates.useQuery();
+  const [roleByUser, setRoleByUser] = useState<Record<number, string>>({});
+  const [seatByUser, setSeatByUser] = useState<Record<number, string>>({});
+
+  const convert = trpc.org.convertDomainCandidate.useMutation({
+    onSuccess: async (result) => {
+      await Promise.all([
+        utils.org.listDomainCandidates.invalidate(),
+        utils.org.getMyOrganization.invalidate(),
+      ]);
+
+      // The membership can succeed while the seat fails (no seats left, for
+      // instance). Reporting only "added" would hide that they're unlicensed.
+      if (result.seat.error) {
+        toast({
+          title: _(msg`${result.email} added, but no seat was assigned`),
+          description: result.seat.error,
+          variant: 'destructive',
+        });
+      } else if (result.seat.assigned) {
+        const tier = result.seat.tier ?? 'licensed';
+        toast({ title: _(msg`${result.email} added with a ${tier} seat`) });
+      } else {
+        toast({ title: _(msg`${result.email} added to the organization`) });
+      }
+    },
+    onError: (error) => toast({ title: error.message, variant: 'destructive' }),
+  });
+
+  const seatOptions = (data?.seatPlans ?? []).filter((p) => p.available > 0);
+
+  // Nothing configured, or nothing to adopt — stay out of the way entirely.
+  if (isLoading || !data || (data.candidates.length === 0 && data.ignoredPublicDomains.length === 0)) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-[var(--r)] border border-border bg-card p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-[14px] font-semibold">
+            <Trans>Pending from your domains</Trans>
+          </h3>
+          <p className="mt-0.5 text-[12px] text-muted-foreground">
+            {data.domains.length > 0 ? (
+              <Trans>
+                Existing HubSign accounts on {data.domains.join(', ')} that aren't in an
+                organization yet.
+              </Trans>
+            ) : (
+              <Trans>No claimable domains are configured.</Trans>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {/*
+        Said plainly because the constraint is not obvious: domains are not
+        verified, so this can only ever offer unaffiliated accounts.
+      */}
+      {data.ignoredPublicDomains.length > 0 && (
+        <p className="mt-2 rounded-[var(--r-sm)] bg-status-pending-bg px-2.5 py-1.5 text-[11px] text-status-pending-text">
+          <Trans>
+            Ignoring {data.ignoredPublicDomains.join(', ')} — shared mailbox providers can't be
+            claimed, since they identify no single organization.
+          </Trans>
+        </p>
+      )}
+
+      {data.candidates.length === 0 ? (
+        <p className="mt-3 text-[12px] text-muted-foreground">
+          <Trans>No unaffiliated accounts found on these domains.</Trans>
+        </p>
+      ) : (
+        <ul className="mt-3 divide-y divide-border">
+          {data.candidates.map((candidate) => (
+            <li key={candidate.id} className="flex items-center justify-between gap-3 py-2.5">
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-medium">
+                  {candidate.name || candidate.email}
+                </p>
+                <p className="truncate text-[11px] text-muted-foreground">{candidate.email}</p>
+                {/*
+                  Shown before the click, not after: seating them cancels their
+                  own subscription, and that is the admin's decision to make
+                  knowingly.
+                */}
+                {candidate.hasPersonalPlan && (
+                  <p className="mt-0.5 text-[11px] text-status-pending-text">
+                    <Trans>
+                      Has a personal subscription — assigning a seat cancels it (prorated credit).
+                    </Trans>
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-shrink-0 items-center gap-2">
+                <span className="rounded-full bg-status-pending-bg px-2 py-0.5 text-[10px] font-medium text-status-pending-text">
+                  <Trans>Pending</Trans>
+                </span>
+
+                <select
+                  className="h-7 rounded-[var(--r-sm)] border border-border bg-background px-1.5 text-[12px]"
+                  value={seatByUser[candidate.id] ?? ''}
+                  onChange={(e) =>
+                    setSeatByUser((prev) => ({ ...prev, [candidate.id]: e.target.value }))
+                  }
+                  aria-label={`Seat for ${candidate.email}`}
+                >
+                  <option value="">No seat</option>
+                  {seatOptions.map((plan) => (
+                    <option key={plan.tier} value={plan.tier}>
+                      {plan.tier} ({plan.available} left)
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  className="h-7 rounded-[var(--r-sm)] border border-border bg-background px-1.5 text-[12px]"
+                  value={roleByUser[candidate.id] ?? 'MEMBER'}
+                  onChange={(e) =>
+                    setRoleByUser((prev) => ({ ...prev, [candidate.id]: e.target.value }))
+                  }
+                  aria-label={`Role for ${candidate.email}`}
+                >
+                  <option value="MEMBER">Member</option>
+                  <option value="MANAGER">Manager</option>
+                  <option value="TEAM_ADMIN">Team Admin</option>
+                  <option value="DMS_ADMIN">DMS Admin</option>
+                  <option value="ORG_ADMIN">Org Admin</option>
+                </select>
+
+                <Button
+                  size="sm"
+                  className="h-7 text-[12px]"
+                  loading={convert.isPending && convert.variables?.userId === candidate.id}
+                  disabled={convert.isPending}
+                  onClick={() => {
+                    const seatTier = seatByUser[candidate.id] || undefined;
+
+                    convert.mutate({
+                      userId: candidate.id,
+                      role: (roleByUser[candidate.id] ?? 'MEMBER') as 'MEMBER',
+                      seatTier: seatTier as 'BUSINESS' | undefined,
+                      // Only pre-acknowledged when the admin can actually see the
+                      // warning above AND chose to consume a seat, so the
+                      // cancellation is never a surprise.
+                      acknowledgeCancelPersonalPlan: Boolean(seatTier && candidate.hasPersonalPlan),
+                    });
+                  }}
+                >
+                  <Trans>Convert</Trans>
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+};
 
 /**
  * Administrative screen: withheld from ordinary members. The sidebar also

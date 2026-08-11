@@ -10,12 +10,10 @@
   "signing-documents": "Signing Documents",
   "templates": "Templates",
   "direct-links": "Direct Signing Links",
-  "teams": "Teams",
+  "teams": "Teams vs Organization",
   "-- Legal Overview": {
     "type": "separator",
     "title": "Legal Overview"
   },
-  "fair-use": "Fair Use Policy",
-  "licenses": "Licenses",
   "compliance": "Compliance"
 }

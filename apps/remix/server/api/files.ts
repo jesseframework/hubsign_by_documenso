@@ -7,7 +7,14 @@ import { getOptionalSession } from '@documenso/auth/server/lib/utils/get-session
 import { APP_DOCUMENT_UPLOAD_SIZE_LIMIT } from '@documenso/lib/constants/app';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import { createDocumentData } from '@documenso/lib/server-only/document-data/create-document-data';
+import { getDocumentWhereInput } from '@documenso/lib/server-only/document/get-document-by-id';
 import { getDocumentAndRecipientByToken } from '@documenso/lib/server-only/document/get-document-by-token';
+import {
+  MAX_SUPPORTING_FILES_PER_RECIPIENT,
+  sanitizeSupportingFileName,
+  validateSupportingFile,
+} from '@documenso/lib/server-only/document/supporting-file-types';
+import { getFileServerSide } from '@documenso/lib/universal/upload/get-file.server';
 import { getApiTokenByToken } from '@documenso/lib/server-only/public-api/get-api-token-by-token';
 import { putFileServerSide } from '@documenso/lib/universal/upload/put-file.server';
 import {
@@ -16,7 +23,12 @@ import {
 } from '@documenso/lib/universal/upload/server-actions';
 import { prisma } from '@documenso/prisma';
 
+import { runAttachmentOcr } from '@documenso/lib/server-only/inbox/run-attachment-ocr';
+import { readOcrField } from '@documenso/lib/universal/ocr-fields';
+import { stripFieldLabel } from '@documenso/lib/universal/reference-number';
+
 import type { HonoEnv } from '../router';
+
 import { buildSignedResponse } from './files.helpers';
 import {
   type TGetPresignedGetUrlResponse,
@@ -25,6 +37,75 @@ import {
   ZGetPresignedPostUrlRequestSchema,
   ZUploadPdfRequestSchema,
 } from './files.types';
+
+/** The headline values from an attachment's extraction, for the signer's eyes. */
+const summariseAttachment = (extractedData: unknown) => {
+  const text = (value: string | null) => {
+    if (value === null) return null;
+    const cleaned = stripFieldLabel(String(value));
+
+    return cleaned === '' ? null : cleaned;
+  };
+
+  return {
+    poNumber: text(readOcrField(extractedData, 'poNumber')),
+    vendorName: text(readOcrField(extractedData, 'vendorName')),
+    total: text(readOcrField(extractedData, 'totalAmount')),
+  };
+};
+
+/**
+ * Run OCR over a just-uploaded attachment without ever failing the upload.
+ *
+ * The file is already stored by the time this runs. An extraction service that
+ * is down, slow or misconfigured must show up as "we could not read it", not as
+ * a lost attachment.
+ */
+const readAttachmentQuietly = async ({
+  supportingFileId,
+  organizationId,
+  fileName,
+}: {
+  supportingFileId: string;
+  organizationId: number | null;
+  fileName: string;
+}) => {
+  // A personal document has no organization, so no extraction service either.
+  if (organizationId === null) return null;
+
+  // Saves a pointless round trip for the file types the extractor cannot read.
+  if (!/\.(pdf|png|jpe?g|tiff?)$/i.test(fileName)) return null;
+
+  try {
+    const result = await runAttachmentOcr({ supportingFileId, organizationId, userId: null });
+
+    return {
+      ran: true,
+      ok: result.ok,
+      error: result.error,
+      documentType: result.documentType,
+      poNumber: result.poNumber,
+      vendorName: result.vendorName,
+      total: result.total,
+      // Whether the number was carried onto the invoice, so the signer can be
+      // told "this cleared it" rather than just "we read your file".
+      appliedToInvoice: result.appliedToInvoice,
+    };
+  } catch (error) {
+    console.error('[supporting-file] OCR failed after upload:', error);
+
+    return {
+      ran: true,
+      ok: false,
+      error: 'Could not read this file.',
+      documentType: null,
+      poNumber: null,
+      vendorName: null,
+      total: null,
+      appliedToInvoice: null,
+    };
+  }
+};
 
 export const filesRoute = new Hono<HonoEnv>()
   /**
@@ -133,6 +214,282 @@ export const filesRoute = new Hono<HonoEnv>()
     } catch (error) {
       console.error('DMS upload failed:', error);
       return c.json({ error: 'Upload failed' }, 500);
+    }
+  })
+  /**
+   * A signer attaching supporting documentation (PO, spec, photo) while signing.
+   *
+   * Authenticated by the signing token alone — the signer has no account — so
+   * every limit here is load-bearing rather than advisory:
+   *   - the token must resolve to a recipient who hasn't finished signing,
+   *   - the file must pass `validateSupportingFile` (extension + MIME + magic
+   *     bytes; executables and archives refused),
+   *   - a per-recipient count cap bounds abuse of an unauthenticated endpoint.
+   */
+  /**
+   * The attachments this signing token has already uploaded.
+   *
+   * Without it the signing page starts from an empty list every time, so a
+   * signer who refreshed could not see what they had sent, could not remove it,
+   * and could re-upload the same file until the per-recipient cap tripped.
+   */
+  .get('/supporting/:token', async (c) => {
+    const token = c.req.param('token');
+
+    const recipient = await prisma.recipient.findFirst({
+      where: { token },
+      select: { id: true },
+    });
+
+    if (!recipient) {
+      return c.json({ error: 'Invalid signing link.' }, 404);
+    }
+
+    const files = await prisma.documentSupportingFile.findMany({
+      where: { recipientId: recipient.id },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        fileName: true,
+        contentType: true,
+        sizeBytes: true,
+        ocrRanAt: true,
+        ocrError: true,
+        ocrDocumentType: true,
+        extractedData: true,
+      },
+    });
+
+    return c.json(
+      files.map(({ extractedData, ocrRanAt, ocrError, ocrDocumentType, ...file }) => ({
+        ...file,
+        ocr: ocrRanAt
+          ? {
+              ran: true,
+              ok: ocrError === null,
+              error: ocrError,
+              documentType: ocrDocumentType,
+              ...summariseAttachment(extractedData),
+            }
+          : null,
+      })),
+    );
+  })
+  .post('/supporting/:token', async (c) => {
+    try {
+      const token = c.req.param('token');
+
+      const recipient = await prisma.recipient.findFirst({
+        where: { token },
+        select: {
+          id: true,
+          documentId: true,
+          signingStatus: true,
+          document: { select: { id: true, status: true, organizationId: true } },
+        },
+      });
+
+      if (!recipient?.document) {
+        return c.json({ error: 'Invalid signing link.' }, 404);
+      }
+
+      // Closed documents accept nothing further; neither does a recipient who
+      // already signed, or the endpoint would be writable forever.
+      if (recipient.document.status === 'COMPLETED' || recipient.document.status === 'REJECTED') {
+        return c.json({ error: 'This document is already closed.' }, 400);
+      }
+
+      if (recipient.signingStatus === 'SIGNED') {
+        return c.json({ error: 'You have already completed this document.' }, 400);
+      }
+
+      const existingCount = await prisma.documentSupportingFile.count({
+        where: { recipientId: recipient.id },
+      });
+
+      if (existingCount >= MAX_SUPPORTING_FILES_PER_RECIPIENT) {
+        return c.json(
+          { error: `You can attach at most ${MAX_SUPPORTING_FILES_PER_RECIPIENT} files.` },
+          400,
+        );
+      }
+
+      const formData = await c.req.formData();
+      const file = formData.get('file');
+
+      if (!(file instanceof File)) {
+        return c.json({ error: 'No file provided.' }, 400);
+      }
+
+      // Read once; the head is needed for signature checking and the whole
+      // buffer for storage.
+      const arrayBuffer = await file.arrayBuffer();
+      const head = new Uint8Array(arrayBuffer.slice(0, 16));
+
+      const verdict = validateSupportingFile({
+        fileName: file.name,
+        declaredType: file.type,
+        sizeBytes: arrayBuffer.byteLength,
+        bytes: head,
+      });
+
+      if (!verdict.ok) {
+        return c.json({ error: verdict.reason }, 400);
+      }
+
+      const fileName = sanitizeSupportingFileName(file.name);
+
+      // Re-wrapped with the VERIFIED content type, so what gets stored (and
+      // later served) is never the client's claim.
+      const safeFile = new File([arrayBuffer], fileName, { type: verdict.contentType });
+      const { type, data } = await putFileServerSide(safeFile);
+
+      const created = await prisma.documentSupportingFile.create({
+        data: {
+          documentId: recipient.documentId!,
+          recipientId: recipient.id,
+          fileName,
+          contentType: verdict.contentType,
+          sizeBytes: arrayBuffer.byteLength,
+          type,
+          data,
+        },
+        select: { id: true, fileName: true, contentType: true, sizeBytes: true, createdAt: true },
+      });
+
+      // Read the attachment straight away.
+      //
+      // This is what makes "attach the PO and carry on signing" work: the
+      // signer is an external party who cannot reach the Signature Inbox, so
+      // waiting for someone in the office to press a button would leave them
+      // blocked with no way forward. The extracted fields become available to
+      // the business rules as `attachedPo.*`, and the next press of Sign is
+      // evaluated against them.
+      //
+      // Never allowed to fail the upload — the file is already stored, and a
+      // extraction service being down must not look like a failed attachment.
+      const ocr = await readAttachmentQuietly({
+        supportingFileId: created.id,
+        organizationId: recipient.document.organizationId,
+        fileName: created.fileName,
+      });
+
+      return c.json({ ...created, ocr });
+    } catch (error) {
+      console.error('Supporting file upload failed:', error);
+
+      return c.json({ error: 'Upload failed.' }, 500);
+    }
+  })
+  /** Remove one of your own attachments before you finish signing. */
+  .delete('/supporting/:token/:id', async (c) => {
+    try {
+      const token = c.req.param('token');
+      const id = c.req.param('id');
+
+      const recipient = await prisma.recipient.findFirst({
+        where: { token },
+        select: { id: true, signingStatus: true },
+      });
+
+      if (!recipient) {
+        return c.json({ error: 'Invalid signing link.' }, 404);
+      }
+
+      if (recipient.signingStatus === 'SIGNED') {
+        return c.json({ error: 'You have already completed this document.' }, 400);
+      }
+
+      // Scoped to this recipient, so a token can only delete its own uploads.
+      const deleted = await prisma.documentSupportingFile.deleteMany({
+        where: { id, recipientId: recipient.id },
+      });
+
+      if (deleted.count === 0) {
+        return c.json({ error: 'Attachment not found.' }, 404);
+      }
+
+      return c.json({ success: true });
+    } catch (error) {
+      console.error('Supporting file delete failed:', error);
+
+      return c.json({ error: 'Delete failed.' }, 500);
+    }
+  })
+  /**
+   * Download a supporting file.
+   *
+   * Two ways in, mirroring who legitimately needs it: a signed-in user with
+   * access to the parent document, or a recipient holding a signing token for
+   * it. Anything else is a 404 — never "forbidden", which would confirm the id.
+   */
+  .get('/supporting/:id', async (c) => {
+    try {
+      const id = c.req.param('id');
+      const recipientToken = new URL(c.req.url).searchParams.get('recipientToken');
+
+      const file = await prisma.documentSupportingFile.findUnique({
+        where: { id },
+        select: {
+          fileName: true,
+          contentType: true,
+          type: true,
+          data: true,
+          documentId: true,
+        },
+      });
+
+      if (!file) {
+        return c.json({ error: 'Not found' }, 404);
+      }
+
+      let authorized = false;
+
+      if (recipientToken) {
+        const recipient = await prisma.recipient.findFirst({
+          where: { token: recipientToken, documentId: file.documentId },
+          select: { id: true },
+        });
+
+        authorized = Boolean(recipient);
+      }
+
+      if (!authorized) {
+        const session = await getOptionalSession(c.req.raw);
+
+        if (session.isAuthenticated && session.user) {
+          // Reuses the document's own access rule rather than inventing a second
+          // one, so attachments can never be broader than their document.
+          const where = await getDocumentWhereInput({
+            documentId: file.documentId,
+            userId: session.user.id,
+          });
+
+          authorized = Boolean(await prisma.document.findFirst({ where }));
+        }
+      }
+
+      if (!authorized) {
+        return c.json({ error: 'Not found' }, 404);
+      }
+
+      const bytes = await getFileServerSide({ type: file.type, data: file.data });
+
+      return new Response(new Uint8Array(bytes), {
+        headers: {
+          'Content-Type': file.contentType,
+          // `attachment` matters: it stops the browser rendering an uploaded
+          // file inline, which for an SVG or HTML would be same-origin script
+          // execution. The name is already sanitized at upload.
+          'Content-Disposition': `attachment; filename="${file.fileName}"`,
+          'X-Content-Type-Options': 'nosniff',
+          'Cache-Control': 'private, max-age=0, no-store',
+        },
+      });
+    } catch (error) {
+      console.error('Supporting file download failed:', error);
+
+      return c.json({ error: 'Download failed' }, 500);
     }
   })
   // DMS document preview — serve DocumentData by ID for authenticated users

@@ -79,6 +79,38 @@ services:
       restart_policy:
         condition: on-failure
 
+  # Documentation portal — docs.hubsign.io
+  #
+  # A separate service rather than part of the application image, because the two
+  # have nothing in common at runtime: this is 38 prerendered HTML pages served by
+  # nginx, with no Node process, no database and no secrets. It also means a
+  # correction to the manual does not rebuild or restart the signing application.
+  #
+  # Built from apps/documentation/Dockerfile at the repository root.
+  docs:
+    # Private registry, matching every other Komodo-built image here.
+    image: 172.16.15.51:5000/futureedge/hubsign-docs:latest
+    ports:
+      # Host port chosen to sit clear of the app on 3000. Point the reverse proxy
+      # for docs.hubsign.io at this.
+      - "3010:80"
+    networks:
+      - documenso-net
+    deploy:
+      # Two replicas: the container is stateless and ~86 MB, so redundancy is
+      # nearly free and a rolling update never drops the site.
+      replicas: 2
+      update_config:
+        order: start-first
+      restart_policy:
+        condition: on-failure
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
 volumes:
   database:
 

@@ -15,6 +15,7 @@ import { AppSidebar } from '~/components/general/app-sidebar';
 import { AppTopbar } from '~/components/general/app-topbar';
 import { OrgBrandingProvider } from '~/components/general/org-branding-provider';
 import { PushAutoSync } from '~/components/general/push-auto-sync';
+import { PushNotificationBanner } from '~/components/general/push-notification-banner';
 import { VerifyEmailBanner } from '~/components/general/verify-email-banner';
 
 import type { Route } from './+types/_layout';
@@ -58,6 +59,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
       <div id="portal-header"></div>
 
       <VerifyEmailBanner email={user.email} isEmailVerified={Boolean(user.emailVerified)} />
+      <PushNotificationBanner />
       {banner && <AppBanner banner={banner} />}
 
       <div className="sidebar-layout">

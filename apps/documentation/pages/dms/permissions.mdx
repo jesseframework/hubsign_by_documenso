@@ -1,0 +1,80 @@
+---
+title: Permissions & Confidentiality
+description: Two independent controls over who can see and do what in Doc Manager.
+---
+
+import { Callout } from 'nextra/components';
+
+# Permissions & Confidentiality
+
+Access to a record is governed by two separate things. Confusing them is the usual cause
+of "why can this person see that?"
+
+| | Answers | Set on |
+|---|---|---|
+| **Permission level** | *What may this person do?* | The person, per scope |
+| **Confidentiality** | *How sensitive is this record?* | The document |
+
+Both apply. A person with `DOWNLOAD` permission still cannot reach a `RESTRICTED`
+document unless the confidentiality rules admit them.
+
+## Permission levels
+
+Set under **Organization → DMS Permissions**, per member.
+
+| Level | Grants |
+|---|---|
+| `VIEW` | See that the record exists and read its metadata |
+| `DOWNLOAD` | Retrieve the file itself |
+| `EDIT` | Change metadata, reclassify, re-file |
+| `DELETE` | Remove a record |
+| `ADMIN` | Manage structure, permissions and retention |
+
+They are cumulative in intent — `ADMIN` implies the rest.
+
+<Callout type="warning">
+  `VIEW` and `DOWNLOAD` are deliberately separate. Being able to see that a contract
+  exists is not the same as being able to take a copy of it, and for sensitive records the
+  difference matters. Grant `VIEW` freely and `DOWNLOAD` deliberately.
+</Callout>
+
+## Confidentiality
+
+Four levels, set per document:
+
+| Level | Meaning |
+|---|---|
+| `PUBLIC` | No restriction within the organization |
+| `INTERNAL` | Staff generally — **the default** |
+| `CONFIDENTIAL` | Restricted to those who need it |
+| `RESTRICTED` | Tightly held |
+
+The default for new documents is set under
+[Organization → Settings](/organization/settings). It ships as `INTERNAL`, which is the
+right default — a record that has not been classified yet should not be public.
+
+## Setting permissions
+
+**Organization → DMS Permissions**, then select a member to manage their access. The page
+is Org Admin only.
+
+## A suggested approach
+
+Rather than granting per person as requests arrive:
+
+1. Decide the **default** — most staff need `VIEW`, and often `DOWNLOAD`, on ordinary
+   records
+2. Treat `EDIT` as a **records-team** function; uncontrolled reclassification undermines
+   retention
+3. Keep `DELETE` and `ADMIN` to as few people as you can name
+4. Use **confidentiality on the document** for the exceptions, rather than carving up
+   permissions per person
+
+The last point is the one that saves you. Permissions granted person-by-person become
+impossible to audit; classification travels with the record.
+
+<Callout type="info">
+  Records with a legal retention obligation should not be deletable by people who might
+  reasonably want them gone. `DELETE` and disposal approval are worth separating —
+  see [Retention & Disposal](/dms/retention).
+</Callout>

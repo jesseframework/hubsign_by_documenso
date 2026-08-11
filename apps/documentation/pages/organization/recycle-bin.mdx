@@ -1,0 +1,78 @@
+---
+title: Recycle Bin
+description: Restore a deleted Doc Manager record — and what happens instead when you delete an E-Sign document.
+---
+
+import { Callout } from 'nextra/components';
+
+# Recycle Bin
+
+**Organization → Recycle Bin** lists deleted **Doc Manager** records, with who deleted
+each one and when, so an Org Admin or DMS Admin can restore it.
+
+<Callout type="warning">
+  **This is the Doc Manager recycle bin only.** Documents deleted from **E-Sign** do not
+  appear here — they follow completely different rules, described below. Do not rely on
+  this page to recover a document you were sending for signature.
+</Callout>
+
+## Doc Manager records
+
+Deleting a record moves it here and marks it `DESTROYED`. Its file and metadata are
+retained, so **Restore** puts it back intact.
+
+**Permanently delete** removes it for good. That action is restricted to **Org Admin**
+and **DMS Admin** — deliberately, because it is the one irreversible step in the
+records lifecycle.
+
+<Callout type="info">
+  The interface describes a 30-day retention period, and each item is stamped with an
+  expiry date accordingly. **Nothing currently acts on that date** — no scheduled job
+  purges expired items, so a deleted record stays here until someone permanently
+  deletes it by hand. Treat the 30 days as the intent, not as an automatic cleanup you
+  can count on.
+</Callout>
+
+For records under a retention schedule, dispose of them through
+[Retention & Disposal](/dms/retention) rather than deleting them here. That path
+records the decision and who approved it, which is what an auditor asks for.
+
+## Deleting an E-Sign document is different
+
+E-Sign deletion depends on the document's status, and **only one of the two cases is
+recoverable at all**.
+
+| Deleting a… | What happens |
+|---|---|
+| **Draft** or **Pending** document | **Deleted outright, immediately and permanently.** Not recoverable, and it does not appear in this Recycle Bin |
+| **Completed** document | Hidden from your lists but retained. Not shown here either, and not restorable through this page |
+
+<Callout type="warning">
+  **Deleting a draft cannot be undone.** A document you have spent time preparing —
+  recipients added, fields placed — is gone the moment you delete it. There is no
+  recycle bin for it and no restore. Check twice.
+</Callout>
+
+## What deleting an E-Sign document does to signing links
+
+**A draft or pending document is removed entirely, so its signing links stop working
+immediately.** Anyone who opens a link they were sent gets an error. Deletion is
+therefore an effective way to stop a document being signed.
+
+That said, **cancel is the better tool** when a document is out for signature. Cancel
+withdraws it and leaves the record — who it went to, when, and that it was withdrawn —
+whereas deleting a pending document destroys that history along with the document.
+
+A **completed** document is already signed, and re-signing is refused regardless of
+deletion, because completion requires the document to be pending. Recipients do keep
+whatever copy they already received by email; deleting in HubSign does not reach into
+anyone's inbox.
+
+## In short
+
+- **Recycle Bin** = Doc Manager records. Restorable.
+- **Delete a draft or pending E-Sign document** = permanent. No safety net.
+- **Want to stop a document being signed but keep the record?** Cancel it.
+- **Want a document kept for a defined period?** File it in
+  [Doc Manager](/dms/documents), where [retention](/dms/retention) is enforced by a
+  schedule with a review step.

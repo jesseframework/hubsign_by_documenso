@@ -16,6 +16,7 @@ export const createInboxItem = async ({
   subject,
   receivedById,
   externalMessageId,
+  receivedAt,
 }: {
   organizationId: number;
   documentId: number;
@@ -23,6 +24,8 @@ export const createInboxItem = async ({
   subject?: string | null;
   receivedById?: number | null;
   externalMessageId?: string | null;
+  /** Mail-server arrival time, when the source provided one. */
+  receivedAt?: Date | null;
 }): Promise<string> => {
   const item = await prisma.signatureInboxItem.create({
     data: {
@@ -32,6 +35,7 @@ export const createInboxItem = async ({
       subject: subject ?? null,
       receivedById: receivedById ?? null,
       externalMessageId: externalMessageId ?? null,
+      receivedAt: receivedAt ?? null,
       status: 'RECEIVED',
     },
   });

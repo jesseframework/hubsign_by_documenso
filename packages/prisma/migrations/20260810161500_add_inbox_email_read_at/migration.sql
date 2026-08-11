@@ -1,0 +1,12 @@
+-- When WorkHub confirmed the source message was marked read.
+--
+-- Mark-read now has three triggers — import, first open in the Signature Inbox,
+-- and SLA breach — and the endpoint is a remote call against an on-prem Exchange
+-- proxy. This column makes the call happen at most once per item, so opening an
+-- already-read document does not hit the mailbox again on every page load.
+--
+-- Nullable with no backfill: for existing rows we genuinely do not know whether
+-- the call ever succeeded. In fact it never did — the request was sent without
+-- the required `isRead` body and rejected — so leaving them NULL lets the next
+-- open or SLA sweep put the mailbox right.
+ALTER TABLE "SignatureInboxItem" ADD COLUMN "emailReadAt" TIMESTAMP(3);

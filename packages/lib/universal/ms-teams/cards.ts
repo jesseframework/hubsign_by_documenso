@@ -68,6 +68,12 @@ const EVENT_PRESENTATION: Record<WorkflowEventKey, EventPresentation> = {
   DMS_RETRIEVAL_REQUESTED: { emoji: '📥', headline: 'Retrieval requested', color: 'accent' },
   INBOX_EMAIL_RECEIVED: { emoji: '📧', headline: 'Inbox email received', color: 'default' },
   INBOX_OCR_COMPLETED: { emoji: '🔍', headline: 'OCR completed', color: 'default' },
+  // Warning colour: this one needs a human to look before anything is paid.
+  INBOX_DUPLICATE_DETECTED: {
+    emoji: '♻️',
+    headline: 'Duplicate invoice detected',
+    color: 'warning',
+  },
 };
 
 export const getEventPresentation = (event: WorkflowEventKey): EventPresentation =>

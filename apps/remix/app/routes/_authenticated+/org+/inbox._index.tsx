@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
@@ -14,13 +14,17 @@ import {
   CircleDashedIcon,
   CoinsIcon,
   DollarSignIcon,
+  FileSpreadsheetIcon,
   InboxIcon,
   MinusCircleIcon,
+  PenLineIcon,
   RefreshCwIcon,
   ScanLineIcon,
   SearchIcon,
   SendIcon,
   SlidersHorizontalIcon,
+  Volume2Icon,
+  VolumeXIcon,
   WorkflowIcon,
   XCircleIcon,
   XIcon,
@@ -28,6 +32,15 @@ import {
 import { Link } from 'react-router';
 
 import { INBOUND_EMAIL_DOMAIN } from '@documenso/lib/constants/app';
+// Shared with the spreadsheet exporter, so what the grid shows and what the
+// export writes are resolved by the same code.
+import type { TExportFilterValue } from '@documenso/lib/types/export';
+import {
+  invoiceAmount,
+  invoiceFields,
+  parseAmount,
+} from '@documenso/lib/universal/inbox-invoice-fields';
+import { ocrSearchText } from '@documenso/lib/utils/ocr-fields';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import {
@@ -37,8 +50,15 @@ import {
 } from '@documenso/ui/primitives/hover-card';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
+import { ExportBuilderDialog } from '~/components/general/export/export-builder-dialog';
+import { ResponsibilityCell } from '~/components/general/inbox/responsibility-cell';
 import { useInboxEvents } from '~/hooks/use-inbox-events';
 import { formatRelativeTime } from '~/utils/format-relative-time';
+import {
+  isInboxChimeEnabled,
+  playInboxChime,
+  setInboxChimeEnabled,
+} from '~/utils/inbox-chime';
 import { appMetaTags } from '~/utils/meta';
 
 const runStatusColor = (status: string | null | undefined): string => {
@@ -137,6 +157,17 @@ export function meta() {
   return appMetaTags('Signature Inbox');
 }
 
+/**
+ * Whether OCR is still reading this item, so its extracted data is not yet
+ * trustworthy.
+ *
+ * Only the active window counts. `PENDING` (queued, not started) and `OCR_FAILED`
+ * are deliberately excluded: an item that never got picked up, or whose read
+ * failed, has to stay openable or it becomes unreachable — the reviewer needs to
+ * see it in order to do anything about it.
+ */
+const isOcrInFlight = (status: string): boolean => status === 'OCR_PROCESSING';
+
 const ocrBadge = (status: string): string => {
   switch (status) {
     case 'OCR_PROCESSING':
@@ -150,6 +181,10 @@ const ocrBadge = (status: string): string => {
       return 'bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300';
     case 'COMPLETED':
       return 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300';
+    // Terminal but unsuccessful — must not inherit the amber "in progress"
+    // default, which would read as still-pending.
+    case 'REJECTED':
+      return 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300';
     case 'ARCHIVED':
       return 'bg-muted text-muted-foreground';
     default:
@@ -157,22 +192,74 @@ const ocrBadge = (status: string): string => {
   }
 };
 
-/** Read the first non-empty value among the given OCR field names. */
-const fieldStr = (item: { extractedData?: unknown }, keys: string[]): string => {
-  const data = (item.extractedData ?? {}) as Record<string, unknown>;
-  for (const k of keys) {
-    const v = data[k];
-    if (v != null && String(v).trim() !== '') return String(v);
-  }
-  return '';
-};
+/**
+ * Where the signatures actually stand, as opposed to whether a send happened.
+ *
+ * `item.status` reaching SENT_FOR_SIGNATURE only records that the document went
+ * out. It stays there whether the signer opened it a minute later or has been
+ * ignoring it for a week, so on its own it cannot answer the question the queue
+ * exists to answer.
+ */
+function SignatureStatus({
+  signature,
+}: {
+  signature: {
+    documentStatus: string;
+    total: number;
+    signed: number;
+    rejected: number;
+    pending: number;
+    waitingOn: string[];
+  };
+}) {
+  const { documentStatus, total, signed, rejected, pending, waitingOn } = signature;
 
-/** Best-effort numeric amount from the OCR fields (currency-agnostic). */
-const amountOf = (item: { extractedData?: unknown }): number | null => {
-  const raw = fieldStr(item, ['total_amount', 'invoice_amount', 'totalAmount', 'amount', 'subtotal']);
-  if (!raw) return null;
-  const n = Number(raw.replace(/[^0-9.\-]/g, ''));
-  return Number.isFinite(n) ? n : null;
+  // Nothing has been sent, so there is no signing state to report yet.
+  if (documentStatus === 'DRAFT' || total === 0) {
+    return null;
+  }
+
+  if (rejected > 0) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700 dark:bg-red-950 dark:text-red-300">
+        <XCircleIcon className="h-3 w-3" />
+        <Trans>declined</Trans>
+      </span>
+    );
+  }
+
+  if (documentStatus === 'COMPLETED' || (total > 0 && signed === total)) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
+        <CheckCheckIcon className="h-3 w-3" />
+        <Trans>signed {signed}/{total}</Trans>
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-700 dark:bg-violet-950 dark:text-violet-300"
+      title={waitingOn.length ? `Waiting on ${waitingOn.join(', ')}` : undefined}
+    >
+      <PenLineIcon className="h-3 w-3" />
+      {signed > 0 ? (
+        <Trans>signed {signed}/{total}</Trans>
+      ) : (
+        <Trans>awaiting {pending} signature(s)</Trans>
+      )}
+    </span>
+  );
+}
+
+/** "3h", "2d 4h" — how far past target an overdue invoice is. */
+const overdueLabel = (minutes: number): string => {
+  const m = Math.max(0, Math.round(minutes));
+  if (m < 60) return `${m}m`;
+  if (m < 60 * 24) return `${Math.floor(m / 60)}h`;
+  const d = Math.floor(m / (60 * 24));
+  const h = Math.round((m % (60 * 24)) / 60);
+  return h ? `${d}d ${h}h` : `${d}d`;
 };
 
 /** Format an OCR date value to YYYY-MM-DD (leaves unparseable values as-is). */
@@ -188,26 +275,14 @@ const fmtDate = (raw: string | Date): string => {
 /** Format a money value with the single currency the ML returned. */
 const fmtMoney = (currency: string, raw: string): string => {
   if (!raw) return '';
-  const n = Number(raw.replace(/[^0-9.\-]/g, ''));
-  const s = Number.isFinite(n)
-    ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : raw;
+  // `parseAmount` rather than a local Number(): it returns null for a value
+  // with no digits, where this used to render "0.00". The spreadsheet export
+  // shows the raw text in that case, and the two must not disagree.
+  const n = parseAmount(raw);
+  const s =
+    n === null ? raw : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return currency ? `${currency} ${s}` : s;
 };
-
-/** All invoice fields we surface in the grid — sourced ONLY from BMS ML metadata. */
-const invoiceFields = (item: { extractedData?: unknown }) => ({
-  invoiceNumber: fieldStr(item, ['invoice_number', 'invoiceNumber', 'invoice_no']),
-  poNumber: fieldStr(item, ['po_number', 'purchase_order', 'poNumber']),
-  vendorName: fieldStr(item, ['vendor_name', 'vendorName', 'vendor', 'supplier', 'supplier_name']),
-  vendorEmail: fieldStr(item, ['vendor_email', 'vendorEmail', 'email']),
-  currency: fieldStr(item, ['currency', 'currency_code', 'ccy']),
-  total: fieldStr(item, ['total_amount', 'invoice_amount', 'total', 'grand_total']),
-  tax: fieldStr(item, ['tax_amount', 'tax', 'vat']),
-  net: fieldStr(item, ['subtotal', 'net_amount', 'net']),
-  invoiceDate: fieldStr(item, ['invoice_date', 'date', 'issue_date']),
-  dueDate: fieldStr(item, ['due_date', 'payment_due']),
-});
 
 const STATUS_FILTERS = [
   { key: 'READY', label: 'Ready', icon: CheckCircle2Icon },
@@ -215,6 +290,7 @@ const STATUS_FILTERS = [
   { key: 'SENT_FOR_SIGNATURE', label: 'Sent to sign', icon: SendIcon },
   { key: 'OCR_FAILED', label: 'OCR failed', icon: XCircleIcon },
   { key: 'COMPLETED', label: 'Completed', icon: CheckCheckIcon },
+  { key: 'REJECTED', label: 'Rejected', icon: XCircleIcon },
   { key: 'ARCHIVED', label: 'Archived', icon: ArchiveIcon },
 ] as const;
 
@@ -271,6 +347,7 @@ export default function SignatureInboxPage() {
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [dateFilter, setDateFilter] = useState<string | null>(null);
   const [amountFilter, setAmountFilter] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const docTypes = useMemo(
     () =>
@@ -288,14 +365,11 @@ export default function SignatureInboxPage() {
     const now = Date.now();
     return items.filter((it) => {
       if (q) {
-        const hay = [
-          it.document.title,
-          it.senderEmail ?? '',
-          fieldStr(it, ['vendor_name']),
-          fieldStr(it, ['invoice_number']),
-          fieldStr(it, ['po_number']),
-          fieldStr(it, ['total_amount', 'amount']),
-        ]
+        // Every extracted value, not a fixed set of field names. The previous
+        // four-name list missed anything the extractor spelled differently —
+        // a vendor stored as `merchant_name` was unfindable — and excluded
+        // line items, addresses and reference numbers entirely.
+        const hay = [it.document.title, it.senderEmail ?? '', ocrSearchText(it.extractedData)]
           .join(' ')
           .toLowerCase();
         if (!hay.includes(q)) return false;
@@ -315,7 +389,7 @@ export default function SignatureInboxPage() {
         if (dateFilter === 'month' && t < now - 30 * 864e5) return false;
       }
       if (amountFilter) {
-        const amt = amountOf(it);
+        const amt = invoiceAmount(it);
         if (amt == null) return false;
         if (amountFilter === 'high' && !(amt > 10000)) return false;
         if (amountFilter === 'low' && !(amt < 1000)) return false;
@@ -323,6 +397,54 @@ export default function SignatureInboxPage() {
       return true;
     });
   }, [items, search, statusFilter, typeFilter, dateFilter, amountFilter]);
+
+  /**
+   * The grid's filters, translated into the export's vocabulary.
+   *
+   * Two of them cannot cross over faithfully, and it is better to drop those
+   * than to ship a spreadsheet that claims a filter it did not apply:
+   *
+   *   - "Needs review" is a flag on the item, not one of the statuses the
+   *     export filters on, so it is left off rather than mapped to something
+   *     adjacent.
+   *   - The date chips are relative to the grid's `createdAt`, while the export
+   *     filters on arrival (mail time where known). Same intent, and the
+   *     boundary can differ by the ingest lag — which is why the workbook
+   *     records the resolved dates on its notes sheet.
+   */
+  const exportFilters = useMemo(() => {
+    const seeded: { id: string; value: TExportFilterValue }[] = [];
+
+    if (search.trim()) {
+      seeded.push({ id: 'search', value: { kind: 'text', value: search.trim() } });
+    }
+
+    if (statusFilter && statusFilter !== 'needs-review') {
+      seeded.push({ id: 'status', value: { kind: 'select', value: [statusFilter] } });
+    }
+
+    if (typeFilter) {
+      seeded.push({ id: 'documentType', value: { kind: 'select', value: [typeFilter] } });
+    }
+
+    if (dateFilter) {
+      const from = new Date();
+      if (dateFilter === 'today') {
+        from.setHours(0, 0, 0, 0);
+      } else {
+        from.setTime(from.getTime() - (dateFilter === 'week' ? 7 : 30) * 864e5);
+      }
+      seeded.push({ id: 'received', value: { kind: 'dateRange', from: from.toISOString(), to: null } });
+    }
+
+    if (amountFilter === 'high') {
+      seeded.push({ id: 'amount', value: { kind: 'numberRange', min: 10000, max: null } });
+    } else if (amountFilter === 'low') {
+      seeded.push({ id: 'amount', value: { kind: 'numberRange', min: null, max: 1000 } });
+    }
+
+    return seeded;
+  }, [search, statusFilter, typeFilter, dateFilter, amountFilter]);
 
   const anyFilter = Boolean(search || statusFilter || typeFilter || dateFilter || amountFilter);
   const activeChipCount = [statusFilter, typeFilter, dateFilter, amountFilter].filter(Boolean).length;
@@ -343,6 +465,12 @@ export default function SignatureInboxPage() {
 
   // Live-refresh the list when OCR finishes or new mail is ingested (SSE).
   useInboxEvents();
+
+  // Start at the util's default so server and first client render agree, then
+  // read the stored preference once mounted — localStorage doesn't exist during
+  // SSR and reading it in the initialiser would cause a hydration mismatch.
+  const [chimeOn, setChimeOn] = useState(true);
+  useEffect(() => setChimeOn(isInboxChimeEnabled()), []);
   const inboxAddress =
     org?.inboxEmail || (org?.slug ? `${org.slug}@${INBOUND_EMAIL_DOMAIN()}` : null);
 
@@ -384,16 +512,42 @@ export default function SignatureInboxPage() {
             </Trans>
           </p>
         </div>
-        <Button
-          size="sm"
-          variant="outline"
-          className="flex-shrink-0"
-          disabled={fetchNow.isPending}
-          onClick={() => fetchNow.mutate()}
-        >
-          <RefreshCwIcon className="mr-1 h-3.5 w-3.5" />
-          <Trans>Fetch from WorkHub</Trans>
-        </Button>
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="px-2"
+            title={
+              chimeOn
+                ? _(msg`Sound on for new mail — click to mute`)
+                : _(msg`Sound muted — click to unmute`)
+            }
+            aria-pressed={chimeOn}
+            onClick={() => {
+              const next = !chimeOn;
+              setChimeOn(next);
+              setInboxChimeEnabled(next);
+              // Play on enable so the volume is known before relying on it —
+              // and because this click satisfies the browser's autoplay gate.
+              if (next) playInboxChime();
+            }}
+          >
+            {chimeOn ? (
+              <Volume2Icon className="h-3.5 w-3.5" />
+            ) : (
+              <VolumeXIcon className="h-3.5 w-3.5" />
+            )}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={fetchNow.isPending}
+            onClick={() => fetchNow.mutate()}
+          >
+            <RefreshCwIcon className="mr-1 h-3.5 w-3.5" />
+            <Trans>Fetch from WorkHub</Trans>
+          </Button>
+        </div>
       </div>
 
       {inboxAddress && (
@@ -437,14 +591,33 @@ export default function SignatureInboxPage() {
         <div className="space-y-3">
           {/* Search + quick filters */}
           <div className="space-y-3 rounded-[var(--r)] border border-border bg-card p-4">
-            <div className="relative">
-              <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={_(msg`Search by document, vendor, invoice #, PO #, or amount`)}
-                className="h-9 w-full rounded-[var(--r)] border border-border bg-background pl-9 pr-3 text-[13px] outline-none focus:border-primary/50"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={_(msg`Search by document, vendor, invoice #, PO #, or amount`)}
+                  className="h-9 w-full rounded-[var(--r)] border border-border bg-background pl-9 pr-3 text-[13px] outline-none focus:border-primary/50"
+                />
+              </div>
+
+              {/*
+                The export re-runs the query server-side rather than serialising
+                what the grid holds — the list is capped at 100 rows and filtered
+                in the browser, so exporting the visible array would quietly
+                export a page. The filters are carried over so the file starts
+                out matching what is on screen.
+              */}
+              <Button
+                type="button"
+                variant="outline"
+                className="h-9 flex-shrink-0 text-[12px]"
+                onClick={() => setExportOpen(true)}
+              >
+                <FileSpreadsheetIcon className="mr-1.5 h-4 w-4" />
+                <Trans>Export to Excel</Trans>
+              </Button>
             </div>
 
             <button
@@ -591,6 +764,9 @@ export default function SignatureInboxPage() {
                 <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   <Trans>Dates</Trans>
                 </th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                  <Trans>Responsibility</Trans>
+                </th>
                 <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   <Trans>Actions</Trans>
                 </th>
@@ -602,12 +778,31 @@ export default function SignatureInboxPage() {
                 const headline = f.invoiceNumber || item.document.title;
                 const hasAmounts = Boolean(f.total || f.tax || f.net);
                 const isUnread = !item.viewedAt;
+                // Past its internal target AND still unsent. Coloured at the row
+                // rather than tucked into a badge: an overdue invoice should be
+                // findable by scrolling, not by reading.
+                //
+                // `open` is what keeps a completed-but-late invoice out of this.
+                // It missed its target, which the SLA dashboard records, but it
+                // is finished and nothing about it needs doing today.
+                const isOverdue = item.sla?.state === 'breached' && item.sla.open;
                 return (
-                  <tr key={item.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                  <tr
+                    key={item.id}
+                    className={`border-b border-border last:border-0 ${
+                      isOverdue
+                        ? 'bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-950/40 dark:hover:bg-orange-950/60'
+                        : 'hover:bg-muted/20'
+                    }`}
+                  >
                     {/* Invoice info */}
                     <td
                       className={`border-l-[3px] px-4 py-3 align-top ${
-                        isUnread ? 'border-l-primary' : 'border-l-transparent'
+                        isOverdue
+                          ? 'border-l-orange-500'
+                          : isUnread
+                            ? 'border-l-primary'
+                            : 'border-l-transparent'
                       }`}
                     >
                       <Link
@@ -641,6 +836,20 @@ export default function SignatureInboxPage() {
                             review
                           </span>
                         )}
+                        {isOverdue && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-800 dark:bg-orange-900 dark:text-orange-200"
+                            title={
+                              item.sla?.dueAt
+                                ? `SLA due ${new Date(item.sla.dueAt).toLocaleString()}`
+                                : undefined
+                            }
+                          >
+                            <AlertTriangleIcon className="h-3 w-3" />
+                            <Trans>overdue {overdueLabel(item.sla?.overdueByMinutes ?? 0)}</Trans>
+                          </span>
+                        )}
+                        <SignatureStatus signature={item.signature} />
                         <WorkflowActivityIndicator item={item} />
                       </div>
                     </td>
@@ -717,24 +926,71 @@ export default function SignatureInboxPage() {
                       </dl>
                     </td>
 
+                    {/* Responsibility — who owes a signature, and the chasing so far */}
+                    <td className="max-w-[13rem] px-4 py-3 align-top">
+                      <ResponsibilityCell
+                        responsibility={item.responsibility}
+                        documentStatus={item.signature.documentStatus}
+                      />
+                    </td>
+
                     {/* Actions */}
                     <td className="px-4 py-3 align-top">
                       <div className="flex items-center justify-end gap-1">
-                        <Link to={`/org/inbox/${item.id}`}>
-                          <Button size="sm" className="h-7 text-[11px]">
-                            <ScanLineIcon className="mr-1 h-3.5 w-3.5" />
-                            <Trans>Review</Trans>
+                        {/*
+                          Review is withheld while OCR is running: the extracted
+                          fields are what the reviewer is there to check, and
+                          opening the item mid-read shows them blank or partial,
+                          which invites approving figures that have not been read
+                          yet. Rendered as a disabled button rather than a disabled
+                          Button inside the Link — the Link would still navigate,
+                          since it captures the click before the button sees it.
+                          The row updates itself when OCR finishes, so this
+                          re-enables without a refresh.
+                        */}
+                        {isOcrInFlight(item.status) ? (
+                          <Button
+                            size="sm"
+                            className="h-7 text-[11px]"
+                            disabled
+                            title={_(msg`OCR is still reading this document`)}
+                          >
+                            <RefreshCwIcon className="mr-1 h-3.5 w-3.5 animate-spin" />
+                            <Trans>Reading…</Trans>
                           </Button>
-                        </Link>
+                        ) : (
+                          <Link to={`/org/inbox/${item.id}`}>
+                            <Button size="sm" className="h-7 text-[11px]">
+                              <ScanLineIcon className="mr-1 h-3.5 w-3.5" />
+                              <Trans>Review</Trans>
+                            </Button>
+                          </Link>
+                        )}
+                        {/*
+                          Re-run OCR stays available even while a read is in
+                          flight — it is the only way to recover an item that has
+                          stuck in OCR_PROCESSING, and disabling it there would
+                          leave the row with no action but Archive.
+
+                          Scoped to the row being re-run: `reprocess.isPending`
+                          alone disabled the button on every row at once, because
+                          one mutation hook serves the whole table.
+                        */}
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-7 text-[11px]"
                           title={_(msg`Re-run OCR`)}
-                          disabled={reprocess.isPending}
+                          disabled={reprocess.isPending && reprocess.variables?.id === item.id}
                           onClick={() => reprocess.mutate({ id: item.id })}
                         >
-                          <RefreshCwIcon className="h-3.5 w-3.5" />
+                          <RefreshCwIcon
+                            className={`h-3.5 w-3.5 ${
+                              reprocess.isPending && reprocess.variables?.id === item.id
+                                ? 'animate-spin'
+                                : ''
+                            }`}
+                          />
                         </Button>
                         {item.status !== 'ARCHIVED' && (
                           <Button
@@ -758,6 +1014,13 @@ export default function SignatureInboxPage() {
           )}
         </div>
       )}
+
+      <ExportBuilderDialog
+        datasetId="signature-inbox"
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        initialFilters={exportFilters}
+      />
     </div>
   );
 }

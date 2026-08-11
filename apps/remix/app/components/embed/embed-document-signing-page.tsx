@@ -15,6 +15,7 @@ import { LucideChevronDown, LucideChevronUp } from 'lucide-react';
 
 import { useThrottleFn } from '@documenso/lib/client-only/hooks/use-throttle-fn';
 import { PDF_VIEWER_PAGE_SELECTOR } from '@documenso/lib/constants/pdf-viewer';
+import { AppError } from '@documenso/lib/errors/app-error';
 import type { DocumentField } from '@documenso/lib/server-only/field/get-fields-for-document';
 import { isFieldUnsignedAndRequired } from '@documenso/lib/utils/advanced-fields-helpers';
 import { validateFieldsInserted } from '@documenso/lib/utils/fields';
@@ -165,11 +166,18 @@ export const EmbedSignDocumentClientPage = ({
         );
       }
 
+      // Report the server's reason where there is one. A business-rule block says
+      // what to fix, and "try again later" would be wrong — an unchanged retry is
+      // refused identically.
+      const error = AppError.parseError(err);
+      const description =
+        error.userMessage ||
+        error.message ||
+        _(msg`We were unable to submit this document at this time. Please try again later.`);
+
       toast({
         title: _(msg`Something went wrong`),
-        description: _(
-          msg`We were unable to submit this document at this time. Please try again later.`,
-        ),
+        description,
         variant: 'destructive',
       });
     }

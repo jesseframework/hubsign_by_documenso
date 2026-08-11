@@ -273,6 +273,15 @@ export const createDocumentFromDirectTemplate = async ({
     userId: template.userId,
   });
 
+  // KNOWN GAP: the DOCUMENT_SIGN business-rule gate is NOT evaluated on this
+  // path, so a direct template link completes a signature without consulting
+  // any rule that `completeDocumentWithToken` would enforce.
+  //
+  // Wiring it here is not a one-liner: the document is created inside the
+  // transaction below, and the rule providers query by document id through the
+  // global client, so they would see nothing until it commits. Doing this
+  // properly means splitting creation from completion. Left explicit rather
+  // than quietly unenforced — see the note on the Business Rules page.
   const { documentId, recipientId, token } = await prisma.$transaction(async (tx) => {
     const documentData = await tx.documentData.create({
       data: {

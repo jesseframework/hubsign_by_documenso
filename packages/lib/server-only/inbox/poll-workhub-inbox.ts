@@ -19,6 +19,8 @@ import { prefixedId } from '../../universal/id';
 import { putPdfFileServerSide } from '../../universal/upload/put-file.server';
 import { triggerWorkflows } from '../workflow/trigger-workflows';
 import { createInboxItem } from './create-inbox-item';
+import { resolveInboxOwnerUserId } from './resolve-inbox-owner';
+import { shouldIngestInboundEmail } from './should-ingest-email';
 import type { WorkHubInboxConfig } from './workhub-inbox-client';
 import {
   isWorkHubInboxConfigured,
@@ -30,7 +32,14 @@ import {
   workhubMarkRead,
 } from './workhub-inbox-client';
 
-export type PollResult = { scanned: number; imported: number; skipped: number; configured: boolean };
+export type PollResult = {
+  scanned: number;
+  imported: number;
+  skipped: number;
+  /** Refused by the inbound filter (self-sent / blocklisted) — see should-ingest-email. */
+  blocked: number;
+  configured: boolean;
+};
 
 const base64ToArrayBuffer = (b64: string): ArrayBuffer => {
   // WorkHub may wrap attachment bytes in a Java-serialized byte[] — unwrap to the
@@ -47,6 +56,8 @@ type OrgInbox = {
   workhubPassword: string | null;
   workhubMailboxId: string | null;
   workhubApiBase: string | null;
+  inboxBlockedSenders: string[];
+  inboxBlockedSubjects: string[];
 };
 
 const configFor = (org: OrgInbox): WorkHubInboxConfig => ({
@@ -72,7 +83,7 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
     );
   }
   if (!isWorkHubInboxConfigured(base)) {
-    return { scanned: 0, imported: 0, skipped: 0, configured: false };
+    return { scanned: 0, imported: 0, skipped: 0, blocked: 0, configured: false };
   }
 
   // Resolve the mailbox UUID from the inbox email (API-key callers must pass a
@@ -97,14 +108,11 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
     });
   }
 
-  // The org owns this mailbox, so trust what lands in it. Documents are owned by
-  // the matching member when the sender is one, otherwise by a default org owner
-  // (first admin) — external senders are expected on a shared mailbox.
-  const defaultOwner = await prisma.organizationMember.findFirst({
-    where: { organizationId: org.id },
-    orderBy: [{ role: 'asc' }, { joinedAt: 'asc' }],
-    select: { userId: true },
-  });
+  // The org owns this mailbox, so trust what lands in it. Every document it
+  // produces is owned by ONE account — the org's inbox owner — regardless of who
+  // emailed it; external senders are expected on a shared mailbox anyway.
+  const inboxOwnerUserId = await resolveInboxOwnerUserId(org.id);
+  const defaultOwner = inboxOwnerUserId ? { userId: inboxOwnerUserId } : null;
 
   const messages = await workhubListInbox(config, {
     isRead: false,
@@ -114,6 +122,7 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
 
   let imported = 0;
   let skipped = 0;
+  let blocked = 0;
 
   for (const msg of messages) {
     try {
@@ -140,7 +149,34 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
         continue;
       }
 
-      // Attribute to the sender if they're a member, else to the default owner.
+      // Refuse mail the platform itself produced, before spending any attachment
+      // quota on it. Without this, a completion email (which carries the signed
+      // PDF) re-enters as a new invoice and re-fires the workflow that produced
+      // it. Marked read so it isn't rescanned on every subsequent poll.
+      const decision = shouldIngestInboundEmail(
+        { from: msg.from, subject: msg.subject },
+        {
+          orgInboxEmail: org.inboxEmail,
+          blockedSenders: org.inboxBlockedSenders,
+          blockedSubjects: org.inboxBlockedSubjects,
+        },
+      );
+
+      if (!decision.ingest) {
+        console.log(`[workhub-poll] skipping message ${msg.id}: ${decision.detail}`);
+
+        await workhubMarkRead(config, msg.id, { mailboxId }).catch((err) =>
+          console.error('[workhub-poll] mark-read failed for filtered message:', err),
+        );
+
+        blocked += 1;
+        continue;
+      }
+
+      // The sender is recorded for attribution, but does NOT own the document.
+      // The inbox is a shared org queue while document access is owner-scoped,
+      // so attributing ownership to the sender hid the document from whoever was
+      // operating the inbox — see `resolveInboxOwnerUserId`.
       const member = msg.from
         ? await prisma.organizationMember.findFirst({
             where: {
@@ -150,11 +186,15 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
             select: { userId: true },
           })
         : null;
-      const ownerUserId = member?.userId ?? defaultOwner?.userId;
+
+      const ownerUserId = defaultOwner?.userId;
       if (!ownerUserId) {
         skipped += 1;
         continue;
       }
+
+      // Who it came from, kept separate from who owns it.
+      const receivedById = member?.userId ?? ownerUserId;
 
       const attachments = await workhubListAttachments(config, msg.id);
 
@@ -237,8 +277,11 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
           documentId: document.id,
           senderEmail: msg.from,
           subject: msg.subject,
-          receivedById: ownerUserId,
+          receivedById,
           externalMessageId,
+          // The mail server's own arrival time, so SLA measures the vendor's
+          // wait rather than the poller's schedule.
+          receivedAt: msg.receivedAt,
         });
 
         await triggerWorkflows({
@@ -265,7 +308,7 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
 
       // Only once every attachment landed — marking read after a partial import
       // would hide the message from the next poll with documents still missing.
-      await workhubMarkRead(config, msg.id).catch((err) =>
+      await workhubMarkRead(config, msg.id, { mailboxId }).catch((err) =>
         console.error('[workhub-poll] mark-read failed:', err),
       );
     } catch (err) {
@@ -274,7 +317,7 @@ export const pollOrgInbox = async (org: OrgInbox): Promise<PollResult> => {
     }
   }
 
-  return { scanned: messages.length, imported, skipped, configured: true };
+  return { scanned: messages.length, imported, skipped, blocked, configured: true };
 };
 
 const ORG_SELECT = {
@@ -285,6 +328,8 @@ const ORG_SELECT = {
   workhubPassword: true,
   workhubMailboxId: true,
   workhubApiBase: true,
+  inboxBlockedSenders: true,
+  inboxBlockedSubjects: true,
 } as const;
 
 /** Poll one organization by id (used by the in-app "Fetch now"). */
@@ -294,7 +339,7 @@ export const pollWorkHubInboxForOrg = async (organizationId: number): Promise<Po
     select: { ...ORG_SELECT, emailToSignEnabled: true },
   });
   if (!org || !org.emailToSignEnabled) {
-    return { scanned: 0, imported: 0, skipped: 0, configured: false };
+    return { scanned: 0, imported: 0, skipped: 0, blocked: 0, configured: false };
   }
   return pollOrgInbox(org);
 };
@@ -312,13 +357,20 @@ export const pollAllOrgInboxes = async (): Promise<PollResult> => {
     select: ORG_SELECT,
   });
 
-  const totals: PollResult = { scanned: 0, imported: 0, skipped: 0, configured: orgs.length > 0 };
+  const totals: PollResult = {
+    scanned: 0,
+    imported: 0,
+    skipped: 0,
+    blocked: 0,
+    configured: orgs.length > 0,
+  };
   for (const org of orgs) {
     try {
       const r = await pollOrgInbox(org);
       totals.scanned += r.scanned;
       totals.imported += r.imported;
       totals.skipped += r.skipped;
+      totals.blocked += r.blocked;
     } catch (err) {
       console.error(`[workhub-poll] org ${org.id} poll failed:`, err);
     }

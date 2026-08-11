@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router';
 
 import { useAnalytics } from '@documenso/lib/client-only/hooks/use-analytics';
 import { useOptionalSession } from '@documenso/lib/client-only/providers/session';
+import { AppError } from '@documenso/lib/errors/app-error';
 import type { DocumentAndSender } from '@documenso/lib/server-only/document/get-document-by-token';
 import type { TRecipientActionAuth } from '@documenso/lib/types/document-auth';
 import { isFieldUnsignedAndRequired } from '@documenso/lib/utils/advanced-fields-helpers';
@@ -30,6 +31,8 @@ import {
 } from '../../dialogs/assistant-confirmation-dialog';
 import { DocumentSigningCompleteDialog } from './document-signing-complete-dialog';
 import { useRequiredDocumentSigningContext } from './document-signing-provider';
+import type { SupportingFile } from './supporting-file-upload';
+import { SupportingFileUpload } from './supporting-file-upload';
 
 export type DocumentSigningFormProps = {
   document: DocumentAndSender;
@@ -62,6 +65,10 @@ export const DocumentSigningForm = ({
   const assistantSignersId = useId();
 
   const { fullName, signature, setFullName, setSignature } = useRequiredDocumentSigningContext();
+
+  // Attachments are persisted the moment they upload, so this only mirrors what
+  // the server already holds — it is not pending state that could be lost.
+  const [supportingFiles, setSupportingFiles] = useState<SupportingFile[]>([]);
 
   const [validateUninsertedFields, setValidateUninsertedFields] = useState(false);
   const [isConfirmationDialogOpen, setIsConfirmationDialogOpen] = useState(false);
@@ -116,9 +123,17 @@ export const DocumentSigningForm = ({
     try {
       await completeDocument(undefined, nextSigner);
     } catch (err) {
+      // Report the server's reason rather than a generic line: a business-rule
+      // block explains what to fix, and "please try again" would be actively
+      // misleading since retrying unchanged will be refused identically.
+      const error = AppError.parseError(err);
+
       toast({
         title: 'Error',
-        description: 'An error occurred while completing the document. Please try again.',
+        description:
+          error.userMessage ||
+          error.message ||
+          'An error occurred while completing the document. Please try again.',
         variant: 'destructive',
       });
 
@@ -369,6 +384,18 @@ export const DocumentSigningForm = ({
                         onChange={(e) => setFullName(e.target.value.trimStart())}
                       />
                     </div>
+
+                    {/*
+                      Above the signature deliberately: attachments are part of
+                      what the signer is submitting, so they belong before the
+                      act of signing rather than after it.
+                    */}
+                    <SupportingFileUpload
+                      token={recipient.token}
+                      files={supportingFiles}
+                      onChange={setSupportingFiles}
+                      disabled={isSubmitting}
+                    />
 
                     {hasSignatureField && (
                       <div>

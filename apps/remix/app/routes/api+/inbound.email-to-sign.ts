@@ -168,7 +168,14 @@ export const action = async ({ request }: Route.ActionArgs) => {
 
   const org = await prisma.organization.findUnique({
     where: { slug: localPart },
-    select: { id: true, slug: true, emailToSignEnabled: true },
+    select: {
+      id: true,
+      slug: true,
+      emailToSignEnabled: true,
+      inboxEmail: true,
+      inboxBlockedSenders: true,
+      inboxBlockedSubjects: true,
+    },
   });
 
   if (!org) {
@@ -195,6 +202,45 @@ export const action = async ({ request }: Route.ActionArgs) => {
       { status: 403 },
     );
   }
+
+  // Refuse mail the platform itself produced. A completed document is emailed to
+  // every recipient WITH the signed PDF attached, so a document sent to this
+  // org's own inbox address comes straight back here as a new "invoice" and
+  // re-fires the workflow that produced it. 200 rather than an error: the
+  // provider did nothing wrong and must not retry.
+  const { shouldIngestInboundEmail } = await import(
+    '@documenso/lib/server-only/inbox/should-ingest-email'
+  );
+
+  const decision = shouldIngestInboundEmail(
+    { from: senderEmail, subject: payload.subject },
+    {
+      orgInboxEmail: org.inboxEmail,
+      blockedSenders: org.inboxBlockedSenders,
+      blockedSubjects: org.inboxBlockedSubjects,
+    },
+  );
+
+  if (!decision.ingest) {
+    console.log(`[email-to-sign] refused inbound email: ${decision.detail}`);
+
+    return Response.json({
+      ok: true,
+      skipped: true,
+      reason: decision.reason,
+      message: `Email not ingested: ${decision.detail}`,
+    });
+  }
+
+  // The sender must be a member (checked above, anti-spoofing) but does not own
+  // the document: the inbox is a shared queue and document access is
+  // owner-scoped, so sender-ownership hid inbound documents from whoever was
+  // operating the inbox. See `resolveInboxOwnerUserId`.
+  const { resolveInboxOwnerUserId } = await import(
+    '@documenso/lib/server-only/inbox/resolve-inbox-owner'
+  );
+
+  const ownerUserId = (await resolveInboxOwnerUserId(member.organizationId)) ?? member.userId;
 
   const { createInboxItem } = await import('@documenso/lib/server-only/inbox/create-inbox-item');
   const { triggerWorkflows } = await import(
@@ -238,7 +284,7 @@ export const action = async ({ request }: Route.ActionArgs) => {
           title,
           qrToken: prefixedId('qr'),
           documentDataId: documentData.id,
-          userId: member.userId,
+          userId: ownerUserId,
           // The receiving org is already resolved above; stamp it directly.
           organizationId: member.organizationId,
           source: DocumentSource.DOCUMENT,
