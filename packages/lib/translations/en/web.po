@@ -801,8 +801,12 @@ msgid "A confirmation email has been sent, and it should arrive in your inbox sh
 msgstr "A confirmation email has been sent, and it should arrive in your inbox shortly."
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
-msgid "A copy of the signed document will be emailed to you."
-msgstr "A copy of the signed document will be emailed to you."
+msgid "A copy of the signed document is on its way to your inbox."
+msgstr "A copy of the signed document is on its way to your inbox."
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+#~ msgid "A copy of the signed document will be emailed to you."
+#~ msgstr "A copy of the signed document will be emailed to you."
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "A device capable of accessing, opening, and reading documents"
@@ -3047,6 +3051,10 @@ msgstr "Create"
 msgid "Create a <0>free account</0> to access your signed documents at any time."
 msgstr "Create a <0>free account</0> to access your signed documents at any time."
 
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+msgid "Create a free HubSign account and keep your signed documents together."
+msgstr "Create a free HubSign account and keep your signed documents together."
+
 #: apps/remix/app/components/forms/signup.tsx
 msgid "Create a new account"
 msgstr "Create a new account"
@@ -3176,8 +3184,8 @@ msgid "Create Webhook"
 msgstr "Create Webhook"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
-msgid "Create your account and start using state-of-the-art document signing."
-msgstr "Create your account and start using state-of-the-art document signing."
+#~ msgid "Create your account and start using state-of-the-art document signing."
+#~ msgstr "Create your account and start using state-of-the-art document signing."
 
 #: apps/remix/app/components/forms/signup.tsx
 msgid "Create your account and start using state-of-the-art document signing. Open and beautiful signing is within your grasp."
@@ -3753,8 +3761,12 @@ msgid "Document All"
 msgstr "Document All"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
-msgid "Document Approved"
-msgstr "Document Approved"
+msgid "Document approved"
+msgstr "Document approved"
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+#~ msgid "Document Approved"
+#~ msgstr "Document Approved"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
 #: packages/lib/server-only/document/super-delete-document.ts
@@ -3920,8 +3932,8 @@ msgid "Document moved to team"
 msgstr "Document moved to team"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
-msgid "Document no longer available to sign"
-msgstr "Document no longer available to sign"
+#~ msgid "Document no longer available to sign"
+#~ msgstr "Document no longer available to sign"
 
 #: apps/remix/app/routes/_share+/verify.$token.tsx
 msgid "Document not found"
@@ -3986,8 +3998,12 @@ msgid "Document sent to you"
 msgstr "Document sent to you"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
-msgid "Document Signed"
-msgstr "Document Signed"
+msgid "Document signed"
+msgstr "Document signed"
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+#~ msgid "Document Signed"
+#~ msgstr "Document Signed"
 
 #: packages/lib/utils/document-audit-logs.ts
 msgid "Document signing auth updated"
@@ -4055,8 +4071,12 @@ msgid "Document uploaded"
 msgstr "Document uploaded"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
-msgid "Document Viewed"
-msgstr "Document Viewed"
+msgid "Document viewed"
+msgstr "Document viewed"
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+#~ msgid "Document Viewed"
+#~ msgstr "Document Viewed"
 
 #: packages/lib/utils/document-audit-logs.ts
 msgid "Document visibility updated"
@@ -4737,8 +4757,8 @@ msgid "Everyone has signed"
 msgstr "Everyone has signed"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
-msgid "Everyone has signed! You will receive an Email copy of the signed document."
-msgstr "Everyone has signed! You will receive an Email copy of the signed document."
+#~ msgid "Everyone has signed! You will receive an Email copy of the signed document."
+#~ msgstr "Everyone has signed! You will receive an Email copy of the signed document."
 
 #: apps/remix/app/components/general/metadata/signer-chain-editor.tsx
 msgid "Everyone is asked at the same time."
@@ -6329,6 +6349,10 @@ msgstr "No further action is required from you at this time."
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "No invoices in this window."
 msgstr "No invoices in this window."
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+msgid "No longer available to sign"
+msgstr "No longer available to sign"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "No metadata yet"
@@ -8692,6 +8716,10 @@ msgstr "Signed"
 msgid "signed {signed}/{total}"
 msgstr "signed {signed}/{total}"
 
+#: apps/remix/app/components/general/document-signing/signing-outcome-card.tsx
+msgid "Signed by"
+msgstr "Signed by"
+
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "Signed by {who}"
 msgstr "Signed by {who}"
@@ -9624,6 +9652,10 @@ msgstr "The following team has been deleted by you"
 msgid "The full signed record"
 msgstr "The full signed record"
 
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+msgid "The owner cancelled this document, so it is no longer available to others."
+msgstr "The owner cancelled this document, so it is no longer available to others."
+
 #. placeholder {0}: data.teamName
 #: apps/remix/app/routes/_unauthenticated+/team.verify.transfer.$token.tsx
 msgid "The ownership of team <0>{0}</0> has been successfully transferred to you."
@@ -9897,8 +9929,8 @@ msgid "This document has already been sent to this recipient. You can no longer 
 msgstr "This document has already been sent to this recipient. You can no longer edit this recipient."
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
-msgid "This document has been cancelled by the owner and is no longer available for others to sign."
-msgstr "This document has been cancelled by the owner and is no longer available for others to sign."
+#~ msgid "This document has been cancelled by the owner and is no longer available for others to sign."
+#~ msgstr "This document has been cancelled by the owner and is no longer available for others to sign."
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
 msgid "This document has been cancelled by the owner."
@@ -10933,8 +10965,12 @@ msgid "View more"
 msgstr "View more"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
-msgid "View Original Document"
-msgstr "View Original Document"
+msgid "View original document"
+msgstr "View original document"
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+#~ msgid "View Original Document"
+#~ msgstr "View Original Document"
 
 #: apps/remix/app/components/general/stamps/stamp-library.tsx
 #: packages/email/template-components/template-document-self-signed.tsx
@@ -11518,6 +11554,10 @@ msgstr "You are currently updating <0>{teamMemberName}.</0>"
 msgid "You are currently updating the <0>{passkeyName}</0> passkey."
 msgstr "You are currently updating the <0>{passkeyName}</0> passkey."
 
+#: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+msgid "You are done. We will email you a copy of the signed document once everyone else has signed."
+msgstr "You are done. We will email you a copy of the signed document once everyone else has signed."
+
 #: apps/remix/app/components/dialogs/template-move-dialog.tsx
 msgid "You are not a member of this team."
 msgstr "You are not a member of this team."
@@ -11804,8 +11844,8 @@ msgid "You will now be required to enter a code from your authenticator app when
 msgstr "You will now be required to enter a code from your authenticator app when signing in."
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
-msgid "You will receive an Email copy of the signed document once everyone has signed."
-msgstr "You will receive an Email copy of the signed document once everyone has signed."
+#~ msgid "You will receive an Email copy of the signed document once everyone has signed."
+#~ msgstr "You will receive an Email copy of the signed document once everyone has signed."
 
 #: apps/remix/app/routes/_authenticated+/dms+/approvals.tsx
 msgid "You're all caught up!"

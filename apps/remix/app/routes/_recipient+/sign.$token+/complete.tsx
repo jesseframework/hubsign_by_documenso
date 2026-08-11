@@ -4,11 +4,10 @@ import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import { type Document, DocumentStatus, FieldType, RecipientRole } from '@prisma/client';
-import { ArrowLeft, CheckCircle2, Clock8, FileSearch } from 'lucide-react';
+import { ArrowLeft, BanIcon, CheckIcon, Clock8, FileSearch, FileTextIcon } from 'lucide-react';
 import { Link, useRevalidator } from 'react-router';
 import { match } from 'ts-pattern';
 
-import signingCelebration from '@documenso/assets/images/signing-celebration.png';
 import { getOptionalSession } from '@documenso/auth/server/lib/utils/get-session';
 import { useOptionalSession } from '@documenso/lib/client-only/providers/session';
 import { getDocumentAndSenderByToken } from '@documenso/lib/server-only/document/get-document-by-token';
@@ -21,13 +20,11 @@ import { isDocumentCompleted } from '@documenso/lib/utils/document';
 import { env } from '@documenso/lib/utils/env';
 import DocumentDialog from '@documenso/ui/components/document/document-dialog';
 import { DocumentDownloadButton } from '@documenso/ui/components/document/document-download-button';
-import { SigningCard3D } from '@documenso/ui/components/signing-card';
-import { cn } from '@documenso/ui/lib/utils';
-import { Badge } from '@documenso/ui/primitives/badge';
 import { Button } from '@documenso/ui/primitives/button';
 
 import { ClaimAccount } from '~/components/general/claim-account';
 import { DocumentSigningAuthPageView } from '~/components/general/document-signing/document-signing-auth-page';
+import { SignaturePanel } from '~/components/general/document-signing/signing-outcome-card';
 
 import type { Route } from './+types/complete';
 
@@ -120,97 +117,110 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
     return <DocumentSigningAuthPageView email={recipientEmail} />;
   }
 
+  /**
+   * One description of the outcome, rather than the same `match` written twice.
+   *
+   * The icon, the chip and the explanation all answer the same question, and
+   * when they were three separate branches it was possible to change the wording
+   * in one and leave the others saying something different.
+   */
+  const outcome = match({ status: document.status, deletedAt: document.deletedAt })
+    .with({ status: DocumentStatus.COMPLETED }, () => ({
+      icon: CheckIcon,
+      tone: 'bg-status-complete-bg text-status-complete-text',
+      label: <Trans>Everyone has signed</Trans>,
+      detail: <Trans>A copy of the signed document is on its way to your inbox.</Trans>,
+    }))
+    .with({ deletedAt: null }, () => ({
+      icon: Clock8,
+      tone: 'bg-status-pending-bg text-status-pending-text',
+      label: <Trans>Waiting for others to sign</Trans>,
+      detail: (
+        <Trans>
+          You are done. We will email you a copy of the signed document once everyone else has
+          signed.
+        </Trans>
+      ),
+    }))
+    .otherwise(() => ({
+      icon: BanIcon,
+      tone: 'bg-destructive/10 text-destructive',
+      label: <Trans>No longer available to sign</Trans>,
+      detail: (
+        <Trans>The owner cancelled this document, so it is no longer available to others.</Trans>
+      ),
+    }));
+
+  const OutcomeIcon = outcome.icon;
+
   return (
-    <div
-      className={cn(
-        '-mx-4 flex flex-col items-center overflow-hidden px-4 pt-24 md:-mx-8 md:px-8 lg:pt-36 xl:pt-44',
-        { 'pt-0 lg:pt-0 xl:pt-0': canSignUp },
-      )}
-    >
-      <div
-        className={cn('relative mt-6 flex w-full flex-col items-center justify-center', {
-          'mt-0 flex-col divide-y overflow-hidden pt-6 md:pt-16 lg:flex-row lg:divide-x lg:divide-y-0 lg:pt-20 xl:pt-24':
-            canSignUp,
-        })}
-      >
-        <div
-          className={cn('flex flex-col items-center', {
-            'mb-8 p-4 md:mb-0 md:p-12': canSignUp,
-          })}
-        >
-          <Badge variant="neutral" size="default" className="mb-6 rounded-xl border bg-transparent">
-            <span className="block max-w-[10rem] truncate font-medium hover:underline md:max-w-[20rem]">
+    <div className="flex w-full flex-col items-center px-4 py-10 sm:py-14">
+      {/*
+        One centred column, stacked — not two side by side.
+
+        Side by side only balances when the second panel is the tall sign-up
+        form. For a signer who already has an account it is a three-line card,
+        which left a card-sized hole beside a much taller one. Stacking is right
+        in every case and needs no breakpoint to hold it together.
+      */}
+      <div className="flex w-full max-w-md flex-col items-center gap-4">
+        {/*
+          The confirmation itself, as one card.
+
+          Previously this was a loose stack — floating badge, 3D card, oversized
+          heading, status line, paragraph — centred on an empty page with up to
+          11rem of top padding. Grouping it states what the page is actually
+          saying: this document, this signature, this outcome, and the one action
+          that follows from it.
+        */}
+        <div className="w-full rounded-[var(--r-lg)] border border-border bg-card p-6 sm:p-8">
+          <div className="flex flex-col items-center text-center">
+            <span
+              className={`flex h-11 w-11 items-center justify-center rounded-full ${outcome.tone}`}
+            >
+              <OutcomeIcon className="h-5 w-5" strokeWidth={2.5} />
+            </span>
+
+            <h1 className="mt-4 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+              {recipient.role === RecipientRole.SIGNER && <Trans>Document signed</Trans>}
+              {recipient.role === RecipientRole.VIEWER && <Trans>Document viewed</Trans>}
+              {recipient.role === RecipientRole.APPROVER && <Trans>Document approved</Trans>}
+            </h1>
+
+            <span
+              className={`mt-2.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${outcome.tone}`}
+            >
+              {outcome.label}
+            </span>
+
+            <p className="mt-3 max-w-[42ch] text-[13px] leading-relaxed text-muted-foreground">
+              {outcome.detail}
+            </p>
+          </div>
+
+          {/* What was signed, named rather than left as a bare chip. */}
+          <div className="mt-6 flex items-center gap-2.5 rounded-[var(--r)] bg-muted/50 px-3 py-2.5">
+            <FileTextIcon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+            <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={document.title}>
               {document.title}
             </span>
-          </Badge>
+          </div>
 
-          {/* Card with recipient */}
-          <SigningCard3D
-            name={recipientName}
-            signature={signatures.at(0) as any}
-            signingCelebrationImage={signingCelebration}
-          />
+          <div className="mt-3">
+            <SignaturePanel name={recipientName} signature={signatures.at(0)} />
+          </div>
 
-          <h2 className="mt-6 max-w-[35ch] text-center text-2xl font-semibold leading-normal md:text-3xl lg:text-4xl">
-            {recipient.role === RecipientRole.SIGNER && <Trans>Document Signed</Trans>}
-            {recipient.role === RecipientRole.VIEWER && <Trans>Document Viewed</Trans>}
-            {recipient.role === RecipientRole.APPROVER && <Trans>Document Approved</Trans>}
-          </h2>
-
-          {match({ status: document.status, deletedAt: document.deletedAt })
-            .with({ status: DocumentStatus.COMPLETED }, () => (
-              <div className="text-primary mt-4 flex items-center text-center">
-                <CheckCircle2 className="mr-2 h-5 w-5" />
-                <span className="text-sm">
-                  <Trans>Everyone has signed</Trans>
-                </span>
-              </div>
-            ))
-            .with({ deletedAt: null }, () => (
-              <div className="mt-4 flex items-center text-center text-blue-600">
-                <Clock8 className="mr-2 h-5 w-5" />
-                <span className="text-sm">
-                  <Trans>Waiting for others to sign</Trans>
-                </span>
-              </div>
-            ))
-            .otherwise(() => (
-              <div className="flex items-center text-center text-red-600">
-                <Clock8 className="mr-2 h-5 w-5" />
-                <span className="text-sm">
-                  <Trans>Document no longer available to sign</Trans>
-                </span>
-              </div>
-            ))}
-
-          {match({ status: document.status, deletedAt: document.deletedAt })
-            .with({ status: DocumentStatus.COMPLETED }, () => (
-              <p className="text-muted-foreground/60 mt-2.5 max-w-[60ch] text-center text-sm font-medium md:text-base">
-                <Trans>
-                  Everyone has signed! You will receive an Email copy of the signed document.
-                </Trans>
-              </p>
-            ))
-            .with({ deletedAt: null }, () => (
-              <p className="text-muted-foreground/60 mt-2.5 max-w-[60ch] text-center text-sm font-medium md:text-base">
-                <Trans>
-                  You will receive an Email copy of the signed document once everyone has signed.
-                </Trans>
-              </p>
-            ))
-            .otherwise(() => (
-              <p className="text-muted-foreground/60 mt-2.5 max-w-[60ch] text-center text-sm font-medium md:text-base">
-                <Trans>
-                  This document has been cancelled by the owner and is no longer available for
-                  others to sign.
-                </Trans>
-              </p>
-            ))}
-
-          <div className="mt-8 flex w-full max-w-sm items-center justify-center gap-4">
+          <div className="mt-6">
             {isDocumentCompleted(document.status) ? (
               <DocumentDownloadButton
-                className="flex-1"
+                // `w-full` alone only widens the wrapper: the split variant is an
+                // inline-flex of button + dropdown, so the button keeps its own
+                // width and sits left of a full-width box. The child rule makes it
+                // take the space, leaving the chevron at the right edge.
+                className="w-full [&>button:first-child]:flex-1"
+                // Downloading the signed copy is why most people are on this
+                // page; an outline button on a white card does not say so.
+                variant="default"
                 fileName={document.title}
                 documentData={document.documentData}
                 certificatePageCount={document.certificatePageCount}
@@ -221,12 +231,12 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
                 documentData={document.documentData}
                 trigger={
                   <Button
-                    className="text-[11px]"
-                    title={_(msg`Signatures will appear once the document has been completed`)}
+                    className="w-full"
                     variant="outline"
+                    title={_(msg`Signatures will appear once the document has been completed`)}
                   >
-                    <FileSearch className="mr-2 h-5 w-5" strokeWidth={1.7} />
-                    <Trans>View Original Document</Trans>
+                    <FileSearch className="mr-2 h-4 w-4" strokeWidth={1.7} />
+                    <Trans>View original document</Trans>
                   </Button>
                 }
               />
@@ -234,48 +244,40 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
           </div>
         </div>
 
-        <div className="flex flex-col items-center">
+        <div className="flex w-full flex-col items-center">
           {/*
-            Without this the page dead-ends. A signer who already has an account
-            gets no sign-up panel (canSignUp is false for them), which used to
-            leave nothing below the Download button but empty space and no way
-            onward. What is useful depends on who they are, so each case gets
-            its own offer rather than one generic link.
+            A signer who already has an account gets no sign-up panel
+            (`canSignUp` is false for them), so without this there is nothing
+            here at all and no way onward.
+
+            The other case this used to cover — no account, sign-up switched off
+            — had only a line saying a copy would be emailed. The outcome card
+            now says that itself, so repeating it two inches lower added nothing.
           */}
-          {!canSignUp && !user && (
-            <div className="mt-8 flex max-w-md flex-col items-center px-4 text-center">
-              {isExistingUser ? (
-                <>
-                  <p className="text-muted-foreground text-sm">
-                    <Trans>
-                      You already have a HubSign account. Sign in to keep this document and your
-                      signature with the rest of your records.
-                    </Trans>
-                  </p>
-                  <Button asChild variant="outline" className="mt-4">
-                    <Link to={`/signin?email=${encodeURIComponent(recipient.email)}`}>
-                      <Trans>Sign in to save your signature</Trans>
-                    </Link>
-                  </Button>
-                </>
-              ) : (
-                <p className="text-muted-foreground text-sm">
-                  <Trans>A copy of the signed document will be emailed to you.</Trans>
-                </p>
-              )}
+          {!canSignUp && !user && isExistingUser && (
+            <div className="w-full rounded-[var(--r-lg)] border border-border bg-card p-6 text-center">
+              <p className="text-[13px] leading-relaxed text-muted-foreground">
+                <Trans>
+                  You already have a HubSign account. Sign in to keep this document and your
+                  signature with the rest of your records.
+                </Trans>
+              </p>
+              <Button asChild variant="outline" className="mt-4 w-full">
+                <Link to={`/signin?email=${encodeURIComponent(recipient.email)}`}>
+                  <Trans>Sign in to save your signature</Trans>
+                </Link>
+              </Button>
             </div>
           )}
 
           {canSignUp && (
-            <div className="flex max-w-xl flex-col items-center justify-center p-4 md:p-12">
-              <h2 className="mt-8 text-center text-xl font-semibold md:mt-0">
+            <div className="w-full rounded-[var(--r-lg)] border border-border bg-card p-6 sm:p-8">
+              <h2 className="text-center text-lg font-semibold tracking-tight">
                 <Trans>Need to sign documents?</Trans>
               </h2>
 
-              <p className="text-muted-foreground/60 mt-4 max-w-[55ch] text-center leading-normal">
-                <Trans>
-                  Create your account and start using state-of-the-art document signing.
-                </Trans>
+              <p className="mt-2 text-center text-[13px] leading-relaxed text-muted-foreground">
+                <Trans>Create a free HubSign account and keep your signed documents together.</Trans>
               </p>
 
               <ClaimAccount defaultName={recipientName} defaultEmail={recipient.email} />
@@ -283,7 +285,7 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
           )}
 
           {user && (
-            <Button asChild variant="outline" className="mt-8">
+            <Button asChild variant="ghost" className="text-[13px] text-muted-foreground">
               <Link to="/documents">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 <Trans>Back to my documents</Trans>
