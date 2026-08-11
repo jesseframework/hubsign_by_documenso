@@ -267,6 +267,70 @@ async function createOrUpdateOrgSubscription(orgId: number) {
   }
 }
 
+/**
+ * Issues a fresh single-use set-password token (24h expiry) for a user who
+ * was auto-created by `inviteMember` and is still locked out, and emails them
+ * the welcome/set-password link. Shared by `inviteMember` (first send) and
+ * `resendMemberInvite` (recovery when the original link expired or was lost).
+ */
+async function sendOrgSetPasswordEmail(params: {
+  user: { id: number; email: string; name: string | null };
+  orgName: string;
+  inviterName: string;
+  roleLabel: string;
+  welcomeMessage?: string;
+  isNewUser: boolean;
+}) {
+  const { user, orgName, inviterName, roleLabel, welcomeMessage, isNewUser } = params;
+
+  const token = crypto.randomBytes(18).toString('hex');
+  await prisma.passwordResetToken.create({
+    data: {
+      token,
+      expiry: new Date(Date.now() + ONE_DAY),
+      userId: user.id,
+    },
+  });
+
+  const assetBaseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
+  const setPasswordLink = `${assetBaseUrl}/reset-password/${token}`;
+
+  const emailTemplate = createElement(OrgMemberWelcomeEmailTemplate, {
+    assetBaseUrl,
+    baseUrl: assetBaseUrl,
+    inviterName,
+    orgName,
+    role: roleLabel,
+    welcomeMessage: welcomeMessage || '',
+    setPasswordLink,
+  });
+
+  const [html, text] = await Promise.all([
+    renderEmailWithI18N(emailTemplate),
+    renderEmailWithI18N(emailTemplate, { plainText: true }),
+  ]);
+
+  const i18n = await getI18nInstance();
+
+  await mailer.sendMail({
+    to: {
+      address: user.email,
+      name: user.name || '',
+    },
+    from: {
+      name: env('NEXT_PRIVATE_SMTP_FROM_NAME') || 'HubSign',
+      address: env('NEXT_PRIVATE_SMTP_FROM_ADDRESS') || 'noreply@hubsign.io',
+    },
+    subject: i18n._(
+      isNewUser ? msg`Welcome to ${orgName} on HubSign` : msg`Your HubSign invite link was resent`,
+    ),
+    html,
+    text,
+  }).catch((err) => {
+    console.error('[Org Invite] Failed to send set-password email:', err);
+  });
+}
+
 export const orgRouter = router({
   // ═══════════════════════════════════════════
   // ORGANIZATION CRUD
@@ -390,7 +454,7 @@ export const orgRouter = router({
           include: {
             members: {
               include: {
-                user: { select: { id: true, name: true, email: true } },
+                user: { select: { id: true, name: true, email: true, mustChangePassword: true } },
               },
             },
             _count: { select: { teams: true, dmsDocuments: true, dmsLocations: true } },
@@ -399,7 +463,43 @@ export const orgRouter = router({
       },
     });
 
-    return membership;
+    if (!membership) {
+      return membership;
+    }
+
+    // Members still on `mustChangePassword` were auto-created by `inviteMember`
+    // and are locked out until they use their emailed set-password link — pull
+    // each one's latest token expiry so the UI can show a countdown/"Expired"
+    // state instead of silently stranding them.
+    const pendingUserIds = membership.organization.members
+      .filter((m) => m.user.mustChangePassword)
+      .map((m) => m.user.id);
+
+    const latestTokenByUser = new Map<number, Date>();
+    if (pendingUserIds.length > 0) {
+      const tokens = await prisma.passwordResetToken.findMany({
+        where: { userId: { in: pendingUserIds } },
+        orderBy: { expiry: 'desc' },
+      });
+      for (const token of tokens) {
+        if (!latestTokenByUser.has(token.userId)) {
+          latestTokenByUser.set(token.userId, token.expiry);
+        }
+      }
+    }
+
+    return {
+      ...membership,
+      organization: {
+        ...membership.organization,
+        members: membership.organization.members.map((m) => ({
+          ...m,
+          inviteExpiresAt: m.user.mustChangePassword
+            ? latestTokenByUser.get(m.user.id) ?? null
+            : null,
+        })),
+      },
+    };
   }),
 
   update: authenticatedProcedure
@@ -588,8 +688,8 @@ export const orgRouter = router({
 
       // Auto-create the user if they don't exist. The admin never sets a
       // password — we flag the user with `mustChangePassword=true` and send
-      // them a single-use set-password link via the password reset flow.
-      let setPasswordLink: string | null = null;
+      // them a single-use set-password link via the password reset flow
+      // (issued below, after the membership is confirmed).
       if (!user) {
         user = await prisma.user.create({
           data: {
@@ -601,19 +701,6 @@ export const orgRouter = router({
             emailVerified: new Date(),
           },
         });
-
-        // Generate a single-use set-password token (24-hour expiry).
-        const token = crypto.randomBytes(18).toString('hex');
-        await prisma.passwordResetToken.create({
-          data: {
-            token,
-            expiry: new Date(Date.now() + ONE_DAY),
-            userId: user.id,
-          },
-        });
-
-        const base = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
-        setPasswordLink = `${base}/reset-password/${token}`;
       }
 
       // Check if already a member
@@ -641,58 +728,110 @@ export const orgRouter = router({
         select: { name: true, email: true },
       });
 
-      const assetBaseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
       const roleLabel = input.role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const inviterName = inviter.name || inviter.email;
 
-      // Choose template: welcome (with set-password link) for new users,
-      // or existing-user invite for users who already had an account.
-      const emailTemplate =
-        isNewUser && setPasswordLink
-          ? createElement(OrgMemberWelcomeEmailTemplate, {
-              assetBaseUrl,
-              baseUrl: assetBaseUrl,
-              inviterName: inviter.name || inviter.email,
-              orgName: org.name,
-              role: roleLabel,
-              welcomeMessage: input.welcomeMessage || '',
-              setPasswordLink,
-            })
-          : createElement(OrgMemberInviteEmailTemplate, {
-              assetBaseUrl,
-              baseUrl: assetBaseUrl,
-              inviterName: inviter.name || inviter.email,
-              orgName: org.name,
-              role: roleLabel,
-            });
+      if (isNewUser) {
+        // Locked out until they use the emailed link — same helper backs
+        // `resendMemberInvite` for when this one expires or gets lost.
+        await sendOrgSetPasswordEmail({
+          user,
+          orgName: org.name,
+          inviterName,
+          roleLabel,
+          welcomeMessage: input.welcomeMessage,
+          isNewUser: true,
+        });
+      } else {
+        // Existing account — just a courtesy notification, no link/token.
+        const assetBaseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
+        const emailTemplate = createElement(OrgMemberInviteEmailTemplate, {
+          assetBaseUrl,
+          baseUrl: assetBaseUrl,
+          inviterName,
+          orgName: org.name,
+          role: roleLabel,
+        });
 
-      const [html, text] = await Promise.all([
-        renderEmailWithI18N(emailTemplate),
-        renderEmailWithI18N(emailTemplate, { plainText: true }),
-      ]);
+        const [html, text] = await Promise.all([
+          renderEmailWithI18N(emailTemplate),
+          renderEmailWithI18N(emailTemplate, { plainText: true }),
+        ]);
 
-      const i18n = await getI18nInstance();
+        const i18n = await getI18nInstance();
 
-      await mailer.sendMail({
-        to: {
-          address: user.email,
-          name: user.name || '',
-        },
-        from: {
-          name: env('NEXT_PRIVATE_SMTP_FROM_NAME') || 'HubSign',
-          address: env('NEXT_PRIVATE_SMTP_FROM_ADDRESS') || 'noreply@hubsign.io',
-        },
-        subject: i18n._(
-          isNewUser
-            ? msg`Welcome to ${org.name} on HubSign`
-            : msg`You've been added to ${org.name} on HubSign`,
-        ),
-        html,
-        text,
-      }).catch((err) => {
-        console.error('[Org Invite] Failed to send invite email:', err);
-      });
+        await mailer.sendMail({
+          to: {
+            address: user.email,
+            name: user.name || '',
+          },
+          from: {
+            name: env('NEXT_PRIVATE_SMTP_FROM_NAME') || 'HubSign',
+            address: env('NEXT_PRIVATE_SMTP_FROM_ADDRESS') || 'noreply@hubsign.io',
+          },
+          subject: i18n._(msg`You've been added to ${org.name} on HubSign`),
+          html,
+          text,
+        }).catch((err) => {
+          console.error('[Org Invite] Failed to send invite email:', err);
+        });
+      }
 
       return newMember;
+    }),
+
+  /**
+   * Re-issues the set-password link for a member still locked out
+   * (`mustChangePassword: true`) — recovers members whose original invite
+   * link expired or was lost, since re-running `inviteMember` for them
+   * would just throw `CONFLICT` (they're already a member).
+   */
+  resendMemberInvite: authenticatedProcedure
+    .input(z.object({ memberId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id, role: { in: ['ORG_ADMIN', 'DMS_ADMIN'] } },
+      });
+
+      if (!membership) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Insufficient permissions to resend invites' });
+      }
+
+      const target = await prisma.organizationMember.findUnique({
+        where: { id: input.memberId },
+        include: { user: true, organization: true },
+      });
+
+      if (!target || target.organizationId !== membership.organizationId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Member not found' });
+      }
+
+      if (!target.user.mustChangePassword) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This member has already set up their account.',
+        });
+      }
+
+      const inviter = await prisma.user.findUniqueOrThrow({
+        where: { id: ctx.user.id },
+        select: { name: true, email: true },
+      });
+
+      const roleLabel = target.role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+      // Invalidate any outstanding link before issuing the new one, so only
+      // the freshest link works.
+      await prisma.passwordResetToken.deleteMany({ where: { userId: target.user.id } });
+      await sendOrgSetPasswordEmail({
+        user: target.user,
+        orgName: target.organization.name,
+        inviterName: inviter.name || inviter.email,
+        roleLabel,
+        isNewUser: false,
+      });
+
+      return { email: target.user.email, expiresAt: new Date(Date.now() + ONE_DAY) };
     }),
 
   updateMemberRole: authenticatedProcedure
