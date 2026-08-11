@@ -247,7 +247,18 @@ export const DocumentSigningForm = ({
                       await completeDocument(undefined, nextSigner);
                     }}
                     role={recipient.role}
-                    signingToken={recipient.token}
+                    /*
+                      Only for a document that belongs to an organization.
+
+                      Business rules and approval chains are org features — the
+                      gate in complete-document-with-token does not even run for
+                      a personal document. Passing the token regardless meant a
+                      personal-account signer who hit any other error was offered
+                      "ask the sender to approve an exception" for rules that
+                      cannot exist, and the request would have been refused for
+                      having no organization.
+                    */
+                    signingToken={document.organizationId ? recipient.token : undefined}
                     allowDictateNextSigner={document.documentMeta?.allowDictateNextSigner}
                     defaultNextSigner={
                       nextRecipient
@@ -440,7 +451,18 @@ export const DocumentSigningForm = ({
                       await completeDocument(undefined, nextSigner);
                     }}
                     role={recipient.role}
-                    signingToken={recipient.token}
+                    /*
+                      Only for a document that belongs to an organization.
+
+                      Business rules and approval chains are org features — the
+                      gate in complete-document-with-token does not even run for
+                      a personal document. Passing the token regardless meant a
+                      personal-account signer who hit any other error was offered
+                      "ask the sender to approve an exception" for rules that
+                      cannot exist, and the request would have been refused for
+                      having no organization.
+                    */
+                    signingToken={document.organizationId ? recipient.token : undefined}
                     allowDictateNextSigner={
                       nextRecipient && document.documentMeta?.allowDictateNextSigner
                     }

@@ -204,10 +204,19 @@ export const businessRuleRouter = router({
 
       const { document } = recipient;
 
+      /*
+        Organizations only, and this is the check that counts.
+
+        Business rules and approval chains are org features, and the signing gate
+        does not even run for a personal document — so there is never anything to
+        waive on one. The signing form also stops offering the request in that
+        case, but that is presentation: this endpoint is unauthenticated, so the
+        decision has to be made here.
+      */
       if (!document.organizationId) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'This document has no organization, so it has no rules to override.',
+          message: 'This document is not part of an organization, so it has no rules to override.',
         });
       }
 
