@@ -30,6 +30,9 @@ export const TIMELINE_KINDS = [
   'FIELD_CORRECTED',
   'FIELD_FROM_ATTACHMENT',
   'ATTACHMENT_READ',
+  'OVERRIDE_REQUESTED',
+  'OVERRIDE_APPROVED',
+  'OVERRIDE_DECLINED',
 ] as const;
 
 export type TimelineKind = (typeof TIMELINE_KINDS)[number];
@@ -47,6 +50,7 @@ export type TimelineEvent = {
    * WORKFLOW_RUN    → the run status
    * FIELD_CORRECTED → the field name
    * ATTACHMENT_READ → 'ok' | 'failed'
+   * OVERRIDE_*      → 'chain' | 'direct', i.e. how it was decided
    */
   detail: string | null;
   /** Free text that is already a proper noun — a workflow name, a reason. */
@@ -88,7 +92,7 @@ export const getInboxItemTimeline = async ({
     return [];
   }
 
-  const [auditLogs, reminders, runs, fieldEdits, attachments] = await Promise.all([
+  const [auditLogs, reminders, runs, fieldEdits, attachments, overrides] = await Promise.all([
     prisma.documentAuditLog.findMany({
       where: { documentId: item.documentId },
       orderBy: { createdAt: 'asc' },
@@ -138,6 +142,22 @@ export const getInboxItemTimeline = async ({
         ocrRanAt: true,
         ocrError: true,
         ocrRanBy: { select: { name: true, email: true } },
+      },
+    }),
+    prisma.businessRuleOverride.findMany({
+      where: { documentId: item.documentId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        decidedAt: true,
+        decisionNote: true,
+        reason: true,
+        approvalRequestId: true,
+        recipient: { select: { name: true, email: true } },
+        decidedBy: { select: { name: true, email: true } },
+        rules: { select: { ruleName: true } },
       },
     }),
   ]);
@@ -292,6 +312,37 @@ export const getInboxItemTimeline = async ({
       detail: attachment.ocrError ? 'failed' : 'ok',
       note: attachment.fileName,
     });
+  }
+
+  // ---- Signing exceptions -------------------------------------------------
+  //
+  // Two rows per override, not one: "a signer was stopped and asked" and "it was
+  // granted" are separate facts, and the gap between them is the thing anyone
+  // reviewing this afterwards actually wants to see.
+  for (const override of overrides) {
+    events.push({
+      id: `${override.id}-requested`,
+      at: override.createdAt,
+      kind: 'OVERRIDE_REQUESTED',
+      actor: override.recipient?.name || override.recipient?.email || null,
+      detail: override.approvalRequestId ? 'chain' : 'direct',
+      // The rules at stake, so the row says what was asked for rather than just
+      // that something was.
+      note: override.rules.map((r) => r.ruleName).join(', ') || null,
+    });
+
+    if (override.decidedAt && override.status !== 'PENDING') {
+      events.push({
+        id: `${override.id}-decided`,
+        at: override.decidedAt,
+        kind: override.status === 'APPROVED' ? 'OVERRIDE_APPROVED' : 'OVERRIDE_DECLINED',
+        // Null for a chain decision: several approvers may have acted, and naming
+        // only one of them would misreport who authorised it.
+        actor: override.decidedBy?.name || override.decidedBy?.email || null,
+        detail: override.approvalRequestId ? 'chain' : 'direct',
+        note: override.decisionNote,
+      });
+    }
   }
 
   // ---- Workflow runs ------------------------------------------------------

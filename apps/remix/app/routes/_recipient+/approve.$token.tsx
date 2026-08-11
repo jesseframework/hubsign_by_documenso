@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { CheckCircle2Icon, XCircleIcon } from 'lucide-react';
-import { Form, useNavigation } from 'react-router';
+import { Form, useNavigation, useSearchParams } from 'react-router';
 
 import {
   actOnApprovalByToken,
@@ -37,7 +37,15 @@ export default function ApprovePage({ loaderData, actionData }: Route.ComponentP
   const { view } = loaderData;
   const navigation = useNavigation();
   const submitting = navigation.state === 'submitting';
-  const [showReject, setShowReject] = useState(false);
+
+  /*
+    The email's two buttons arrive here as ?intent=, which only chooses which
+    control is already open — the decision itself still needs a click on this
+    page. Mail clients and security scanners prefetch links, and a GET that
+    approved a payment would let them do it on the approver's behalf.
+  */
+  const [searchParams] = useSearchParams();
+  const [showReject, setShowReject] = useState(searchParams.get('intent') === 'reject');
 
   const card = 'mx-auto mt-16 max-w-md rounded-xl border border-border bg-card p-6 text-center shadow-sm';
 

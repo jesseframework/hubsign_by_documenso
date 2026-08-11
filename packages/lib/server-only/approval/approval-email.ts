@@ -13,13 +13,39 @@ import { FROM_ADDRESS, FROM_NAME } from '../../constants/email';
 
 const baseUrl = () => NEXT_PUBLIC_WEBAPP_URL();
 
-const shell = (heading: string, bodyHtml: string, ctaLabel: string, ctaUrl: string) => `
+type Action = { label: string; url: string; tone?: 'primary' | 'danger' | 'plain' };
+
+const BUTTON: Record<NonNullable<Action['tone']>, string> = {
+  primary: 'background:#7c5cfc;color:#fff;border:1px solid #7c5cfc',
+  danger: 'background:#fff;color:#dc2626;border:1px solid #f0a8a8',
+  plain: 'background:#fff;color:#111;border:1px solid #d9d9e3',
+};
+
+/**
+ * One or more call-to-action buttons.
+ *
+ * Each is a link to the decision page carrying its intent, NOT a link that
+ * performs the decision. That distinction is the whole safety story: a mail
+ * client or scanner that prefetches links would otherwise approve payments on
+ * the approver's behalf, so the page still requires a click to commit. The
+ * intent only decides which control is already open when they arrive.
+ *
+ * Table-based layout because Outlook ignores flexbox and inline-block margins.
+ */
+const shell = (heading: string, bodyHtml: string, actions: Action[]) => `
   <div style="font-family:ui-sans-serif,system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111">
     <h2 style="font-size:18px;margin:0 0 12px">${heading}</h2>
     ${bodyHtml}
-    <p style="margin:24px 0">
-      <a href="${ctaUrl}" style="background:#7c5cfc;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;display:inline-block;font-weight:600">${ctaLabel}</a>
-    </p>
+    <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px 0"><tr>
+      ${actions
+        .map(
+          (action) =>
+            `<td style="padding-right:8px"><a href="${action.url}" style="${
+              BUTTON[action.tone ?? 'primary']
+            };text-decoration:none;padding:10px 18px;border-radius:8px;display:inline-block;font-weight:600;font-size:14px">${action.label}</a></td>`,
+        )
+        .join('')}
+    </tr></table>
   </div>`;
 
 const summaryRow = (label: string, value?: string | null) =>
@@ -48,14 +74,17 @@ export const sendApprovalRequestEmail = async (input: SendApprovalRequestEmailIn
       ${summaryRow('Amount', input.amount != null ? String(input.amount) : null)}
       ${summaryRow('Priority', input.priority)}
     </table>
-    <p style="font-size:13px;color:#666">Open the review page to approve or reject. <a href="${appUrl}">View in app</a>.</p>`;
+    <p style="font-size:13px;color:#666">Both buttons open the review page, where you confirm the decision. <a href="${appUrl}">View in app</a>.</p>`;
 
   await mailer.sendMail({
     to: { name: input.to.name ?? '', address: input.to.email },
     from: { name: FROM_NAME, address: FROM_ADDRESS },
     subject: `Approval requested: ${input.entityTitle}`,
-    html: shell('Approval requested', body, 'Review & approve', approveUrl),
-    text: `Approval requested for "${input.entityTitle}". Review: ${approveUrl}`,
+    html: shell('Approval requested', body, [
+      { label: 'Approve', url: `${approveUrl}?intent=approve`, tone: 'primary' },
+      { label: 'Decline', url: `${approveUrl}?intent=reject`, tone: 'danger' },
+    ]),
+    text: `Approval requested for "${input.entityTitle}". Review and decide: ${approveUrl}`,
   });
 };
 
@@ -81,7 +110,10 @@ export const sendApprovalReminderEmail = async (input: SendApprovalReminderEmail
     ...(input.ccEmails && input.ccEmails.length > 0 ? { cc: input.ccEmails } : {}),
     from: { name: FROM_NAME, address: FROM_ADDRESS },
     subject: `${isEscalation ? '[Escalation] ' : 'Reminder: '}Approval pending: ${input.entityTitle}`,
-    html: shell(isEscalation ? 'Approval escalated' : 'Approval reminder', body, 'Review & approve', approveUrl),
+    html: shell(isEscalation ? 'Approval escalated' : 'Approval reminder', body, [
+      { label: 'Approve', url: `${approveUrl}?intent=approve`, tone: 'primary' },
+      { label: 'Decline', url: `${approveUrl}?intent=reject`, tone: 'danger' },
+    ]),
     text: `Approval still pending for "${input.entityTitle}". Review: ${approveUrl}`,
   });
 };
@@ -106,7 +138,7 @@ export const sendApprovalOutcomeEmail = async (input: SendApprovalOutcomeEmailIn
     to: { name: input.to.name ?? '', address: input.to.email },
     from: { name: FROM_NAME, address: FROM_ADDRESS },
     subject: `Approval ${verb}: ${input.entityTitle}`,
-    html: shell(`Approval ${verb}`, body, 'View details', appUrl),
+    html: shell(`Approval ${verb}`, body, [{ label: 'View details', url: appUrl, tone: 'plain' }]),
     text: `Your approval request for "${input.entityTitle}" was ${verb}. ${appUrl}`,
   });
 };

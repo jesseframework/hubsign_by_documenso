@@ -644,6 +644,14 @@ msgstr ""
 msgid "{who} set {0} to {note}"
 msgstr ""
 
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "{who} was blocked and asked to sign anyway"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "{who} was blocked and asked to sign anyway — {note}"
+msgstr ""
+
 #. placeholder {0}: config.joins.length
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
 msgid "+{0} joined"
@@ -4816,8 +4824,28 @@ msgstr "Tiempo de espera excedido"
 msgid "Excel workbooks (.xlsx) aren't supported. In Excel choose File → Save As → CSV UTF-8, then upload that file."
 msgstr ""
 
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Exception approved"
+msgstr ""
+
 #: apps/remix/app/components/general/rules/rule-override-queue.tsx
 msgid "Exception approved — the signer can now sign"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Exception approved by {who}"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Exception approved by the approval chain"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Exception declined by {who}"
+msgstr ""
+
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Exception declined by {who} — {note}"
 msgstr ""
 
 #. placeholder {0}: data.domains.join(', ')
