@@ -22,7 +22,7 @@ import { DocumentStatus } from '~/components/general/document/document-status';
 import { useOptionalCurrentTeam } from '~/providers/team';
 
 import { StackAvatarsWithTooltip } from '../general/stack-avatars-with-tooltip';
-import { DocumentOcrAmount, DocumentOcrSummary } from './document-ocr-summary';
+import { DocumentOcrSummary } from './document-ocr-summary';
 import { DocumentsTableActionButton } from './documents-table-action-button';
 import { DocumentsTableActionDropdown } from './documents-table-action-dropdown';
 
@@ -110,12 +110,6 @@ export const DocumentsTable = ({
           />
         ),
         size: 90,
-      },
-      {
-        header: () => <span className="block text-right">{_(msg`Amount`)}</span>,
-        id: 'amount',
-        cell: ({ row }) => <DocumentOcrAmount ocr={row.original.ocr} />,
-        size: 110,
       },
       {
         header: _(msg`Status`),

@@ -158,6 +158,9 @@ export const ZFindDocumentsInternalRequestSchema = ZFindDocumentsRequestSchema.e
  * Deliberately on the INTERNAL response only. The public v2 `findDocuments`
  * contract is a separate decision, and quietly widening it here would commit us
  * to shipping these fields to API consumers forever.
+ *
+ * No amount: it is not rendered anywhere in the list, and a value only some
+ * documents have is not worth sending to every row of every page.
  */
 export const ZDocumentOcrSummarySchema = z
   .object({
@@ -165,8 +168,6 @@ export const ZDocumentOcrSummarySchema = z
     vendorContact: z.string().nullable(),
     invoiceNumber: z.string().nullable(),
     poNumber: z.string().nullable(),
-    totalAmount: z.string().nullable(),
-    currency: z.string().nullable(),
   })
   .nullable();
 

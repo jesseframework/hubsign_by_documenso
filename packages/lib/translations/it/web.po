@@ -1481,7 +1481,6 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
-#: apps/remix/app/components/tables/documents-table.tsx
 msgid "Amount"
 msgstr "Importo"
 

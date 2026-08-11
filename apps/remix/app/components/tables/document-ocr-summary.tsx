@@ -3,17 +3,20 @@ import { BuildingIcon, FileTextIcon, HashIcon } from 'lucide-react';
 /**
  * The handful of OCR values worth seeing in a list of documents.
  *
- * Both components render nothing at all when there is no extraction, which is the
- * normal case for a hand-uploaded document — a list of empty dashes would make
- * every non-invoice row look like it was missing something.
+ * Renders nothing at all when there is no extraction, which is the normal case for
+ * a hand-uploaded document — a list of empty dashes would make every non-invoice
+ * row look like it was missing something.
+ *
+ * There is deliberately no amount here. It was briefly its own column, which put
+ * a permanent "Amount" header above a cell that is empty for every contract, NDA
+ * and letter in the list — most of them. A figure only some documents have does
+ * not earn a column of its own.
  */
 export type DocumentOcr = {
   vendorName: string | null;
   vendorContact: string | null;
   invoiceNumber: string | null;
   poNumber: string | null;
-  totalAmount: string | null;
-  currency: string | null;
 } | null;
 
 export const DocumentOcrSummary = ({ ocr }: { ocr: DocumentOcr }) => {
@@ -56,27 +59,6 @@ export const DocumentOcrSummary = ({ ocr }: { ocr: DocumentOcr }) => {
           )}
         </div>
       )}
-    </div>
-  );
-};
-
-export const DocumentOcrAmount = ({ ocr }: { ocr: DocumentOcr }) => {
-  if (!ocr?.totalAmount) return null;
-
-  /*
-    Shown as extracted, not reformatted.
-
-    The value arrives as whatever the extractor produced, so parsing it into a
-    number to run through a currency formatter risks turning "1.234,56" into
-    1.234 and reporting a thousandth of the real total on an invoice list. The
-    currency code goes beside it instead.
-  */
-  return (
-    <div className="whitespace-nowrap text-right text-[12px]">
-      {ocr.currency && (
-        <span className="mr-1 text-[10px] uppercase text-muted-foreground">{ocr.currency}</span>
-      )}
-      <span className="font-medium">{ocr.totalAmount}</span>
     </div>
   );
 };

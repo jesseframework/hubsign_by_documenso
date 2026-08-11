@@ -292,8 +292,6 @@ export const findDocuments = async ({
           vendorContact: readOcrField(inboxItem.extractedData, 'vendorContact'),
           invoiceNumber: readOcrField(inboxItem.extractedData, 'invoiceNumber'),
           poNumber: readOcrField(inboxItem.extractedData, 'poNumber'),
-          totalAmount: readOcrField(inboxItem.extractedData, 'totalAmount'),
-          currency: readOcrField(inboxItem.extractedData, 'currency'),
         }
       : null,
   }));
