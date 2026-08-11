@@ -1,5 +1,6 @@
 import { useState } from 'react';
 
+import type { EmailTemplate } from '@prisma/client';
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
@@ -97,7 +98,7 @@ function EmailTemplatesPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {templates.map((template) => (
+              {templates.map((template: EmailTemplate) => (
                 <tr key={template.id} className="hover:bg-muted/20">
                   <td className="px-4 py-3">
                     <Link

@@ -1,8 +1,12 @@
+import type { EmailTemplate } from '@prisma/client';
 import { Trans } from '@lingui/react/macro';
 import { ChevronDownIcon, ChevronUpIcon, PlusIcon, TrashIcon } from 'lucide-react';
+import { Link } from 'react-router';
 
+import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import { Input } from '@documenso/ui/primitives/input';
+import { RichTextEditor } from '@documenso/ui/primitives/rich-text-editor';
 
 import {
   ConditionRuleBuilder,
@@ -225,6 +229,34 @@ const labelCls = 'block text-[11px] font-medium text-muted-foreground mb-1';
 const fieldCls =
   'block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary';
 
+/** "Custom / Template" switch for a SEND_EMAIL step's body — mirrors the Simple/Advanced toggle elsewhere. */
+const EmailBodyModeToggle = ({
+  mode,
+  onCustom,
+  onTemplate,
+}: {
+  mode: 'custom' | 'template';
+  onCustom: () => void;
+  onTemplate: () => void;
+}) => (
+  <div className="flex rounded-md border border-border p-0.5 text-[11px]">
+    <button
+      type="button"
+      className={`rounded px-2 py-0.5 ${mode === 'custom' ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}
+      onClick={onCustom}
+    >
+      <Trans>Custom</Trans>
+    </button>
+    <button
+      type="button"
+      className={`rounded px-2 py-0.5 ${mode === 'template' ? 'bg-primary/10 text-primary' : 'text-muted-foreground'}`}
+      onClick={onTemplate}
+    >
+      <Trans>Template</Trans>
+    </button>
+  </div>
+);
+
 /** Dropdown of other step ids to jump to, plus a "(end of workflow)" option. */
 const StepTargetSelect = ({
   stepIds,
@@ -400,6 +432,7 @@ export const StepVisualEditor = ({
   onStartStepIdChange: (next: string) => void;
 }) => {
   const stepIds = Object.keys(steps);
+  const { data: emailTemplates } = trpc.emailTemplate.list.useQuery();
 
   const addStep = (kind: TStepKind) => {
     const base = kind === 'CONDITION' ? 'condition' : kind.toLowerCase();
@@ -581,42 +614,106 @@ export const StepVisualEditor = ({
                 </div>
               )}
 
-              {kind === 'SEND_EMAIL' && (
-                <div className="grid gap-2">
-                  <div>
-                    <label className={labelCls}>
-                      <Trans>To</Trans>
-                    </label>
-                    <Input
-                      className="h-8 font-mono text-[12px]"
-                      value={typeof config.to === 'string' ? config.to : ''}
-                      onChange={(e) => updateConfig(id, { to: e.target.value })}
-                      placeholder="{{document.user.email}}"
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>
-                      <Trans>Subject</Trans>
-                    </label>
-                    <Input
-                      className="h-8 text-[13px]"
-                      value={typeof config.subject === 'string' ? config.subject : ''}
-                      onChange={(e) => updateConfig(id, { subject: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label className={labelCls}>
-                      <Trans>Body (HTML)</Trans>
-                    </label>
-                    <textarea
-                      className={`${fieldCls} font-mono text-[12px]`}
-                      rows={3}
-                      value={typeof config.html === 'string' ? config.html : ''}
-                      onChange={(e) => updateConfig(id, { html: e.target.value })}
-                    />
-                  </div>
-                </div>
-              )}
+              {kind === 'SEND_EMAIL' &&
+                (() => {
+                  const emailMode = typeof config.templateKey === 'string' ? 'template' : 'custom';
+
+                  return (
+                    <div className="grid gap-2">
+                      <div>
+                        <label className={labelCls}>
+                          <Trans>To</Trans>
+                        </label>
+                        <Input
+                          className="h-8 font-mono text-[12px]"
+                          value={typeof config.to === 'string' ? config.to : ''}
+                          onChange={(e) => updateConfig(id, { to: e.target.value })}
+                          placeholder="{{document.user.email}}"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <label className={`${labelCls} mb-0`}>
+                          <Trans>Body</Trans>
+                        </label>
+                        <EmailBodyModeToggle
+                          mode={emailMode}
+                          onCustom={() =>
+                            updateConfig(id, {
+                              templateKey: undefined,
+                              html: typeof config.html === 'string' && config.html ? config.html : '<p>Body here</p>',
+                            })
+                          }
+                          onTemplate={() =>
+                            updateConfig(id, {
+                              templateKey: emailTemplates?.[0]?.key ?? '',
+                              html: '',
+                            })
+                          }
+                        />
+                      </div>
+
+                      {emailMode === 'custom' && (
+                        <>
+                          <div>
+                            <label className={labelCls}>
+                              <Trans>Subject</Trans>
+                            </label>
+                            <Input
+                              className="h-8 text-[13px]"
+                              value={typeof config.subject === 'string' ? config.subject : ''}
+                              onChange={(e) => updateConfig(id, { subject: e.target.value })}
+                            />
+                          </div>
+                          <RichTextEditor
+                            value={typeof config.html === 'string' ? config.html : ''}
+                            onChange={(html) => updateConfig(id, { html })}
+                          />
+                        </>
+                      )}
+
+                      {emailMode === 'template' && (
+                        <>
+                          <div>
+                            <select
+                              className={fieldCls}
+                              value={typeof config.templateKey === 'string' ? config.templateKey : ''}
+                              onChange={(e) => updateConfig(id, { templateKey: e.target.value })}
+                            >
+                              <option value="" disabled>
+                                <Trans>Select a template…</Trans>
+                              </option>
+                              {emailTemplates?.map((template: EmailTemplate) => (
+                                <option key={template.key} value={template.key}>
+                                  {template.name} ({template.key})
+                                </option>
+                              ))}
+                            </select>
+                            {emailTemplates?.length === 0 && (
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                <Trans>No email templates yet — </Trans>
+                                <Link to="/org/email-templates/new" className="text-primary underline">
+                                  <Trans>create one</Trans>
+                                </Link>
+                              </p>
+                            )}
+                          </div>
+                          <div>
+                            <label className={labelCls}>
+                              <Trans>Subject override (optional)</Trans>
+                            </label>
+                            <Input
+                              className="h-8 text-[13px]"
+                              value={typeof config.subject === 'string' ? config.subject : ''}
+                              onChange={(e) => updateConfig(id, { subject: e.target.value })}
+                              placeholder="Uses the template's subject if left blank"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
 
               {kind === 'HTTP_REQUEST' && (
                 <div className="grid gap-2">

@@ -9,6 +9,7 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import { Input } from '@documenso/ui/primitives/input';
+import { RichTextEditor } from '@documenso/ui/primitives/rich-text-editor';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { OrgAdminGuard } from '~/components/general/org-admin-guard';
@@ -237,13 +238,7 @@ function EmailTemplateEditorPage() {
           <label className={label}>
             <Trans>HTML body</Trans>
           </label>
-          <textarea
-            className="h-80 w-full resize-y rounded-[var(--r-sm)] border border-border bg-input p-3 font-mono text-[12px] leading-relaxed outline-none focus:border-primary"
-            placeholder={'<p>Hi {{vars.vendor.label}},</p>\n<p>We have received your invoice.</p>'}
-            value={form.html}
-            onChange={(e) => set({ html: e.target.value })}
-            spellCheck={false}
-          />
+          <RichTextEditor value={form.html} onChange={(html) => set({ html })} />
 
           <label className={`${label} mt-3`}>
             <Trans>Plain text fallback (optional)</Trans>
