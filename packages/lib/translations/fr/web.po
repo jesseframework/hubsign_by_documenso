@@ -669,10 +669,9 @@ msgstr ""
 msgid "+{0} older, not shown"
 msgstr ""
 
-#. placeholder {0}: document.title
 #: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
-msgid "<0>\"{0}\"</0>is no longer available to sign"
-msgstr "<0>\"{0}\"</0> n'est plus disponible pour signer"
+#~ msgid "<0>\"{0}\"</0>is no longer available to sign"
+#~ msgstr "<0>\"{0}\"</0> n'est plus disponible pour signer"
 
 #: packages/email/templates/org-member-invite.tsx
 msgid "<0>{inviterName}</0> has added you to the organization <1>{orgName}</1> as a <2>{role}</2>."
@@ -2073,6 +2072,7 @@ msgid "Back to Documents"
 msgstr "Retour aux documents"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+#: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
 msgid "Back to my documents"
 msgstr ""
 
@@ -2352,6 +2352,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 msgid "Cancel plan & continue"
+msgstr ""
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
+msgid "Cancelled"
 msgstr ""
 
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
@@ -3336,6 +3340,10 @@ msgstr "Décliner"
 msgid "declined"
 msgstr ""
 
+#: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
+msgid "Declined"
+msgstr ""
+
 #. placeholder {0}: rejected[0].name || rejected[0].email
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "Declined by {0}. Nothing further will be sent."
@@ -3773,7 +3781,6 @@ msgstr ""
 #~ msgid "Document Approved"
 #~ msgstr "Document Approuvé"
 
-#: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
 #: packages/lib/server-only/document/super-delete-document.ts
 #: packages/lib/server-only/document/delete-document.ts
 msgid "Document Cancelled"
@@ -3789,6 +3796,7 @@ msgstr ""
 
 #: apps/remix/app/components/general/document/document-status.tsx
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
+#: apps/remix/app/components/embed/embed-document-completed.tsx
 #: packages/lib/utils/document-audit-logs.ts
 #: packages/lib/utils/document-audit-logs.ts
 msgid "Document completed"
@@ -3800,8 +3808,8 @@ msgid "Document completed email"
 msgstr "E-mail de document complété"
 
 #: apps/remix/app/components/embed/embed-document-completed.tsx
-msgid "Document Completed!"
-msgstr "Document Complété !"
+#~ msgid "Document Completed!"
+#~ msgstr "Document Complété !"
 
 #: apps/remix/app/routes/_authenticated+/doc-merge.tsx
 #: apps/remix/app/components/dialogs/template-use-dialog.tsx
@@ -4758,6 +4766,7 @@ msgstr ""
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
 #: apps/remix/app/components/general/inbox/responsibility-cell.tsx
+#: apps/remix/app/components/embed/embed-document-completed.tsx
 msgid "Everyone has signed"
 msgstr "Tout le monde a signé"
 
@@ -5125,8 +5134,8 @@ msgid "Go back home"
 msgstr "Revenir au tableau de bord"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
-msgid "Go Back Home"
-msgstr "Revenir au tableau de bord"
+#~ msgid "Go Back Home"
+#~ msgstr "Revenir au tableau de bord"
 
 #: apps/remix/app/components/general/document/document-certificate-qr-view.tsx
 msgid "Go to document"
@@ -6356,6 +6365,7 @@ msgid "No invoices in this window."
 msgstr ""
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
+#: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
 msgid "No longer available to sign"
 msgstr ""
 
@@ -6745,6 +6755,10 @@ msgstr "Une fois votre modèle configuré, partagez le lien où vous le souhaite
 
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 msgid "One connection per organization. Add channels below."
+msgstr ""
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
+msgid "One of the signers declined to sign this document, so it can no longer be completed. The sender can tell you why and start it again if it was a mistake."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
@@ -8817,6 +8831,10 @@ msgstr ""
 msgid "Signing Volume"
 msgstr "Volume de signatures"
 
+#: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
+msgid "Signing was declined"
+msgstr ""
+
 #: apps/remix/app/components/forms/signup.tsx
 msgid "Signups are disabled."
 msgstr "Les inscriptions sont désactivées."
@@ -9578,8 +9596,8 @@ msgid "The document is already saved and cannot be changed."
 msgstr ""
 
 #: apps/remix/app/components/embed/embed-document-completed.tsx
-msgid "The document is now completed, please follow any instructions provided within the parent application."
-msgstr "Le document est maintenant complet, veuillez suivre toutes les instructions fournies dans l'application parente."
+#~ msgid "The document is now completed, please follow any instructions provided within the parent application."
+#~ msgstr "Le document est maintenant complet, veuillez suivre toutes les instructions fournies dans l'application parente."
 
 #: apps/remix/app/routes/_authenticated+/dms+/_layout.tsx
 msgid "The Document Manager module is an enterprise add-on that provides full document lifecycle management — filing, retention, compliance, workflows, and more."
@@ -9659,6 +9677,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
 msgid "The owner cancelled this document, so it is no longer available to others."
+msgstr ""
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
+msgid "The owner cancelled this document, so it is no longer available to sign."
 msgstr ""
 
 #. placeholder {0}: data.teamName
@@ -9936,8 +9958,8 @@ msgstr "Ce document a déjà été envoyé à ce destinataire. Vous ne pouvez pl
 #~ msgstr "Ce document a été annulé par le propriétaire et n'est plus disponible pour d'autres à signer."
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
-msgid "This document has been cancelled by the owner."
-msgstr "Ce document a été annulé par le propriétaire."
+#~ msgid "This document has been cancelled by the owner."
+#~ msgstr "Ce document a été annulé par le propriétaire."
 
 #: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/documents.$id._index.tsx
@@ -9959,6 +9981,10 @@ msgstr ""
 
 #: apps/remix/app/components/general/inbox/extracted-fields.tsx
 msgid "This document is complete, so its extracted data can no longer be changed."
+msgstr ""
+
+#: apps/remix/app/components/embed/embed-document-completed.tsx
+msgid "This document is complete. Follow any instructions shown in the application you started from."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id._index.tsx
@@ -11046,8 +11072,12 @@ msgid "Want to make changes first? Update or cancel your plan from your <0>billi
 msgstr ""
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
-msgid "Want to send slick signing links like this one? <0>Check out HubSign.</0>"
-msgstr "Vous voulez envoyer des liens de signature élégants comme celui-ci ? <0>Découvrez HubSign.</0>"
+msgid "Want to send signing links like this one? <0>Take a look at HubSign.</0>"
+msgstr ""
+
+#: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
+#~ msgid "Want to send slick signing links like this one? <0>Check out HubSign.</0>"
+#~ msgstr "Vous voulez envoyer des liens de signature élégants comme celui-ci ? <0>Découvrez HubSign.</0>"
 
 #: apps/remix/app/routes/_profile+/_layout.tsx
 msgid "Want your own public profile?"

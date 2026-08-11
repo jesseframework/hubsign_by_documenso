@@ -4,7 +4,7 @@ import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import { type Document, DocumentStatus, FieldType, RecipientRole } from '@prisma/client';
-import { ArrowLeft, BanIcon, CheckIcon, Clock8, FileSearch, FileTextIcon } from 'lucide-react';
+import { ArrowLeft, BanIcon, CheckIcon, Clock8, FileSearch } from 'lucide-react';
 import { Link, useRevalidator } from 'react-router';
 import { match } from 'ts-pattern';
 
@@ -24,7 +24,11 @@ import { Button } from '@documenso/ui/primitives/button';
 
 import { ClaimAccount } from '~/components/general/claim-account';
 import { DocumentSigningAuthPageView } from '~/components/general/document-signing/document-signing-auth-page';
-import { SignaturePanel } from '~/components/general/document-signing/signing-outcome-card';
+import {
+  DocumentTitleRow,
+  OutcomeCard,
+  SignaturePanel,
+} from '~/components/general/document-signing/signing-outcome-card';
 
 import type { Route } from './+types/complete';
 
@@ -151,8 +155,6 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
       ),
     }));
 
-  const OutcomeIcon = outcome.icon;
-
   return (
     <div className="flex w-full flex-col items-center px-4 py-10 sm:py-14">
       {/*
@@ -173,38 +175,20 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
           saying: this document, this signature, this outcome, and the one action
           that follows from it.
         */}
-        <div className="w-full rounded-[var(--r-lg)] border border-border bg-card p-6 sm:p-8">
-          <div className="flex flex-col items-center text-center">
-            <span
-              className={`flex h-11 w-11 items-center justify-center rounded-full ${outcome.tone}`}
-            >
-              <OutcomeIcon className="h-5 w-5" strokeWidth={2.5} />
-            </span>
-
-            <h1 className="mt-4 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
+        <OutcomeCard
+          icon={outcome.icon}
+          tone={outcome.tone}
+          chip={outcome.label}
+          detail={outcome.detail}
+          title={
+            <>
               {recipient.role === RecipientRole.SIGNER && <Trans>Document signed</Trans>}
               {recipient.role === RecipientRole.VIEWER && <Trans>Document viewed</Trans>}
               {recipient.role === RecipientRole.APPROVER && <Trans>Document approved</Trans>}
-            </h1>
-
-            <span
-              className={`mt-2.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${outcome.tone}`}
-            >
-              {outcome.label}
-            </span>
-
-            <p className="mt-3 max-w-[42ch] text-[13px] leading-relaxed text-muted-foreground">
-              {outcome.detail}
-            </p>
-          </div>
-
-          {/* What was signed, named rather than left as a bare chip. */}
-          <div className="mt-6 flex items-center gap-2.5 rounded-[var(--r)] bg-muted/50 px-3 py-2.5">
-            <FileTextIcon className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1 truncate text-[13px] font-medium" title={document.title}>
-              {document.title}
-            </span>
-          </div>
+            </>
+          }
+        >
+          <DocumentTitleRow title={document.title} />
 
           <div className="mt-3">
             <SignaturePanel name={recipientName} signature={signatures.at(0)} />
@@ -242,7 +226,7 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
               />
             )}
           </div>
-        </div>
+        </OutcomeCard>
 
         <div className="flex w-full flex-col items-center">
           {/*

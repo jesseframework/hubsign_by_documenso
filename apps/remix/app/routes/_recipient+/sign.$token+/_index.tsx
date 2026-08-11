@@ -1,10 +1,9 @@
 import { Trans } from '@lingui/react/macro';
 import { DocumentSigningOrder, DocumentStatus, RecipientRole, SigningStatus } from '@prisma/client';
-import { Clock8 } from 'lucide-react';
+import { BanIcon, XCircleIcon } from 'lucide-react';
 import { Link, redirect } from 'react-router';
 import { getOptionalLoaderContext } from 'server/utils/get-loader-session';
 
-import signingCelebration from '@documenso/assets/images/signing-celebration.png';
 import { getOptionalSession } from '@documenso/auth/server/lib/utils/get-session';
 import { useOptionalSession } from '@documenso/lib/client-only/providers/session';
 import { getDocumentAndSenderByToken } from '@documenso/lib/server-only/document/get-document-by-token';
@@ -15,14 +14,14 @@ import { getFieldsForToken } from '@documenso/lib/server-only/field/get-fields-f
 import { getIsRecipientsTurnToSign } from '@documenso/lib/server-only/recipient/get-is-recipient-turn';
 import { getNextPendingRecipient } from '@documenso/lib/server-only/recipient/get-next-pending-recipient';
 import { getRecipientByToken } from '@documenso/lib/server-only/recipient/get-recipient-by-token';
-import { getRecipientSignatures } from '@documenso/lib/server-only/recipient/get-recipient-signatures';
 import { getRecipientsForAssistant } from '@documenso/lib/server-only/recipient/get-recipients-for-assistant';
 import { getStampPlacementsForToken } from '@documenso/lib/server-only/stamps/get-stamp-placements-for-token';
 import { getUserByEmail } from '@documenso/lib/server-only/user/get-user-by-email';
 import { extractDocumentAuthMethods } from '@documenso/lib/utils/document-auth';
-import { SigningCard3D } from '@documenso/ui/components/signing-card';
+import { Button } from '@documenso/ui/primitives/button';
 
 import { DocumentSigningAuthPageView } from '~/components/general/document-signing/document-signing-auth-page';
+import { DocumentTitleRow, OutcomeCard } from '~/components/general/document-signing/signing-outcome-card';
 import { DocumentSigningAuthProvider } from '~/components/general/document-signing/document-signing-auth-provider';
 import { DocumentSigningPageView } from '~/components/general/document-signing/document-signing-page-view';
 import { DocumentSigningProvider } from '~/components/general/document-signing/document-signing-provider';
@@ -138,8 +137,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     throw redirect(documentMeta?.redirectUrl || `/sign/${token}/complete`);
   }
 
-  const [recipientSignature] = await getRecipientSignatures({ recipientId: recipient.id });
-
   const stampPlacements = await getStampPlacementsForToken({ token });
 
   return superLoaderJson({
@@ -150,7 +147,6 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     recipientWithFields,
     allRecipients,
     completedFields,
-    recipientSignature,
     isRecipientsTurn,
     stampPlacements,
   } as const);
@@ -176,7 +172,6 @@ export default function SigningPage() {
     fields,
     recipient,
     completedFields,
-    recipientSignature,
     isRecipientsTurn,
     allRecipients,
     recipientWithFields,
@@ -184,46 +179,68 @@ export default function SigningPage() {
   } = data;
 
   if (document.deletedAt || document.status === DocumentStatus.REJECTED) {
+    /**
+     * Rejected and cancelled are not the same event, and saying so matters.
+     *
+     * This branch catches both, but the copy only ever described a cancellation
+     * — so a signer arriving at a document another signer had DECLINED was told
+     * the owner had cancelled it. That sends them to the wrong person to ask
+     * about it.
+     *
+     * The rejector's `rejectionReason` would be better still, but it lives on
+     * their recipient row rather than this one and would need another query.
+     */
+    const wasRejected = document.status === DocumentStatus.REJECTED;
+
     return (
-      <div className="-mx-4 flex max-w-[100vw] flex-col items-center overflow-x-hidden px-4 pt-16 md:-mx-8 md:px-8 lg:pt-16 xl:pt-24">
-        <SigningCard3D
-          name={recipient.name}
-          signature={recipientSignature}
-          signingCelebrationImage={signingCelebration}
-        />
+      <div className="flex w-full flex-col items-center px-4 py-10 sm:py-14">
+        <div className="flex w-full max-w-md flex-col items-center gap-4">
+          <OutcomeCard
+            icon={wasRejected ? XCircleIcon : BanIcon}
+            tone="bg-destructive/10 text-destructive"
+            title={
+              wasRejected ? (
+                <Trans>Signing was declined</Trans>
+              ) : (
+                <Trans>No longer available to sign</Trans>
+              )
+            }
+            chip={wasRejected ? <Trans>Declined</Trans> : <Trans>Cancelled</Trans>}
+            detail={
+              wasRejected ? (
+                <Trans>
+                  One of the signers declined to sign this document, so it can no longer be
+                  completed. The sender can tell you why and start it again if it was a mistake.
+                </Trans>
+              ) : (
+                <Trans>
+                  The owner cancelled this document, so it is no longer available to sign.
+                </Trans>
+              )
+            }
+          >
+            <DocumentTitleRow title={document.title} />
 
-        <div className="relative mt-2 flex w-full flex-col items-center">
-          <div className="mt-8 flex items-center text-center text-red-600">
-            <Clock8 className="mr-2 h-5 w-5" />
-            <span className="text-sm">
-              <Trans>Document Cancelled</Trans>
-            </span>
-          </div>
+            {user && (
+              <Button asChild variant="outline" className="mt-6 w-full">
+                <Link to="/documents">
+                  <Trans>Back to my documents</Trans>
+                </Link>
+              </Button>
+            )}
+          </OutcomeCard>
 
-          <h2 className="mt-6 max-w-[35ch] text-center text-2xl font-semibold leading-normal md:text-3xl lg:text-4xl">
-            <Trans>
-              <span className="mt-1.5 block">"{document.title}"</span>
-              is no longer available to sign
-            </Trans>
-          </h2>
-
-          <p className="text-muted-foreground/60 mt-2.5 max-w-[60ch] text-center text-sm font-medium md:text-base">
-            <Trans>This document has been cancelled by the owner.</Trans>
-          </p>
-
-          {user ? (
-            <Link to="/documents" className="text-primary hover:text-primary/80 mt-36">
-              <Trans>Go Back Home</Trans>
-            </Link>
-          ) : (
-            <p className="text-muted-foreground/60 mt-36 text-sm">
+          {/*
+            The upstream version put this promo 9rem below the message, which on
+            a short page left it stranded on its own screenful. It belongs with
+            the card, and only for someone who has no account to go back to.
+          */}
+          {!user && (
+            <p className="text-center text-[12px] text-muted-foreground">
               <Trans>
-                Want to send slick signing links like this one?{' '}
-                <Link
-                  to="https://hubsign.io"
-                  className="text-primary hover:text-primary/80"
-                >
-                  Check out HubSign.
+                Want to send signing links like this one?{' '}
+                <Link to="https://hubsign.io" className="text-primary hover:underline">
+                  Take a look at HubSign.
                 </Link>
               </Trans>
             </p>

@@ -1,36 +1,44 @@
 import { Trans } from '@lingui/react/macro';
 import type { Signature } from '@prisma/client';
+import { CheckIcon } from 'lucide-react';
 
-import signingCelebration from '@documenso/assets/images/signing-celebration.png';
-import { SigningCard3D } from '@documenso/ui/components/signing-card';
+import { OutcomeCard, SignaturePanel } from '../general/document-signing/signing-outcome-card';
 
 export type EmbedDocumentCompletedPageProps = {
   name?: string;
   signature?: Signature;
 };
 
+/**
+ * Shown inside the host application's iframe once signing is done.
+ *
+ * Same card as the standalone completion screen, so a signer who sees one and
+ * then the other is not looking at two different products. What it deliberately
+ * does NOT carry is a download button or any link out: this is embedded, the
+ * parent application owns what happens next, and a link here would navigate
+ * inside somebody else's frame.
+ */
 export const EmbedDocumentCompleted = ({ name, signature }: EmbedDocumentCompletedPageProps) => {
   return (
-    <div className="embed--DocumentCompleted relative mx-auto flex min-h-[100dvh] max-w-screen-lg flex-col items-center justify-center p-6">
-      <h3 className="text-foreground text-2xl font-semibold">
-        <Trans>Document Completed!</Trans>
-      </h3>
-
-      <div className="mt-8 w-full max-w-md">
-        <SigningCard3D
-          className="mx-auto w-full"
-          name={name || 'HubSign'}
-          signature={signature}
-          signingCelebrationImage={signingCelebration}
-        />
+    <div className="embed--DocumentCompleted flex min-h-[100dvh] flex-col items-center justify-center p-6">
+      <div className="w-full max-w-md">
+        <OutcomeCard
+          icon={CheckIcon}
+          tone="bg-status-complete-bg text-status-complete-text"
+          title={<Trans>Document completed</Trans>}
+          chip={<Trans>Everyone has signed</Trans>}
+          detail={
+            <Trans>
+              This document is complete. Follow any instructions shown in the application you
+              started from.
+            </Trans>
+          }
+        >
+          <div className="mt-6">
+            <SignaturePanel name={name || 'HubSign'} signature={signature} />
+          </div>
+        </OutcomeCard>
       </div>
-
-      <p className="text-muted-foreground mt-8 max-w-[50ch] text-center text-sm">
-        <Trans>
-          The document is now completed, please follow any instructions provided within the parent
-          application.
-        </Trans>
-      </p>
     </div>
   );
 };
