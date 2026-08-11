@@ -21,8 +21,8 @@ export const onOrgSubscriptionUpdated = async ({
   // Re-fetch with product data expanded regardless of what the caller passed
   // in — an org's subscription can now hold items for more than one tier at
   // once, so classifying them requires each item's own product metadata
-  // (`{ type, tier, interval }`, tagged by `getOrCreateOrgPrice`), not a
-  // single subscription-level `tier`/array position. Not every call site
+  // (`{ type, tier, interval }`, Stripe-authoritative — see `getOrgSeatPrice`),
+  // not a single subscription-level `tier`/array position. Not every call site
   // expands this (the `customer.subscription.updated` webhook branch hands
   // over the raw, unexpanded event payload), so this makes the function
   // correct regardless of caller rather than relying on caller discipline.
@@ -41,7 +41,12 @@ export const onOrgSubscriptionUpdated = async ({
     const { product } = item.price;
     if (typeof product === 'string' || product.deleted) return [];
     const { type, tier } = product.metadata ?? {};
-    if ((type !== 'org_seat' && type !== 'org_dms') || !isOrgSeatTier(tier)) return [];
+    if (
+      (type !== 'org_seat' && type !== 'org_dms' && type !== 'org_doc_block') ||
+      !isOrgSeatTier(tier)
+    ) {
+      return [];
+    }
     return [{ item, type, tier }];
   });
 
@@ -81,6 +86,7 @@ export const onOrgSubscriptionUpdated = async ({
   for (const tier of tiersOnThisSubscription) {
     const seatItem = classifiedItems.find((c) => c.tier === tier && c.type === 'org_seat')?.item;
     const dmsItem = classifiedItems.find((c) => c.tier === tier && c.type === 'org_dms')?.item;
+    const docBlockItem = classifiedItems.find((c) => c.tier === tier && c.type === 'org_doc_block')?.item;
 
     if (!seatItem) continue;
 
@@ -92,6 +98,9 @@ export const onOrgSubscriptionUpdated = async ({
       recipientsPerMonth: tierLimits.recipients ?? ORG_UNLIMITED_SENTINEL,
       directTemplates: tierLimits.directTemplates ?? ORG_UNLIMITED_SENTINEL,
       dmsEnabled,
+      // Item quantity directly *is* the block count (independent of seat
+      // count) — set that way in `purchaseSeats`.
+      docBlockQuantity: docBlockItem?.quantity ?? 0,
       quantity: seatItem.quantity ?? 0,
       billingInterval: seatItem.price.recurring?.interval === 'year' ? 'year' : 'month',
       stripePriceId: seatItem.price.id,

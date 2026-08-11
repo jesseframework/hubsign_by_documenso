@@ -27,6 +27,8 @@
     "prisma:studio": "npm run with:env -- npm run prisma:studio -w @documenso/prisma",
     "with:env": "dotenv -e .env -e .env.local --",
     "reset:hard": "npm run clean && npm i && npm run prisma:generate",
+    "migrate:org-pricing": "npm run with:env -- npx tsx scripts/migrate-org-pricing.ts",
+    "migrate:org-pricing:apply": "npm run with:env -- npx tsx scripts/migrate-org-pricing.ts --apply",
     "precommit": "npm install && git add package.json package-lock.json",
     "trigger:dev": "npm run with:env -- npx trigger-cli dev --handler-path=\"/api/jobs\"",
     "inngest:dev": "inngest dev -u http://localhost:3000/api/jobs",

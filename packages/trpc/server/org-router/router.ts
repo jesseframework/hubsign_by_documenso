@@ -6,23 +6,24 @@ import { TRPCError } from '@trpc/server';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
 
-import { getOrCreateOrgPrice } from '@documenso/ee/server-only/stripe/get-or-create-org-price';
+import {
+  getOrgSeatPrice,
+  matchOrgPrice,
+  searchActiveOrgPrices,
+} from '@documenso/lib/server-only/stripe/get-org-seat-price';
 import { onOrgSubscriptionUpdated } from '@documenso/ee/server-only/stripe/webhook/on-org-subscription-updated';
 import { onSubscriptionDeleted } from '@documenso/ee/server-only/stripe/webhook/on-subscription-deleted';
 import {
   getSubscriptionPeriodEndISO,
   resolveOrgPlanNameAndPrice,
 } from '@documenso/ee/server-only/stripe/webhook/resolve-org-plan-price';
-import { IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
+import { DEPLOYMENT_TYPE, IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 import { normalizeClaimableDomains } from '@documenso/lib/constants/public-email-domains';
 import { PUBLIC_EMAIL_DOMAINS } from '@documenso/lib/constants/public-email-domains';
 import { getI18nInstance } from '@documenso/lib/client-only/providers/i18n-server';
 import {
-  ORG_DMS_ADDON_PRICE_CENTS,
-  ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT,
   ORG_SEAT_TIERS,
   ORG_UNLIMITED_SENTINEL,
-  getOrgYearlyPriceCents,
 } from '@documenso/lib/constants/org-tiers';
 import type { OrgBillingInterval } from '@documenso/lib/constants/org-tiers';
 import { env } from '@documenso/lib/utils/env';
@@ -1001,12 +1002,58 @@ export const orgRouter = router({
     });
   }),
 
+  /**
+   * Live Stripe-authoritative pricing for every org seat/DMS/doc-block
+   * combination the billing page can display or purchase — one Stripe search
+   * call shared across all of them (see `searchActiveOrgPrices`) rather than
+   * a separate round trip per combination. `unitAmountCents: null` means
+   * that Price hasn't been configured in Stripe yet.
+   */
+  getSeatPricing: authenticatedProcedure.query(async () => {
+    const prices = await searchActiveOrgPrices();
+    const deployment = DEPLOYMENT_TYPE();
+
+    const amountFor = (options: Parameters<typeof matchOrgPrice>[1]) =>
+      matchOrgPrice(prices, options)?.unit_amount ?? null;
+
+    return {
+      seat: {
+        BUSINESS: {
+          month: amountFor({ type: 'org_seat', tier: 'BUSINESS', interval: 'month' }),
+          year: amountFor({ type: 'org_seat', tier: 'BUSINESS', interval: 'year' }),
+        },
+        ENTERPRISE: {
+          month: amountFor({ type: 'org_seat', tier: 'ENTERPRISE', interval: 'month', deployment }),
+          year: amountFor({ type: 'org_seat', tier: 'ENTERPRISE', interval: 'year', deployment }),
+        },
+      },
+      dms: {
+        BUSINESS: {
+          month: amountFor({ type: 'org_dms', tier: 'BUSINESS', interval: 'month' }),
+          year: amountFor({ type: 'org_dms', tier: 'BUSINESS', interval: 'year' }),
+        },
+        ENTERPRISE: {
+          month: amountFor({ type: 'org_dms', tier: 'ENTERPRISE', interval: 'month' }),
+          year: amountFor({ type: 'org_dms', tier: 'ENTERPRISE', interval: 'year' }),
+        },
+      },
+      // Business-only.
+      docBlock: {
+        month: amountFor({ type: 'org_doc_block', tier: 'BUSINESS', interval: 'month' }),
+        year: amountFor({ type: 'org_doc_block', tier: 'BUSINESS', interval: 'year' }),
+      },
+      deployment,
+    };
+  }),
+
   purchaseSeats: authenticatedProcedure
     .input(z.object({
       tier: z.enum(['BUSINESS', 'ENTERPRISE']),
       quantity: z.number().min(1).max(100),
       interval: z.enum(['month', 'year']).default('month'),
       dmsEnabled: z.boolean().optional(),
+      // Business-only: how many +100/mo document volume blocks to add.
+      docBlocks: z.number().int().min(0).optional(),
       acknowledgeCancelPersonalPlan: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1064,16 +1111,6 @@ export const orgRouter = router({
         ? ((anyExistingSeatPlan.billingInterval as OrgBillingInterval | undefined) ?? 'month')
         : input.interval;
 
-      const seatUnitAmountCents =
-        interval === 'year'
-          ? getOrgYearlyPriceCents(tierLimits.priceCents, tierLimits.yearlyDiscountPercent)
-          : tierLimits.priceCents;
-
-      const dmsUnitAmountCents =
-        interval === 'year'
-          ? getOrgYearlyPriceCents(ORG_DMS_ADDON_PRICE_CENTS, ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT)
-          : ORG_DMS_ADDON_PRICE_CENTS;
-
       // The tier minimum only applies to establishing *that tier*, whether
       // it's the org's first tier ever or a second one added alongside an
       // existing one — once a tier already meets it, buying 1-2 more is fine.
@@ -1115,10 +1152,13 @@ export const orgRouter = router({
       if (!IS_BILLING_ENABLED()) {
         // Billing not enabled — just track it locally, synchronously (no
         // Stripe involved either way, so there's nothing to wait on).
+        const docBlockQuantity =
+          (existingSeatPlan?.docBlockQuantity ?? 0) + (input.tier === 'BUSINESS' ? (input.docBlocks ?? 0) : 0);
+
         const seatPlan = existingSeatPlan
           ? await prisma.orgSeatPlan.update({
               where: { id: existingSeatPlan.id },
-              data: { quantity: existingSeatPlan.quantity + input.quantity, dmsEnabled },
+              data: { quantity: existingSeatPlan.quantity + input.quantity, dmsEnabled, docBlockQuantity },
             })
           : await prisma.orgSeatPlan.create({
               data: {
@@ -1129,6 +1169,7 @@ export const orgRouter = router({
                 recipientsPerMonth: config.recipientsPerMonth,
                 directTemplates: config.directTemplates,
                 dmsEnabled,
+                docBlockQuantity,
                 billingInterval: interval,
               },
             });
@@ -1141,7 +1182,7 @@ export const orgRouter = router({
 
           await prisma.organizationMember.update({
             where: { id: membership.id },
-            data: { seatTier: input.tier, dmsAddon: input.tier === 'ENTERPRISE' ? true : dmsEnabled },
+            data: { seatTier: input.tier, dmsAddon: dmsEnabled },
           });
 
           return updatedSeatPlan;
@@ -1167,7 +1208,10 @@ export const orgRouter = router({
         // product metadata `{ type, tier }` (the same self-healing pattern
         // already used here for DMS) is what keeps this tier-correct instead
         // of accidentally grabbing another tier's item.
-        const findTierItem = (type: 'org_seat' | 'org_dms', cachedPriceId?: string | null) =>
+        const findTierItem = (
+          type: 'org_seat' | 'org_dms' | 'org_doc_block',
+          cachedPriceId?: string | null,
+        ) =>
           liveSubscription.items.data.find((item) => cachedPriceId && item.price.id === cachedPriceId) ??
           liveSubscription.items.data.find((item) => {
             const { product } = item.price;
@@ -1188,16 +1232,24 @@ export const orgRouter = router({
         } else {
           // This tier doesn't exist on the subscription yet — adding it
           // alongside whatever other tier(s) the org already has, rather
-          // than starting a second subscription.
-          const seatPriceId = await getOrCreateOrgPrice({
+          // than starting a second subscription. Pricing is Stripe-authoritative
+          // (see `getOrgSeatPrice`), so this is a lookup, not a get-or-create —
+          // a missing Price here means Stripe isn't configured for this plan yet.
+          const seatPrice = await getOrgSeatPrice({
             type: 'org_seat',
             tier: input.tier,
             interval,
-            unitAmountCents: seatUnitAmountCents,
-            productName: `HubSign ${input.tier.charAt(0) + input.tier.slice(1).toLowerCase()} Seat`,
+            deployment: input.tier === 'ENTERPRISE' ? DEPLOYMENT_TYPE() : undefined,
           });
 
-          items.push({ price: seatPriceId, quantity: newQuantity });
+          if (!seatPrice) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `No Stripe price configured for ${input.tier} seats (${interval}).`,
+            });
+          }
+
+          items.push({ price: seatPrice.id, quantity: newQuantity });
         }
 
         const existingDmsItem = findTierItem('org_dms', null);
@@ -1211,19 +1263,41 @@ export const orgRouter = router({
             items.push({ id: existingDmsItem.id, quantity: newQuantity });
           } else {
             // Unlike Checkout Session line items, `subscriptions.update`
-            // doesn't accept an inline `price_data.product_data` — it needs
-            // a real product/price to reference, hence the get-or-create
-            // lookup (also reused by the first-purchase branch below, so DMS
-            // Prices are never spawned by more than one code path).
-            const dmsPriceId = await getOrCreateOrgPrice({
-              type: 'org_dms',
-              tier: input.tier,
-              interval,
-              unitAmountCents: dmsUnitAmountCents,
-              productName: 'Document Manager (DMS) Add-On',
-            });
+            // doesn't accept an inline `price_data.product_data` — it needs a
+            // real Price to reference, hence the lookup (also reused by the
+            // first-purchase branch below, so both go through one place).
+            const dmsPrice = await getOrgSeatPrice({ type: 'org_dms', tier: input.tier, interval });
 
-            items.push({ price: dmsPriceId, quantity: newQuantity });
+            if (!dmsPrice) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: `No Stripe price configured for the DMS add-on (${interval}).`,
+              });
+            }
+
+            items.push({ price: dmsPrice.id, quantity: newQuantity });
+          }
+        }
+
+        // Doc volume blocks: Business-only, quantity = number of +100 blocks
+        // (independent of seat count, unlike seats/DMS above).
+        const newDocBlockQuantity = (existingSeatPlan?.docBlockQuantity ?? 0) + (input.docBlocks ?? 0);
+        const existingDocBlockItem = findTierItem('org_doc_block', null);
+
+        if (input.tier === 'BUSINESS' && newDocBlockQuantity > 0) {
+          if (existingDocBlockItem) {
+            items.push({ id: existingDocBlockItem.id, quantity: newDocBlockQuantity });
+          } else {
+            const docBlockPrice = await getOrgSeatPrice({ type: 'org_doc_block', tier: input.tier, interval });
+
+            if (!docBlockPrice) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: `No Stripe price configured for the document volume block add-on (${interval}).`,
+              });
+            }
+
+            items.push({ price: docBlockPrice.id, quantity: newDocBlockQuantity });
           }
         }
 
@@ -1287,32 +1361,55 @@ export const orgRouter = router({
       // email (`handler.ts`'s `checkout.session.completed` branch).
       const customerId = await getOrCreateStripeCustomer(org, ctx.user.email);
 
-      // Resolved via `getOrCreateOrgPrice` (same as the top-up branch) rather
-      // than inline `price_data` — a real, reusable Price per (tier, interval)
-      // instead of a brand-new ephemeral one on every first purchase.
-      const seatPriceId = await getOrCreateOrgPrice({
+      // Resolved via `getOrgSeatPrice` (same as the top-up branch) — pricing
+      // is Stripe-authoritative, so this is a lookup, not a get-or-create; a
+      // missing Price here means Stripe isn't configured for this plan yet.
+      const seatPrice = await getOrgSeatPrice({
         type: 'org_seat',
         tier: input.tier,
         interval,
-        unitAmountCents: seatUnitAmountCents,
-        productName: `HubSign ${input.tier.charAt(0) + input.tier.slice(1).toLowerCase()} Seat`,
+        deployment: input.tier === 'ENTERPRISE' ? DEPLOYMENT_TYPE() : undefined,
       });
 
+      if (!seatPrice) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `No Stripe price configured for ${input.tier} seats (${interval}).`,
+        });
+      }
+
       const lineItems: Array<{ price: string; quantity: number }> = [
-        { price: seatPriceId, quantity: input.quantity },
+        { price: seatPrice.id, quantity: input.quantity },
       ];
 
-      // Add DMS add-on line item if enabled
-      if (dmsEnabled && input.tier !== 'ENTERPRISE') {
-        const dmsPriceId = await getOrCreateOrgPrice({
-          type: 'org_dms',
-          tier: input.tier,
-          interval,
-          unitAmountCents: dmsUnitAmountCents,
-          productName: 'Document Manager (DMS) Add-On',
-        });
+      // DMS add-on — available on every tier now (no longer bundled into
+      // Enterprise), so no tier exclusion here.
+      if (dmsEnabled) {
+        const dmsPrice = await getOrgSeatPrice({ type: 'org_dms', tier: input.tier, interval });
 
-        lineItems.push({ price: dmsPriceId, quantity: input.quantity });
+        if (!dmsPrice) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `No Stripe price configured for the DMS add-on (${interval}).`,
+          });
+        }
+
+        lineItems.push({ price: dmsPrice.id, quantity: input.quantity });
+      }
+
+      // Doc volume blocks — Business-only, quantity = number of +100 blocks.
+      if (input.tier === 'BUSINESS' && (input.docBlocks ?? 0) > 0) {
+        const docBlockPrice = await getOrgSeatPrice({ type: 'org_doc_block', tier: input.tier, interval });
+
+        if (!docBlockPrice) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `No Stripe price configured for the document volume block add-on (${interval}).`,
+          });
+        }
+
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        lineItems.push({ price: docBlockPrice.id, quantity: input.docBlocks as number });
       }
 
       const sessionParams = {

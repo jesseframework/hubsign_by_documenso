@@ -1816,6 +1816,8 @@ model OrgSeatPlan {
   recipientsPerMonth Int     @default(50)
   directTemplates    Int     @default(5)
   dmsEnabled         Boolean @default(false)
+  // How many +100-doc volume blocks purchased (Business tier only).
+  docBlockQuantity   Int     @default(0)
 
   // How many seats purchased at this tier
   quantity Int @default(1)

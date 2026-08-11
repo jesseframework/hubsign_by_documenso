@@ -18,8 +18,10 @@ import { SubscriptionStatus } from '@prisma/client';
 import { jobs } from '@documenso/lib/jobs/client';
 import { prisma } from '@documenso/prisma';
 
-import { NEXT_PUBLIC_WEBAPP_URL } from '../../constants/app';
-import { ORG_DMS_ADDON_PRICE_CENTS, ORG_SEAT_TIERS } from '../../constants/org-tiers';
+import { DEPLOYMENT_TYPE, NEXT_PUBLIC_WEBAPP_URL } from '../../constants/app';
+import { ORG_SEAT_TIERS } from '../../constants/org-tiers';
+import type { OrgBillingInterval } from '../../constants/org-tiers';
+import { matchOrgPrice, searchActiveOrgPrices } from '../stripe/get-org-seat-price';
 import { stripe } from '../stripe';
 
 export const RENEWAL_REMINDER_DAYS_BEFORE = 3;
@@ -137,6 +139,11 @@ export const runDueSubscriptionRenewalReminders = async (): Promise<{
     },
   });
 
+  // Org seat pricing is Stripe-authoritative (see `get-org-seat-price.ts`) —
+  // one search shared across every org below rather than a lookup per org.
+  const orgPrices = organizations.length > 0 ? await searchActiveOrgPrices() : [];
+  const deployment = DEPLOYMENT_TYPE();
+
   for (const organization of organizations) {
     scanned += 1;
 
@@ -159,12 +166,28 @@ export const runDueSubscriptionRenewalReminders = async (): Promise<{
     const seatPlans = organization.seatPlans;
 
     const totalCents = seatPlans.reduce((sum, plan) => {
-      const tierConfig = ORG_SEAT_TIERS[plan.tier];
+      const interval = (plan.billingInterval === 'year' ? 'year' : 'month') as OrgBillingInterval;
+
+      const seatPrice = matchOrgPrice(orgPrices, {
+        type: 'org_seat',
+        tier: plan.tier,
+        interval,
+        deployment: plan.tier === 'ENTERPRISE' ? deployment : undefined,
+      });
+
+      const dmsPrice = plan.dmsEnabled
+        ? matchOrgPrice(orgPrices, { type: 'org_dms', tier: plan.tier, interval })
+        : null;
+
+      const docBlockPrice = plan.docBlockQuantity
+        ? matchOrgPrice(orgPrices, { type: 'org_doc_block', tier: plan.tier, interval })
+        : null;
 
       return (
         sum +
-        tierConfig.priceCents * plan.quantity +
-        (plan.dmsEnabled ? ORG_DMS_ADDON_PRICE_CENTS * plan.quantity : 0)
+        (seatPrice?.unit_amount ?? 0) * plan.quantity +
+        (dmsPrice?.unit_amount ?? 0) * plan.quantity +
+        (docBlockPrice?.unit_amount ?? 0) * plan.docBlockQuantity
       );
     }, 0);
 

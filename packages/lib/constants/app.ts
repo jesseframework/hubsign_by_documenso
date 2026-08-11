@@ -12,6 +12,15 @@ export const NEXT_PRIVATE_INTERNAL_WEBAPP_URL =
 export const IS_BILLING_ENABLED = () => env('NEXT_PUBLIC_FEATURE_BILLING_ENABLED') === 'true';
 
 /**
+ * Which kind of deployment this instance is — decides which Enterprise org
+ * seat price applies (see `ORG_SEAT_TIERS`). Defaults to `dedicated` so any
+ * new/other stack needs zero configuration; only the main shared multi-tenant
+ * production stack (app.hubsign.io) needs this explicitly set to `shared`.
+ */
+export const DEPLOYMENT_TYPE = (): 'shared' | 'dedicated' =>
+  env('NEXT_PUBLIC_DEPLOYMENT_TYPE') === 'shared' ? 'shared' : 'dedicated';
+
+/**
  * The domain inbound signing emails are addressed to. Each org's inbox alias is
  * `<org-slug>@<this domain>`. Public so the UI can display the alias.
  */
