@@ -148,8 +148,30 @@ export const ZFindDocumentsInternalRequestSchema = ZFindDocumentsRequestSchema.e
   folderId: z.string().optional(),
 });
 
+/**
+ * What OCR read, for a document that arrived through the signature inbox.
+ *
+ * Every field is nullable and the whole object is null for a document that never
+ * came from the inbox — the list has to render identically for the many documents
+ * that have no extraction at all.
+ *
+ * Deliberately on the INTERNAL response only. The public v2 `findDocuments`
+ * contract is a separate decision, and quietly widening it here would commit us
+ * to shipping these fields to API consumers forever.
+ */
+export const ZDocumentOcrSummarySchema = z
+  .object({
+    vendorName: z.string().nullable(),
+    vendorContact: z.string().nullable(),
+    invoiceNumber: z.string().nullable(),
+    poNumber: z.string().nullable(),
+    totalAmount: z.string().nullable(),
+    currency: z.string().nullable(),
+  })
+  .nullable();
+
 export const ZFindDocumentsInternalResponseSchema = ZFindResultResponse.extend({
-  data: ZDocumentManySchema.array(),
+  data: ZDocumentManySchema.extend({ ocr: ZDocumentOcrSummarySchema }).array(),
   stats: z.object({
     [ExtendedDocumentStatus.DRAFT]: z.number(),
     [ExtendedDocumentStatus.PENDING]: z.number(),

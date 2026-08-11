@@ -8,6 +8,7 @@ import { ExtendedDocumentStatus } from '@documenso/prisma/types/extended-documen
 
 import { DocumentVisibility } from '../../types/document-visibility';
 import { type FindResultResponse } from '../../types/search-params';
+import { readOcrField } from '../../universal/ocr-fields';
 import { maskRecipientTokensForDocument } from '../../utils/mask-recipient-tokens-for-document';
 
 export type PeriodSelectorValue = '' | '7d' | '14d' | '30d';
@@ -258,6 +259,18 @@ export const findDocuments = async ({
             url: true,
           },
         },
+        /*
+          What OCR read, for documents that arrived through the signature inbox.
+
+          Only the extraction is pulled, and it is projected to a handful of named
+          values below rather than handed to the client whole: `extractedData` is
+          an arbitrary bag that can carry line-item arrays and raw page text, and
+          shipping all of it to a list view would be both wasteful and a way to
+          leak fields nobody chose to display.
+        */
+        inboxItem: {
+          select: { extractedData: true },
+        },
       },
     }),
     prisma.document.count({
@@ -265,12 +278,25 @@ export const findDocuments = async ({
     }),
   ]);
 
-  const maskedData = data.map((document) =>
-    maskRecipientTokensForDocument({
-      document,
-      user,
-    }),
-  );
+  const maskedData = data.map(({ inboxItem, ...document }) => ({
+    ...maskRecipientTokensForDocument({ document, user }),
+    /*
+      Read through the canonical accessors, so a template that calls the vendor
+      `merchant_name` or the total `amount_due` still resolves. Null when the
+      document never came from the inbox, or when OCR found nothing — the list
+      then shows the row exactly as it did before.
+    */
+    ocr: inboxItem?.extractedData
+      ? {
+          vendorName: readOcrField(inboxItem.extractedData, 'vendorName'),
+          vendorContact: readOcrField(inboxItem.extractedData, 'vendorContact'),
+          invoiceNumber: readOcrField(inboxItem.extractedData, 'invoiceNumber'),
+          poNumber: readOcrField(inboxItem.extractedData, 'poNumber'),
+          totalAmount: readOcrField(inboxItem.extractedData, 'totalAmount'),
+          currency: readOcrField(inboxItem.extractedData, 'currency'),
+        }
+      : null,
+  }));
 
   return {
     data: maskedData,
@@ -278,7 +304,9 @@ export const findDocuments = async ({
     currentPage: Math.max(page, 1),
     perPage,
     totalPages: Math.ceil(count / perPage),
-  } satisfies FindResultResponse<typeof data>;
+    // `maskedData`, not `data`: the returned rows carry the projected `ocr`
+    // summary and no longer carry the raw inbox extraction they were built from.
+  } satisfies FindResultResponse<typeof maskedData>;
 };
 
 const findDocumentsFilter = (
