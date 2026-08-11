@@ -1,4 +1,10 @@
-import type { DocumentSigningOrder, RecipientRole, SendStatus, SigningStatus } from '@prisma/client';
+import type {
+  DocumentSigningOrder,
+  ReadStatus,
+  RecipientRole,
+  SendStatus,
+  SigningStatus,
+} from '@prisma/client';
 
 import { prisma } from '@documenso/prisma';
 
@@ -29,6 +35,12 @@ export type RecipientResponsibility = {
   signingOrder: number | null;
   signingStatus: SigningStatus;
   sendStatus: SendStatus;
+  /**
+   * Whether they have opened the document. The difference between "never
+   * looked at it" and "read it and did nothing" is the difference between a
+   * delivery problem and a person problem.
+   */
+  readStatus: ReadStatus;
   signedAt: Date | null;
   reminders: {
     /** Every nudge we know went out: the scheduler's counter plus manual sends. */
@@ -72,6 +84,7 @@ type RecipientRow = {
   signingOrder: number | null;
   signingStatus: SigningStatus;
   sendStatus: SendStatus;
+  readStatus: ReadStatus;
   signedAt: Date | null;
   remindersSent: number;
   lastReminderAt: Date | null;
@@ -106,6 +119,7 @@ export const getDocumentResponsibility = async (
         signingOrder: true,
         signingStatus: true,
         sendStatus: true,
+        readStatus: true,
         signedAt: true,
         remindersSent: true,
         lastReminderAt: true,
@@ -209,6 +223,7 @@ const summariseRecipient = (
     signingOrder: row.signingOrder,
     signingStatus: row.signingStatus,
     sendStatus: row.sendStatus,
+    readStatus: row.readStatus,
     signedAt: row.signedAt,
     reminders: {
       total: automaticTotal + manualLogged,

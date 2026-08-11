@@ -39,6 +39,7 @@ import {
   redeemLicenseKey,
 } from '@documenso/lib/server-only/license/redeem-license-key';
 import { stripe } from '@documenso/lib/server-only/stripe';
+import { getSigningBottlenecks } from '@documenso/lib/server-only/document/bottlenecks';
 import { prisma } from '@documenso/prisma';
 
 import { authenticatedProcedure, router } from '../trpc';
@@ -2013,6 +2014,8 @@ export const orgRouter = router({
       },
     });
 
+    const bottlenecks = await getSigningBottlenecks(membership.organizationId);
+
     return {
       totalDocuments,
       draft: countOf(byStatus, 'DRAFT'),
@@ -2042,6 +2045,12 @@ export const orgRouter = router({
       approvalsCharted: approvalTrend.reduce((sum, point) => sum + point.count, 0),
 
       ageBuckets: ageBuckets.map(({ key, label, count }) => ({ key, label, count })),
+
+      // Where signatures are stuck and with whom. Deliberately NOT windowed by
+      // the date filter: a bottleneck is about what is outstanding right now,
+      // and hiding a four-month-old stuck document because it falls outside
+      // "this month" would hide the worst case on the dashboard.
+      bottlenecks,
 
       monthOverMonth: {
         current: currentMonthCount,

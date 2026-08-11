@@ -14,8 +14,7 @@ import {
   HourglassIcon,
   InboxIcon,
   PenLineIcon,
-  UsersIcon,
-  WorkflowIcon,
+  UserXIcon,
 } from 'lucide-react';
 import { Link } from 'react-router';
 
@@ -36,6 +35,13 @@ import {
   TrendAreaChart,
 } from '~/components/general/org-dashboard/trend-chart';
 import { useChartMode } from '~/components/general/org-dashboard/use-chart-mode';
+import {
+  type BottleneckDetail,
+  BottleneckDetailDialog,
+  OverdueByVendorTile,
+  WaitingOnTile,
+  WhereItsStuckTile,
+} from '~/components/general/dashboard/bottleneck-tiles';
 import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
@@ -53,6 +59,8 @@ export default function OrgDashboard() {
   // Initialised from localStorage in an effect rather than at useState time, so
   // the server render and the first client render agree (no hydration mismatch).
   const [refreshMs, setRefreshMs] = useState(0);
+  /** Which bottleneck tile has been opened for its full detail. */
+  const [detail, setDetail] = useState<BottleneckDetail>(null);
 
   useEffect(() => setRefreshMs(readStoredRefreshMs()), []);
 
@@ -143,12 +151,6 @@ export default function OrgDashboard() {
     stats.range.grain === 'day' ? 'Daily Document Trend' : 'Monthly Document Trend';
 
   const inboxSourced = stats.inboxSourced;
-  const activeWorkflows = stats.activeWorkflows;
-  const approvalsTotal =
-    stats.approvalsOpen +
-    stats.approvalsApproved +
-    stats.approvalsRejected +
-    stats.approvalsCancelled;
 
   return (
     <div className="space-y-4">
@@ -357,106 +359,75 @@ export default function OrgDashboard() {
           />
         </ChartCard>
 
+        {/*
+          These three replaced the approval charts and the top-sender bar. Both
+          approval tiles read 0 because the module is unused, and the sender bar
+          was a single bar because every document arrives through one mailbox —
+          three tiles of screen showing nothing actionable. What was missing was
+          the question the queue is opened to answer: who is holding this up.
+
+          Each is a summary at the height of its row, with the full list behind
+          a click. Three different plot shapes, so they read as three questions
+          rather than one chart repeated.
+        */}
         <ChartCard
-          title={<Trans>Approval Requests</Trans>}
-          value={approvalsTotal}
-          icon={ClipboardCheckIcon}
-          iconBg="bg-status-complete-bg"
-          iconColor={status.complete}
-          footer={<Trans>{activeWorkflows} workflows currently enabled</Trans>}
+          title={<Trans>Waiting on</Trans>}
+          value={stats.bottlenecks.totalOpen}
+          icon={UserXIcon}
+          iconBg="bg-status-pending-bg"
+          iconColor={status.pending}
+          onClick={() => setDetail('waiting')}
+          footer={<Trans>Outstanding signatures, by person</Trans>}
         >
-          <DonutChart
-            data={[
-              { label: 'Approved', value: stats.approvalsApproved, color: status.complete },
-              { label: 'Open', value: stats.approvalsOpen, color: status.pending },
-              { label: 'Cancelled', value: stats.approvalsCancelled, color: status.draft },
-              { label: 'Rejected', value: stats.approvalsRejected, color: status.rejected },
-            ]}
+          <WaitingOnTile
+            people={stats.bottlenecks.people}
+            otherPeople={stats.bottlenecks.otherPeople}
           />
         </ChartCard>
 
         <ChartCard
-          title={<Trans>Approval Timeline</Trans>}
-          value={stats.approvalsCharted}
-          icon={WorkflowIcon}
-          iconBgColor={BRAND.primaryTint}
-          iconColor={BRAND.primary}
-          footer={trendLabel}
+          title={<Trans>Where it's stuck</Trans>}
+          value={stats.bottlenecks.totalOpen}
+          icon={AlertTriangleIcon}
+          iconBg="bg-status-draft-bg"
+          iconColor={status.draft}
+          onClick={() => setDetail('stuck')}
+          footer={<Trans>What is actually holding them up</Trans>}
         >
-          <TrendAreaChart data={stats.approvalTrend} seriesName="Approvals" />
+          <WhereItsStuckTile
+            stages={stats.bottlenecks.stages}
+            chase={stats.bottlenecks.chase}
+            totalOpen={stats.bottlenecks.totalOpen}
+          />
         </ChartCard>
 
         <ChartCard
-          title={
-            stats.distinctSenders > stats.topSenders.length ? (
-              <Trans>Top Senders (of {stats.distinctSenders})</Trans>
-            ) : (
-              <Trans>Top Senders</Trans>
-            )
-          }
-          // Deliberately no headline figure: the old one was the length of a
-          // take:5 list, so it could never exceed 5 and wasn't a metric.
-          icon={UsersIcon}
-          iconBg="bg-muted"
-          iconColor={status.draft}
-          footer={
-            <Link to="/org/members" className="hover:underline">
-              <Trans>Manage members</Trans>
-            </Link>
-          }
+          title={<Trans>Overdue by vendor</Trans>}
+          value={stats.bottlenecks.vendors.rows.reduce((sum, row) => sum + row.breached, 0)}
+          icon={ClockIcon}
+          iconBg="bg-status-rejected-bg"
+          iconColor={status.rejected}
+          onClick={() => setDetail('vendors')}
+          footer={<Trans>Past SLA and still running</Trans>}
         >
-          <TopSenders senders={stats.topSenders} />
+          <OverdueByVendorTile
+            enabled={stats.bottlenecks.vendors.enabled}
+            rows={stats.bottlenecks.vendors.rows}
+            unattributed={stats.bottlenecks.vendors.unattributed}
+          />
         </ChartCard>
       </div>
+
+      <BottleneckDetailDialog
+        detail={detail}
+        onClose={() => setDetail(null)}
+        people={stats.bottlenecks.people}
+        stages={stats.bottlenecks.stages}
+        chase={stats.bottlenecks.chase}
+        totalOpen={stats.bottlenecks.totalOpen}
+        vendors={stats.bottlenecks.vendors}
+      />
     </div>
   );
 }
 
-/**
- * Ranked member list. The bar behind each row encodes share of the top sender's
- * volume, so the ranking is readable without comparing the numerals — but the
- * count is printed too, since the bar alone is a weak channel at these widths.
- */
-const TopSenders = ({
-  senders,
-}: {
-  senders: Array<{ userId: number; name: string; email: string; count: number }>;
-}) => {
-  if (senders.length === 0) {
-    return (
-      <div className="flex h-[180px] flex-col items-center justify-center text-muted-foreground">
-        <HourglassIcon className="mb-2 h-8 w-8 opacity-40" />
-        <p className="text-[12px]">
-          <Trans>No documents sent yet</Trans>
-        </p>
-      </div>
-    );
-  }
-
-  const max = Math.max(...senders.map((sender) => sender.count), 1);
-
-  return (
-    <ul className="space-y-2">
-      {senders.map((sender) => (
-        <li key={sender.userId}>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="truncate text-[12px] font-medium text-foreground">{sender.name}</span>
-            <span className="flex-shrink-0 text-[12px] tabular-nums text-muted-foreground">
-              {sender.count.toLocaleString()}
-            </span>
-          </div>
-
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${Math.max((sender.count / max) * 100, 4)}%`,
-                background: BRAND.primary,
-              }}
-            />
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-};
