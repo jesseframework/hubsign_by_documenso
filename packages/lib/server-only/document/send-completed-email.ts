@@ -91,12 +91,12 @@ export const sendCompletedEmail = async ({ documentId, requestMetadata }: SendDo
     subject falls back to the plain form when it did not. Hand-uploaded documents
     never have one, which is why this cannot be unconditional.
 
-    The phrase "Signing Complete" is preserved verbatim at the start. An
-    organization may have configured it as a blocked inbox subject to stop
-    completion mail (which carries the signed PDF as an attachment) being ingested
-    as a fresh invoice; that filter is a substring match, so appending to the
-    phrase keeps the guard working while replacing it would silently re-open the
-    feedback loop.
+    The wording is free to change. Completion mail carries the signed PDF as an
+    attachment, so it could in principle be re-ingested as a fresh invoice — but
+    what prevents that is the SENDER rule: `should-ingest-email` refuses anything
+    from our own outbound address unconditionally, and the poller filters the
+    address as well. The blocked-subject filter is a secondary net that nothing
+    depends on, so this phrase carries no requirement beyond reading well.
   */
   const vendorName = resolveOcrVendorName(document.inboxItem?.extractedData ?? null);
 
