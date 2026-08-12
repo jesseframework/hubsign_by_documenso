@@ -188,26 +188,28 @@ export function CustomFieldsManager({
                         <p className="text-[10px] text-muted-foreground">{field.helpText}</p>
                       )}
                     </td>
-                    <td className="w-[90px] px-3 py-2 text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7"
-                        title={_(msg`Edit`)}
-                        onClick={() => startEdit(field)}
-                      >
-                        <PencilIcon className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 text-destructive"
-                        title={_(msg`Remove this field. Values already saved are kept.`)}
-                        disabled={deleteField.isPending}
-                        onClick={() => deleteField.mutate({ id: field.id })}
-                      >
-                        <Trash2Icon className="h-3.5 w-3.5" />
-                      </Button>
+                    <td className="w-[90px] px-3 py-2">
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7"
+                          title={_(msg`Edit`)}
+                          onClick={() => startEdit(field)}
+                        >
+                          <PencilIcon className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-destructive"
+                          title={_(msg`Remove this field. Values already saved are kept.`)}
+                          disabled={deleteField.isPending}
+                          onClick={() => deleteField.mutate({ id: field.id })}
+                        >
+                          <Trash2Icon className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
