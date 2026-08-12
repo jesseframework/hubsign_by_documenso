@@ -243,6 +243,11 @@ msgstr "{0} invited you to {recipientActionVerb} a document"
 msgid "{0} invoices arrived in this window but only the most recent {1} were measured. Every figure above describes that subset."
 msgstr "{0} invoices arrived in this window but only the most recent {1} were measured. Every figure above describes that subset."
 
+#. placeholder {0}: field.label
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "{0} is required."
+msgstr "{0} is required."
+
 #. placeholder {0}: data.untracked
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "{0} item(s) are missing a target on at least one clock and are excluded from it — set one on the vendor's Metadata record, or an organization default in Settings."
@@ -880,6 +885,10 @@ msgstr "A field was removed"
 msgid "A field was updated"
 msgstr "A field was updated"
 
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "A field with that name already exists for {normalizedCategory}."
+msgstr "A field with that name already exists for {normalizedCategory}."
+
 #. placeholder {0}: vendors.unattributed
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "A further {0} are late but carry no vendor name, so they cannot be grouped. They are counted nowhere in the table above."
@@ -1136,6 +1145,7 @@ msgstr "Activity Feed"
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 #: apps/remix/app/components/general/subscription-addons.tsx
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
 #: apps/remix/app/components/general/inbox/extracted-fields.tsx
 #: apps/remix/app/components/dialogs/team-email-add-dialog.tsx
 msgid "Add"
@@ -1149,6 +1159,10 @@ msgstr "Add a channel"
 #: packages/ui/primitives/document-dropzone.tsx
 msgid "Add a document"
 msgstr "Add a document"
+
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Add a field"
+msgstr "Add a field"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "Add a record"
@@ -2423,6 +2437,7 @@ msgstr "Can prepare"
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
 #: apps/remix/app/components/general/teams/team-transfer-status.tsx
 #: apps/remix/app/components/general/teams/team-email-usage.tsx
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
 #: apps/remix/app/components/general/inbox/signer-list.tsx
 #: apps/remix/app/components/general/export/export-builder-dialog.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
@@ -3420,6 +3435,15 @@ msgstr "Current recipients:"
 #: apps/remix/app/components/general/inbox/signer-list.tsx
 msgid "Currently with <0>{0}</0> ({1})."
 msgstr "Currently with <0>{0}</0> ({1})."
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Custom fields"
+msgstr "Custom fields"
+
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Custom fields for {normalizedCategory}"
+msgstr "Custom fields for {normalizedCategory}"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Customize your organization's appearance with your brand colors and logo."
@@ -4473,6 +4497,14 @@ msgstr "E-Sign: Pending"
 msgid "e.g. Approved"
 msgstr "e.g. Approved"
 
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "e.g. Approved, Pending, Blocked"
+msgstr "e.g. Approved, Pending, Blocked"
+
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "e.g. GL account"
+msgstr "e.g. GL account"
+
 #: apps/remix/app/components/general/export/export-builder-dialog.tsx
 msgid "e.g. Monthly AP review"
 msgstr "e.g. Monthly AP review"
@@ -4490,6 +4522,7 @@ msgstr "e.g. Round red APPROVED stamp with the company name and today's date"
 #: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
 #: apps/remix/app/components/tables/documents-table-action-button.tsx
 #: apps/remix/app/components/general/teams/team-email-dropdown.tsx
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
 #: apps/remix/app/components/general/document/document-page-view-dropdown.tsx
 #: apps/remix/app/components/general/document/document-page-view-button.tsx
 msgid "Edit"
@@ -4498,6 +4531,10 @@ msgstr "Edit"
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
 msgid "Edit email template"
 msgstr "Edit email template"
+
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Edit field"
+msgstr "Edit field"
 
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
 msgid "Edit layout"
@@ -4822,6 +4859,7 @@ msgstr "Entity"
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/template/template-edit-form.tsx
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
 #: apps/remix/app/components/general/inbox/signer-list.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
@@ -5057,6 +5095,10 @@ msgstr "Favorites"
 msgid "Fetch from WorkHub"
 msgstr "Fetch from WorkHub"
 
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Field added"
+msgstr "Field added"
+
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
 msgid "Field character limit"
 msgstr "Field character limit"
@@ -5080,6 +5122,10 @@ msgstr "Field format"
 msgid "Field label"
 msgstr "Field label"
 
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Field name"
+msgstr "Field name"
+
 #: apps/remix/app/components/general/inbox/extracted-fields.tsx
 msgid "Field name, e.g. po_number"
 msgstr "Field name, e.g. po_number"
@@ -5092,6 +5138,10 @@ msgstr "Field placeholder"
 msgid "Field prefilled by assistant"
 msgstr "Field prefilled by assistant"
 
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Field removed"
+msgstr "Field removed"
+
 #: packages/lib/utils/document-audit-logs.ts
 msgid "Field signed"
 msgstr "Field signed"
@@ -5100,6 +5150,10 @@ msgstr "Field signed"
 msgid "Field unsigned"
 msgstr "Field unsigned"
 
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Field updated"
+msgstr "Field updated"
+
 #: apps/remix/app/components/tables/admin-document-recipient-item-table.tsx
 msgid "Fields"
 msgstr "Fields"
@@ -5107,6 +5161,14 @@ msgstr "Fields"
 #: apps/remix/app/components/general/legacy-field-warning-popover.tsx
 msgid "Fields updated"
 msgstr "Fields updated"
+
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Fields you add here appear on every {normalizedCategory} record, in the spreadsheet template, and in workflows as"
+msgstr "Fields you add here appear on every {normalizedCategory} record, in the spreadsheet template, and in workflows as"
+
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+#~ msgid "Fields you add here appear on every {normalizedCategory} record, in the spreadsheet template, and in workflows as <0>{{vars.<step>.<field>}}</0>."
+#~ msgstr "Fields you add here appear on every {normalizedCategory} record, in the spreadsheet template, and in workflows as <0>{{vars.<step>.<field>}}</0>."
 
 #: apps/remix/app/components/general/document/document-upload.tsx
 #: apps/remix/app/components/general/document/document-drop-zone-wrapper.tsx
@@ -5421,6 +5483,10 @@ msgstr "Hide"
 #: apps/remix/app/components/general/document/document-history-sheet.tsx
 msgid "Hide additional information"
 msgstr "Hide additional information"
+
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Hint (optional)"
+msgstr "Hint (optional)"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Holidays"
@@ -7072,6 +7138,10 @@ msgstr "Opens print dialog, signed pages only"
 msgid "Optional"
 msgstr "Optional"
 
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Options (comma-separated)"
+msgstr "Options (comma-separated)"
+
 #: apps/remix/app/components/forms/signup.tsx
 #: apps/remix/app/components/dialogs/template-direct-link-dialog.tsx
 msgid "Or"
@@ -8142,6 +8212,14 @@ msgstr "Remove team email"
 msgid "Remove team member"
 msgstr "Remove team member"
 
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Remove this field. Values already saved are kept."
+msgstr "Remove this field. Values already saved are kept."
+
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Renaming the field keeps this the same."
+msgstr "Renaming the field keeps this the same."
+
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.billing.tsx
 msgid "Renews: {formattedDate}"
 msgstr "Renews: {formattedDate}"
@@ -8198,6 +8276,10 @@ msgstr "Requests go through your approval chain \"{0}\" ({1} {2}), and are grant
 #: apps/remix/app/components/general/rules/rule-override-queue.tsx
 msgid "Requests go to whoever sent the document, who is emailed and decides here. To route them through an approval chain instead, create an approval template whose \"what this chain approves\" is set to rule override."
 msgstr "Requests go to whoever sent the document, who is emailed and decides here. To route them through an approval chain instead, create an approval template whose \"what this chain approves\" is set to rule override."
+
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Required"
+msgstr "Required"
 
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/text-field.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/radio-field.tsx
@@ -8891,6 +8973,10 @@ msgstr "Showing {shown} of {total}"
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "Showing the {0} longest-waiting of {1}."
 msgstr "Showing the {0} longest-waiting of {1}."
+
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Shown under the field"
+msgstr "Shown under the field"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Shows SLA performance on the dashboard and flags overdue items."
@@ -9847,6 +9933,10 @@ msgstr "Thanks for subscribing, {name}!"
 msgid "That image is too large (max 2 MB)."
 msgstr "That image is too large (max 2 MB)."
 
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "That name is already a built-in field on this record. Pick another one."
+msgstr "That name is already a built-in field on this record. Pick another one."
+
 #: packages/email/template-components/template-forgot-password.tsx
 msgid "That's okay, it happens! Click the button below to reset your password."
 msgstr "That's okay, it happens! Click the button below to reset your password."
@@ -10791,6 +10881,7 @@ msgstr "Two-Factor Re-Authentication"
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/components/tables/templates-table.tsx
 #: apps/remix/app/components/tables/admin-document-recipient-item-table.tsx
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
 #: packages/lib/constants/document.ts
 msgid "Type"
 msgstr "Type"
@@ -10926,6 +11017,7 @@ msgstr "Unsettled inbox invoices, any date range"
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
 #: apps/remix/app/components/tables/settings-public-profile-templates-table.tsx
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 #: apps/remix/app/components/forms/team-branding-preferences-form.tsx
 #: apps/remix/app/components/forms/public-profile-form.tsx
@@ -11859,6 +11951,14 @@ msgstr "Workflow Steps"
 msgid "Workflows"
 msgstr "Workflows"
 
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+msgid "Workflows will read this as"
+msgstr "Workflows will read this as"
+
+#: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
+#~ msgid "Workflows will read this as <0>{{vars.<step>.{derivedKey}}}</0>.{0}"
+#~ msgstr "Workflows will read this as <0>{{vars.<step>.{derivedKey}}}</0>.{0}"
+
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "WorkHub API base (optional)"
 msgstr "WorkHub API base (optional)"
@@ -11900,6 +12000,7 @@ msgstr "Write what should happen in plain English. Example: \"When an inbox docu
 msgid "Yearly"
 msgstr "Yearly"
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/email-templates._index.tsx
 msgid "Yes"
 msgstr "Yes"

@@ -15,10 +15,16 @@ import {
 import Papa, { type ParseResult } from 'papaparse';
 
 import {
+  RESERVED_METADATA_DATA_KEYS,
+  coerceMetadataFieldValue,
+  formatMetadataFieldValue,
+} from '@documenso/lib/universal/metadata-fields';
+import {
   MAX_METADATA_IMPORT_ROWS,
   METADATA_IMPORT_HEADER_ALIASES,
   buildMetadataTemplateCsv,
   parseKeywordsCell,
+  readCustomFieldCell,
 } from '@documenso/lib/universal/metadata-import';
 import {
   DEFAULT_SIGNING_ORDER,
@@ -39,6 +45,10 @@ import { Button } from '@documenso/ui/primitives/button';
 import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
+import {
+  CustomFieldsManager,
+  type MetadataFieldDefinition,
+} from '~/components/general/metadata/custom-fields-manager';
 import { SignerChainEditor } from '~/components/general/metadata/signer-chain-editor';
 import { appMetaTags } from '~/utils/meta';
 
@@ -58,12 +68,25 @@ const dataOf = (record: { data?: unknown }): Record<string, unknown> =>
 
 const label = 'mb-1 block text-[11px] font-medium text-muted-foreground';
 
+/**
+ * Keys this form owns. Anything else on a record's data bag belongs to a custom
+ * field — possibly one that has since been deleted, whose value is preserved
+ * rather than dropped on the next save.
+ */
+const BUILT_IN_DATA_KEYS = new Set<string>(RESERVED_METADATA_DATA_KEYS);
+
 export default function MetadataPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const utils = trpc.useUtils();
 
   const { data: records, isLoading } = trpc.metadata.list.useQuery();
+  const { data: customFields } = trpc.metadata.listFields.useQuery();
+
+  const fieldDefinitions = (customFields ?? []) as MetadataFieldDefinition[];
+  /** Definitions for one category, in the order they should be rendered. */
+  const fieldsFor = (forCategory: string) =>
+    fieldDefinitions.filter((field) => field.category === forCategory.trim().toLowerCase());
 
   const [category, setCategory] = useState('vendor');
   const [name, setName] = useState('');
@@ -90,6 +113,15 @@ export default function MetadataPage() {
     produce a directory that cannot answer the question the aging report asks.
   */
   const [termsCode, setTermsCode] = useState(DEFAULT_TERMS_CODE);
+  /*
+    The org's own fields, held as the text that is in the box.
+
+    Kept as strings rather than typed values because that is what an input gives
+    back, and because a half-typed number ("12.") has to survive the keystroke
+    that follows it. Coercion happens once, on save, through the same function
+    the server and the CSV import use.
+  */
+  const [customValues, setCustomValues] = useState<Record<string, string>>({});
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Extraction templates, so a vendor can be pinned to one — invoices from that
@@ -111,6 +143,7 @@ export default function MetadataPage() {
     setSlaInternalHours('');
     setSlaEndToEndHours('');
     setTermsCode(DEFAULT_TERMS_CODE);
+    setCustomValues({});
   };
 
   const upsert = trpc.metadata.upsert.useMutation({
@@ -167,7 +200,12 @@ export default function MetadataPage() {
   });
 
   const downloadTemplate = () => {
-    const blob = new Blob([buildMetadataTemplateCsv()], { type: 'text/csv;charset=utf-8;' });
+    // The template's example rows are vendors, so it carries the vendor fields —
+    // matching the category the form is on would produce a sheet whose examples
+    // and columns described two different things.
+    const blob = new Blob([buildMetadataTemplateCsv(fieldsFor('vendor'))], {
+      type: 'text/csv;charset=utf-8;',
+    });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
 
@@ -316,6 +354,17 @@ export default function MetadataPage() {
             }
           }
 
+          // The org's own columns, matched by header text or storage key. Sent as
+          // text and coerced server-side, which is also what validates them —
+          // this parser deliberately does not decide what a value means.
+          for (const field of fieldsFor(category)) {
+            const cell = readCustomFieldCell(raw, field);
+
+            if (cell !== undefined) {
+              extra[field.key] = cell;
+            }
+          }
+
           records.push({
             category,
             label,
@@ -395,6 +444,17 @@ export default function MetadataPage() {
     // Empty stays empty on an existing record: pre-filling the default here would
     // silently give a vendor terms nobody agreed to the next time anything was saved.
     setTermsCode(typeof d.termsCode === 'string' ? d.termsCode : '');
+    // Only this category's fields: a value left behind by a field that has since
+    // been removed stays in the record untouched rather than being shown here and
+    // re-saved as something it no longer is.
+    setCustomValues(
+      Object.fromEntries(
+        fieldsFor(r.category).map((field) => [
+          field.key,
+          formatMetadataFieldValue(field, d[field.key]),
+        ]),
+      ),
+    );
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -431,6 +491,45 @@ export default function MetadataPage() {
       if (chosen) extra.ocrTemplateName = chosen.name;
     }
 
+    // The org's own fields, checked against what each one promises. Refused here
+    // rather than sent and rejected, so the message names the field while the
+    // person is still looking at it — the server applies the same rules.
+    const editingRecord = editingId ? records?.find((r) => r.id === editingId) : undefined;
+    const previous = editingRecord ? dataOf(editingRecord) : {};
+
+    for (const field of fieldsFor(category)) {
+      const coerced = coerceMetadataFieldValue(field, customValues[field.key] ?? '');
+
+      if (!coerced.ok) {
+        toast({ title: coerced.message, variant: 'destructive' });
+        return;
+      }
+
+      if (coerced.value === null) {
+        if (field.required) {
+          toast({ title: _(msg`${field.label} is required.`), variant: 'destructive' });
+          return;
+        }
+        continue;
+      }
+
+      extra[field.key] = coerced.value;
+    }
+
+    // Values belonging to fields that are no longer defined are carried over
+    // untouched. `update` replaces the whole data object, so leaving them out
+    // would delete data the org never asked to lose — and re-adding the field
+    // brings it straight back into view.
+    for (const [key, value] of Object.entries(previous)) {
+      if (
+        !(key in extra) &&
+        !BUILT_IN_DATA_KEYS.has(key) &&
+        !fieldsFor(category).some((f) => f.key === key)
+      ) {
+        extra[key] = value;
+      }
+    }
+
     const payload = {
       category: category.trim() || 'vendor',
       label: name.trim(),
@@ -461,6 +560,7 @@ export default function MetadataPage() {
         </div>
 
         <div className="flex flex-shrink-0 items-center gap-2">
+          <CustomFieldsManager category={category} fields={fieldDefinitions} />
           <Button size="sm" variant="outline" onClick={downloadTemplate}>
             <DownloadIcon className="mr-1.5 h-3.5 w-3.5" />
             <Trans>Download template</Trans>
@@ -699,6 +799,82 @@ export default function MetadataPage() {
           )}
         </div>
 
+        {fieldsFor(category).length > 0 && (
+          <div className="mt-3 rounded-[var(--r-sm)] border border-border bg-muted/20 p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase text-muted-foreground">
+              <Trans>Custom fields</Trans>
+            </p>
+            <div className="flex flex-wrap items-start gap-2">
+              {fieldsFor(category).map((field) => (
+                <div key={field.id} className="min-w-[170px] flex-1">
+                  {/*
+                    Tied to its input with htmlFor/id rather than merely sitting
+                    above it, so the field is reachable by its name — clicking the
+                    label focuses the box, and a screen reader announces which
+                    value it is reading.
+                  */}
+                  <label className={label} htmlFor={`custom-${field.key}`}>
+                    {field.label}
+                    {field.required && <span className="ml-0.5 text-destructive">*</span>}
+                  </label>
+
+                  {field.type === 'SELECT' ? (
+                    <select
+                      id={`custom-${field.key}`}
+                      className="h-8 w-full rounded-md border border-border bg-card px-2 text-[13px]"
+                      value={customValues[field.key] ?? ''}
+                      onChange={(e) =>
+                        setCustomValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                      }
+                    >
+                      <option value="">—</option>
+                      {field.options.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  ) : field.type === 'BOOLEAN' ? (
+                    <label className="flex h-8 items-center gap-1.5 text-[12px] text-muted-foreground">
+                      <input
+                        id={`custom-${field.key}`}
+                        type="checkbox"
+                        className="h-3.5 w-3.5"
+                        checked={customValues[field.key] === 'Yes'}
+                        onChange={(e) =>
+                          setCustomValues((prev) => ({
+                            ...prev,
+                            // Blank rather than "No" when unticked, so an untouched
+                            // yes/no field stays unset instead of asserting "no".
+                            [field.key]: e.target.checked ? 'Yes' : '',
+                          }))
+                        }
+                      />
+                      <Trans>Yes</Trans>
+                    </label>
+                  ) : (
+                    <Input
+                      id={`custom-${field.key}`}
+                      className="h-8 text-[13px]"
+                      type={field.type === 'NUMBER' ? 'number' : field.type === 'DATE' ? 'date' : 'text'}
+                      value={customValues[field.key] ?? ''}
+                      onChange={(e) =>
+                        setCustomValues((prev) => ({ ...prev, [field.key]: e.target.value }))
+                      }
+                      placeholder={field.type === 'DATE' ? 'YYYY-MM-DD' : ''}
+                      title={field.helpText ?? undefined}
+                    />
+                  )}
+
+                  {field.helpText && (
+                    <p className="mt-1 text-[10px] text-muted-foreground">{field.helpText}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="mt-3">
           <SignerChainEditor
             signers={signers}
@@ -870,6 +1046,24 @@ export default function MetadataPage() {
                           )}
                         </p>
                       )}
+                      {fieldsFor(r.category).map((field) => {
+                        const shown = formatMetadataFieldValue(field, d[field.key]);
+
+                        // Only fields that have a value: a column of dashes across
+                        // every row would say nothing and cost the most space.
+                        if (!shown) return null;
+
+                        return (
+                          <p
+                            key={field.id}
+                            className="mt-1 text-[10px] text-muted-foreground"
+                            title={field.helpText ?? undefined}
+                          >
+                            <span className="opacity-70">{field.label}: </span>
+                            {shown}
+                          </p>
+                        );
+                      })}
                       {(() => {
                         // Shown as the chain it is, in order, so the approval
                         // route is readable from the list without opening the

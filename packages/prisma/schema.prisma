@@ -2588,6 +2588,40 @@ model MetadataRecord {
   @@index([organizationId, category])
 }
 
+/// What kind of value an organization-defined metadata field holds.
+enum MetadataFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SELECT
+}
+
+/// An organization-defined field on a metadata record.
+///
+/// The values live in `MetadataRecord.data` alongside the built-in keys — this
+/// table only declares that a field exists, so the form can render it, the table
+/// can show it and the CSV can carry it. `key` is derived from `label` and is
+/// what workflow templates reference (`{{vars.vendor.glAccount}}`), so it is
+/// fixed once created; renaming the label leaves the key alone.
+model MetadataFieldDefinition {
+  id             String            @id @default(cuid())
+  organizationId Int
+  category       String /// Which category the field applies to, e.g. "vendor".
+  key            String /// Storage key inside MetadataRecord.data.
+  label          String /// Shown on the form and used as the CSV column header.
+  type           MetadataFieldType @default(TEXT)
+  options        String[] /// Allowed values for SELECT; empty for other types.
+  helpText       String?
+  required       Boolean           @default(false)
+  order          Int               @default(0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([organizationId, category, key])
+  @@index([organizationId, category])
+}
+
 /// Where a business rule is enforced. Each value has exactly one call site.
 enum BusinessRuleGate {
   DOCUMENT_SEND

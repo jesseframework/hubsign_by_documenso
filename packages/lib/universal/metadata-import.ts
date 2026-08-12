@@ -203,8 +203,58 @@ export const toCsv = (rows: readonly (readonly string[])[]): string =>
  */
 const UTF8_BOM = '﻿';
 
-export const buildMetadataTemplateCsv = (): string =>
-  UTF8_BOM + toCsv([METADATA_IMPORT_COLUMNS, ...TEMPLATE_EXAMPLE_ROWS]);
+/**
+ * The template file's contents, with the org's own fields appended.
+ *
+ * Custom columns go after the built-in ones and carry the field's label as the
+ * header, because that is the name the person filling the sheet in sees on the
+ * form. The example rows are padded to match so every row has the same number of
+ * cells — a short row is legal CSV but reads as corrupt in Excel.
+ *
+ * A SELECT field lists its options in the first example row rather than leaving
+ * the cell blank: the allowed values are otherwise invisible until an import
+ * rejects them.
+ */
+export const buildMetadataTemplateCsv = (
+  customFields: readonly { label: string; type?: string; options?: string[] }[] = [],
+): string => {
+  const headers = [...METADATA_IMPORT_COLUMNS, ...customFields.map((field) => field.label)];
+
+  const rows = TEMPLATE_EXAMPLE_ROWS.map((row, rowIndex) => [
+    ...row,
+    ...customFields.map((field) =>
+      rowIndex === 0 && field.type === 'SELECT' && field.options?.length
+        ? field.options.join(' / ')
+        : '',
+    ),
+  ]);
+
+  return UTF8_BOM + toCsv([headers, ...rows]);
+};
+
+/**
+ * Which column of a parsed row holds a custom field's value.
+ *
+ * `transformHeader` lowercases anything it does not recognise, so a column
+ * titled "GL Account" arrives as `gl account`. Both the label and the storage key
+ * are accepted: an export or a sheet written against the API would use the key.
+ */
+export const readCustomFieldCell = (
+  row: Record<string, string>,
+  field: { key: string; label: string },
+): string | undefined => {
+  const candidates = [field.label.trim().toLowerCase(), field.key.toLowerCase(), field.key];
+
+  for (const candidate of candidates) {
+    const value = row[candidate];
+
+    if (typeof value === 'string' && value.trim() !== '') {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+};
 
 /**
  * Split a keywords cell. Accepts semicolons as well as commas: a comma-bearing
