@@ -6,8 +6,11 @@ import { Link, useLocation } from 'react-router';
 
 import { authClient } from '@documenso/auth/client';
 
+import { useNavContext } from '~/hooks/use-nav-context';
+
 import { AppCommandMenu } from './app-command-menu';
 import { TopbarPreferences } from './app-topbar-preferences';
+import { getPrimaryNav, resolveBreadcrumb, resolvePrimaryHref } from './nav-config';
 
 export type AppTopbarProps = {
   onHamburgerClick: () => void;
@@ -36,64 +39,36 @@ export const AppTopbar = ({ onHamburgerClick, title }: AppTopbarProps) => {
     void authClient.signOut();
   };
 
-  // Derive readable page name from path
-  const pathParts = location.pathname.split('/').filter(Boolean);
+  const ctx = useNavContext();
 
-  const routeNames: Record<string, string> = {
-    documents: 'E-Sign Document',
-    templates: 'Templates',
-    settings: 'Settings',
-    admin: 'Admin',
-    dms: 'Document Manager',
-    'bulk-upload': 'Bulk Upload',
-    'ocr-queue': 'OCR Queue',
-    search: 'Search',
-    filing: 'Filing Structure',
-    favorites: 'Favorites',
-    approvals: 'Approvals',
-    retrievals: 'Retrievals',
-    retention: 'Retention',
-    activity: 'Activity',
-    compliance: 'Compliance',
-    profile: 'Profile',
-    security: 'Security',
-    tokens: 'API Tokens',
-    webhooks: 'Webhooks',
-    billing: 'Billing',
-    teams: 'Teams',
-    stats: 'Stats',
-    users: 'Users',
-    subscriptions: 'Subscriptions',
-    leaderboard: 'Leaderboard',
-    'site-settings': 'Site Settings',
-    'public-profile': 'Public Profile',
-    doc: 'Details',
+  // Where "Home" actually goes for this user. A personal account has no org
+  // dashboard, so the first row they can see is the only honest target.
+  const primaryNav = getPrimaryNav(ctx);
+  const homeHref = primaryNav.length > 0 ? resolvePrimaryHref(primaryNav[0], ctx) : '/documents';
+
+  /**
+   * The trail comes from the nav registries, so a page is named in the
+   * breadcrumb exactly as it is named in the sidebar. Only the leaf names that
+   * no registry owns — a document editor, a detail view — are worked out here.
+   */
+  const trail = resolveBreadcrumb(location.pathname);
+
+  const leafNames: Record<string, string> = {
     edit: 'Edit',
     logs: 'Logs',
+    doc: 'Details',
     label: 'Print Label',
     folders: 'Folders',
-    signin: 'Sign In',
-    signup: 'Sign Up',
   };
 
-  // Find the best display name — skip IDs (long strings with mixed chars)
-  const getDisplayName = () => {
-    if (title) return title;
-    for (let i = pathParts.length - 1; i >= 0; i--) {
-      const part = pathParts[i];
-      if (routeNames[part]) return routeNames[part];
-    }
-    // Fallback: use last part if it looks like a word
-    const last = pathParts[pathParts.length - 1] || 'Documents';
-    if (last.length < 20 && /^[a-zA-Z-]+$/.test(last)) {
-      return last.charAt(0).toUpperCase() + last.slice(1);
-    }
-    // It's an ID — use the route before it
-    const secondLast = pathParts[pathParts.length - 2];
-    return routeNames[secondLast] || 'Documents';
-  };
+  const pathParts = location.pathname.split('/').filter(Boolean);
+  const lastPart = pathParts[pathParts.length - 1] ?? '';
 
-  const displayName = getDisplayName();
+  const crumbs: React.ReactNode[] = title
+    ? [title]
+    : trail.length > 0
+      ? [...trail, ...(leafNames[lastPart] ? [leafNames[lastPart]] : [])]
+      : [leafNames[lastPart] ?? 'Documents'];
 
   return (
     <>
@@ -108,12 +83,30 @@ export const AppTopbar = ({ onHamburgerClick, title }: AppTopbarProps) => {
           </button>
 
           <div className="flex items-center gap-1.5 text-[13px] text-muted-foreground">
-            <Link to="/documents" className="flex items-center gap-1.5 transition-colors hover:text-foreground">
+            <Link
+              to={homeHref}
+              className="flex flex-shrink-0 items-center gap-1.5 transition-colors hover:text-foreground"
+            >
               <HomeIcon className="h-3.5 w-3.5" />
-              <span>Home</span>
+              <span className="hidden sm:inline">
+                <Trans>Home</Trans>
+              </span>
             </Link>
-            <ChevronRightIcon className="h-3 w-3" />
-            <span className="font-medium text-foreground">{displayName}</span>
+
+            {crumbs.map((crumb, index) => (
+              <span key={index} className="flex min-w-0 items-center gap-1.5">
+                <ChevronRightIcon className="h-3 w-3 flex-shrink-0" />
+                <span
+                  className={
+                    index === crumbs.length - 1
+                      ? 'truncate font-medium text-foreground'
+                      : 'hidden truncate sm:inline'
+                  }
+                >
+                  {crumb}
+                </span>
+              </span>
+            ))}
           </div>
         </div>
 

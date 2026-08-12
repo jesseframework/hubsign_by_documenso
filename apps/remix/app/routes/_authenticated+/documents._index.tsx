@@ -43,7 +43,7 @@ import { useOptionalCurrentTeam } from '~/providers/team';
 import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
-  return appMetaTags('E-Sign Document');
+  return appMetaTags('E-Sign');
 }
 
 const ZSearchParamsSchema = ZFindDocumentsInternalRequestSchema.pick({
@@ -308,10 +308,11 @@ export default function DocumentsPage() {
           </>
         )}
 
-        {/* Documents section title */}
+        {/* Matches the sidebar row and the breadcrumb exactly — one surface,
+            one name, wherever the user reads it. */}
         <div className="mt-8 mb-3">
           <h2 className="text-xl font-semibold tracking-tight">
-            <Trans>E-Sign Document</Trans>
+            <Trans>E-Sign</Trans>
           </h2>
         </div>
 

@@ -13,6 +13,7 @@ import { AppBanner } from '~/components/general/app-banner';
 import { AppBottomNav } from '~/components/general/app-bottom-nav';
 import { AppSidebar } from '~/components/general/app-sidebar';
 import { AppTopbar } from '~/components/general/app-topbar';
+import { ConsoleShell } from '~/components/general/console-shell';
 import { OrgBrandingProvider } from '~/components/general/org-branding-provider';
 import { PushAutoSync } from '~/components/general/push-auto-sync';
 import { PushNotificationBanner } from '~/components/general/push-notification-banner';
@@ -74,7 +75,12 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
           <AppTopbar onHamburgerClick={() => setIsSidebarOpen(true)} />
 
           <main className="flex-1 px-3.5 pb-[90px] pt-3.5 sm:px-5 sm:pb-5 sm:pt-5">
-            <Outlet />
+            {/* Tab strips and console rails are applied here, from the
+                registries in `nav-config.tsx`, so no route file has to opt in
+                and none can drift out of sync with the sidebar. */}
+            <ConsoleShell>
+              <Outlet />
+            </ConsoleShell>
           </main>
         </div>
       </div>
