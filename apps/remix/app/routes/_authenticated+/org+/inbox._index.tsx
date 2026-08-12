@@ -6,13 +6,16 @@ import { Trans } from '@lingui/react/macro';
 import {
   AlertTriangleIcon,
   ArchiveIcon,
+  AtSignIcon,
   CalendarIcon,
   CheckCheckIcon,
   CheckCircle2Icon,
+  CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   CircleDashedIcon,
   CoinsIcon,
+  CopyIcon,
   DollarSignIcon,
   FileSpreadsheetIcon,
   InboxIcon,
@@ -155,6 +158,52 @@ function WorkflowActivityIndicator({
 
 export function meta() {
   return appMetaTags('Signature Inbox');
+}
+
+/**
+ * The org's inbound address, as a click-to-copy chip.
+ *
+ * This used to be a full-width bar under the heading with its own label, code
+ * block and Copy button — three elements and a band of chrome for one string that
+ * is only needed the handful of times someone sets up a forwarding rule. Folding
+ * it into the header line keeps it available without spending vertical space on it
+ * every visit.
+ *
+ * The tick is shown on the chip itself rather than only in a toast: on a wide
+ * screen the toast lands far from where the click happened.
+ */
+function InboxAddressChip({ address }: { address: string }) {
+  const { _ } = useLingui();
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  return (
+    <button
+      type="button"
+      title={_(msg`Copy your organization's inbox address`)}
+      onClick={() => {
+        void navigator.clipboard?.writeText(address);
+        setCopied(true);
+      }}
+      className="group inline-flex max-w-full items-center gap-1.5 rounded-[var(--r-sm)] border border-border bg-muted/40 py-0.5 pl-1.5 pr-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground"
+    >
+      <AtSignIcon className="h-3 w-3 flex-shrink-0 opacity-50" />
+      <span className="truncate">{address}</span>
+      {copied ? (
+        <CheckIcon className="h-3 w-3 flex-shrink-0 text-status-complete-text" />
+      ) : (
+        <CopyIcon className="h-3 w-3 flex-shrink-0 opacity-40 transition-opacity group-hover:opacity-80" />
+      )}
+      <span className="sr-only">
+        {copied ? <Trans>Copied</Trans> : <Trans>Copy inbox address</Trans>}
+      </span>
+    </button>
+  );
 }
 
 /**
@@ -462,6 +511,7 @@ export default function SignatureInboxPage() {
   ) => setter(current === key ? null : key);
   const { data: membership } = trpc.org.getMyOrganization.useQuery();
   const org = membership?.organization;
+  const { data: unreadCount } = trpc.inbox.unreadCount.useQuery();
 
   // Live-refresh the list when OCR finishes or new mail is ingested (SSE).
   useInboxEvents();
@@ -500,23 +550,55 @@ export default function SignatureInboxPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">
-            <Trans>Signature Inbox</Trans>
-          </h2>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            <Trans>
-              Documents emailed in for signature. Each is read by OCR (BMS ML) so you can review the
-              data, then send it off to sign.
-            </Trans>
-          </p>
+      {/*
+        One header band instead of three stacked ones. The title, the count, the
+        inbox address and the two actions all sit on a single line-pair closed by a
+        rule, so the grid starts near the top of the viewport — which is what the
+        page is actually for.
+      */}
+      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-border pb-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold tracking-[-0.01em]">
+              <Trans>Signature Inbox</Trans>
+            </h2>
+            {/*
+              Same query the sidebar badge reads, so the two can never disagree —
+              a header saying "4 unopened" beside a nav badge saying 6 would put
+              every other number on the page in doubt.
+            */}
+            {typeof unreadCount === 'number' && unreadCount > 0 && (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold leading-5 text-primary">
+                <Trans>{unreadCount} unopened</Trans>
+              </span>
+            )}
+          </div>
+
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] text-muted-foreground">
+            <span>
+              <Trans>Emailed in, read by OCR, then sent to sign.</Trans>
+            </span>
+            {inboxAddress && (
+              <>
+                <span className="opacity-40">·</span>
+                <InboxAddressChip address={inboxAddress} />
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-2">
+
+        {/*
+          Both controls carry `border-border bg-card` rather than relying on the
+          outline variant. `--input` (97% L) is indistinguishable from the page
+          background (also 97% L), so an outline button here has a border only in
+          theory — on the page it reads as loose text. On a white card it is fine,
+          which is why "Export to Excel" below needs no such treatment.
+        */}
+        <div className="flex flex-shrink-0 items-center gap-1.5">
           <Button
             size="sm"
             variant="outline"
-            className="px-2"
+            className="h-8 w-8 border-border bg-card p-0 text-muted-foreground hover:text-foreground"
             title={
               chimeOn
                 ? _(msg`Sound on for new mail — click to mute`)
@@ -533,44 +615,28 @@ export default function SignatureInboxPage() {
             }}
           >
             {chimeOn ? (
-              <Volume2Icon className="h-3.5 w-3.5" />
+              <Volume2Icon className="h-4 w-4" />
             ) : (
-              <VolumeXIcon className="h-3.5 w-3.5" />
+              <VolumeXIcon className="h-4 w-4" />
             )}
+            <span className="sr-only">
+              <Trans>New mail sound</Trans>
+            </span>
           </Button>
           <Button
             size="sm"
             variant="outline"
+            className="h-8 border-border bg-card text-[12px] font-medium"
             disabled={fetchNow.isPending}
             onClick={() => fetchNow.mutate()}
           >
-            <RefreshCwIcon className="mr-1 h-3.5 w-3.5" />
+            <RefreshCwIcon
+              className={`mr-1.5 h-3.5 w-3.5 ${fetchNow.isPending ? 'animate-spin' : ''}`}
+            />
             <Trans>Fetch from WorkHub</Trans>
           </Button>
         </div>
-      </div>
-
-      {inboxAddress && (
-        <div className="flex flex-wrap items-center gap-2 rounded-[var(--r)] border border-border bg-muted/30 px-4 py-3 text-[12px]">
-          <span className="text-muted-foreground">
-            <Trans>Email PDFs to your organization's inbox:</Trans>
-          </span>
-          <code className="rounded bg-background px-1.5 py-0.5 font-mono text-[12px] font-medium">
-            {inboxAddress}
-          </code>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 text-[11px]"
-            onClick={() => {
-              void navigator.clipboard?.writeText(inboxAddress);
-              toast({ title: _(msg`Copied`) });
-            }}
-          >
-            <Trans>Copy</Trans>
-          </Button>
-        </div>
-      )}
+      </header>
 
       {isLoading ? (
         <div className="py-12 text-center text-muted-foreground">Loading…</div>

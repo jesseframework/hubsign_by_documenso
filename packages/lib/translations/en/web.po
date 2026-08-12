@@ -597,6 +597,10 @@ msgstr "{unattributed} late with no vendor name."
 msgid "{unattributed} unattributed"
 msgstr "{unattributed} unattributed"
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "{unreadCount} unopened"
+msgstr "{unreadCount} unopened"
+
 #: apps/remix/app/components/general/inbox/responsibility-cell.tsx
 msgid "{untimestamped} earlier send(s) were made before reminder times were recorded, so only the most recent one per person has a date."
 msgstr "{untimestamped} earlier send(s) were made before reminder times were recorded, so only the most recent one per person has a date."
@@ -2994,11 +2998,14 @@ msgstr "Copied \"{key}\" — paste it into a workflow step"
 msgid "Copied to clipboard"
 msgstr "Copied to clipboard"
 
-#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/components/general/document/document-recipient-link-copy-dialog.tsx
 #: packages/ui/primitives/document-flow/add-subject.tsx
 msgid "Copy"
 msgstr "Copy"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Copy inbox address"
+msgstr "Copy inbox address"
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates._index.tsx
 msgid "Copy key"
@@ -3027,6 +3034,10 @@ msgstr "Copy Signing Links"
 #: apps/remix/app/components/forms/token.tsx
 msgid "Copy token"
 msgstr "Copy token"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Copy your organization's inbox address"
+msgstr "Copy your organization's inbox address"
 
 #: apps/remix/app/components/general/inbox/extracted-fields.tsx
 msgid "Correct or add a field"
@@ -4145,8 +4156,8 @@ msgid "Documents created from template"
 msgstr "Documents created from template"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-msgid "Documents emailed in for signature. Each is read by OCR (BMS ML) so you can review the data, then send it off to sign."
-msgstr "Documents emailed in for signature. Each is read by OCR (BMS ML) so you can review the data, then send it off to sign."
+#~ msgid "Documents emailed in for signature. Each is read by OCR (BMS ML) so you can review the data, then send it off to sign."
+#~ msgstr "Documents emailed in for signature. Each is read by OCR (BMS ML) so you can review the data, then send it off to sign."
 
 #: apps/remix/app/routes/_authenticated+/dms+/retention.tsx
 msgid "Documents Past Retention Date"
@@ -4506,8 +4517,8 @@ msgid "Email Options"
 msgstr "Email Options"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-msgid "Email PDFs to your organization's inbox:"
-msgstr "Email PDFs to your organization's inbox:"
+#~ msgid "Email PDFs to your organization's inbox:"
+#~ msgstr "Email PDFs to your organization's inbox:"
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
 msgid "Email preview"
@@ -4555,6 +4566,10 @@ msgstr "Email viewed by {0} ({1})"
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Email-to-Sign Inbox"
 msgstr "Email-to-Sign Inbox"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Emailed in, read by OCR, then sent to sign."
+msgstr "Emailed in, read by OCR, then sent to sign."
 
 #. placeholder {0}: stages.emailedNotOpened
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
@@ -6274,6 +6289,10 @@ msgstr "New email template"
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "New inbox item"
 msgstr "New inbox item"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "New mail sound"
+msgstr "New mail sound"
 
 #: apps/remix/app/components/forms/password.tsx
 msgid "New Password"
