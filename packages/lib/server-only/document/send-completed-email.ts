@@ -12,6 +12,7 @@ import { NEXT_PUBLIC_WEBAPP_URL } from '../../constants/app';
 import { DOCUMENT_AUDIT_LOG_TYPE } from '../../types/document-audit-logs';
 import { extractDerivedDocumentEmailSettings } from '../../types/document-email';
 import type { RequestMetadata } from '../../universal/extract-request-metadata';
+import { resolveOcrVendorName } from '../../universal/ocr-fields';
 import { getFileServerSide } from '../../universal/upload/get-file.server';
 import { createDocumentAuditLogData } from '../../utils/document-audit-logs';
 import { env } from '../../utils/env';
@@ -19,6 +20,9 @@ import { renderCustomEmailTemplate } from '../../utils/render-custom-email-templ
 import { renderEmailWithI18N } from '../../utils/render-email-with-i18n';
 import { teamGlobalSettingsToBranding } from '../../utils/team-global-settings-to-branding';
 import { formatDocumentsPath } from '../../utils/teams';
+
+/** Longest vendor name allowed into a subject line. */
+const MAX_SUBJECT_VENDOR_LENGTH = 60;
 
 export interface SendDocumentOptions {
   documentId: number;
@@ -42,6 +46,11 @@ export const sendCompletedEmail = async ({ documentId, requestMetadata }: SendDo
           teamGlobalSettings: true,
         },
       },
+      /*
+        What OCR read, for documents that arrived through the signature inbox. Only
+        the extraction, and only to name the counterparty in the subject line.
+      */
+      inboxItem: { select: { extractedData: true } },
     },
   });
 
@@ -72,6 +81,35 @@ export const sendCompletedEmail = async ({ documentId, requestMetadata }: SendDo
   }
 
   const i18n = await getI18nInstance(document.documentMeta?.language);
+
+  /*
+    Subject line, naming the counterparty when we know it.
+
+    "Signing Complete!" tells an AP clerk with forty of these in their inbox
+    nothing at all. The vendor name is the one word that makes the mail findable
+    later and identifiable at a glance — so it goes in when OCR read one, and the
+    subject falls back to the plain form when it did not. Hand-uploaded documents
+    never have one, which is why this cannot be unconditional.
+
+    The phrase "Signing Complete" is preserved verbatim at the start. An
+    organization may have configured it as a blocked inbox subject to stop
+    completion mail (which carries the signed PDF as an attachment) being ingested
+    as a fresh invoice; that filter is a substring match, so appending to the
+    phrase keeps the guard working while replacing it would silently re-open the
+    feedback loop.
+  */
+  const vendorName = resolveOcrVendorName(document.inboxItem?.extractedData ?? null);
+
+  // Capped: a subject is not a place for a paragraph, and an extraction that
+  // grabbed half an address block would otherwise land there in full.
+  const subjectVendor =
+    vendorName && vendorName.trim().length > 0
+      ? vendorName.trim().slice(0, MAX_SUBJECT_VENDOR_LENGTH)
+      : null;
+
+  const completedSubject = subjectVendor
+    ? i18n._(msg`Signing Complete for ${subjectVendor}`)
+    : i18n._(msg`Signing Complete!`);
 
   const emailSettings = extractDerivedDocumentEmailSettings(document.documentMeta);
   const isDocumentCompletedEmailEnabled = emailSettings.documentCompleted;
@@ -117,7 +155,7 @@ export const sendCompletedEmail = async ({ documentId, requestMetadata }: SendDo
         name: env('NEXT_PRIVATE_SMTP_FROM_NAME') || 'HubSign',
         address: env('NEXT_PRIVATE_SMTP_FROM_ADDRESS') || 'noreply@hubsign.io',
       },
-      subject: i18n._(msg`Signing Complete!`),
+      subject: completedSubject,
       html,
       text,
       attachments: [
@@ -197,7 +235,7 @@ export const sendCompletedEmail = async ({ documentId, requestMetadata }: SendDo
         subject:
           isDirectTemplate && document.documentMeta?.subject
             ? renderCustomEmailTemplate(document.documentMeta.subject, customEmailTemplate)
-            : i18n._(msg`Signing Complete!`),
+            : completedSubject,
         html,
         text,
         attachments: [

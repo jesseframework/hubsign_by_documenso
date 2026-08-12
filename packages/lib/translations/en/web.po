@@ -9053,6 +9053,9 @@ msgid "Signing complete — all {0} recipient(s) have signed."
 msgstr "Signing complete — all {0} recipient(s) have signed."
 
 #: packages/lib/server-only/document/send-completed-email.ts
+msgid "Signing Complete for {subjectVendor}"
+msgstr "Signing Complete for {subjectVendor}"
+
 #: packages/lib/server-only/document/send-completed-email.ts
 msgid "Signing Complete!"
 msgstr "Signing Complete!"
