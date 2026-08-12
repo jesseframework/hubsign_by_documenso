@@ -2093,7 +2093,6 @@ export const orgRouter = router({
       approvalsByStatus,
       totalDocuments,
       inboxSourced,
-      pendingDocuments,
       documentsByMonth,
       approvalsByMonth,
       topSenders,
@@ -2115,13 +2114,6 @@ export const orgRouter = router({
       // SignatureInboxItem directly mixed org-scoped inbox rows with
       // member-scoped documents and needed a clamp to stay non-negative.
       prisma.document.count({ where: { ...documentWhere, inboxItem: { isNot: null } } }),
-      // Aging is bucketed by how far past the INVOICE's due date each pending
-      // document is, so only its id is needed here — the dates come from the
-      // due-date resolver below.
-      prisma.document.findMany({
-        where: { ...documentWhere, status: 'PENDING' },
-        select: { id: true },
-      }),
       // `grain` is a literal from a two-value union, never user text, so it is
       // safe to interpolate into DATE_TRUNC — which cannot take a bound
       // parameter for its field argument.
@@ -2199,15 +2191,25 @@ export const orgRouter = router({
       aging report means to anyone in finance. An invoice with three weeks of
       credit left was shown in the same bucket as one a month past its due date.
 
-      The due date is the one OCR read off the invoice, or the vendor's payment
-      terms code applied to the invoice date. Documents that have neither get their
-      own bucket rather than being dropped: the donut has to sum to the headline,
-      and "we cannot judge these" is a real answer that a silent omission hides.
+      Counted over exactly the population the "Overdue by vendor" card counts:
+      every unsettled invoice from the inbox, unwindowed. Two mismatches used to
+      make the pair irreconcilable on the same screen —
+
+        - It counted only PENDING documents, so an invoice still sitting in DRAFT
+          was absent from aging while appearing as overdue by vendor. A draft
+          invoice twenty-five days past due is the worst case, not an exempt one:
+          nobody has even sent it.
+        - It was filtered by the dashboard's date range, which the vendor card
+          deliberately ignores. An aging report that hides the oldest invoices
+          because they were created before the selected month is an aging report
+          with the answer removed.
+
+      Documents that never came through the inbox are outside this card entirely:
+      a contract awaiting signature has no invoice due date to be measured against,
+      and "Waiting on" is where it is accounted for.
     */
     const dueDates = await getOrganizationDueDates({ organizationId });
-    const daysPastDueByDocument = new Map(
-      dueDates.map((due) => [due.documentId, due.daysPastDue]),
-    );
+    const openInvoices = dueDates.filter((due) => due.open);
 
     const ageBuckets = [
       { key: 'current', label: 'Not yet due', min: -Infinity, max: 1, count: 0 },
@@ -2220,19 +2222,18 @@ export const orgRouter = router({
 
     const unknownBucket = ageBuckets[ageBuckets.length - 1];
 
-    for (const doc of pendingDocuments) {
-      const daysPastDue = daysPastDueByDocument.get(doc.id);
-
-      // `undefined` means the document never came through the inbox at all (a
-      // hand-uploaded contract has no invoice due date to have); `null` means it
-      // did but neither the page nor the vendor's terms could date it. Both are
-      // "cannot be judged", and the tile says so rather than implying punctuality.
-      if (daysPastDue === undefined || daysPastDue === null) {
+    for (const due of openInvoices) {
+      // Neither the page nor the vendor's terms could date it. Counted rather
+      // than dropped: the donut has to sum to the headline above it, and "we
+      // cannot judge these" is a real answer that a silent omission hides.
+      if (due.daysPastDue === null) {
         unknownBucket.count += 1;
         continue;
       }
 
-      const bucket = ageBuckets.find((b) => daysPastDue >= b.min && daysPastDue < b.max);
+      const bucket = ageBuckets.find(
+        (b) => (due.daysPastDue as number) >= b.min && (due.daysPastDue as number) < b.max,
+      );
       if (bucket) bucket.count += 1;
     }
 
@@ -2295,6 +2296,15 @@ export const orgRouter = router({
       approvalsCharted: approvalTrend.reduce((sum, point) => sum + point.count, 0),
 
       ageBuckets: ageBuckets.map(({ key, label, count }) => ({ key, label, count })),
+      /*
+        The number the aging donut sums to.
+
+        Not `pending`: that counts documents of every kind in the selected date
+        range, while these buckets count unsettled invoices from the inbox
+        regardless of range. Putting one above the other left a donut whose slices
+        did not add up to its own headline.
+      */
+      agingOpenInvoices: openInvoices.length,
 
       // Where signatures are stuck and with whom. Deliberately NOT windowed by
       // the date filter: a bottleneck is about what is outstanding right now,

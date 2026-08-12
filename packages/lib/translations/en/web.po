@@ -613,6 +613,10 @@ msgstr "{unattributed} overdue with no vendor name."
 msgid "{unattributed} unattributed"
 msgstr "{unattributed} unattributed"
 
+#: apps/remix/app/routes/_authenticated+/org+/_index.tsx
+msgid "{undated} undated · unsettled inbox invoices"
+msgstr "{undated} undated · unsettled inbox invoices"
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "{unreadCount} unopened"
 msgstr "{unreadCount} unopened"
@@ -6718,12 +6722,12 @@ msgid "Nothing is waiting on anyone."
 msgstr "Nothing is waiting on anyone."
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
-msgid "Nothing more than 90 days past due"
-msgstr "Nothing more than 90 days past due"
+#~ msgid "Nothing more than 90 days past due"
+#~ msgstr "Nothing more than 90 days past due"
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
-msgid "Nothing more than 90 days past due · {undated} undated"
-msgstr "Nothing more than 90 days past due · {undated} undated"
+#~ msgid "Nothing more than 90 days past due · {undated} undated"
+#~ msgstr "Nothing more than 90 days past due · {undated} undated"
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 #~ msgid "Nothing outstanding beyond 90 days"
@@ -10833,6 +10837,10 @@ msgstr "Unknown"
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
 msgid "Unpaid"
 msgstr "Unpaid"
+
+#: apps/remix/app/routes/_authenticated+/org+/_index.tsx
+msgid "Unsettled inbox invoices, any date range"
+msgstr "Unsettled inbox invoices, any date range"
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx

@@ -254,22 +254,29 @@ export default function OrgDashboard() {
 
         <ChartCard
           title={<Trans>Signature Aging</Trans>}
-          value={stats.pending}
+          // The population these buckets actually cover — unsettled invoices from
+          // the inbox — not the pending-document count, which is a different set
+          // and left the slices not adding up to the number above them.
+          value={stats.agingOpenInvoices}
           icon={ClockIcon}
           iconBg="bg-status-pending-bg"
           iconColor={status.pending}
+          /*
+            Worst first, then the caveat, then the scope. `undated` is reported
+            rather than rounded away: those invoices are the ones the aging figures
+            cannot speak for, and a clean chart that quietly excludes them is the
+            misleading version. The scope is stated because this headline counts a
+            different population from the pending figure beside it.
+          */
           footer={
             overdue > 0 ? (
               <span style={{ color: status.rejected }}>
                 <Trans>{overdue} more than 90 days past due</Trans>
               </span>
             ) : undated > 0 ? (
-              // Reported rather than rounded away: these are the invoices the
-              // aging figures cannot speak for, and a clean chart that quietly
-              // excludes them is the misleading version.
-              <Trans>Nothing more than 90 days past due · {undated} undated</Trans>
+              <Trans>{undated} undated · unsettled inbox invoices</Trans>
             ) : (
-              <Trans>Nothing more than 90 days past due</Trans>
+              <Trans>Unsettled inbox invoices, any date range</Trans>
             )
           }
         >
