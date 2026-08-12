@@ -4831,6 +4831,10 @@ msgstr ""
 msgid "Everyone signed — document completed"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/documents._index.tsx
+msgid "Everything in signing — drafts, out for signature, and fully signed."
+msgstr ""
+
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
 msgid "Exceeded timeout"
 msgstr "Zeitüberschreitung überschritten"

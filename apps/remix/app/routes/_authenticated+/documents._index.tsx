@@ -148,11 +148,30 @@ export default function DocumentsPage() {
   return (
     <DocumentDropZoneWrapper>
       <div className="w-full">
-        {/* Actions bar */}
-        <div className="flex items-center justify-end gap-3">
-          <DocumentUploadDropzone />
-          <CreateFolderDialog />
-        </div>
+        {/*
+          Same header as the Signature Inbox: name, one line saying what the screen
+          holds, actions on the right, closed by a rule. The name used to sit
+          two-thirds down the page immediately above the table, which read as a
+          section heading for the table rather than the title of the screen — and at
+          text-xl it was a different size from every other page's heading.
+        */}
+        <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-border pb-3">
+          <div className="min-w-0">
+            {/* Matches the sidebar row and the breadcrumb exactly — one surface,
+                one name, wherever the user reads it. */}
+            <h2 className="text-lg font-semibold tracking-[-0.01em]">
+              <Trans>E-Sign</Trans>
+            </h2>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              <Trans>Everything in signing — drafts, out for signature, and fully signed.</Trans>
+            </p>
+          </div>
+
+          <div className="flex flex-shrink-0 items-center gap-3">
+            <DocumentUploadDropzone />
+            <CreateFolderDialog />
+          </div>
+        </header>
 
         {/* Stats grid — clickable, each card filters the document list to
             its status. Mirrors the behaviour of the removed tab strip. */}
@@ -291,8 +310,12 @@ export default function DocumentsPage() {
                   ))}
               </div>
 
-              <div className="mt-6 flex items-center justify-center">
-                {foldersData && foldersData.folders?.length > 12 && (
+              {/* Only when there is something to show. The row used to render
+                  regardless, leaving 24px of margin and a button's worth of empty
+                  space under the folders on every account with twelve or fewer —
+                  a gap that was hidden behind the old mid-page heading. */}
+              {foldersData && foldersData.folders?.length > 12 && (
+                <div className="mt-6 flex items-center justify-center">
                   <Button
                     variant="link"
                     size="sm"
@@ -301,19 +324,11 @@ export default function DocumentsPage() {
                   >
                     View all folders
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </>
         )}
-
-        {/* Matches the sidebar row and the breadcrumb exactly — one surface,
-            one name, wherever the user reads it. */}
-        <div className="mt-8 mb-3">
-          <h2 className="text-xl font-semibold tracking-tight">
-            <Trans>E-Sign</Trans>
-          </h2>
-        </div>
 
         {/*
           The Signature Inbox's filter card, so the two lists filter alike. It
