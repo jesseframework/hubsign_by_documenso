@@ -580,7 +580,9 @@ export default function SignatureInboxPage() {
             </span>
             {inboxAddress && (
               <>
-                <span className="opacity-40">·</span>
+                {/* Hidden once the chip wraps to its own line, where a leading
+                    interpunct is just a stray dot. */}
+                <span className="hidden opacity-40 sm:inline">·</span>
                 <InboxAddressChip address={inboxAddress} />
               </>
             )}
@@ -814,26 +816,56 @@ export default function SignatureInboxPage() {
               </Button>
             </div>
           ) : (
-            <div className="rounded-[var(--r)] border border-border bg-card">
-              <table className="w-full">
-            <thead>
+            /*
+              The grid scrolls inside its own card.
+
+              Without this the table's ~1050px of min-content pushed the whole
+              page wider than the viewport — below about 1300px the browser grew a
+              document-level horizontal scrollbar, which carried the sidebar, the
+              top bar and the header's buttons off to the right along with it.
+              Sideways-scrolling chrome is the tell of a page that was only ever
+              opened on a large monitor.
+            */
+            <div className="overflow-x-auto rounded-[var(--r)] border border-border bg-card">
+              {/*
+                Below xl the row stops being a row: `block` on the cells stacks
+                them, turning each item into a card. Six dense columns need about
+                1070px, so on a phone the table would otherwise sit in a 360px
+                window with Review — the whole point of the screen — parked off the
+                right edge behind a scrollbar nobody looks for.
+
+                xl (1280px) rather than a smaller breakpoint because that is the
+                first width where the grid actually fits: 1280 less the sidebar and
+                padding leaves 978px, close enough that only the trailing icons
+                fall into the scroll. At lg the content area is 764px and a third of
+                the grid would be hidden.
+
+                The stack works without column headers because every value that
+                needs naming already carries its own label: Invoice/Due/Created on
+                the dates, Inv/Tax/Net on the amounts. A vendor, a person and two
+                buttons say what they are.
+              */}
+              <table className="block w-full xl:table">
+            <thead className="hidden xl:table-header-group">
+              {/* Headers never wrap — "Vendor / Contact" splitting across two
+                  lines makes the whole row taller for no gain. */}
               <tr className="border-b border-border bg-[#faf9fe] dark:bg-muted/30">
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   <Trans>Invoice info</Trans>
                 </th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   <Trans>Vendor / Contact</Trans>
                 </th>
-                <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <th className="whitespace-nowrap px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   <Trans>Amounts</Trans>
                 </th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   <Trans>Dates</Trans>
                 </th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   <Trans>Responsibility</Trans>
                 </th>
-                <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+                <th className="whitespace-nowrap px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
                   <Trans>Actions</Trans>
                 </th>
               </tr>
@@ -855,7 +887,7 @@ export default function SignatureInboxPage() {
                 return (
                   <tr
                     key={item.id}
-                    className={`border-b border-border last:border-0 ${
+                    className={`block border-b border-border last:border-0 xl:table-row ${
                       isOverdue
                         ? 'bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-950/40 dark:hover:bg-orange-950/60'
                         : 'hover:bg-muted/20'
@@ -863,7 +895,7 @@ export default function SignatureInboxPage() {
                   >
                     {/* Invoice info */}
                     <td
-                      className={`border-l-[3px] px-4 py-3 align-top ${
+                      className={`block border-l-[3px] px-4 pb-1 pt-3 align-top xl:table-cell xl:py-3 ${
                         isOverdue
                           ? 'border-l-orange-500'
                           : isUnread
@@ -920,8 +952,18 @@ export default function SignatureInboxPage() {
                       </div>
                     </td>
 
-                    {/* Vendor / contact */}
-                    <td className="px-4 py-3 align-top">
+                    {/*
+                      Vendor / contact.
+
+                      Capped, because on a wide monitor the auto layout handed this
+                      column several hundred pixels of slack it had nothing to put
+                      in — a vendor name, an email, and then a hole between it and
+                      the right-aligned amounts. Capping it sends that width to the
+                      invoice column, which has a title, a subtitle and a row of
+                      badges to spend it on. The longest address seen so far
+                      (accounts@silverstonefacility.com) needs about 210px.
+                    */}
+                    <td className="block max-w-full px-4 py-1 align-top xl:table-cell xl:max-w-[14rem] xl:py-3">
                       <p className="text-[13px] font-medium">{f.vendorName || '—'}</p>
                       {f.vendorEmail && (
                         <p className="text-[12px] text-muted-foreground">{f.vendorEmail}</p>
@@ -932,7 +974,7 @@ export default function SignatureInboxPage() {
                     </td>
 
                     {/* Amounts — single currency, straight from BMS ML metadata */}
-                    <td className="px-4 py-3 align-top text-right">
+                    <td className="block whitespace-nowrap px-4 py-1 align-top text-left xl:table-cell xl:py-3 xl:text-right">
                       {f.currency && (
                         <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                           {f.currency}
@@ -941,19 +983,19 @@ export default function SignatureInboxPage() {
                       {hasAmounts ? (
                         <dl className="space-y-0.5 text-[12px]">
                           {f.total && (
-                            <div className="flex items-baseline justify-end gap-2">
+                            <div className="flex items-baseline justify-start gap-2 xl:justify-end">
                               <dt className="text-[10px] uppercase text-muted-foreground">Inv</dt>
                               <dd className="font-semibold tabular-nums">{fmtMoney(f.currency, f.total)}</dd>
                             </div>
                           )}
                           {f.tax && (
-                            <div className="flex items-baseline justify-end gap-2">
+                            <div className="flex items-baseline justify-start gap-2 xl:justify-end">
                               <dt className="text-[10px] uppercase text-muted-foreground">Tax</dt>
                               <dd className="tabular-nums">{fmtMoney(f.currency, f.tax)}</dd>
                             </div>
                           )}
                           {f.net && (
-                            <div className="flex items-baseline justify-end gap-2">
+                            <div className="flex items-baseline justify-start gap-2 xl:justify-end">
                               <dt className="text-[10px] uppercase text-muted-foreground">Net</dt>
                               <dd className="font-medium tabular-nums">{fmtMoney(f.currency, f.net)}</dd>
                             </div>
@@ -964,27 +1006,37 @@ export default function SignatureInboxPage() {
                       )}
                     </td>
 
-                    {/* Dates */}
-                    <td className="px-4 py-3 align-top text-[12px]">
+                    {/*
+                      Dates.
+
+                      `whitespace-nowrap` is the whole point of this cell: a date
+                      is one token, and the auto layout was happily breaking
+                      2026-08-02 after a hyphen to squeeze the column, which turns
+                      four dates into eight lines of hyphenated digits. Declaring
+                      it unbreakable raises the column's min-content to what a date
+                      actually needs, so the layout takes the width out of the
+                      slack pooling in the text columns instead.
+                    */}
+                    <td className="block whitespace-nowrap px-4 py-1 align-top text-[12px] xl:table-cell xl:py-3">
                       <dl className="space-y-0.5">
                         {f.invoiceDate && (
                           <div className="flex items-baseline gap-2">
-                            <dt className="w-16 text-[10px] uppercase text-muted-foreground">Invoice</dt>
+                            <dt className="w-14 text-[10px] uppercase text-muted-foreground">Invoice</dt>
                             <dd className="tabular-nums">{fmtDate(f.invoiceDate)}</dd>
                           </div>
                         )}
                         {f.dueDate && (
                           <div className="flex items-baseline gap-2">
-                            <dt className="w-16 text-[10px] uppercase text-muted-foreground">Due</dt>
+                            <dt className="w-14 text-[10px] uppercase text-muted-foreground">Due</dt>
                             <dd className="tabular-nums">{fmtDate(f.dueDate)}</dd>
                           </div>
                         )}
                         <div className="flex items-baseline gap-2">
-                          <dt className="w-16 text-[10px] uppercase text-muted-foreground">Created</dt>
+                          <dt className="w-14 text-[10px] uppercase text-muted-foreground">Created</dt>
                           <dd className="tabular-nums text-muted-foreground">{fmtDate(item.createdAt)}</dd>
                         </div>
                         <div className="flex items-baseline gap-2">
-                          <dt className="w-16 text-[10px] uppercase text-muted-foreground">Updated</dt>
+                          <dt className="w-14 text-[10px] uppercase text-muted-foreground">Updated</dt>
                           <dd className="tabular-nums text-muted-foreground">
                             {formatRelativeTime(item.updatedAt)}
                           </dd>
@@ -993,7 +1045,7 @@ export default function SignatureInboxPage() {
                     </td>
 
                     {/* Responsibility — who owes a signature, and the chasing so far */}
-                    <td className="max-w-[13rem] px-4 py-3 align-top">
+                    <td className="block px-4 py-1 align-top xl:table-cell xl:max-w-[13rem] xl:py-3">
                       <ResponsibilityCell
                         responsibility={item.responsibility}
                         documentStatus={item.signature.documentStatus}
@@ -1001,8 +1053,8 @@ export default function SignatureInboxPage() {
                     </td>
 
                     {/* Actions */}
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex items-center justify-end gap-1">
+                    <td className="block whitespace-nowrap px-4 pb-3 pt-1.5 align-top xl:table-cell xl:py-3">
+                      <div className="flex items-center justify-start gap-1 xl:justify-end">
                         {/*
                           Review is withheld while OCR is running: the extracted
                           fields are what the reviewer is there to check, and
