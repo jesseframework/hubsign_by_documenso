@@ -29,6 +29,11 @@ import {
   readRecordSigningOrder,
   writeRecordSigners,
 } from '@documenso/lib/universal/metadata-signers';
+import {
+  DEFAULT_TERMS_CODE,
+  TERMS_CODE_PRESETS,
+  parseTermsCode,
+} from '@documenso/lib/universal/payment-terms';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import { Input } from '@documenso/ui/primitives/input';
@@ -76,6 +81,15 @@ export default function MetadataPage() {
   // Turnaround targets in business hours; blank = inherit the org default.
   const [slaInternalHours, setSlaInternalHours] = useState('');
   const [slaEndToEndHours, setSlaEndToEndHours] = useState('');
+  /*
+    How long this vendor gives us to pay, e.g. `30d`.
+
+    Pre-filled on a new record rather than left blank. An invoice whose page states
+    no due date and whose vendor states no terms cannot be aged at all, and it drops
+    into the dashboard's "no due date" bucket — so a blank default would quietly
+    produce a directory that cannot answer the question the aging report asks.
+  */
+  const [termsCode, setTermsCode] = useState(DEFAULT_TERMS_CODE);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   // Extraction templates, so a vendor can be pinned to one — invoices from that
@@ -96,6 +110,7 @@ export default function MetadataPage() {
     setSigningOrder(DEFAULT_SIGNING_ORDER);
     setSlaInternalHours('');
     setSlaEndToEndHours('');
+    setTermsCode(DEFAULT_TERMS_CODE);
   };
 
   const upsert = trpc.metadata.upsert.useMutation({
@@ -233,6 +248,7 @@ export default function MetadataPage() {
               'signerRole',
               'slaInternalHours',
               'slaEndToEndHours',
+              'termsCode',
             ].some((f) => value(f));
 
             if (hasAnyValue) {
@@ -283,6 +299,22 @@ export default function MetadataPage() {
           const slaEndToEnd = Number(value('slaEndToEndHours'));
           if (Number.isFinite(slaInternal) && slaInternal > 0) extra.slaInternalHours = slaInternal;
           if (Number.isFinite(slaEndToEnd) && slaEndToEnd > 0) extra.slaEndToEndHours = slaEndToEnd;
+
+          // Stored only when it parses. Nobody is watching an inline warning during
+          // an import, and a code that cannot be read is worse than none: it looks
+          // configured while behaving exactly like an empty field.
+          const termsValue = value('termsCode');
+          if (termsValue) {
+            if (parseTermsCode(termsValue) === null) {
+              localErrors.push({
+                row,
+                label,
+                message: `Terms code "${termsValue}" was not understood and has been left unset. Try 30d, net30 or 0d.`,
+              });
+            } else {
+              extra.termsCode = termsValue.trim();
+            }
+          }
 
           records.push({
             category,
@@ -360,6 +392,9 @@ export default function MetadataPage() {
     setSigningOrder(readRecordSigningOrder(d));
     setSlaInternalHours(typeof d.slaInternalHours === 'number' ? String(d.slaInternalHours) : '');
     setSlaEndToEndHours(typeof d.slaEndToEndHours === 'number' ? String(d.slaEndToEndHours) : '');
+    // Empty stays empty on an existing record: pre-filling the default here would
+    // silently give a vendor terms nobody agreed to the next time anything was saved.
+    setTermsCode(typeof d.termsCode === 'string' ? d.termsCode : '');
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -388,6 +423,7 @@ export default function MetadataPage() {
     Object.assign(extra, writeRecordSigners(cleanSigners, signingOrder));
     if (Number(slaInternalHours) > 0) extra.slaInternalHours = Number(slaInternalHours);
     if (Number(slaEndToEndHours) > 0) extra.slaEndToEndHours = Number(slaEndToEndHours);
+    if (termsCode.trim()) extra.termsCode = termsCode.trim();
 
     if (ocrTemplateId) {
       const chosen = ocrTemplates?.templates.find((t) => String(t.id) === ocrTemplateId);
@@ -604,6 +640,33 @@ export default function MetadataPage() {
               title={_(msg`Business hours from email received to fully signed. Blank uses the org default.`)}
             />
           </div>
+          <div className="w-[110px]">
+            <label className={label}>
+              <Trans>Terms code</Trans>
+            </label>
+            <Input
+              className="h-8 text-[13px]"
+              list="terms-code-presets"
+              value={termsCode}
+              onChange={(e) => setTermsCode(e.target.value)}
+              placeholder="30d"
+              title={_(
+                msg`How long this vendor gives you to pay, e.g. 30d. Used to date an invoice that states no due date of its own — which is what the dashboard's aging and overdue figures are measured against.`,
+              )}
+            />
+            <datalist id="terms-code-presets">
+              {TERMS_CODE_PRESETS.map((preset) => (
+                <option key={preset} value={preset} />
+              ))}
+            </datalist>
+            {/* Invalid is worth saying immediately: a code that will not parse is
+                indistinguishable from no code at all once the dashboard runs. */}
+            {termsCode.trim() !== '' && parseTermsCode(termsCode) === null && (
+              <p className="mt-1 text-[10px] text-destructive">
+                <Trans>Not a term. Try 30d, net30 or 0d.</Trans>
+              </p>
+            )}
+          </div>
           {Boolean(ocrTemplates?.templates.length) && (
             <div className="w-[170px]">
               <label className={label}>
@@ -780,6 +843,31 @@ export default function MetadataPage() {
                           {typeof d.slaInternalHours === 'number' ? `${d.slaInternalHours}h` : '—'}
                           {' / '}
                           {typeof d.slaEndToEndHours === 'number' ? `${d.slaEndToEndHours}h` : '—'}
+                        </p>
+                      )}
+                      {/* Vendors only: terms belong to a supplier, not to a signee
+                          or a department, and showing "—" on those rows would imply
+                          something is missing from them. */}
+                      {r.category === 'vendor' && (
+                        <p
+                          className="mt-1 text-[10px]"
+                          title={_(
+                            msg`Payment terms, used to date an invoice that states no due date of its own.`,
+                          )}
+                        >
+                          <span className="text-muted-foreground">Terms: </span>
+                          {typeof d.termsCode === 'string' && parseTermsCode(d.termsCode) !== null ? (
+                            <span className="text-muted-foreground">{d.termsCode}</span>
+                          ) : (
+                            // Amber rather than a dash: an invoice from this vendor
+                            // with no printed due date cannot be aged at all, and
+                            // that is a gap somebody should close.
+                            <span className="text-amber-600 dark:text-amber-400">
+                              {typeof d.termsCode === 'string' && d.termsCode.trim() !== ''
+                                ? `${d.termsCode} (unreadable)`
+                                : 'not set'}
+                            </span>
+                          )}
                         </p>
                       )}
                       {(() => {

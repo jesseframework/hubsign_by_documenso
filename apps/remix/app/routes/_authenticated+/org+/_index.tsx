@@ -132,6 +132,7 @@ export default function OrgDashboard() {
   // needs a `?? 0` fallback — every figure on the page is a value the server
   // actually computed, never a stand-in for a failed request.
   const overdue = stats.ageBuckets.find((bucket) => bucket.key === '90+')?.count ?? 0;
+  const undated = stats.ageBuckets.find((bucket) => bucket.key === 'unknown')?.count ?? 0;
   const momChange = stats.monthOverMonth.percentChange;
   const MomIcon =
     momChange === null || momChange === 0
@@ -260,10 +261,15 @@ export default function OrgDashboard() {
           footer={
             overdue > 0 ? (
               <span style={{ color: status.rejected }}>
-                <Trans>{overdue} outstanding beyond 90 days</Trans>
+                <Trans>{overdue} more than 90 days past due</Trans>
               </span>
+            ) : undated > 0 ? (
+              // Reported rather than rounded away: these are the invoices the
+              // aging figures cannot speak for, and a clean chart that quietly
+              // excludes them is the misleading version.
+              <Trans>Nothing more than 90 days past due · {undated} undated</Trans>
             ) : (
-              <Trans>Nothing outstanding beyond 90 days</Trans>
+              <Trans>Nothing more than 90 days past due</Trans>
             )
           }
         >
@@ -403,17 +409,20 @@ export default function OrgDashboard() {
 
         <ChartCard
           title={<Trans>Overdue by vendor</Trans>}
-          value={stats.bottlenecks.vendors.rows.reduce((sum, row) => sum + row.breached, 0)}
+          value={stats.bottlenecks.vendors.rows.reduce((sum, row) => sum + row.overdue, 0)}
           icon={ClockIcon}
           iconBg="bg-status-rejected-bg"
           iconColor={status.rejected}
           onClick={() => setDetail('vendors')}
-          footer={<Trans>Past SLA and still running</Trans>}
+          // Names the basis, because "overdue" against our own turnaround target
+          // and overdue against the vendor's due date are different claims and
+          // this card used to make the first while appearing to make the second.
+          footer={<Trans>Past the invoice due date, still unsigned</Trans>}
         >
           <OverdueByVendorTile
-            enabled={stats.bottlenecks.vendors.enabled}
             rows={stats.bottlenecks.vendors.rows}
             unattributed={stats.bottlenecks.vendors.unattributed}
+            noDueDate={stats.bottlenecks.vendors.noDueDate}
           />
         </ChartCard>
       </div>

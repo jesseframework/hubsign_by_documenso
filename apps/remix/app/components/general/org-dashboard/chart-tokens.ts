@@ -47,10 +47,17 @@ export const STATUS_COLORS: Record<ChartMode, Record<string, string>> = {
   },
 };
 
-/** Ordinal ramp for signature-aging buckets: current → 90+ days. */
+/**
+ * Ordinal ramp for aging buckets: not yet due → 90+ days past due.
+ *
+ * The sixth slot is deliberately off the ramp — a flat grey, not a darker blue.
+ * It holds invoices with no due date at all, which is an absence of information
+ * rather than the extreme end of the scale, and giving it the darkest blue would
+ * read as "these are the worst".
+ */
 export const AGING_RAMP: Record<ChartMode, string[]> = {
-  light: ['#86b6ef', '#5598e7', '#2a78d6', '#1c5cab', '#104281'],
-  dark: ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#184f95'],
+  light: ['#86b6ef', '#5598e7', '#2a78d6', '#1c5cab', '#104281', '#c3c1cc'],
+  dark: ['#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#184f95', '#4b4a55'],
 };
 
 /**

@@ -66,6 +66,16 @@ export type SlaTargets = {
   /** Where the target came from, for display and for debugging a surprise. */
   source: 'vendor' | 'keyword' | 'org-default' | 'none';
   vendorLabel?: string;
+  /**
+   * The identified vendor's payment terms code, e.g. `30d`.
+   *
+   * Carried here rather than resolved by a second lookup because identifying the
+   * vendor is the expensive and error-prone half of the job, and a second
+   * implementation of "which directory record is this invoice from" would
+   * eventually disagree with this one. Independent of the SLA target: a vendor may
+   * state terms and no turnaround target, or the reverse.
+   */
+  termsCode?: string | null;
 };
 
 const positiveInt = (value: unknown): number | null => {
@@ -73,9 +83,11 @@ const positiveInt = (value: unknown): number | null => {
   return Number.isFinite(n) && n > 0 ? n : null;
 };
 
-const readTargets = (data: unknown): { internal: number | null; endToEnd: number | null } => {
+const readTargets = (
+  data: unknown,
+): { internal: number | null; endToEnd: number | null; termsCode: string | null } => {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    return { internal: null, endToEnd: null };
+    return { internal: null, endToEnd: null, termsCode: null };
   }
 
   const bag = data as Record<string, unknown>;
@@ -83,6 +95,9 @@ const readTargets = (data: unknown): { internal: number | null; endToEnd: number
   return {
     internal: positiveInt(bag.slaInternalHours),
     endToEnd: positiveInt(bag.slaEndToEndHours),
+    // Stored as typed, parsed at the point of use — so a code that will not parse
+    // stays visible in the directory instead of being silently dropped on save.
+    termsCode: typeof bag.termsCode === 'string' && bag.termsCode.trim() !== '' ? bag.termsCode : null,
   };
 };
 
@@ -100,6 +115,7 @@ type ResolverRecord = {
   keywords: string[];
   internal: number | null;
   endToEnd: number | null;
+  termsCode: string | null;
 };
 
 /**
@@ -123,6 +139,7 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
       keywords: keywordsOf(record.data),
       internal: targets.internal,
       endToEnd: targets.endToEnd,
+      termsCode: targets.termsCode,
     };
   });
 
@@ -206,6 +223,7 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
         endToEndHours: identified.endToEnd ?? orgDefaults.endToEndHours,
         source: 'vendor',
         vendorLabel: identified.label ?? undefined,
+        termsCode: identified.termsCode,
       };
     }
 
@@ -219,6 +237,7 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
           endToEndHours: hit.endToEnd ?? orgDefaults.endToEndHours,
           source: 'vendor',
           vendorLabel: hit.label ?? undefined,
+          termsCode: hit.termsCode ?? identified?.termsCode ?? null,
         };
       }
     }
@@ -254,11 +273,18 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
           endToEndHours: keywordHit.endToEnd ?? orgDefaults.endToEndHours,
           source: 'keyword',
           vendorLabel: keywordHit.label ?? undefined,
+          termsCode: keywordHit.termsCode,
         };
       }
     }
 
-    return orgDefaults;
+    /*
+      No target of its own, so the org default applies — but the terms code is a
+      separate question and is answered here regardless. A vendor that states
+      "30d" and leaves the turnaround target unset is the common case, and losing
+      its terms here would push every one of its invoices into "no due date".
+    */
+    return { ...orgDefaults, termsCode: identified?.termsCode ?? null };
   };
 };
 

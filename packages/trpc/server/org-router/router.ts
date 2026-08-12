@@ -41,6 +41,7 @@ import {
 } from '@documenso/lib/server-only/license/redeem-license-key';
 import { stripe } from '@documenso/lib/server-only/stripe';
 import { getSigningBottlenecks } from '@documenso/lib/server-only/document/bottlenecks';
+import { getOrganizationDueDates } from '@documenso/lib/server-only/inbox/invoice-due';
 import { prisma } from '@documenso/prisma';
 
 import { authenticatedProcedure, router } from '../trpc';
@@ -2114,20 +2115,12 @@ export const orgRouter = router({
       // SignatureInboxItem directly mixed org-scoped inbox rows with
       // member-scoped documents and needed a clamp to stay non-negative.
       prisma.document.count({ where: { ...documentWhere, inboxItem: { isNot: null } } }),
-      // Aging needs each pending document's send time, which lives in the audit
-      // log; `createdAt` is the fallback for documents sent before that log
-      // existed (or never logged).
+      // Aging is bucketed by how far past the INVOICE's due date each pending
+      // document is, so only its id is needed here — the dates come from the
+      // due-date resolver below.
       prisma.document.findMany({
         where: { ...documentWhere, status: 'PENDING' },
-        select: {
-          createdAt: true,
-          auditLogs: {
-            where: { type: 'DOCUMENT_SENT' },
-            select: { createdAt: true },
-            orderBy: { createdAt: 'asc' },
-            take: 1,
-          },
-        },
+        select: { id: true },
       }),
       // `grain` is a literal from a two-value union, never user text, so it is
       // safe to interpolate into DATE_TRUNC — which cannot take a bound
@@ -2197,28 +2190,49 @@ export const orgRouter = router({
       }));
     };
 
-    // Aging is measured on documents still awaiting signature — how long each
-    // has been outstanding since it was SENT, which is what the card claims.
-    // Inbox-sourced documents are created when the email lands and sent much
-    // later, so createdAt would have aged them from the wrong instant.
+    /*
+      Aging, measured against the date the VENDOR is owed by.
+
+      It used to measure how long each pending document had been outstanding since
+      we sent it. That answers "how slow are our signers", which the "Waiting on"
+      and "Where it's stuck" tiles already answer better — and it is not what an
+      aging report means to anyone in finance. An invoice with three weeks of
+      credit left was shown in the same bucket as one a month past its due date.
+
+      The due date is the one OCR read off the invoice, or the vendor's payment
+      terms code applied to the invoice date. Documents that have neither get their
+      own bucket rather than being dropped: the donut has to sum to the headline,
+      and "we cannot judge these" is a real answer that a silent omission hides.
+    */
+    const dueDates = await getOrganizationDueDates({ organizationId });
+    const daysPastDueByDocument = new Map(
+      dueDates.map((due) => [due.documentId, due.daysPastDue]),
+    );
+
     const ageBuckets = [
-      { key: 'current', label: 'Current', min: 0, max: 1, count: 0 },
-      { key: '1-30', label: '1-30 days', min: 1, max: 31, count: 0 },
-      { key: '31-60', label: '31-60 days', min: 31, max: 61, count: 0 },
-      { key: '61-90', label: '61-90 days', min: 61, max: 91, count: 0 },
-      { key: '90+', label: '90+ days', min: 91, max: Infinity, count: 0 },
+      { key: 'current', label: 'Not yet due', min: -Infinity, max: 1, count: 0 },
+      { key: '1-30', label: '1-30 days late', min: 1, max: 31, count: 0 },
+      { key: '31-60', label: '31-60 days late', min: 31, max: 61, count: 0 },
+      { key: '61-90', label: '61-90 days late', min: 61, max: 91, count: 0 },
+      { key: '90+', label: '90+ days late', min: 91, max: Infinity, count: 0 },
+      { key: 'unknown', label: 'No due date', min: NaN, max: NaN, count: 0 },
     ];
 
+    const unknownBucket = ageBuckets[ageBuckets.length - 1];
+
     for (const doc of pendingDocuments) {
-      const sentAt = doc.auditLogs[0]?.createdAt ?? doc.createdAt;
-      // Clamp at zero so a clock-skewed or future-dated row lands in "Current"
-      // rather than matching no bucket and vanishing from a donut that is
-      // supposed to sum to the headline.
-      const days = Math.max(
-        0,
-        Math.floor(DateTime.utc().diff(DateTime.fromJSDate(sentAt), 'days').days),
-      );
-      const bucket = ageBuckets.find((b) => days >= b.min && days < b.max);
+      const daysPastDue = daysPastDueByDocument.get(doc.id);
+
+      // `undefined` means the document never came through the inbox at all (a
+      // hand-uploaded contract has no invoice due date to have); `null` means it
+      // did but neither the page nor the vendor's terms could date it. Both are
+      // "cannot be judged", and the tile says so rather than implying punctuality.
+      if (daysPastDue === undefined || daysPastDue === null) {
+        unknownBucket.count += 1;
+        continue;
+      }
+
+      const bucket = ageBuckets.find((b) => daysPastDue >= b.min && daysPastDue < b.max);
       if (bucket) bucket.count += 1;
     }
 

@@ -19,6 +19,7 @@ export const METADATA_IMPORT_COLUMNS = [
   'Signers',
   'SLA internal hours',
   'SLA end-to-end hours',
+  'Terms code',
 ] as const;
 
 /** The fields a parsed row can carry, keyed by our internal names. */
@@ -36,7 +37,8 @@ export type MetadataImportField =
   | 'signerEmail'
   | 'signerRole'
   | 'slaInternalHours'
-  | 'slaEndToEndHours';
+  | 'slaEndToEndHours'
+  | 'termsCode';
 
 /**
  * Header text (lowercased, trimmed) → internal field. Generous on purpose:
@@ -113,6 +115,14 @@ export const METADATA_IMPORT_HEADER_ALIASES: Record<string, MetadataImportField>
   'signee role': 'signerRole',
 
   // Turnaround targets in BUSINESS hours; blank means "use the org default".
+  'terms code': 'termsCode',
+  termscode: 'termsCode',
+  terms: 'termsCode',
+  'payment terms': 'termsCode',
+  'payment term': 'termsCode',
+  'credit terms': 'termsCode',
+  net: 'termsCode',
+
   'sla internal hours': 'slaInternalHours',
   slainternalhours: 'slaInternalHours',
   'internal sla': 'slaInternalHours',
@@ -155,6 +165,7 @@ const TEMPLATE_EXAMPLE_ROWS: string[][] = [
     'alex.kim@example.com|SIGNER|Alex Kim;dana.reid@example.com|APPROVER|Dana Reid;ap@skiddview.com|CC|Finance',
     '8',
     '72',
+    '30d',
   ],
   // Just an address: role defaults to SIGNER and the name is optional.
   [
@@ -169,10 +180,11 @@ const TEMPLATE_EXAMPLE_ROWS: string[][] = [
     'dana.reid@example.com',
     '24',
     '120',
+    'net45',
   ],
   // A vendor with no signer set is still valid — it just gets the confirmation
   // email and stops there.
-  ['vendor', 'Acme Freight', 'Billing Dept', 'billing@acmefreight.com', '', '', 'acme', '', '', '', ''],
+  ['vendor', 'Acme Freight', 'Billing Dept', 'billing@acmefreight.com', '', '', 'acme', '', '', '', '', '0d'],
 ];
 
 /** RFC 4180 quoting — only quote when the value would otherwise break the row. */

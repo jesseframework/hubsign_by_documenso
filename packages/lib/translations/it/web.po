@@ -416,13 +416,25 @@ msgstr "{memberEmail} si è unito al seguente team"
 msgid "{memberEmail} left the following team"
 msgstr "{memberEmail} ha lasciato il seguente team"
 
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "{noDueDate} cannot be judged — no due date and no terms code."
+msgstr ""
+
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "{noDueDate} undated"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.billing.tsx
 msgid "{numberOfSeats, plural, one {# member} other {# members}}"
 msgstr "{numberOfSeats, plural, one {# membro} other {# membri}}"
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
-msgid "{overdue} outstanding beyond 90 days"
+msgid "{overdue} more than 90 days past due"
 msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/_index.tsx
+#~ msgid "{overdue} outstanding beyond 90 days"
+#~ msgstr ""
 
 #: packages/lib/utils/document-audit-logs.ts
 msgid "{prefix} added a field"
@@ -595,7 +607,11 @@ msgid "{teamName} ownership transfer request"
 msgstr "richiesta di trasferimento di proprietà di {teamName}"
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
-msgid "{unattributed} late with no vendor name."
+#~ msgid "{unattributed} late with no vendor name."
+#~ msgstr ""
+
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "{unattributed} overdue with no vendor name."
 msgstr ""
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
@@ -999,7 +1015,9 @@ msgstr ""
 
 #: apps/remix/app/components/general/nav-config.tsx
 #: apps/remix/app/components/general/nav-config.tsx
+#: apps/remix/app/components/general/nav-config.tsx
 #: apps/remix/app/components/general/app-sidebar.tsx
+#: apps/remix/app/components/general/app-nav-mobile.tsx
 msgid "Account"
 msgstr ""
 
@@ -4194,8 +4212,6 @@ msgstr ""
 #: apps/remix/app/components/general/nav-config.tsx
 #: apps/remix/app/components/general/nav-config.tsx
 #: apps/remix/app/components/general/generic-error-layout.tsx
-#: apps/remix/app/components/general/app-nav-mobile.tsx
-#: apps/remix/app/components/general/app-nav-desktop.tsx
 #: apps/remix/app/components/general/skeletons/document-edit-skeleton.tsx
 msgid "Documents"
 msgstr "Documenti"
@@ -4204,10 +4220,6 @@ msgstr "Documenti"
 #: apps/remix/app/routes/_authenticated+/templates.$id._index.tsx
 msgid "Documents created from template"
 msgstr "Documenti creati da modello"
-
-#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-#~ msgid "Documents emailed in for signature. Each is read by OCR (BMS ML) so you can review the data, then send it off to sign."
-#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/dms+/retention.tsx
 msgid "Documents Past Retention Date"
@@ -4396,6 +4408,8 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/documents._index.tsx
 #: apps/remix/app/components/general/nav-config.tsx
+#: apps/remix/app/components/general/app-nav-mobile.tsx
+#: apps/remix/app/components/general/app-nav-desktop.tsx
 #: apps/remix/app/components/general/app-command-menu.tsx
 msgid "E-Sign"
 msgstr ""
@@ -4566,10 +4580,6 @@ msgstr ""
 #: packages/ui/primitives/template-flow/add-template-settings.tsx
 msgid "Email Options"
 msgstr "Opzioni email"
-
-#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
-#~ msgid "Email PDFs to your organization's inbox:"
-#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
 msgid "Email preview"
@@ -5390,6 +5400,10 @@ msgstr ""
 msgid "How hard we have chased"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "How long this vendor gives you to pay, e.g. 30d. Used to date an invoice that states no due date of its own — which is what the dashboard's aging and overdue figures are measured against."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
 msgid "HTML body"
 msgstr ""
@@ -5673,8 +5687,12 @@ msgid "Invoices from this vendor's email extract with this template."
 msgstr ""
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
-msgid "Invoices past their SLA whose clock is still running. One already sent late is history and is not counted here."
+msgid "Invoices past the date the vendor is owed by, and still awaiting signature. The due date is the one printed on the invoice; where it states none, the vendor's terms code is applied to the invoice date. One already signed is history and is not counted here."
 msgstr ""
+
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+#~ msgid "Invoices past their SLA whose clock is still running. One already sent late is history and is not counted here."
+#~ msgstr ""
 
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: apps/remix/app/components/tables/internal-audit-log-table.tsx
@@ -5788,8 +5806,8 @@ msgid "Last used"
 msgstr "Ultimo utilizzo"
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
-msgid "Late"
-msgstr ""
+#~ msgid "Late"
+#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
 msgid "Layout"
@@ -6647,8 +6665,8 @@ msgid "No value found."
 msgstr "Nessun valore trovato."
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
-msgid "No vendor is past its SLA."
-msgstr ""
+#~ msgid "No vendor is past its SLA."
+#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 msgid "No workflows yet"
@@ -6663,6 +6681,10 @@ msgstr "Non ti preoccupare, succede! Inserisci la tua email e ti invieremo un li
 #: packages/lib/constants/document.ts
 msgid "None"
 msgstr "Nessuno"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Not a term. Try 30d, net30 or 0d."
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 msgid "Not affected by the selected date range"
@@ -6701,7 +6723,19 @@ msgid "Nothing is waiting on anyone."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
-msgid "Nothing outstanding beyond 90 days"
+msgid "Nothing more than 90 days past due"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/_index.tsx
+msgid "Nothing more than 90 days past due · {undated} undated"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/_index.tsx
+#~ msgid "Nothing outstanding beyond 90 days"
+#~ msgstr ""
+
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "Nothing past its due date."
 msgstr ""
 
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
@@ -6948,6 +6982,7 @@ msgid "Oops! Something went wrong."
 msgstr "Ops! Qualcosa è andato storto."
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "Open"
 msgstr ""
 
@@ -7057,6 +7092,10 @@ msgstr ""
 #. placeholder {0}: shortDuration(item.overdueByMinutes)
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "over by {0}"
+msgstr ""
+
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "Overdue"
 msgstr ""
 
 #. placeholder {0}: overdueLabel(item.sla?.overdueByMinutes ?? 0)
@@ -7197,7 +7236,11 @@ msgid "Passwords do not match"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
-msgid "Past SLA and still running"
+#~ msgid "Past SLA and still running"
+#~ msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/_index.tsx
+msgid "Past the invoice due date, still unsigned"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
@@ -7223,6 +7266,10 @@ msgstr "Pagamento scaduto"
 
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 msgid "Payment successful! Your seats have been activated."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Payment terms, used to date an invoice that states no due date of its own."
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.members.tsx
@@ -8248,10 +8295,6 @@ msgid "Role"
 msgstr "Ruolo"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
-#~ msgid "Role → approver mappings"
-#~ msgstr ""
-
-#: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Role key and approver required"
 msgstr ""
 
@@ -8698,7 +8741,6 @@ msgstr ""
 
 #: apps/remix/app/components/general/nav-config.tsx
 #: apps/remix/app/components/general/nav-config.tsx
-#: apps/remix/app/components/general/app-nav-mobile.tsx
 #: apps/remix/app/components/general/app-command-menu.tsx
 #: apps/remix/app/components/general/app-command-menu.tsx
 msgid "Settings"
@@ -9083,8 +9125,8 @@ msgid "SLA tracking is off"
 msgstr ""
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
-msgid "SLA tracking is off, so nothing can be judged late."
-msgstr ""
+#~ msgid "SLA tracking is off, so nothing can be judged late."
+#~ msgstr ""
 
 #: packages/ui/primitives/document-flow/missing-signature-field-dialog.tsx
 msgid "Some signers have not been assigned a signature field. Please assign at least 1 signature field to each signer before proceeding."
@@ -9333,8 +9375,8 @@ msgid "Steps (JSON object keyed by step id)"
 msgstr ""
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
-msgid "Still running"
-msgstr ""
+#~ msgid "Still running"
+#~ msgstr ""
 
 #: packages/email/templates/approval.tsx
 msgid "Still waiting on your approval: {entityTitle}"
@@ -9692,6 +9734,10 @@ msgstr "Modelli"
 #: apps/remix/app/components/dialogs/template-create-dialog.tsx
 msgid "Templates allow you to quickly generate documents with pre-filled recipients and fields."
 msgstr "I modelli ti consentono di generare rapidamente documenti con destinatari e campi precompilati."
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Terms code"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 msgid "Test against a document"
@@ -10546,10 +10592,6 @@ msgstr "Totale firmatari che si sono iscritti"
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Total Users"
 msgstr "Totale utenti"
-
-#: apps/remix/app/routes/_authenticated+/dms+/ocr-queue.tsx
-#~ msgid "Track OCR processing status for uploaded documents."
-#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/dms+/retrievals.tsx
 msgid "Track requests for physical document retrieval from filing locations."

@@ -33,7 +33,7 @@ export type Person = {
   openedNotSigned: number;
 };
 
-export type VendorRow = { vendor: string; breached: number; open: number };
+export type VendorRow = { vendor: string; overdue: number; open: number };
 
 export type Stages = { neverEmailed: number; emailedNotOpened: number; openedNotSigned: number };
 export type Chase = { none: number; once: number; repeatedly: number };
@@ -180,30 +180,30 @@ export const WhereItsStuckTile = ({
 // ---------------------------------------------------------------------------
 
 export const OverdueByVendorTile = ({
-  enabled,
   rows,
   unattributed,
+  noDueDate,
 }: {
-  enabled: boolean;
   rows: VendorRow[];
   unattributed: number;
+  /** Open invoices that carry no due date and no vendor terms code. */
+  noDueDate: number;
 }) => {
-  if (!enabled) {
-    // Not "0 overdue" — SLA tracking being off is a different statement from
-    // everything being on time, and the second would be a lie.
-    return <Empty>
-      <Trans>SLA tracking is off, so nothing can be judged late.</Trans>
-    </Empty>;
-  }
-
   if (rows.length === 0) {
     return (
       <Empty>
         <span>
-          <Trans>No vendor is past its SLA.</Trans>
+          <Trans>Nothing past its due date.</Trans>
           {unattributed > 0 && (
             <span className="mt-1 block">
-              <Trans>{unattributed} late with no vendor name.</Trans>
+              <Trans>{unattributed} overdue with no vendor name.</Trans>
+            </span>
+          )}
+          {/* Said out loud, because an unmeasured queue and a punctual one look
+              identical from a chart showing nothing. */}
+          {noDueDate > 0 && (
+            <span className="mt-1 block">
+              <Trans>{noDueDate} cannot be judged — no due date and no terms code.</Trans>
             </span>
           )}
         </span>
@@ -212,7 +212,7 @@ export const OverdueByVendorTile = ({
   }
 
   const top = rows.slice(0, 3);
-  const worst = Math.max(...top.map((row) => row.breached), 1);
+  const worst = Math.max(...top.map((row) => row.overdue), 1);
 
   return (
     <div className="flex flex-col justify-center" style={{ minHeight: PLOT_HEIGHT }}>
@@ -224,13 +224,13 @@ export const OverdueByVendorTile = ({
                 {row.vendor}
               </span>
               <span className="flex-shrink-0 text-[12px] font-semibold tabular-nums text-orange-600 dark:text-orange-400">
-                {row.breached}
+                {row.overdue}
               </span>
             </div>
             <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-orange-500"
-                style={{ width: `${Math.round((row.breached / worst) * 100)}%` }}
+                style={{ width: `${Math.round((row.overdue / worst) * 100)}%` }}
               />
             </div>
           </div>
@@ -247,6 +247,12 @@ export const OverdueByVendorTile = ({
           <span>
             {' · '}
             <Trans>{unattributed} unattributed</Trans>
+          </span>
+        )}
+        {noDueDate > 0 && (
+          <span>
+            {' · '}
+            <Trans>{noDueDate} undated</Trans>
           </span>
         )}
       </p>
@@ -278,7 +284,7 @@ export const BottleneckDetailDialog = ({
   stages: Stages;
   chase: Chase;
   totalOpen: number;
-  vendors: { enabled: boolean; rows: VendorRow[]; unattributed: number };
+  vendors: { rows: VendorRow[]; unattributed: number; noDueDate: number };
 }) => {
   return (
     <Dialog open={detail !== null} onOpenChange={(open) => !open && onClose()}>
@@ -431,8 +437,10 @@ export const BottleneckDetailDialog = ({
               </DialogTitle>
               <DialogDescription>
                 <Trans>
-                  Invoices past their SLA whose clock is still running. One already sent late is
-                  history and is not counted here.
+                  Invoices past the date the vendor is owed by, and still awaiting signature. The
+                  due date is the one printed on the invoice; where it states none, the vendor's
+                  terms code is applied to the invoice date. One already signed is history and is
+                  not counted here.
                 </Trans>
               </DialogDescription>
             </DialogHeader>
@@ -445,10 +453,10 @@ export const BottleneckDetailDialog = ({
                       <Trans>Vendor</Trans>
                     </th>
                     <th className={`${th} text-right`}>
-                      <Trans>Late</Trans>
+                      <Trans>Overdue</Trans>
                     </th>
                     <th className={`${th} text-right`}>
-                      <Trans>Still running</Trans>
+                      <Trans>Open</Trans>
                     </th>
                   </tr>
                 </thead>
@@ -457,7 +465,7 @@ export const BottleneckDetailDialog = ({
                     <tr key={row.vendor} className="border-b border-border last:border-0">
                       <td className={td}>{row.vendor}</td>
                       <td className={`${td} text-right font-semibold tabular-nums text-orange-600 dark:text-orange-400`}>
-                        {row.breached}
+                        {row.overdue}
                       </td>
                       <td className={`${td} text-right tabular-nums text-muted-foreground`}>
                         {row.open}
