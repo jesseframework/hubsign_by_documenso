@@ -20,13 +20,27 @@ import { useToast } from '@documenso/ui/primitives/use-toast';
  * deciding them in two places would leave the chain running with its approvers
  * still holding live links.
  */
-export const RuleOverrideQueue = () => {
+export const RuleOverrideQueue = ({
+  /**
+   * Restrict to what the caller has been assigned.
+   *
+   * The Approvals page passes this: it is reachable by every member, whereas
+   * Business Rules is admin-only — so an approver picked by a role group needs
+   * somewhere to answer that is not gated on being an admin.
+   */
+  assignedToMe = false,
+}: {
+  assignedToMe?: boolean;
+} = {}) => {
   const { _ } = useLingui();
   const { toast } = useToast();
   const utils = trpc.useUtils();
 
-  const { data: pending } = trpc.businessRule.listOverrides.useQuery();
-  const { data: routing } = trpc.businessRule.overrideRouting.useQuery();
+  const { data: pending } = trpc.businessRule.listOverrides.useQuery({ assignedToMe });
+  // Routing is org-wide configuration and only worth stating where it is managed.
+  const { data: routing } = trpc.businessRule.overrideRouting.useQuery(undefined, {
+    enabled: !assignedToMe,
+  });
   const [notes, setNotes] = useState<Record<string, string>>({});
 
   const decide = trpc.businessRule.decideOverride.useMutation({
@@ -137,6 +151,20 @@ export const RuleOverrideQueue = () => {
                   <Trans>Waives:</Trans> {item.rules.map((r) => r.ruleName).join(', ')}
                 </p>
               </div>
+
+              {item.approverRoleKey && (
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  <Trans>
+                    Sent to {item.approverRoleType}: {item.approverRoleKey}
+                  </Trans>
+                  {item.assignedApprover && (
+                    <>
+                      {' — '}
+                      {item.assignedApprover.name || item.assignedApprover.email}
+                    </>
+                  )}
+                </p>
+              )}
 
               {item.reason && (
                 <div className="mt-2">

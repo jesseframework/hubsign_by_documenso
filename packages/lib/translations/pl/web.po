@@ -8539,6 +8539,12 @@ msgstr ""
 msgid "Sent for signature by {who}"
 msgstr ""
 
+#. placeholder {0}: item.approverRoleType
+#. placeholder {1}: item.approverRoleKey
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Sent to {0}: {1}"
+msgstr ""
+
 #: apps/remix/app/components/general/claim-account.tsx
 msgid "Set a password"
 msgstr "Ustaw hasło"

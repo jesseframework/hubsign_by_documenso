@@ -3,7 +3,11 @@ import { z } from 'zod';
 
 import { RULE_OVERRIDE_ENTITY_TYPE } from '@documenso/lib/constants/rule-overrides';
 import { evaluateGate } from '@documenso/lib/server-only/rules/evaluate-gate';
-import { decideRuleOverride, requestRuleOverride } from '@documenso/lib/server-only/rules/overrides';
+import {
+  decideRuleOverride,
+  listRoleGroups,
+  requestRuleOverride,
+} from '@documenso/lib/server-only/rules/overrides';
 import { buildRuleContext, ruleFieldCatalogue } from '@documenso/lib/server-only/rules/registry';
 import { RULE_GATES, RULE_GATE_LABELS, RULE_OUTCOMES } from '@documenso/lib/server-only/rules/types';
 import { prisma } from '@documenso/prisma';
@@ -180,6 +184,33 @@ export const businessRuleRouter = router({
     }),
 
   /**
+   * The role groups a blocked signer may send their request to.
+   *
+   * Token-authenticated for the same reason the request itself is — the signer has
+   * no account. It returns LABELS ONLY (`Department: Finance`), never a name, email
+   * or user id: an external party must not be handed the organization's staff list
+   * just because a rule stopped them.
+   */
+  overrideApproverOptions: procedure
+    .input(z.object({ token: z.string().min(1) }))
+    .query(async ({ input }) => {
+      const recipient = await prisma.recipient.findFirst({
+        where: { token: input.token },
+        select: { document: { select: { organizationId: true, deletedAt: true } } },
+      });
+
+      if (!recipient?.document || recipient.document.deletedAt) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Signing link not found.' });
+      }
+
+      if (!recipient.document.organizationId) {
+        return { roleGroups: [] };
+      }
+
+      return { roleGroups: await listRoleGroups(recipient.document.organizationId) };
+    }),
+
+  /**
    * A signer asking to be let past the rules blocking them.
    *
    * Unauthenticated on purpose — the signer holds a signing token, not an account,
@@ -187,7 +218,20 @@ export const businessRuleRouter = router({
    * it identifies the recipient AND the document, so neither is taken from input.
    */
   requestOverride: procedure
-    .input(z.object({ token: z.string().min(1), reason: z.string().max(1000).optional() }))
+    .input(
+      z.object({
+        token: z.string().min(1),
+        reason: z.string().max(1000).optional(),
+        /**
+         * Which role group to send it to, by label. Validated against the
+         * document's own organization below — a caller must not be able to route a
+         * request into another tenant's approvers by inventing a key.
+         */
+        approverRole: z
+          .object({ roleType: z.string().min(1).max(64), roleKey: z.string().min(1).max(64) })
+          .optional(),
+      }),
+    )
     .mutation(async ({ input }) => {
       const recipient = await prisma.recipient.findFirst({
         where: { token: input.token },
@@ -241,11 +285,23 @@ export const businessRuleRouter = router({
         },
       });
 
+      // Only a group this organization actually has. An unknown pair is ignored
+      // rather than rejected: the request still matters, it just routes to the
+      // sender instead of nowhere.
+      const approverRole = input.approverRole
+        ? (await listRoleGroups(document.organizationId)).find(
+            (g) =>
+              g.roleType === input.approverRole!.roleType &&
+              g.roleKey === input.approverRole!.roleKey,
+          ) ?? null
+        : null;
+
       return requestRuleOverride({
         documentId: document.id,
         organizationId: document.organizationId,
         recipientId: recipient.id,
         reason: input.reason,
+        approverRole,
         blocks: verdict.blocks.map((b) => ({
           ruleId: b.ruleId,
           name: b.name,
@@ -306,7 +362,19 @@ export const businessRuleRouter = router({
 
   /** Override requests awaiting a decision, for the organization's queue. */
   listOverrides: authenticatedProcedure
-    .input(z.object({ status: z.nativeEnum(BusinessRuleOverrideStatus).optional() }).optional())
+    .input(
+      z
+        .object({
+          status: z.nativeEnum(BusinessRuleOverrideStatus).optional(),
+          /**
+           * Only what is assigned to the caller. Used by the Approvals page, which
+           * every member can reach — Business Rules is admin-only, so an assigned
+           * MANAGER would otherwise have no page on which to answer.
+           */
+          assignedToMe: z.boolean().optional(),
+        })
+        .optional(),
+    )
     .query(async ({ ctx, input }) => {
       const membership = await prisma.organizationMember.findFirst({
         where: { userId: ctx.user.id },
@@ -319,6 +387,7 @@ export const businessRuleRouter = router({
         where: {
           organizationId: membership.organizationId,
           status: input?.status ?? BusinessRuleOverrideStatus.PENDING,
+          ...(input?.assignedToMe ? { assignedApproverId: ctx.user.id } : {}),
         },
         orderBy: { createdAt: 'desc' },
         take: 100,
@@ -327,6 +396,7 @@ export const businessRuleRouter = router({
           document: { select: { id: true, title: true, userId: true } },
           recipient: { select: { email: true, name: true } },
           decidedBy: { select: { name: true, email: true } },
+          assignedApprover: { select: { name: true, email: true } },
         },
       });
     }),
@@ -362,6 +432,7 @@ export const businessRuleRouter = router({
         select: {
           id: true,
           approvalRequestId: true,
+          assignedApproverId: true,
           document: { select: { userId: true } },
         },
       });
@@ -371,11 +442,14 @@ export const businessRuleRouter = router({
       }
 
       const isSender = override.document.userId === ctx.user.id;
+      // The person the signer's chosen role group resolved to. Without this they
+      // are emailed a request they have no authority to answer.
+      const isAssigned = override.assignedApproverId === ctx.user.id;
 
-      if (membership.role !== 'ORG_ADMIN' && !isSender) {
+      if (membership.role !== 'ORG_ADMIN' && !isSender && !isAssigned) {
         throw new TRPCError({
           code: 'FORBIDDEN',
-          message: 'Only an organization administrator or the sender can decide this.',
+          message: 'Only an administrator, the sender, or the assigned approver can decide this.',
         });
       }
 

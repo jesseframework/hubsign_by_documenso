@@ -116,6 +116,7 @@ model User {
   inboxFieldEdits          InboxFieldEdit[]       @relation("UserInboxFieldEdits")
   attachmentOcrRuns        DocumentSupportingFile[] @relation("UserRanAttachmentOcr")
   decidedRuleOverrides     BusinessRuleOverride[]   @relation("UserDecidedRuleOverrides")
+  assignedRuleOverrides    BusinessRuleOverride[]   @relation("UserAssignedRuleOverrides")
 
   @@index([email])
 }
@@ -2679,6 +2680,19 @@ model BusinessRuleOverride {
   /// Which recipient asked. Null if the row outlives the recipient.
   requestedByRecipientId Int?
 
+  /// The role group the signer chose to send this to, e.g. roleType
+  /// "Department" / roleKey "Finance". Labels only — the signer is an external
+  /// party and never sees who holds the role.
+  approverRoleType String?
+  approverRoleKey  String?
+
+  /// The person that role group resolved to when the request was raised.
+  ///
+  /// Resolved once and stored rather than looked up at decision time: a mapping
+  /// that changes later must not silently move a live request to somebody who was
+  /// never told about it.
+  assignedApproverId Int?
+
   /// The approval chain handling this, when the org has a template for it.
   /// Null means it is waiting on the document owner directly.
   approvalRequestId String?
@@ -2691,13 +2705,16 @@ model BusinessRuleOverride {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  document    Document                   @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  recipient   Recipient?                 @relation(fields: [requestedByRecipientId], references: [id], onDelete: SetNull)
-  decidedBy   User?                      @relation("UserDecidedRuleOverrides", fields: [decidedById], references: [id], onDelete: SetNull)
+  document         Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  recipient        Recipient? @relation(fields: [requestedByRecipientId], references: [id], onDelete: SetNull)
+  decidedBy        User?      @relation("UserDecidedRuleOverrides", fields: [decidedById], references: [id], onDelete: SetNull)
+  assignedApprover User?      @relation("UserAssignedRuleOverrides", fields: [assignedApproverId], references: [id], onDelete: SetNull)
   rules       BusinessRuleOverrideRule[]
 
   /// The signing gate's lookup: approved waivers for one document.
   @@index([documentId, status])
+  /// An approver's own queue.
+  @@index([assignedApproverId, status])
   @@index([organizationId, status])
   @@index([approvalRequestId])
 }

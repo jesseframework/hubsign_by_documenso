@@ -8534,6 +8534,12 @@ msgstr "Sent for signature — {0} of {1} signed, waiting on {2}."
 msgid "Sent for signature by {who}"
 msgstr "Sent for signature by {who}"
 
+#. placeholder {0}: item.approverRoleType
+#. placeholder {1}: item.approverRoleKey
+#: apps/remix/app/components/general/rules/rule-override-queue.tsx
+msgid "Sent to {0}: {1}"
+msgstr "Sent to {0}: {1}"
+
 #: apps/remix/app/components/general/claim-account.tsx
 msgid "Set a password"
 msgstr "Set a password"

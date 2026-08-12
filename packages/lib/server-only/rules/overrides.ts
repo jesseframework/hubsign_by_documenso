@@ -50,6 +50,76 @@ export const waivedRuleIdsForDocument = async (documentId: number): Promise<Set<
 };
 
 /**
+ * Distinct role groups an organization has configured, as labels only.
+ *
+ * Safe to hand to a signer: `roleType`/`roleKey` are org-authored words like
+ * "Department" / "Finance". No name, email or user id is exposed, so an external
+ * party learns nothing about who works there.
+ */
+export const listRoleGroups = async (organizationId: number) => {
+  const mappings = await prisma.approvalRoleMapping.findMany({
+    where: { organizationId },
+    orderBy: [{ roleType: 'asc' }, { roleKey: 'asc' }, { approvalLevel: 'asc' }],
+    select: { roleType: true, roleKey: true },
+  });
+
+  // Levels mean the same group appears more than once; the signer picks a group,
+  // not a level.
+  const seen = new Set<string>();
+
+  return mappings.filter((m) => {
+    const key = `${m.roleType}\u0000${m.roleKey}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+
+    return true;
+  });
+};
+
+/**
+ * The person a role group currently resolves to.
+ *
+ * Lowest approval level first, primary before backup — the same precedence the
+ * approval engine's ROLE_MAPPING determination uses, so a request routed by a role
+ * reaches whoever a chain would have reached. Returns null when the group has no
+ * usable approver, which the caller must treat as "not routed" rather than as a
+ * silent success.
+ */
+const resolveRoleGroupApprover = async ({
+  organizationId,
+  roleType,
+  roleKey,
+}: {
+  organizationId: number;
+  roleType: string;
+  roleKey: string;
+}): Promise<{ id: number; name: string | null; email: string } | null> => {
+  const mappings = await prisma.approvalRoleMapping.findMany({
+    where: { organizationId, roleType, roleKey },
+    orderBy: { approvalLevel: 'asc' },
+    select: { primaryApproverId: true, backupApproverId: true },
+  });
+
+  for (const mapping of mappings) {
+    for (const candidate of [mapping.primaryApproverId, mapping.backupApproverId]) {
+      if (!candidate) continue;
+
+      // Still a member of THIS organization: a mapping can outlive somebody
+      // leaving, and routing an exception to an ex-colleague is worse than not
+      // routing it.
+      const member = await prisma.organizationMember.findFirst({
+        where: { organizationId, userId: candidate },
+        select: { user: { select: { id: true, name: true, email: true } } },
+      });
+
+      if (member?.user) return member.user;
+    }
+  }
+
+  return null;
+};
+
+/**
  * Record a signer's request to be let past the rules currently blocking them.
  *
  * The blocking rules are passed in by the caller, which has just evaluated the
@@ -62,12 +132,21 @@ export const requestRuleOverride = async ({
   recipientId,
   reason,
   blocks,
+  approverRole,
 }: {
   documentId: number;
   organizationId: number;
   recipientId: number;
   reason?: string | null;
   blocks: Array<{ ruleId: string; name: string; message: string }>;
+  /**
+   * The role group the signer picked, by label. Resolved to a person here.
+   *
+   * Deliberately a role and not a user id: the signer is an external party, so
+   * they must not be handed a list of your staff, and the person asking for an
+   * exception must not get to nominate who judges it.
+   */
+  approverRole?: { roleType: string; roleKey: string } | null;
 }) => {
   if (blocks.length === 0) {
     throw new AppError(AppErrorCode.INVALID_REQUEST, {
@@ -129,11 +208,18 @@ export const requestRuleOverride = async ({
     });
   }
 
+  const assigned = approverRole
+    ? await resolveRoleGroupApprover({ organizationId, ...approverRole })
+    : null;
+
   const override = await prisma.businessRuleOverride.create({
     data: {
       documentId,
       organizationId,
       requestedByRecipientId: recipientId,
+      approverRoleType: approverRole?.roleType ?? null,
+      approverRoleKey: approverRole?.roleKey ?? null,
+      assignedApproverId: assigned?.id ?? null,
       reason: reason?.trim() ? reason.trim() : null,
       blockedReason: blocks.map((b) => b.message).join('\n'),
       rules: {
@@ -158,16 +244,26 @@ export const requestRuleOverride = async ({
   */
   const { startApprovalRequest } = await import('../approval/approval-execution');
 
-  const started = await startApprovalRequest({
-    organizationId,
-    entityType: RULE_OVERRIDE_ENTITY_TYPE,
-    entityId: override.id,
-    cancelExisting: false,
-  }).catch((err) => {
-    console.error('[rule-override] could not start an approval chain:', err);
+  /*
+    An explicit choice beats the default chain.
 
-    return { skipped: true as const, reason: 'error' };
-  });
+    When the signer picked a role group and it resolved to somebody, that person is
+    who the request goes to — starting the org's default chain instead would record
+    the choice and then quietly ignore it, which is worse than not offering the
+    choice at all. With no choice made, the chain runs exactly as before.
+  */
+  const started = assigned
+    ? ({ skipped: true as const, reason: 'routed-to-role-group' } as const)
+    : await startApprovalRequest({
+        organizationId,
+        entityType: RULE_OVERRIDE_ENTITY_TYPE,
+        entityId: override.id,
+        cancelExisting: false,
+      }).catch((err) => {
+        console.error('[rule-override] could not start an approval chain:', err);
+
+        return { skipped: true as const, reason: 'error' };
+      });
 
   if ('requestId' in started) {
     await prisma.businessRuleOverride.update({
@@ -186,44 +282,65 @@ export const requestRuleOverride = async ({
     Never allowed to fail the request: the row is already written and is what the
     queue reads, so a mail problem must not lose the signer's ask.
   */
-  await notifyOwnerOfOverrideRequest({ documentId, blocks, reason }).catch((err) =>
-    console.error('[rule-override] could not notify the document owner:', err),
-  );
+  await notifyOverrideRequest({
+    documentId,
+    blocks,
+    reason,
+    // Whoever the chosen role group resolved to. Falls back to the document's
+    // sender when nothing was chosen, or when the group had no usable approver —
+    // an unroutable request must still reach somebody.
+    assigned,
+    roleLabel: approverRole ? `${approverRole.roleType}: ${approverRole.roleKey}` : null,
+  }).catch((err) => console.error('[rule-override] could not notify an approver:', err));
 
   return { ...override, alreadyExisted: false as const, routedToChain: false as const };
 };
 
-const notifyOwnerOfOverrideRequest = async ({
+const notifyOverrideRequest = async ({
   documentId,
   blocks,
   reason,
+  assigned,
+  roleLabel,
 }: {
   documentId: number;
   blocks: Array<{ name: string; message: string }>;
   reason?: string | null;
+  assigned?: { id: number; name: string | null; email: string } | null;
+  roleLabel?: string | null;
 }) => {
   const document = await prisma.document.findUnique({
     where: { id: documentId },
     select: { id: true, title: true, user: { select: { name: true, email: true } } },
   });
 
-  if (!document?.user?.email) return;
+  const to = assigned ?? document?.user ?? null;
+
+  if (!to?.email) return;
 
   const { mailer } = await import('@documenso/email/mailer');
   const { FROM_ADDRESS, FROM_NAME } = await import('../../constants/email');
   const { NEXT_PUBLIC_WEBAPP_URL } = await import('../../constants/app');
 
-  const url = `${NEXT_PUBLIC_WEBAPP_URL()}/org/business-rules`;
+  if (!document) return;
+
+  /*
+    An assigned approver is sent to Approvals, which every member can reach.
+    Business Rules is admin-only, so linking a MANAGER there would hand them a
+    page they cannot open.
+  */
+  const url = `${NEXT_PUBLIC_WEBAPP_URL()}${assigned ? '/org/approvals' : '/org/business-rules'}`;
   const blocked = blocks.map((b) => `<li>${b.message}</li>`).join('');
 
   await mailer.sendMail({
-    to: { name: document.user.name ?? '', address: document.user.email },
+    to: { name: to.name ?? '', address: to.email },
     from: { name: FROM_NAME, address: FROM_ADDRESS },
     subject: `Signer blocked on "${document.title}" — they are asking for an exception`,
     html: `
       <div style="font-family:ui-sans-serif,system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111">
         <h2 style="font-size:18px;margin:0 0 12px">A signer cannot sign "${document.title}"</h2>
         <p>A business rule stopped them and they cannot fix it themselves, so they have asked you to approve an exception.</p>
+        ${roleLabel ? `<p style="font-size:13px;color:#666">They sent it to <b>${roleLabel}</b>.</p>` : ''}
         <p style="margin:0 0 4px;color:#666;font-size:13px">What blocked them:</p>
         <ul style="font-size:13px;margin:0 0 12px">${blocked}</ul>
         ${reason ? `<p style="font-size:13px;color:#666">Their reason: ${reason}</p>` : ''}

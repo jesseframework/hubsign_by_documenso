@@ -80,6 +80,9 @@ export const DocumentSigningCompleteDialog = ({
   /** The signer's justification, sent to whoever decides the exception. */
   const [overrideReason, setOverrideReason] = useState('');
   const [overrideAsked, setOverrideAsked] = useState(false);
+  /** Which role group to send it to, as "roleType\u0000roleKey". */
+  const [overrideRole, setOverrideRole] = useState('');
+
 
   const requestOverride = trpc.businessRule.requestOverride.useMutation({
     onSuccess: () => setOverrideAsked(true),
@@ -95,6 +98,16 @@ export const DocumentSigningCompleteDialog = ({
    * explanation and looked to the signer like the button was broken.
    */
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  /*
+    Fetched only once the signer is actually blocked and offered the request, so a
+    normal signature costs no extra query. Returns labels only — see the endpoint.
+  */
+  const { data: approverOptions } = trpc.businessRule.overrideApproverOptions.useQuery(
+    { token: signingToken ?? '' },
+    { enabled: Boolean(signingToken) && Boolean(submissionError) },
+  );
+
+  const roleGroups = approverOptions?.roleGroups ?? [];
 
   const form = useForm<TNextSignerFormSchema>({
     resolver: allowDictateNextSigner ? zodResolver(ZNextSignerFormSchema) : undefined,
@@ -380,6 +393,29 @@ export const DocumentSigningCompleteDialog = ({
                         </Trans>
                       </p>
 
+                      {/*
+                        Only when the organization has published groups. With none
+                        configured the request goes to whoever sent the document, and
+                        an empty dropdown would imply a choice that does not exist.
+                      */}
+                      {roleGroups.length > 0 && (
+                        <select
+                          className="mt-2 w-full rounded-md border border-border bg-background p-2 text-[13px]"
+                          value={overrideRole}
+                          onChange={(e) => setOverrideRole(e.target.value)}
+                        >
+                          <option value="">Send to the sender</option>
+                          {roleGroups.map((group) => (
+                            <option
+                              key={`${group.roleType}\u0000${group.roleKey}`}
+                              value={`${group.roleType}\u0000${group.roleKey}`}
+                            >
+                              {group.roleType}: {group.roleKey}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
                       <textarea
                         className="mt-2 min-h-[60px] w-full resize-y rounded-md border border-border bg-background p-2 text-[13px]"
                         placeholder="Why should this be allowed? (optional)"
@@ -404,6 +440,12 @@ export const DocumentSigningCompleteDialog = ({
                           requestOverride.mutate({
                             token: signingToken,
                             reason: overrideReason.trim() || undefined,
+                            approverRole: overrideRole
+                              ? {
+                                  roleType: overrideRole.split('\u0000')[0],
+                                  roleKey: overrideRole.split('\u0000')[1],
+                                }
+                              : undefined,
                           })
                         }
                       >
