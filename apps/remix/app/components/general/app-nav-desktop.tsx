@@ -11,10 +11,13 @@ import { getRootHref } from '@documenso/lib/utils/params';
 import { cn } from '@documenso/ui/lib/utils';
 import { Button } from '@documenso/ui/primitives/button';
 
+// Rendered by `app-header`, which the recipient and public-profile layouts still
+// use — so these labels must track the main nav or a signed-in user meets two
+// different names for the same place.
 const navigationLinks = [
   {
     href: '/documents',
-    label: msg`Documents`,
+    label: msg`E-Sign`,
   },
   {
     href: '/templates',

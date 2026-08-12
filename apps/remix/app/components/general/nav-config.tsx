@@ -541,7 +541,23 @@ export const ADMIN_CONSOLE: ConsoleDef = {
 
 export const CONSOLES: ConsoleDef[] = [SETTINGS_CONSOLE, ACCOUNT_CONSOLE, ADMIN_CONSOLE];
 
-/** Pinned below the divider in the sidebar — doors, not daily destinations. */
+/**
+ * Pinned below the divider in the sidebar — doors, not daily destinations.
+ *
+ * Ordered by widening scope: me, then my organization, then the platform.
+ *
+ * `Account` is a labelled row and not only the avatar dropdown. The dropdown
+ * still works, but an avatar is an ambiguous affordance: nothing about a face
+ * and an email address says "Notifications live in here", and the first reading
+ * of the restructured sidebar was that those pages had been deleted. A door
+ * people cannot see is not meaningfully different from a missing one.
+ */
+export const ACCOUNT_ITEM: NavItem = {
+  to: ACCOUNT_CONSOLE.home,
+  icon: UserIcon,
+  label: <Trans>Account</Trans>,
+};
+
 export const SETTINGS_ITEM: NavItem = {
   to: SETTINGS_CONSOLE.home,
   icon: SettingsIcon,

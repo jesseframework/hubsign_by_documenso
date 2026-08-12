@@ -28,7 +28,7 @@ export const AppNavMobile = ({ isMenuOpen, onMenuOpenChange }: AppNavMobileProps
   const menuNavigationLinks = [
     {
       href: `${rootHref}/documents`,
-      text: msg`Documents`,
+      text: msg`E-Sign`,
     },
     {
       href: `${rootHref}/templates`,
@@ -39,8 +39,10 @@ export const AppNavMobile = ({ isMenuOpen, onMenuOpenChange }: AppNavMobileProps
       text: msg`Teams`,
     },
     {
+      // `Account`, not `Settings`: this points at personal preferences, while
+      // `Settings` in the main nav means the organization console.
       href: '/settings/profile',
-      text: msg`Settings`,
+      text: msg`Account`,
     },
   ];
 

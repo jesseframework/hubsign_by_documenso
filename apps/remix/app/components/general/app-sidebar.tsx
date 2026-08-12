@@ -26,6 +26,7 @@ import { BrandingLogo } from './branding-logo';
 import type { NavItem } from './nav-config';
 import {
   ACCOUNT_CONSOLE,
+  ACCOUNT_ITEM,
   ADMIN_CONSOLE,
   ADMIN_ITEM,
   SETTINGS_CONSOLE,
@@ -307,6 +308,7 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
             style={{ background: sidebarTextColor ? `${sidebarTextColor}15` : 'hsl(var(--sidebar-border))' }}
           />
 
+          {renderNavRow(ACCOUNT_ITEM, accountActive)}
           {renderNavRow(SETTINGS_ITEM, isConsoleActive(SETTINGS_CONSOLE, pathname))}
           {isAdmin && renderNavRow(ADMIN_ITEM, isConsoleActive(ADMIN_CONSOLE, pathname))}
         </div>
@@ -346,6 +348,13 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
                       {user.email}
                     </div>
                   </div>
+
+                  {/* Without this the trigger is just a name and an email, which
+                      reads as a label rather than a control. */}
+                  <ChevronsUpDownIcon
+                    className="h-3 w-3 flex-shrink-0"
+                    style={{ color: mutedColor }}
+                  />
                 </button>
               </DropdownMenuTrigger>
 
