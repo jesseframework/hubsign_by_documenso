@@ -83,11 +83,50 @@ export const requestRuleOverride = async ({
       documentId,
       status: { in: [BusinessRuleOverrideStatus.PENDING, BusinessRuleOverrideStatus.APPROVED] },
     },
-    select: { id: true, status: true },
+    select: { id: true, status: true, approvalRequestId: true },
   });
 
   if (existing) {
-    return { ...existing, alreadyExisted: true as const };
+    /*
+      A PENDING row whose approval chain is dead must not wedge the document.
+
+      Cancelling the approval request left this row PENDING with nothing able to
+      decide it, while the PENDING itself blocked any replacement — so the signer
+      had no request anyone could act on and no way to raise another. That is a
+      dead end reachable by one click in the Approvals list.
+
+      Rather than trust that every future path remembers to tidy up, the state is
+      checked here: if the chain that owned this row is no longer live, the row is
+      superseded and a fresh request is raised. That also repairs rows already
+      stuck this way, with no migration.
+    */
+    const stale = await (async () => {
+      if (existing.status !== BusinessRuleOverrideStatus.PENDING) return false;
+      if (!existing.approvalRequestId) return false; // waiting on a person, legitimately
+
+      const chain = await prisma.approvalRequest.findUnique({
+        where: { id: existing.approvalRequestId },
+        select: { status: true },
+      });
+
+      // Missing counts as dead: the row points at a request that no longer exists.
+      return !chain || (chain.status !== 'PENDING' && chain.status !== 'IN_PROGRESS');
+    })();
+
+    if (!stale) {
+      return { ...existing, alreadyExisted: true as const };
+    }
+
+    await prisma.businessRuleOverride.update({
+      where: { id: existing.id },
+      data: {
+        status: BusinessRuleOverrideStatus.CANCELLED,
+        decidedAt: new Date(),
+        decisionNote:
+          'Superseded automatically: the approval request handling this was cancelled or ' +
+          'removed, so nothing could decide it.',
+      },
+    });
   }
 
   const override = await prisma.businessRuleOverride.create({
@@ -199,6 +238,34 @@ const notifyOwnerOfOverrideRequest = async ({
       (reason ? `\nTheir reason: ${reason}\n` : '') +
       `\nReview it: ${url}`,
   });
+};
+
+/**
+ * Mark an override cancelled because whatever was handling it went away.
+ *
+ * Distinct from declining: nobody judged the request on its merits, so the signer
+ * is free to raise it again rather than being told no.
+ */
+export const cancelRuleOverride = async ({
+  overrideId,
+  note,
+}: {
+  overrideId: string;
+  note?: string | null;
+}) => {
+  const updated = await prisma.businessRuleOverride.updateMany({
+    // Scoped to PENDING: an approved waiver must not be revoked by cancelling the
+    // approval request afterwards, or a document already signed under it would
+    // lose the record of why that was allowed.
+    where: { id: overrideId, status: BusinessRuleOverrideStatus.PENDING },
+    data: {
+      status: BusinessRuleOverrideStatus.CANCELLED,
+      decidedAt: new Date(),
+      decisionNote: note ?? 'The approval request handling this was cancelled.',
+    },
+  });
+
+  return { cancelled: updated.count > 0 };
 };
 
 /**
