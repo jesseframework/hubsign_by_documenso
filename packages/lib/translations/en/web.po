@@ -1478,6 +1478,7 @@ msgstr "Always use this template for {0}"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
+#: packages/email/template-components/template-approval.tsx
 msgid "Amount"
 msgstr "Amount"
 
@@ -1795,6 +1796,18 @@ msgstr "Approaching your direct template limit ({0}/{1})"
 msgid "Approaching your document limit"
 msgstr "Approaching your document limit"
 
+#: packages/email/template-components/template-approval.tsx
+msgid "Approval escalated"
+msgstr "Approval escalated"
+
+#: packages/email/template-components/template-approval.tsx
+msgid "Approval requested"
+msgstr "Approval requested"
+
+#: packages/email/templates/approval.tsx
+msgid "Approval requested: {entityTitle}"
+msgstr "Approval requested: {entityTitle}"
+
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 msgid "Approval Setup"
 msgstr "Approval Setup"
@@ -1802,6 +1815,10 @@ msgstr "Approval Setup"
 #: apps/remix/app/routes/_authenticated+/org+/approvals.$id.tsx
 msgid "Approval steps"
 msgstr "Approval steps"
+
+#: packages/email/template-components/template-approval.tsx
+msgid "Approval still pending"
+msgstr "Approval still pending"
 
 #: apps/remix/app/components/general/nav-config.tsx
 msgid "Approval Templates"
@@ -1824,6 +1841,7 @@ msgstr "Approvals"
 #: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
 #: apps/remix/app/components/general/document/document-page-view-button.tsx
 #: packages/lib/constants/recipient-roles.ts
+#: packages/email/template-components/template-approval.tsx
 msgid "Approve"
 msgstr "Approve"
 
@@ -1839,8 +1857,13 @@ msgstr "Approve exception"
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
 #: apps/remix/app/components/general/document/document-page-view-recipients.tsx
 #: packages/lib/constants/recipient-roles.ts
+#: packages/email/template-components/template-approval.tsx
 msgid "Approved"
 msgstr "Approved"
+
+#: packages/email/templates/approval.tsx
+msgid "Approved: {entityTitle}"
+msgstr "Approved: {entityTitle}"
 
 #: packages/lib/constants/recipient-roles.ts
 msgid "Approver"
@@ -2184,6 +2207,10 @@ msgstr "Blocked subjects"
 #: packages/ui/primitives/signature-pad/signature-pad-color-picker.tsx
 msgid "Blue"
 msgstr "Blue"
+
+#: packages/email/template-components/template-approval.tsx
+msgid "Both buttons open the review page, where you confirm the decision. Nothing is recorded until you do."
+msgstr "Both buttons open the review page, where you confirm the decision. Nothing is recorded until you do."
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.preferences.tsx
 msgid "Branding Preferences"
@@ -2669,6 +2696,10 @@ msgstr "Columns"
 #: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
 msgid "Comment added"
 msgstr "Comment added"
+
+#: packages/email/template-components/template-approval.tsx
+msgid "Comments"
+msgstr "Comments"
 
 #: apps/remix/app/components/embed/authoring/configure-document-advanced-settings.tsx
 msgid "Communication"
@@ -3390,6 +3421,7 @@ msgstr "Decision recorded"
 #: apps/remix/app/components/general/teams/team-invitations.tsx
 #: apps/remix/app/components/general/rules/rule-override-queue.tsx
 #: packages/email/templates/team-invite.tsx
+#: packages/email/template-components/template-approval.tsx
 msgid "Decline"
 msgstr "Decline"
 
@@ -3398,6 +3430,7 @@ msgid "declined"
 msgstr "declined"
 
 #: apps/remix/app/routes/_recipient+/sign.$token+/_index.tsx
+#: packages/email/template-components/template-approval.tsx
 msgid "Declined"
 msgstr "Declined"
 
@@ -3421,6 +3454,10 @@ msgstr "Declined team invitation"
 #: apps/remix/app/components/general/inbox/responsibility-cell.tsx
 msgid "declined to sign"
 msgstr "declined to sign"
+
+#: packages/email/templates/approval.tsx
+msgid "Declined: {entityTitle}"
+msgstr "Declined: {entityTitle}"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 msgid "Default"
@@ -3795,6 +3832,7 @@ msgstr "Doc Merging"
 #: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id.logs.tsx
 #: apps/remix/app/routes/_authenticated+/documents.$id.logs.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
+#: packages/email/template-components/template-approval.tsx
 msgid "Document"
 msgstr "Document"
 
@@ -4783,6 +4821,10 @@ msgstr "Error"
 #: apps/remix/app/components/embed/authoring/configure-document-upload.tsx
 msgid "Error uploading file"
 msgstr "Error uploading file"
+
+#: packages/email/templates/approval.tsx
+msgid "Escalated — approval overdue: {entityTitle}"
+msgstr "Escalated — approval overdue: {entityTitle}"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 msgid "Escalation recipients (comma-separated emails)"
@@ -7471,6 +7513,10 @@ msgstr "Pre-configured retention schedules for different document types and indu
 msgid "Pre-formatted CSV template with example data."
 msgstr "Pre-formatted CSV template with example data."
 
+#: packages/email/templates/approval.tsx
+msgid "Prefer the full history? <0>Open it in HubSign</0>."
+msgstr "Prefer the full history? <0>Open it in HubSign</0>."
+
 #: apps/remix/app/components/general/app-command-menu.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-mobile.tsx
 #: apps/remix/app/components/general/teams/team-settings-nav-desktop.tsx
@@ -7505,6 +7551,7 @@ msgid "Print without audit certificate"
 msgstr "Print without audit certificate"
 
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
+#: packages/email/template-components/template-approval.tsx
 msgid "Priority"
 msgstr "Priority"
 
@@ -8016,6 +8063,10 @@ msgstr "Request Document Retrieval"
 #: apps/remix/app/components/dialogs/team-transfer-dialog.tsx
 msgid "Request transfer"
 msgstr "Request transfer"
+
+#: packages/email/template-components/template-approval.tsx
+msgid "Requested by"
+msgstr "Requested by"
 
 #: apps/remix/app/routes/_authenticated+/dms+/retrievals.tsx
 msgid "Requests are created from the document detail page for physical documents."
@@ -9251,6 +9302,7 @@ msgid "Status"
 msgstr "Status"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
+#: packages/email/template-components/template-approval.tsx
 msgid "Step"
 msgstr "Step"
 
@@ -9278,6 +9330,10 @@ msgstr "Steps (JSON object keyed by step id)"
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "Still running"
 msgstr "Still running"
+
+#: packages/email/templates/approval.tsx
+msgid "Still waiting on your approval: {entityTitle}"
+msgstr "Still waiting on your approval: {entityTitle}"
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
@@ -10071,6 +10127,14 @@ msgstr "This action is not reversible. Please be certain."
 #: apps/remix/app/components/dialogs/admin-user-disable-dialog.tsx
 msgid "This action is reversible, but please be careful as the account may be affected permanently (e.g. their settings and contents not being restored properly)."
 msgstr "This action is reversible, but please be careful as the account may be affected permanently (e.g. their settings and contents not being restored properly)."
+
+#: packages/email/template-components/template-approval.tsx
+msgid "This approval has not been decided yet."
+msgstr "This approval has not been decided yet."
+
+#: packages/email/template-components/template-approval.tsx
+msgid "This approval has passed its deadline and is still waiting on a decision."
+msgstr "This approval has passed its deadline and is still waiting on a decision."
 
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "This browser doesn't support push notifications."
@@ -11127,6 +11191,10 @@ msgstr "View Billing"
 msgid "View Codes"
 msgstr "View Codes"
 
+#: packages/email/template-components/template-approval.tsx
+msgid "View details"
+msgstr "View details"
+
 #: packages/email/templates/document-created-from-direct-template.tsx
 msgid "View document"
 msgstr "View document"
@@ -11892,6 +11960,14 @@ msgstr "You have already completed the ownership transfer for <0>{0}</0>."
 msgid "You have already verified your email address for <0>{0}</0>."
 msgstr "You have already verified your email address for <0>{0}</0>."
 
+#: packages/email/template-components/template-approval.tsx
+msgid "You have an approval request waiting for the <0>{stepName}</0> step."
+msgstr "You have an approval request waiting for the <0>{stepName}</0> step."
+
+#: packages/email/template-components/template-approval.tsx
+msgid "You have an approval request waiting on you."
+msgstr "You have an approval request waiting on you."
+
 #. placeholder {0}: data.teamName
 #: apps/remix/app/routes/_unauthenticated+/team.invite.$token.tsx
 #: apps/remix/app/routes/_unauthenticated+/team.decline.$token.tsx
@@ -12268,6 +12344,14 @@ msgstr "Your recovery code has been copied to your clipboard."
 #: apps/remix/app/components/forms/2fa/enable-authenticator-app-dialog.tsx
 msgid "Your recovery codes are listed below. Please store them in a safe place."
 msgstr "Your recovery codes are listed below. Please store them in a safe place."
+
+#: packages/email/template-components/template-approval.tsx
+msgid "Your request for <0>{entityTitle}</0> was approved."
+msgstr "Your request for <0>{entityTitle}</0> was approved."
+
+#: packages/email/template-components/template-approval.tsx
+msgid "Your request for <0>{entityTitle}</0> was declined."
+msgstr "Your request for <0>{entityTitle}</0> was declined."
 
 #: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
 msgid "Your request has been sent"
