@@ -14,6 +14,7 @@ import { runAttachmentOcr } from '@documenso/lib/server-only/inbox/run-attachmen
 import { rememberTemplateForSender } from '@documenso/lib/server-only/inbox/resolve-ocr-template';
 import { SLA_ORG_SELECT, evaluateItemsSla, slaClockStart } from '@documenso/lib/server-only/inbox/sla';
 import { getInboxItemTimeline } from '@documenso/lib/server-only/inbox/timeline';
+import { reassignRecipient } from '@documenso/lib/server-only/recipient/reassign-recipient';
 import { nanoid } from '@documenso/lib/universal/id';
 import { vendorCoreName } from '@documenso/lib/universal/vendor-match';
 import { prisma } from '@documenso/prisma';
@@ -488,6 +489,48 @@ export const inboxRouter = router({
       });
 
       return sent;
+    }),
+
+  /**
+   * Hand a signing request to a different person.
+   *
+   * Scoped to the item's organization, like everything else on this router — the
+   * inbox is a shared queue, so any member who can send an invoice for signature
+   * can also correct who it went to. The consequential parts (invalidating the
+   * previous signer's link, clearing what they entered, emailing the new signer)
+   * all live in `reassignRecipient`.
+   */
+  reassignRecipient: authenticatedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        recipientId: z.number(),
+        email: z.string().email(),
+        name: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireOrgMember(ctx.user.id);
+      const item = await prisma.signatureInboxItem.findFirst({
+        where: { id: input.id, organizationId: membership.organizationId },
+        select: { id: true, documentId: true },
+      });
+      if (!item) throw new TRPCError({ code: 'NOT_FOUND', message: 'Inbox item not found.' });
+
+      const result = await reassignRecipient({
+        documentId: item.documentId,
+        recipientId: input.recipientId,
+        email: input.email,
+        name: input.name,
+        actorUserId: ctx.user.id,
+        requestMetadata: ctx.metadata.requestMetadata,
+      });
+
+      // The queue shows who each document is waiting on, so that column is now
+      // stale for everyone looking at it.
+      publishInboxEvent(membership.organizationId, { type: 'update', inboxItemId: item.id });
+
+      return result;
     }),
 
   /**

@@ -187,6 +187,11 @@ msgstr "{0} an active <0>{1}</0> personal subscription ({2}). {3} immediately �
 msgid "{0} archived invoice(s) from this window are not measured, so archiving a late invoice removes it from these figures."
 msgstr "{0} archived invoice(s) from this window are not measured, so archiving a late invoice removes it from these figures."
 
+#. placeholder {0}: result.previous.email
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+msgid "{0} can no longer open it. Nothing has been emailed yet."
+msgstr "{0} can no longer open it. Nothing has been emailed yet."
+
 #. placeholder {0}: config.columns?.length ?? 0
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
 msgid "{0} columns"
@@ -343,6 +348,11 @@ msgstr "{0} row(s) were skipped"
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "{0} taken from the attached “{who}”{1}"
 msgstr "{0} taken from the attached “{who}”{1}"
+
+#. placeholder {0}: signer.email
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+msgid "{0}'s signing link stops working immediately."
+msgstr "{0}'s signing link stops working immediately."
 
 #. placeholder {0}: invoice.daysPastDue
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
@@ -1789,6 +1799,10 @@ msgstr "Any Source"
 msgid "Any Status"
 msgstr "Any Status"
 
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+msgid "Anything they had filled in or signed on this document is cleared."
+msgstr "Anything they had filled in or signed on this document is cleared."
+
 #: apps/remix/app/routes/_authenticated+/settings+/tokens.tsx
 #: apps/remix/app/components/general/settings-nav-mobile.tsx
 #: apps/remix/app/components/general/settings-nav-desktop.tsx
@@ -2409,6 +2423,7 @@ msgstr "Can prepare"
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
 #: apps/remix/app/components/general/teams/team-transfer-status.tsx
 #: apps/remix/app/components/general/teams/team-email-usage.tsx
+#: apps/remix/app/components/general/inbox/signer-list.tsx
 #: apps/remix/app/components/general/export/export-builder-dialog.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-signature-field.tsx
@@ -3399,6 +3414,12 @@ msgstr "Current plan"
 #: apps/remix/app/components/dialogs/template-bulk-send-dialog.tsx
 msgid "Current recipients:"
 msgstr "Current recipients:"
+
+#. placeholder {0}: signer.name || signer.email
+#. placeholder {1}: signer.email
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+msgid "Currently with <0>{0}</0> ({1})."
+msgstr "Currently with <0>{0}</0> ({1})."
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Customize your organization's appearance with your brand colors and logo."
@@ -4801,6 +4822,7 @@ msgstr "Entity"
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/template/template-edit-form.tsx
 #: apps/remix/app/components/general/template/template-edit-form.tsx
+#: apps/remix/app/components/general/inbox/signer-list.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-signature-field.tsx
@@ -6282,6 +6304,7 @@ msgstr "N/A"
 #: apps/remix/app/components/tables/admin-document-recipient-item-table.tsx
 #: apps/remix/app/components/tables/admin-dashboard-users-table.tsx
 #: apps/remix/app/components/general/claim-account.tsx
+#: apps/remix/app/components/general/inbox/signer-list.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-name-field.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
 #: apps/remix/app/components/embed/authoring/configure-document-recipients.tsx
@@ -6727,6 +6750,10 @@ msgstr "Not supported"
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "Nothing has finished in this window yet, so there is no trend to show."
 msgstr "Nothing has finished in this window yet, so there is no trend to show."
+
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+msgid "Nothing is emailed — this document has not been sent for signature yet."
+msgstr "Nothing is emailed — this document has not been sent for signature yet."
 
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 msgid "Nothing is enforced until you add one. Start from a preset above."
@@ -7834,6 +7861,26 @@ msgstr "Reason for rejection: {rejectionReason}"
 msgid "Reason must be less than 500 characters"
 msgstr "Reason must be less than 500 characters"
 
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+msgid "Reassign"
+msgstr "Reassign"
+
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+msgid "Reassign this signing request"
+msgstr "Reassign this signing request"
+
+#. placeholder {0}: note ?? '—'
+#. placeholder {1}: detail ?? who
+#: apps/remix/app/components/general/inbox/document-timeline.tsx
+msgid "Reassigned from {0} to {1}"
+msgstr "Reassigned from {0} to {1}"
+
+#. placeholder {0}: result.recipient.email
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+msgid "Reassigned to {0}"
+msgstr "Reassigned to {0}"
+
 #: apps/remix/app/components/general/document-signing/document-signing-auth-dialog.tsx
 msgid "Reauthentication is required to sign this field"
 msgstr "Reauthentication is required to sign this field"
@@ -8666,6 +8713,10 @@ msgstr "Send documents to recipients immediately"
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "Send for signature"
 msgstr "Send for signature"
+
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+msgid "Send it to"
+msgstr "Send it to"
 
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Send on Behalf of Team"
@@ -9951,6 +10002,10 @@ msgstr "The following team has been deleted by you"
 msgid "The full signed record"
 msgstr "The full signed record"
 
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+msgid "The new signer is emailed the signing request now."
+msgstr "The new signer is emailed the signing request now."
+
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
 msgid "The owner cancelled this document, so it is no longer available to others."
 msgstr "The owner cancelled this document, so it is no longer available to others."
@@ -10176,6 +10231,11 @@ msgstr "These figures couldn't be loaded, so nothing is shown rather than showin
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
 msgid "These workflows reference \"{0}\" and will stop sending until they're updated to the new key:"
 msgstr "These workflows reference \"{0}\" and will stop sending until they're updated to the new key:"
+
+#. placeholder {0}: result.previous.email
+#: apps/remix/app/components/general/inbox/signer-list.tsx
+msgid "They have been emailed the signing request. {0} can no longer open it."
+msgstr "They have been emailed the signing request. {0} can no longer open it."
 
 #: apps/remix/app/components/general/teams/team-email-usage.tsx
 msgid "They have permission on your behalf to:"

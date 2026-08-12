@@ -1,5 +1,6 @@
 import { Trans } from '@lingui/react/macro';
 import {
+  ArrowRightLeftIcon,
   BellIcon,
   CheckCheckIcon,
   CheckCircle2Icon,
@@ -43,6 +44,7 @@ type Kind =
   | 'RECIPIENT_OPENED'
   | 'RECIPIENT_SIGNED'
   | 'RECIPIENT_REJECTED'
+  | 'RECIPIENT_REASSIGNED'
   | 'COMPLETED'
   | 'COPY_EMAILED'
   | 'WORKFLOW_RUN'
@@ -64,6 +66,7 @@ const ICONS: Record<Kind, typeof InboxIcon> = {
   RECIPIENT_OPENED: EyeIcon,
   RECIPIENT_SIGNED: PenLineIcon,
   RECIPIENT_REJECTED: XCircleIcon,
+  RECIPIENT_REASSIGNED: ArrowRightLeftIcon,
   COMPLETED: CheckCheckIcon,
   COPY_EMAILED: MailIcon,
   WORKFLOW_RUN: WorkflowIcon,
@@ -81,6 +84,9 @@ const TONES: Partial<Record<Kind, string>> = {
   RECIPIENT_REJECTED: 'text-red-600 dark:text-red-400',
   REMINDER_SENT: 'text-sky-600 dark:text-sky-400',
   SENT_FOR_SIGNATURE: 'text-violet-600 dark:text-violet-400',
+  // Amber: a request changing hands mid-flight is a deviation worth noticing,
+  // not routine progress.
+  RECIPIENT_REASSIGNED: 'text-amber-600 dark:text-amber-400',
   FIELD_CORRECTED: 'text-sky-600 dark:text-sky-400',
   FIELD_FROM_ATTACHMENT: 'text-sky-600 dark:text-sky-400',
   // Amber, not green: an exception being granted is a control being stood down,
@@ -141,6 +147,14 @@ function Label({
         </Trans>
       ) : (
         <Trans>Declined by {who}</Trans>
+      );
+    case 'RECIPIENT_REASSIGNED':
+      // Both addresses, because "who was it taken from" is the whole point of
+      // the row — and the previous signer's link stopped working at this moment.
+      return (
+        <Trans>
+          Reassigned from {note ?? '—'} to {detail ?? who}
+        </Trans>
       );
     case 'COMPLETED':
       return <Trans>Everyone signed — document completed</Trans>;

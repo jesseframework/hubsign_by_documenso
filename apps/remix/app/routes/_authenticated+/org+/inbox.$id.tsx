@@ -17,6 +17,7 @@ import {
   SigningStatusBanner,
 } from '~/components/general/inbox/document-timeline';
 import { ExtractedFields } from '~/components/general/inbox/extracted-fields';
+import { SignerList } from '~/components/general/inbox/signer-list';
 import { useInboxEvents } from '~/hooks/use-inbox-events';
 import { appMetaTags } from '~/utils/meta';
 
@@ -359,16 +360,11 @@ export default function InboxItemPage() {
               <p className={label}>
                 <Trans>Existing signers</Trans>
               </p>
-              <ul className="space-y-1">
-                {item.document.recipients.map((r) => (
-                  <li key={r.id} className="text-[12px]">
-                    {r.name || r.email}{' '}
-                    <span className="text-muted-foreground">
-                      ({r.email}) · {r.signingStatus.toLowerCase()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <SignerList
+                inboxItemId={id}
+                documentStatus={item.document.status}
+                signers={item.document.recipients}
+              />
             </div>
           )}
 
