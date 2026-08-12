@@ -54,6 +54,7 @@ import {
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { ExportBuilderDialog } from '~/components/general/export/export-builder-dialog';
+import { FilterChip } from '~/components/general/filter-chip';
 import { ResponsibilityCell } from '~/components/general/inbox/responsibility-cell';
 import { useInboxEvents } from '~/hooks/use-inbox-events';
 import { formatRelativeTime } from '~/utils/format-relative-time';
@@ -373,34 +374,6 @@ const AMOUNT_FILTERS = [
   { key: 'high', label: 'High value (>$10K)', icon: DollarSignIcon },
   { key: 'low', label: 'Small (<$1K)', icon: CoinsIcon },
 ] as const;
-
-/** A pill toggle in HubSign's palette. */
-function FilterChip({
-  active,
-  onClick,
-  icon: Icon,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon?: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] font-medium transition ${
-        active
-          ? 'border-primary/40 bg-primary/10 text-primary'
-          : 'border-border bg-background text-muted-foreground hover:bg-muted/50'
-      }`}
-    >
-      {Icon && <Icon className="h-3 w-3" />}
-      {children}
-    </button>
-  );
-}
 
 export default function SignatureInboxPage() {
   const { _ } = useLingui();

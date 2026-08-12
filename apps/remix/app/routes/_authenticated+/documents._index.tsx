@@ -32,10 +32,9 @@ import { FolderDeleteDialog } from '~/components/dialogs/folder-delete-dialog';
 import { FolderMoveDialog } from '~/components/dialogs/folder-move-dialog';
 import { FolderSettingsDialog } from '~/components/dialogs/folder-settings-dialog';
 import { DocumentDropZoneWrapper } from '~/components/general/document/document-drop-zone-wrapper';
-import { DocumentSearch } from '~/components/general/document/document-search';
 import { DocumentUploadDropzone } from '~/components/general/document/document-upload';
 import { FolderCard } from '~/components/general/folder/folder-card';
-import { PeriodSelector } from '~/components/general/period-selector';
+import { DocumentsFilterCard } from '~/components/tables/documents-filter-card';
 import { DocumentsTable } from '~/components/tables/documents-table';
 import { DocumentsTableEmptyState } from '~/components/tables/documents-table-empty-state';
 import { DocumentsTableSenderFilter } from '~/components/tables/documents-table-sender-filter';
@@ -316,17 +315,21 @@ export default function DocumentsPage() {
           </h2>
         </div>
 
-        {/* Table card with filters inside */}
+        {/*
+          The Signature Inbox's filter card, so the two lists filter alike. It
+          replaces a period dropdown and a bare search box: the period is a chip
+          now, the status chips reach Rejected (which has no metric card, and so
+          had no control at all), and the count line says how much of the queue you
+          are looking at. The sender dropdown is passed in rather than rebuilt —
+          a team can have more members than a chip row can hold.
+        */}
+        <DocumentsFilterCard
+          shown={data?.data.length ?? 0}
+          total={data?.count ?? 0}
+          senderFilter={team ? <DocumentsTableSenderFilter teamId={team.id} /> : undefined}
+        />
+
         <div className="overflow-hidden rounded-[var(--r)] border border-border bg-card">
-          {/* Filter bar inside card — tabs removed (the dashboard cards
-              above already show the same per-status counts). */}
-          <div className="flex items-center gap-2 border-b border-border p-2 sm:p-3">
-            <div className="ml-auto flex flex-shrink-0 items-center gap-2">
-              {team && <DocumentsTableSenderFilter teamId={team.id} />}
-              <PeriodSelector />
-              <DocumentSearch initialValue={findDocumentSearchParams.query} />
-            </div>
-          </div>
           {data &&
           data.count === 0 &&
           (!foldersData?.folders.length || foldersData.folders.length === 0) ? (

@@ -2096,6 +2096,10 @@ msgstr "awaiting {pending} signature(s)"
 msgid "Awaiting email confirmation"
 msgstr "Awaiting email confirmation"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
+msgid "Awaiting others"
+msgstr "Awaiting others"
+
 #: apps/remix/app/components/general/direct-template/direct-template-signing-form.tsx
 #: apps/remix/app/components/embed/authoring/configure-fields-view.tsx
 #: apps/remix/app/components/embed/authoring/configure-fields-view.tsx
@@ -2580,6 +2584,7 @@ msgid "Clear"
 msgstr "Clear"
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 msgid "Clear all"
 msgstr "Clear all"
 
@@ -2701,6 +2706,7 @@ msgstr "Complete the fields for the following signers. Once reviewed, they will 
 msgid "Complete Viewing"
 msgstr "Complete Viewing"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/stack-avatars-with-tooltip.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/general/document/document-status.tsx
@@ -3261,6 +3267,7 @@ msgstr "Create your first location to start organizing documents."
 #: apps/remix/app/components/tables/templates-table.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table.tsx
 #: apps/remix/app/components/tables/documents-table.tsx
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/tables/admin-leaderboard-table.tsx
 #: apps/remix/app/components/general/template/template-page-view-information.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
@@ -4254,6 +4261,7 @@ msgstr "Download with audit certificate"
 msgid "Download without audit certificate"
 msgstr "Download without audit certificate"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/general/document/document-status.tsx
 #: packages/lib/constants/document.ts
@@ -5691,14 +5699,17 @@ msgstr "Label"
 msgid "Language"
 msgstr "Language"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/period-selector.tsx
 msgid "Last 14 days"
 msgstr "Last 14 days"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/period-selector.tsx
 msgid "Last 30 days"
 msgstr "Last 30 days"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/period-selector.tsx
 msgid "Last 7 days"
 msgstr "Last 7 days"
@@ -6243,6 +6254,10 @@ msgstr "Need to place signature fields precisely? Use \"Open in editor\" for the
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
 msgid "Need to sign documents?"
 msgstr "Need to sign documents?"
+
+#: apps/remix/app/components/tables/documents-filter-card.tsx
+msgid "Needs action"
+msgstr "Needs action"
 
 #: packages/ui/components/recipient/recipient-role-select.tsx
 msgid "Needs to approve"
@@ -7595,6 +7610,7 @@ msgid "Questions about your plan? Manage or cancel anytime from your <0>billing 
 msgstr "Questions about your plan? Manage or cancel anytime from your <0>billing settings</0>."
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 msgid "Quick filters"
 msgstr "Quick filters"
 
@@ -7861,6 +7877,7 @@ msgstr "Reject Document"
 #: apps/remix/app/routes/_share+/verify.$token.tsx
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/stack-avatars-with-tooltip.tsx
 #: apps/remix/app/components/general/document/document-status.tsx
 #: apps/remix/app/components/general/document/document-page-view-recipients.tsx
@@ -8357,6 +8374,10 @@ msgstr "Search by document, vendor, invoice #, PO #, or amount"
 msgid "Search by name or email"
 msgstr "Search by name or email"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
+msgid "Search by title, recipient, vendor, invoice # or PO #"
+msgstr "Search by title, recipient, vendor, invoice # or PO #"
+
 #: apps/remix/app/components/general/export/export-builder-dialog.tsx
 msgid "Search columns…"
 msgstr "Search columns…"
@@ -8690,6 +8711,10 @@ msgstr "Show the data the rules saw"
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "Showing {0} of {1}"
 msgstr "Showing {0} of {1}"
+
+#: apps/remix/app/components/tables/documents-filter-card.tsx
+msgid "Showing {shown} of {total}"
+msgstr "Showing {shown} of {total}"
 
 #. placeholder {0}: data.breachedOpen.items.length
 #. placeholder {1}: data.breachedOpen.count
@@ -9216,6 +9241,7 @@ msgstr "Stats"
 #: apps/remix/app/routes/_authenticated+/admin+/documents._index.tsx
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
 #: apps/remix/app/components/tables/documents-table.tsx
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 msgid "Status"
 msgstr "Status"

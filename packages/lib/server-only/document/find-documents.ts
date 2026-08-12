@@ -10,6 +10,7 @@ import { DocumentVisibility } from '../../types/document-visibility';
 import { type FindResultResponse } from '../../types/search-params';
 import { readOcrField } from '../../universal/ocr-fields';
 import { maskRecipientTokensForDocument } from '../../utils/mask-recipient-tokens-for-document';
+import { documentIdsMatchingOcr } from './ocr-search';
 
 export type PeriodSelectorValue = '' | '7d' | '14d' | '30d';
 
@@ -81,12 +82,21 @@ export const findDocuments = async ({
   const orderByDirection = orderBy?.direction ?? 'desc';
   const teamMemberRole = team?.members[0].role ?? null;
 
+  /*
+    Anything OCR read counts as searchable text for this document. The ids come
+    from a separate query because the extraction is JSON in another table; they
+    are folded into the same OR so paging and counting stay consistent with what
+    the reader sees.
+  */
+  const ocrMatchIds = await documentIdsMatchingOcr(query);
+
   const searchFilter: Prisma.DocumentWhereInput = {
     OR: [
       { title: { contains: query, mode: 'insensitive' } },
       { externalId: { contains: query, mode: 'insensitive' } },
       { recipients: { some: { name: { contains: query, mode: 'insensitive' } } } },
       { recipients: { some: { email: { contains: query, mode: 'insensitive' } } } },
+      ...(ocrMatchIds.length > 0 ? [{ id: { in: ocrMatchIds } }] : []),
     ],
   };
 

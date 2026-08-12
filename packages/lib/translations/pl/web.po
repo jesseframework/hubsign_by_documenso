@@ -2101,6 +2101,10 @@ msgstr ""
 msgid "Awaiting email confirmation"
 msgstr "Czekam na potwierdzenie e-maila"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
+msgid "Awaiting others"
+msgstr ""
+
 #: apps/remix/app/components/general/direct-template/direct-template-signing-form.tsx
 #: apps/remix/app/components/embed/authoring/configure-fields-view.tsx
 #: apps/remix/app/components/embed/authoring/configure-fields-view.tsx
@@ -2585,6 +2589,7 @@ msgid "Clear"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 msgid "Clear all"
 msgstr ""
 
@@ -2706,6 +2711,7 @@ msgstr "Wypełnij pola dla następujących sygnatariuszy. Po przeglądzie poinfo
 msgid "Complete Viewing"
 msgstr "Zakończ wyświetlanie"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/stack-avatars-with-tooltip.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/general/document/document-status.tsx
@@ -3266,6 +3272,7 @@ msgstr ""
 #: apps/remix/app/components/tables/templates-table.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table.tsx
 #: apps/remix/app/components/tables/documents-table.tsx
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/tables/admin-leaderboard-table.tsx
 #: apps/remix/app/components/general/template/template-page-view-information.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
@@ -4259,6 +4266,7 @@ msgstr ""
 msgid "Download without audit certificate"
 msgstr ""
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 #: apps/remix/app/components/general/document/document-status.tsx
 #: packages/lib/constants/document.ts
@@ -5696,14 +5704,17 @@ msgstr "Etykieta"
 msgid "Language"
 msgstr "Język"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/period-selector.tsx
 msgid "Last 14 days"
 msgstr "Ostatnie 14 dni"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/period-selector.tsx
 msgid "Last 30 days"
 msgstr "Ostatnie 30 dni"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/period-selector.tsx
 msgid "Last 7 days"
 msgstr "Ostatnie 7 dni"
@@ -6248,6 +6259,10 @@ msgstr ""
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
 msgid "Need to sign documents?"
 msgstr "Potrzebujesz podpisać dokumenty?"
+
+#: apps/remix/app/components/tables/documents-filter-card.tsx
+msgid "Needs action"
+msgstr ""
 
 #: packages/ui/components/recipient/recipient-role-select.tsx
 msgid "Needs to approve"
@@ -7600,6 +7615,7 @@ msgid "Questions about your plan? Manage or cancel anytime from your <0>billing 
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 msgid "Quick filters"
 msgstr ""
 
@@ -7866,6 +7882,7 @@ msgstr "Odrzuć dokument"
 #: apps/remix/app/routes/_share+/verify.$token.tsx
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/stack-avatars-with-tooltip.tsx
 #: apps/remix/app/components/general/document/document-status.tsx
 #: apps/remix/app/components/general/document/document-page-view-recipients.tsx
@@ -8362,6 +8379,10 @@ msgstr ""
 msgid "Search by name or email"
 msgstr "Szukaj nazwy lub adresu e-mail"
 
+#: apps/remix/app/components/tables/documents-filter-card.tsx
+msgid "Search by title, recipient, vendor, invoice # or PO #"
+msgstr ""
+
 #: apps/remix/app/components/general/export/export-builder-dialog.tsx
 msgid "Search columns…"
 msgstr ""
@@ -8694,6 +8715,10 @@ msgstr ""
 #. placeholder {1}: items.length
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "Showing {0} of {1}"
+msgstr ""
+
+#: apps/remix/app/components/tables/documents-filter-card.tsx
+msgid "Showing {shown} of {total}"
 msgstr ""
 
 #. placeholder {0}: data.breachedOpen.items.length
@@ -9221,6 +9246,7 @@ msgstr "Statystyki"
 #: apps/remix/app/routes/_authenticated+/admin+/documents._index.tsx
 #: apps/remix/app/components/tables/team-settings-billing-invoices-table.tsx
 #: apps/remix/app/components/tables/documents-table.tsx
+#: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/template/template-page-view-documents-table.tsx
 msgid "Status"
 msgstr "Stan"
