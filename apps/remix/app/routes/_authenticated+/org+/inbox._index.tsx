@@ -311,6 +311,26 @@ const overdueLabel = (minutes: number): string => {
   return h ? `${d}d ${h}h` : `${d}d`;
 };
 
+/**
+ * The queue's column widths, shared by the header and every row.
+ *
+ * A CSS grid rather than a `<table>`, for one reason: the same six blocks have to
+ * be a dense row on a monitor and a card on a phone, and only one of those is a
+ * table. Restacking table cells with `display: block` gets the pixels roughly
+ * right but produces a column of orphaned values with no hierarchy — and strips
+ * the table semantics screen readers rely on, so it isn't even a fair trade. Here
+ * the row is `grid-cols-2` by default and picks up these columns at xl, from one
+ * set of markup.
+ *
+ * `minmax(0, Nfr)` on the three text columns lets them absorb every pixel of a
+ * wide monitor and shrink on a laptop without the auto-layout guesswork the table
+ * did. The three fixed columns are sized to their content and never move: amounts
+ * to `USD 2,843.38`, dates to a label plus `2026-08-02`, actions to Review and its
+ * two icon buttons. That is also why nothing scrolls sideways any more.
+ */
+const GRID_COLUMNS =
+  'xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_8rem_10.5rem_minmax(0,1fr)_10.5rem]';
+
 /** Format an OCR date value to YYYY-MM-DD (leaves unparseable values as-is). */
 const fmtDate = (raw: string | Date): string => {
   const s = typeof raw === 'string' ? raw : raw.toISOString();
@@ -816,61 +836,35 @@ export default function SignatureInboxPage() {
               </Button>
             </div>
           ) : (
-            /*
-              The grid scrolls inside its own card.
+            <div role="table" className="rounded-[var(--r)] border border-border bg-card">
+              {/* Column headers exist only in row mode; a card labels its own
+                  values. Never wrapped — "Vendor / Contact" over two lines makes
+                  the header band taller for no gain. */}
+              <div
+                role="row"
+                className={`hidden border-b border-border bg-[#faf9fe] dark:bg-muted/30 xl:grid ${GRID_COLUMNS}`}
+              >
+                {[
+                  <Trans key="a">Invoice info</Trans>,
+                  <Trans key="b">Vendor / Contact</Trans>,
+                  <Trans key="c">Amounts</Trans>,
+                  <Trans key="d">Dates</Trans>,
+                  <Trans key="e">Responsibility</Trans>,
+                  <Trans key="f">Actions</Trans>,
+                ].map((label, index) => (
+                  <div
+                    key={index}
+                    role="columnheader"
+                    className={`whitespace-nowrap px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground ${
+                      index === 2 || index === 5 ? 'text-right' : 'text-left'
+                    }`}
+                  >
+                    {label}
+                  </div>
+                ))}
+              </div>
 
-              Without this the table's ~1050px of min-content pushed the whole
-              page wider than the viewport — below about 1300px the browser grew a
-              document-level horizontal scrollbar, which carried the sidebar, the
-              top bar and the header's buttons off to the right along with it.
-              Sideways-scrolling chrome is the tell of a page that was only ever
-              opened on a large monitor.
-            */
-            <div className="overflow-x-auto rounded-[var(--r)] border border-border bg-card">
-              {/*
-                Below xl the row stops being a row: `block` on the cells stacks
-                them, turning each item into a card. Six dense columns need about
-                1070px, so on a phone the table would otherwise sit in a 360px
-                window with Review — the whole point of the screen — parked off the
-                right edge behind a scrollbar nobody looks for.
-
-                xl (1280px) rather than a smaller breakpoint because that is the
-                first width where the grid actually fits: 1280 less the sidebar and
-                padding leaves 978px, close enough that only the trailing icons
-                fall into the scroll. At lg the content area is 764px and a third of
-                the grid would be hidden.
-
-                The stack works without column headers because every value that
-                needs naming already carries its own label: Invoice/Due/Created on
-                the dates, Inv/Tax/Net on the amounts. A vendor, a person and two
-                buttons say what they are.
-              */}
-              <table className="block w-full xl:table">
-            <thead className="hidden xl:table-header-group">
-              {/* Headers never wrap — "Vendor / Contact" splitting across two
-                  lines makes the whole row taller for no gain. */}
-              <tr className="border-b border-border bg-[#faf9fe] dark:bg-muted/30">
-                <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Invoice info</Trans>
-                </th>
-                <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Vendor / Contact</Trans>
-                </th>
-                <th className="whitespace-nowrap px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Amounts</Trans>
-                </th>
-                <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Dates</Trans>
-                </th>
-                <th className="whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Responsibility</Trans>
-                </th>
-                <th className="whitespace-nowrap px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Actions</Trans>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+            <div role="rowgroup">
               {filteredItems.map((item) => {
                 const f = invoiceFields(item);
                 const headline = f.invoiceNumber || item.document.title;
@@ -885,27 +879,25 @@ export default function SignatureInboxPage() {
                 // is finished and nothing about it needs doing today.
                 const isOverdue = item.sla?.state === 'breached' && item.sla.open;
                 return (
-                  <tr
+                  <div
+                    role="row"
                     key={item.id}
-                    className={`block border-b border-border last:border-0 xl:table-row ${
+                    /*
+                      Card below xl, row at xl. The accent that marks unread and
+                      overdue moves to the container here — as a border on the first
+                      cell it would have striped only the top block of a card.
+                    */
+                    className={`grid grid-cols-2 gap-x-4 gap-y-2 border-b border-l-[3px] border-border p-4 last:border-b-0 xl:gap-x-0 xl:gap-y-0 xl:p-0 ${GRID_COLUMNS} ${
                       isOverdue
-                        ? 'bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-950/40 dark:hover:bg-orange-950/60'
-                        : 'hover:bg-muted/20'
+                        ? 'border-l-orange-500 bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-950/40 dark:hover:bg-orange-950/60'
+                        : `hover:bg-muted/20 ${isUnread ? 'border-l-primary' : 'border-l-transparent'}`
                     }`}
                   >
                     {/* Invoice info */}
-                    <td
-                      className={`block border-l-[3px] px-4 pb-1 pt-3 align-top xl:table-cell xl:py-3 ${
-                        isOverdue
-                          ? 'border-l-orange-500'
-                          : isUnread
-                            ? 'border-l-primary'
-                            : 'border-l-transparent'
-                      }`}
-                    >
+                    <div role="cell" className="col-span-2 min-w-0 xl:col-span-1 xl:px-4 xl:py-3">
                       <Link
                         to={`/org/inbox/${item.id}`}
-                        className={`text-[13px] hover:text-primary hover:underline ${
+                        className={`text-[14px] hover:text-primary hover:underline xl:text-[13px] ${
                           isUnread ? 'font-bold' : 'font-medium text-foreground/80'
                         }`}
                       >
@@ -950,36 +942,51 @@ export default function SignatureInboxPage() {
                         <SignatureStatus signature={item.signature} />
                         <WorkflowActivityIndicator item={item} />
                       </div>
-                    </td>
+                    </div>
 
                     {/*
                       Vendor / contact.
 
-                      Capped, because on a wide monitor the auto layout handed this
-                      column several hundred pixels of slack it had nothing to put
-                      in — a vendor name, an email, and then a hole between it and
-                      the right-aligned amounts. Capping it sends that width to the
-                      invoice column, which has a title, a subtitle and a row of
-                      badges to spend it on. The longest address seen so far
-                      (accounts@silverstonefacility.com) needs about 210px.
+                      The addresses truncate rather than wrap. An email is one
+                      unbreakable token, so a column narrower than the address either
+                      spills into its neighbour or forces the column wider at every
+                      other row's expense; an ellipsis with the full value in the
+                      title attribute costs a hover. The name above it wraps, because
+                      half a company name is not a company name.
                     */}
-                    <td className="block max-w-full px-4 py-1 align-top xl:table-cell xl:max-w-[14rem] xl:py-3">
+                    <div role="cell" className="col-span-2 min-w-0 xl:col-span-1 xl:px-4 xl:py-3">
                       <p className="text-[13px] font-medium">{f.vendorName || '—'}</p>
                       {f.vendorEmail && (
-                        <p className="text-[12px] text-muted-foreground">{f.vendorEmail}</p>
+                        <p className="truncate text-[12px] text-muted-foreground" title={f.vendorEmail}>
+                          {f.vendorEmail}
+                        </p>
                       )}
                       {item.senderEmail && (
-                        <p className="text-[11px] text-muted-foreground/70">from {item.senderEmail}</p>
+                        <p
+                          className="truncate text-[11px] text-muted-foreground/70"
+                          title={item.senderEmail}
+                        >
+                          from {item.senderEmail}
+                        </p>
                       )}
-                    </td>
+                    </div>
 
-                    {/* Amounts — single currency, straight from BMS ML metadata */}
-                    <td className="block whitespace-nowrap px-4 py-1 align-top text-left xl:table-cell xl:py-3 xl:text-right">
-                      {f.currency && (
-                        <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          {f.currency}
-                        </div>
-                      )}
+                    {/*
+                      Amounts — single currency, straight from BMS ML metadata.
+
+                      Tinted on a card so the two figure blocks read as a pair of
+                      facts rather than more stacked text; in row mode the column
+                      itself provides that separation.
+                    */}
+                    <div
+                      role="cell"
+                      className="min-w-0 whitespace-nowrap rounded-[var(--r-sm)] bg-muted/40 p-2.5 text-left xl:rounded-none xl:bg-transparent xl:px-4 xl:py-3 xl:text-right"
+                    >
+                      {/*
+                        No separate currency line: `fmtMoney` already prefixes every
+                        figure with it, so a JMD header above "JMD 66.59" was saying
+                        it twice and costing a line in every row.
+                      */}
                       {hasAmounts ? (
                         <dl className="space-y-0.5 text-[12px]">
                           {f.total && (
@@ -1004,20 +1011,21 @@ export default function SignatureInboxPage() {
                       ) : (
                         <span className="text-[12px] text-muted-foreground">—</span>
                       )}
-                    </td>
+                    </div>
 
                     {/*
                       Dates.
 
-                      `whitespace-nowrap` is the whole point of this cell: a date
-                      is one token, and the auto layout was happily breaking
-                      2026-08-02 after a hyphen to squeeze the column, which turns
-                      four dates into eight lines of hyphenated digits. Declaring
-                      it unbreakable raises the column's min-content to what a date
-                      actually needs, so the layout takes the width out of the
-                      slack pooling in the text columns instead.
+                      `whitespace-nowrap` is the whole point of this cell: a date is
+                      one token, and the layout was happily breaking 2026-08-02 after
+                      a hyphen to squeeze the column, which turns four dates into
+                      eight lines of hyphenated digits. The column is now sized to a
+                      label plus a date and never squeezed at all.
                     */}
-                    <td className="block whitespace-nowrap px-4 py-1 align-top text-[12px] xl:table-cell xl:py-3">
+                    <div
+                      role="cell"
+                      className="min-w-0 whitespace-nowrap rounded-[var(--r-sm)] bg-muted/40 p-2.5 text-[12px] xl:rounded-none xl:bg-transparent xl:px-4 xl:py-3"
+                    >
                       <dl className="space-y-0.5">
                         {f.invoiceDate && (
                           <div className="flex items-baseline gap-2">
@@ -1042,18 +1050,21 @@ export default function SignatureInboxPage() {
                           </dd>
                         </div>
                       </dl>
-                    </td>
+                    </div>
 
                     {/* Responsibility — who owes a signature, and the chasing so far */}
-                    <td className="block px-4 py-1 align-top xl:table-cell xl:max-w-[13rem] xl:py-3">
+                    <div role="cell" className="col-span-2 min-w-0 xl:col-span-1 xl:px-4 xl:py-3">
                       <ResponsibilityCell
                         responsibility={item.responsibility}
                         documentStatus={item.signature.documentStatus}
                       />
-                    </td>
+                    </div>
 
                     {/* Actions */}
-                    <td className="block whitespace-nowrap px-4 pb-3 pt-1.5 align-top xl:table-cell xl:py-3">
+                    <div
+                      role="cell"
+                      className="col-span-2 min-w-0 whitespace-nowrap xl:col-span-1 xl:px-4 xl:py-3"
+                    >
                       <div className="flex items-center justify-start gap-1 xl:justify-end">
                         {/*
                           Review is withheld while OCR is running: the extracted
@@ -1122,12 +1133,11 @@ export default function SignatureInboxPage() {
                           </Button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
             </div>
           )}
         </div>
