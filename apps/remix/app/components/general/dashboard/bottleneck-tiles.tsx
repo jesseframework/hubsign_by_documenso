@@ -1,4 +1,5 @@
 import { Trans } from '@lingui/react/macro';
+import { Link } from 'react-router';
 
 import {
   Dialog,
@@ -33,7 +34,23 @@ export type Person = {
   openedNotSigned: number;
 };
 
-export type VendorRow = { vendor: string; overdue: number; open: number };
+export type VendorInvoice = {
+  inboxItemId: string;
+  documentId: number;
+  label: string;
+  invoiceNumber: string | null;
+  documentTitle: string;
+  dueAt: string | Date | null;
+  daysPastDue: number;
+};
+
+export type VendorRow = {
+  vendor: string;
+  overdue: number;
+  open: number;
+  invoices: VendorInvoice[];
+  moreOverdue: number;
+};
 
 export type Stages = { neverEmailed: number; emailedNotOpened: number; openedNotSigned: number };
 export type Chase = { none: number; once: number; repeatedly: number };
@@ -445,35 +462,70 @@ export const BottleneckDetailDialog = ({
               </DialogDescription>
             </DialogHeader>
 
-            <div className="custom-scrollbar max-h-[60vh] overflow-y-auto">
-              <table className="w-full">
-                <thead className="sticky top-0 bg-card">
-                  <tr className="border-b border-border">
-                    <th className={th}>
-                      <Trans>Vendor</Trans>
-                    </th>
-                    <th className={`${th} text-right`}>
-                      <Trans>Overdue</Trans>
-                    </th>
-                    <th className={`${th} text-right`}>
-                      <Trans>Open</Trans>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendors.rows.map((row) => (
-                    <tr key={row.vendor} className="border-b border-border last:border-0">
-                      <td className={td}>{row.vendor}</td>
-                      <td className={`${td} text-right font-semibold tabular-nums text-orange-600 dark:text-orange-400`}>
+            {/*
+              The invoices, not only the counts. A count says a supplier is a
+              problem; the invoice number and how late it is are what someone acts
+              on, and they had to leave this panel and search the inbox to find
+              them. Each row opens the item it names.
+            */}
+            <div className="custom-scrollbar max-h-[60vh] space-y-4 overflow-y-auto">
+              {vendors.rows.map((row) => (
+                <div key={row.vendor}>
+                  <div className="sticky top-0 flex items-baseline justify-between gap-3 border-b border-border bg-card pb-1.5">
+                    <p className="min-w-0 truncate text-[13px] font-semibold" title={row.vendor}>
+                      {row.vendor}
+                    </p>
+                    <p className="flex-shrink-0 text-[11px] text-muted-foreground">
+                      <span className="font-semibold text-orange-600 dark:text-orange-400">
                         {row.overdue}
-                      </td>
-                      <td className={`${td} text-right tabular-nums text-muted-foreground`}>
-                        {row.open}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </span>{' '}
+                      <Trans>overdue</Trans>
+                      {' · '}
+                      <Trans>{row.open} open</Trans>
+                    </p>
+                  </div>
+
+                  <ul className="divide-y divide-border">
+                    {row.invoices.map((invoice) => (
+                      <li key={invoice.inboxItemId}>
+                        <Link
+                          to={`/org/inbox/${invoice.inboxItemId}`}
+                          className="flex items-baseline justify-between gap-3 py-1.5 hover:bg-muted/40"
+                        >
+                          <span
+                            className="min-w-0 flex-1 truncate text-[12px]"
+                            title={`${invoice.label} · ${invoice.documentTitle}`}
+                          >
+                            {invoice.label}
+                            {/* Only when it adds something: the title IS the label
+                                whenever no number extracted, and printing it twice
+                                would pad every such row. */}
+                            {invoice.documentTitle !== invoice.label && (
+                              <span className="ml-1.5 text-muted-foreground">
+                                {invoice.documentTitle}
+                              </span>
+                            )}
+                          </span>
+                          <span className="flex-shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                            {invoice.dueAt
+                              ? new Date(invoice.dueAt).toISOString().slice(0, 10)
+                              : '—'}
+                          </span>
+                          <span className="w-[5.5rem] flex-shrink-0 text-right text-[11px] font-medium tabular-nums text-orange-600 dark:text-orange-400">
+                            <Trans>{invoice.daysPastDue}d late</Trans>
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {row.moreOverdue > 0 && (
+                    <p className="pt-1.5 text-[11px] text-muted-foreground">
+                      <Trans>+{row.moreOverdue} more overdue from this vendor</Trans>
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
 
             {vendors.unattributed > 0 && (

@@ -33,6 +33,25 @@ import { SLA_ORG_SELECT, type OrgSlaConfig, buildSlaResolver, slaClockStart } fr
 export type ItemDueDate = {
   inboxItemId: string;
   documentId: number;
+  /**
+   * What to call this invoice on screen: its OCR'd invoice number, or the
+   * document's title when the number never extracted. Same precedence the E-Sign
+   * and inbox lists use, so one invoice is not called two different things in two
+   * places.
+   */
+  label: string;
+  /** The number itself, where there is one — distinct from the fallback label. */
+  invoiceNumber: string | null;
+  /**
+   * The document's own title, carried alongside the label rather than only as its
+   * fallback.
+   *
+   * Extraction repeats itself more than you would hope: six invoices from one
+   * vendor in this deployment all came back numbered "12". Shown together, the
+   * number identifies the invoice and the title distinguishes the rows; shown
+   * alone, six identical labels are no more use than six blank ones.
+   */
+  documentTitle: string;
   /** The vendor named on the invoice, for grouping. Null when OCR found none. */
   vendorLabel: string | null;
   dueAt: Date | null;
@@ -49,7 +68,7 @@ type DueEvaluableItem = Pick<
   SignatureInboxItem,
   'id' | 'documentId' | 'createdAt' | 'receivedAt' | 'senderEmail' | 'subject' | 'extractedData'
 > & {
-  document: { status: string; completedAt: Date | null };
+  document: { status: string; completedAt: Date | null; title: string };
 };
 
 /**
@@ -97,6 +116,9 @@ export const evaluateItemsDueDates = async ({
     return {
       inboxItemId: item.id,
       documentId: item.documentId,
+      label: fields.invoiceNumber || item.document.title,
+      invoiceNumber: fields.invoiceNumber || null,
+      documentTitle: item.document.title,
       // The vendor named ON THE INVOICE, not whichever record supplied the terms —
       // a keyword- or sender-matched record must never make the dashboard blame a
       // different company for this invoice being late.
@@ -119,7 +141,7 @@ export const DUE_DATE_ITEM_SELECT = {
   senderEmail: true,
   subject: true,
   extractedData: true,
-  document: { select: { status: true, completedAt: true } },
+  document: { select: { status: true, completedAt: true, title: true } },
 } as const;
 
 /**

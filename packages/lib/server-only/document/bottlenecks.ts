@@ -23,6 +23,8 @@ import { getDocumentResponsibility } from './responsibility';
  */
 const PEOPLE_LIMIT = 50;
 const VENDOR_LIMIT = 25;
+/** Overdue invoices listed under each vendor in the detail panel. */
+const INVOICES_PER_VENDOR = 20;
 
 /** Documents scanned. Far above any realistic pending queue. */
 const SCAN_LIMIT = 2_000;
@@ -70,7 +72,29 @@ export type SigningBottlenecks = {
      * eight-hour target had lapsed, and a genuinely late payment could be absent
      * because we happened to process it quickly.
      */
-    rows: { vendor: string; overdue: number; open: number }[];
+    rows: {
+      vendor: string;
+      overdue: number;
+      open: number;
+      /**
+       * The overdue invoices themselves, worst first.
+       *
+       * A count tells you a supplier is a problem; it does not tell you which
+       * invoice to go and look at, which is the only reason anyone opens this
+       * panel. Capped per vendor so one badly-behaved supplier cannot make the
+       * dashboard payload unbounded — `moreOverdue` says what was left out.
+       */
+      invoices: {
+        inboxItemId: string;
+        documentId: number;
+        label: string;
+        invoiceNumber: string | null;
+        documentTitle: string;
+        dueAt: Date | null;
+        daysPastDue: number;
+      }[];
+      moreOverdue: number;
+    }[];
     /**
      * Overdue invoices whose vendor could not be identified. Reported separately
      * rather than ranked as a vendor called "Unknown": it is not a supplier,
@@ -247,7 +271,9 @@ const whenEachRecipientWasAsked = async (documentIds: number[]): Promise<Map<num
 const vendorOverdue = async (organizationId: number): Promise<SigningBottlenecks['vendors']> => {
   const dues = await getOrganizationDueDates({ organizationId, limit: SCAN_LIMIT });
 
-  const byVendor = new Map<string, { vendor: string; overdue: number; open: number }>();
+  type VendorRow = SigningBottlenecks['vendors']['rows'][number];
+
+  const byVendor = new Map<string, VendorRow>();
   let unattributed = 0;
   let noDueDate = 0;
 
@@ -273,10 +299,23 @@ const vendorOverdue = async (organizationId: number): Promise<SigningBottlenecks
       continue;
     }
 
-    const row = byVendor.get(key) ?? { vendor: label, overdue: 0, open: 0 };
+    const row =
+      byVendor.get(key) ?? { vendor: label, overdue: 0, open: 0, invoices: [], moreOverdue: 0 };
 
     row.open += 1;
-    if (isOverdue) row.overdue += 1;
+
+    if (isOverdue) {
+      row.overdue += 1;
+      row.invoices.push({
+        inboxItemId: due.inboxItemId,
+        documentId: due.documentId,
+        label: due.label,
+        invoiceNumber: due.invoiceNumber,
+        documentTitle: due.documentTitle,
+        dueAt: due.dueAt,
+        daysPastDue: due.daysPastDue,
+      });
+    }
 
     byVendor.set(key, row);
   }
@@ -284,7 +323,15 @@ const vendorOverdue = async (organizationId: number): Promise<SigningBottlenecks
   const rows = [...byVendor.values()]
     .filter((row) => row.overdue > 0)
     .sort((a, b) => b.overdue - a.overdue || b.open - a.open)
-    .slice(0, VENDOR_LIMIT);
+    .slice(0, VENDOR_LIMIT)
+    .map((row) => ({
+      ...row,
+      // Worst first: the invoice furthest past its due date is the one to chase.
+      invoices: [...row.invoices]
+        .sort((a, b) => b.daysPastDue - a.daysPastDue)
+        .slice(0, INVOICES_PER_VENDOR),
+      moreOverdue: Math.max(0, row.invoices.length - INVOICES_PER_VENDOR),
+    }));
 
   return { rows, unattributed, noDueDate };
 };

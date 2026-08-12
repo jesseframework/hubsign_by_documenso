@@ -305,6 +305,11 @@ msgstr ""
 msgid "{0} on behalf of \"{1}\" has invited you to {recipientActionVerb} the document \"{2}\"."
 msgstr "{0} w imieniu \"{1}\" zaprosił Cię do {recipientActionVerb} dokument „{2}”."
 
+#. placeholder {0}: row.open
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "{0} open"
+msgstr ""
+
 #. placeholder {0}: data.forecast.openBreached
 #. placeholder {1}: data.forecast.openAtRisk
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
@@ -342,6 +347,11 @@ msgstr ""
 #. placeholder {1}: note ? `: ${note}` : ''
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "{0} taken from the attached “{who}”{1}"
+msgstr ""
+
+#. placeholder {0}: invoice.daysPastDue
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "{0}d late"
 msgstr ""
 
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
@@ -684,6 +694,11 @@ msgstr ""
 #. placeholder {0}: awaiting.length - 1
 #: apps/remix/app/components/general/inbox/responsibility-cell.tsx
 msgid "+{0} more in parallel"
+msgstr ""
+
+#. placeholder {0}: row.moreOverdue
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "+{0} more overdue from this vendor"
 msgstr ""
 
 #. placeholder {0}: people.length - 5 + otherPeople
@@ -6986,7 +7001,6 @@ msgid "Oops! Something went wrong."
 msgstr "Ups! Coś poszło nie tak."
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
-#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "Open"
 msgstr ""
 
@@ -7099,8 +7113,12 @@ msgid "over by {0}"
 msgstr ""
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
-msgid "Overdue"
+msgid "overdue"
 msgstr ""
+
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+#~ msgid "Overdue"
+#~ msgstr ""
 
 #. placeholder {0}: overdueLabel(item.sla?.overdueByMinutes ?? 0)
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
@@ -11150,7 +11168,6 @@ msgid "Value"
 msgstr "Wartość"
 
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
-#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "Vendor"
 msgstr ""
 

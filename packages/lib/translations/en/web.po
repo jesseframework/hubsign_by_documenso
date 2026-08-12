@@ -300,6 +300,11 @@ msgstr "{0} of those {1} are still outstanding right now."
 msgid "{0} on behalf of \"{1}\" has invited you to {recipientActionVerb} the document \"{2}\"."
 msgstr "{0} on behalf of \"{1}\" has invited you to {recipientActionVerb} the document \"{2}\"."
 
+#. placeholder {0}: row.open
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "{0} open"
+msgstr "{0} open"
+
 #. placeholder {0}: data.forecast.openBreached
 #. placeholder {1}: data.forecast.openAtRisk
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
@@ -338,6 +343,11 @@ msgstr "{0} row(s) were skipped"
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "{0} taken from the attached “{who}”{1}"
 msgstr "{0} taken from the attached “{who}”{1}"
+
+#. placeholder {0}: invoice.daysPastDue
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "{0}d late"
+msgstr "{0}d late"
 
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 msgid "{charactersRemaining, plural, one {1 character remaining} other {{charactersRemaining} characters remaining}}"
@@ -680,6 +690,11 @@ msgstr "+{0} joined"
 #: apps/remix/app/components/general/inbox/responsibility-cell.tsx
 msgid "+{0} more in parallel"
 msgstr "+{0} more in parallel"
+
+#. placeholder {0}: row.moreOverdue
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "+{0} more overdue from this vendor"
+msgstr "+{0} more overdue from this vendor"
 
 #. placeholder {0}: people.length - 5 + otherPeople
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
@@ -6981,7 +6996,6 @@ msgid "Oops! Something went wrong."
 msgstr "Oops! Something went wrong."
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
-#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "Open"
 msgstr "Open"
 
@@ -7094,8 +7108,12 @@ msgid "over by {0}"
 msgstr "over by {0}"
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
-msgid "Overdue"
-msgstr "Overdue"
+msgid "overdue"
+msgstr "overdue"
+
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+#~ msgid "Overdue"
+#~ msgstr "Overdue"
 
 #. placeholder {0}: overdueLabel(item.sla?.overdueByMinutes ?? 0)
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
@@ -11147,7 +11165,6 @@ msgid "Value"
 msgstr "Value"
 
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
-#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "Vendor"
 msgstr "Vendor"
 
