@@ -1,0 +1,117 @@
+---
+title: Navigation
+description: How HubSign is laid out, and where to find every screen.
+---
+
+import { Callout } from 'nextra/components';
+
+# Finding your way around
+
+HubSign has three levels of navigation, and knowing which level a screen belongs to
+is usually enough to find it.
+
+| Level | What it holds | Where it appears |
+|---|---|---|
+| **Sidebar** | The work you do daily | Down the left, always visible |
+| **Tabs** | Views over the same thing | A strip across the top of a screen |
+| **Settings** | Configuration you set once | Its own page with a list of categories |
+
+The sidebar is deliberately short and, apart from the Doc Manager add-on, the same
+for everybody. What your role changes is what you can do *inside* a screen — not
+which rows you can see — so you and a colleague can describe a location to each
+other and be looking at the same thing.
+
+## The sidebar
+
+| Row | What it is | Tabs inside it |
+|---|---|---|
+| **Home** | Live signing activity for the organization | Overview · SLA · Activity |
+| **Inbox** | Invoices emailed in, waiting to be sent for signature | Incoming |
+| **E-Sign** | Documents going through signing — drafts, out for signature, completed | — |
+| **Repository** | The records library (Doc Manager) | Overview · Browse · Processing · Search · Favorites · Trash |
+| **Templates** | Reusable documents with fields already placed | — |
+| **Tasks** | Everything waiting on you | Approvals · Workflow Steps · Retrievals |
+| **Tools** | Utilities you run, rather than places you go | Merge · Bulk Upload · Exports · AI Agent |
+| **Settings** | Organization configuration | see below |
+| **Admin** | Platform administration, for HubSign operators | — |
+
+**Inbox** means the *signature* inbox: invoices vendors have emailed you, read by OCR
+and waiting for someone to send them for signature. It is not the same as
+**Repository → Processing**, which reports OCR progress on the records library.
+
+**Tools** is the one row in the sidebar that expands. Click the chevron to open it;
+it opens by itself when you are already on one of its screens.
+
+## Settings
+
+Settings is a page of its own with four categories down the left. Click a category
+to open it — the one holding the page you are on opens automatically, and a
+collapsed category with a dot beside it is the one you are currently in.
+
+| Category | Screens |
+|---|---|
+| **Organization** | Profile & Branding · Members & Roles · Teams · Billing & Plan · Integrations |
+| **Documents** | Filing Structure · Metadata Fields · Retention · Stamps · Access Control · Compliance · Repository Options |
+| **Automation** | Workflows · Business Rules · Approval Templates · Approver Roles & Rules · Email Templates |
+| **Developer** | API Tokens · Webhooks |
+
+The categories describe **the thing being configured**, not which part of the product
+implements it. Document retention and the filing structure sit under *Documents*
+alongside stamps and metadata, even though they belong to different modules — you
+should not have to know which service owns retention in order to change it.
+
+<Callout type="info">
+  **Your own settings are somewhere else.** Your profile, password, notification
+  preferences and personal billing live under your avatar at the bottom of the
+  sidebar. "My settings" and "our settings" are kept apart on purpose.
+</Callout>
+
+## Where do I find…?
+
+| To do this | Go here |
+|---|---|
+| See how signing is going across the organization | **Home** → Overview |
+| Check what is running late | **Home** → SLA |
+| Read the records-library audit log | **Home** → Activity |
+| Work through invoices emailed in | **Inbox** |
+| Upload a document and send it for signature | **E-Sign** → Upload Document |
+| Find a document that has been sent or signed | **E-Sign**, then search — it reads OCR data too |
+| Browse or search the records library | **Repository** → Browse / Search |
+| See which uploads OCR is still reading | **Repository** → Processing |
+| Restore something deleted | **Repository** → Trash |
+| Approve or decline something waiting on you | **Tasks** → Approvals |
+| Answer a request to fetch a physical file | **Tasks** → Retrievals |
+| Merge several PDFs into one | **Tools** → Merge |
+| Import many records at once | **Tools** → Bulk Upload |
+| Export a queue to Excel | **Tools** → Exports |
+| Ask questions about your documents | **Tools** → AI Agent |
+| Invite someone, or change their role | **Settings → Organization** → Members & Roles |
+| Change colours, logo or the organization's name | **Settings → Organization** → Profile & Branding |
+| Turn on email-to-sign, or set the signing inbox address | **Settings → Organization** → Profile & Branding, *Email-to-Sign Inbox* card |
+| See seats in use | **Settings → Organization** → Billing & Plan |
+| Connect Microsoft Teams | **Settings → Organization** → Integrations |
+| Decide where records are filed | **Settings → Documents** → Filing Structure |
+| Maintain vendors, contacts and other reference lists | **Settings → Documents** → Metadata Fields |
+| Set who can see which records | **Settings → Documents** → Access Control |
+| Set retention schedules | **Settings → Documents** → Retention / Compliance |
+| Manage the shared library of seals and marks | **Settings → Documents** → Stamps |
+| Stop a signature when data is wrong | **Settings → Automation** → Business Rules |
+| Build a trigger-and-action automation | **Settings → Automation** → Workflows |
+| Set up an approval chain | **Settings → Automation** → Approval Templates |
+| Name the group a blocked signer can ask for an exception | **Settings → Automation** → Approver Roles & Rules |
+| Change the wording of an email HubSign sends | **Settings → Automation** → Email Templates |
+| Create an API token or a webhook | **Settings → Developer** |
+| Change your own password or notifications | **Your avatar** → Account |
+| Buy seats, add a mailbox, manage SSO | Not in HubSign — the **WorkHub console** |
+
+## If a row is missing
+
+Two reasons, and they look the same from the outside:
+
+- **Your role does not include it.** Most configuration is organization-admin only.
+- **The add-on is not in your subscription.** Repository, Bulk Upload and AI Agent
+  need Doc Manager.
+
+A hidden row is not the whole story: the screen behind it refuses to load as well,
+so a link someone sends you will not get you in either. Ask an organization admin
+rather than hunting for the URL.

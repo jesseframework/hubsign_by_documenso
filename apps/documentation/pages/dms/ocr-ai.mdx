@@ -9,7 +9,7 @@ import { Callout } from 'nextra/components';
 
 ## OCR Processing Queue
 
-**Doc Manager → OCR Queue** tracks OCR status for uploaded documents.
+**Repository → Processing** tracks OCR status for uploaded documents.
 
 OCR is what makes a scan's **contents** searchable. Until it has run, a document is findable
 by its metadata only — see [Search](/dms/search).
@@ -19,7 +19,7 @@ by its metadata only — see [Search](/dms/search).
 The queue depends on the **BMS ML service** being configured for your organization. Until it
 is, uploads will sit unprocessed. The page says so, and links to the settings.
 
-Configuration lives under **Organization → Settings**, where the service URL and credentials
+Configuration lives under **Settings → Organization → Profile & Branding**, where the service URL and credentials
 are set. This is the same service the
 [Signature Inbox](/organization/signature-inbox) uses to read invoices.
 
@@ -38,7 +38,7 @@ before concluding that an imported document is missing text.
 
 ## AI
 
-**Doc Manager → AI** lets you ask questions about your documents, generate reports and get
+**Tools → AI Agent** lets you ask questions about your documents, generate reports and get
 insights, as a conversation.
 
 ### What it is good for

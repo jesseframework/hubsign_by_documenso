@@ -10,6 +10,10 @@
       "breadcrumb": false
     }
   },
+  "navigation": {
+    "type": "page",
+    "title": "Navigation"
+  },
   "organization": {
     "type": "page",
     "title": "Organization"
