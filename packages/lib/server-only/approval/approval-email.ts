@@ -62,7 +62,14 @@ export type SendApprovalRequestEmailInput = {
   priority?: string | null;
 };
 
-export const sendApprovalRequestEmail = async (input: SendApprovalRequestEmailInput) => {
+/**
+ * Builds the request email without sending it.
+ *
+ * Split out from the send so the markup can be rendered and looked at — an email
+ * whose only route to a human eye is a live SMTP server is an email nobody checks
+ * before shipping.
+ */
+export const renderApprovalRequestEmail = (input: SendApprovalRequestEmailInput) => {
   const approveUrl = `${baseUrl()}/approve/${input.token}`;
   const appUrl = `${baseUrl()}/org/approvals/${input.requestId}`;
 
@@ -76,15 +83,25 @@ export const sendApprovalRequestEmail = async (input: SendApprovalRequestEmailIn
     </table>
     <p style="font-size:13px;color:#666">Both buttons open the review page, where you confirm the decision. <a href="${appUrl}">View in app</a>.</p>`;
 
-  await mailer.sendMail({
-    to: { name: input.to.name ?? '', address: input.to.email },
-    from: { name: FROM_NAME, address: FROM_ADDRESS },
+  return {
     subject: `Approval requested: ${input.entityTitle}`,
     html: shell('Approval requested', body, [
       { label: 'Approve', url: `${approveUrl}?intent=approve`, tone: 'primary' },
       { label: 'Decline', url: `${approveUrl}?intent=reject`, tone: 'danger' },
     ]),
     text: `Approval requested for "${input.entityTitle}". Review and decide: ${approveUrl}`,
+  };
+};
+
+export const sendApprovalRequestEmail = async (input: SendApprovalRequestEmailInput) => {
+  const { subject, html, text } = renderApprovalRequestEmail(input);
+
+  await mailer.sendMail({
+    to: { name: input.to.name ?? '', address: input.to.email },
+    from: { name: FROM_NAME, address: FROM_ADDRESS },
+    subject,
+    html,
+    text,
   });
 };
 
