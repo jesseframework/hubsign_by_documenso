@@ -1,4 +1,7 @@
+import { useState } from 'react';
+
 import { Trans } from '@lingui/react/macro';
+import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
 import { Link, useLocation } from 'react-router';
 
 import { useNavContext } from '~/hooks/use-nav-context';
@@ -44,40 +47,114 @@ const SurfaceTabs = ({ tabs, pathname }: { tabs: NavItem[]; pathname: string }) 
   </div>
 );
 
-/** Vertical grouped rail, shown beside console content on wide viewports. */
-const ConsoleRail = ({ groups, pathname }: { groups: NavGroup[]; pathname: string }) => (
-  <nav className="space-y-5" aria-label="Sections">
-    {groups.map((group) => (
-      <div key={group.id}>
-        <div className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {group.label}
-        </div>
+/** One console destination, as it appears in the rail. */
+const RailLink = ({ item, pathname }: { item: NavItem; pathname: string }) => {
+  const active = isPathActive(item, pathname);
 
-        <div className="space-y-px">
-          {group.items.map((item) => {
-            const active = isPathActive(item, pathname);
+  return (
+    <Link
+      to={item.to}
+      aria-current={active ? 'page' : undefined}
+      className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
+        active
+          ? 'bg-primary/10 font-medium text-primary'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+      }`}
+    >
+      <item.icon className="h-4 w-4 shrink-0 opacity-80" />
+      {item.label}
+    </Link>
+  );
+};
 
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                aria-current={active ? 'page' : undefined}
-                className={`flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] transition-colors ${
-                  active
-                    ? 'bg-primary/10 font-medium text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                }`}
-              >
-                <item.icon className="h-4 w-4 shrink-0 opacity-80" />
-                {item.label}
-              </Link>
-            );
-          })}
+/**
+ * A console category as a collapsible parent row.
+ *
+ * Deliberately the same shape as the sidebar's Tools group — icon, label,
+ * chevron, children indented behind a vertical rule — because this rail sits one
+ * click from that sidebar and a second idiom for "things nested under a heading"
+ * is one the reader has to learn twice. Twenty settings under four static capital
+ * letters read as one long list with dividers; the same twenty behind four rows
+ * you can open and shut read as four decisions.
+ *
+ * The parent toggles and does not navigate. That is the one departure from the
+ * sidebar, where Tools opens Merge: a category here has up to seven children and
+ * no obvious first one, so picking one to jump to would be arbitrary.
+ */
+const RailGroup = ({ group, pathname }: { group: NavGroup; pathname: string }) => {
+  const containsActive = group.items.some((item) => isPathActive(item, pathname));
+
+  /*
+    `null` means untouched, which resolves to "open if the page you are on lives
+    here". Once toggled the choice sticks — the rail is mounted by the
+    authenticated layout, so it survives navigation between console pages.
+  */
+  const [open, setOpen] = useState<boolean | null>(null);
+  const show = open === null ? containsActive : open;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!show)}
+        aria-expanded={show}
+        className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors hover:bg-muted ${
+          containsActive ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'
+        }`}
+      >
+        {group.icon && <group.icon className="h-4 w-4 shrink-0 opacity-80" />}
+        <span className="flex-1 text-left">{group.label}</span>
+
+        {/* Collapsed over the current page: without this the rail would show no
+            trace of where the reader is. */}
+        {!show && containsActive && (
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true" />
+        )}
+
+        {show ? (
+          <ChevronDownIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
+        ) : (
+          <ChevronRightIcon className="h-3.5 w-3.5 shrink-0 opacity-60" />
+        )}
+      </button>
+
+      {show && (
+        <div className="ml-[18px] mt-0.5 space-y-px border-l border-border pl-2.5">
+          {group.items.map((item) => (
+            <RailLink key={item.to} item={item} pathname={pathname} />
+          ))}
         </div>
-      </div>
-    ))}
-  </nav>
-);
+      )}
+    </div>
+  );
+};
+
+/**
+ * Vertical grouped rail, shown beside console content on wide viewports.
+ *
+ * A single-group console (Account, Platform Admin) draws its items flat. The
+ * sidebar's rule applies: a category of one is a row with an extra click in front
+ * of it, and its label would only repeat the console title above it.
+ */
+const ConsoleRail = ({ groups, pathname }: { groups: NavGroup[]; pathname: string }) => {
+  if (groups.length === 1) {
+    return (
+      <nav className="space-y-px" aria-label="Sections">
+        {groups[0].items.map((item) => (
+          <RailLink key={item.to} item={item} pathname={pathname} />
+        ))}
+      </nav>
+    );
+  }
+
+  return (
+    <nav className="space-y-0.5" aria-label="Sections">
+      {groups.map((group) => (
+        <RailGroup key={group.id} group={group} pathname={pathname} />
+      ))}
+    </nav>
+  );
+};
 
 /**
  * The same console items as a horizontal scroller, for viewports too narrow to

@@ -7,8 +7,10 @@ import {
   BellIcon,
   BotIcon,
   BracesIcon,
+  Building2Icon,
   BuildingIcon,
   CheckSquareIcon,
+  Code2Icon,
   ClipboardCheckIcon,
   ClipboardListIcon,
   ClockIcon,
@@ -50,6 +52,7 @@ import {
   WebhookIcon,
   WorkflowIcon,
   WrenchIcon,
+  ZapIcon,
 } from 'lucide-react';
 
 /**
@@ -131,6 +134,13 @@ export const resolveTeamHref = (item: NavItem, teamUrl: string | undefined): Nav
 export type NavGroup = {
   id: string;
   label: React.ReactNode;
+  /**
+   * Shown when the group is drawn as a collapsible category in the console rail,
+   * which is how a console with more than one group renders (see `ConsoleShell`).
+   * Optional because a single-group console draws its items flat, with no parent
+   * row for an icon to sit on.
+   */
+  icon?: NavIcon;
   items: NavItem[];
 };
 
@@ -333,6 +343,7 @@ export const SETTINGS_CONSOLE: ConsoleDef = {
     {
       id: 'organization',
       label: <Trans>Organization</Trans>,
+      icon: Building2Icon,
       items: [
         // Two entries for one path, mutually exclusive by context. `/org/settings`
         // is both the org profile form and the only route to creating an
@@ -374,6 +385,7 @@ export const SETTINGS_CONSOLE: ConsoleDef = {
     {
       id: 'documents',
       label: <Trans>Documents</Trans>,
+      icon: FileStackIcon,
       items: [
         {
           to: '/dms/filing',
@@ -417,6 +429,7 @@ export const SETTINGS_CONSOLE: ConsoleDef = {
     {
       id: 'automation',
       label: <Trans>Automation</Trans>,
+      icon: ZapIcon,
       items: [
         {
           to: '/org/workflows',
@@ -460,6 +473,7 @@ export const SETTINGS_CONSOLE: ConsoleDef = {
     {
       id: 'developer',
       label: <Trans>Developer</Trans>,
+      icon: Code2Icon,
       items: [
         { to: '/settings/tokens', icon: BracesIcon, label: <Trans>API Tokens</Trans> },
         { to: '/settings/webhooks', icon: WebhookIcon, label: <Trans>Webhooks</Trans> },
