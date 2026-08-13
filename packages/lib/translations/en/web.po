@@ -1632,6 +1632,10 @@ msgstr "Already have a password? You can sign in at <0>{baseUrl}/signin</0>"
 msgid "Already have an account? <0>Sign in instead</0>"
 msgstr "Already have an account? <0>Sign in instead</0>"
 
+#: packages/ui/primitives/signature-pad/signature-pad-upload.tsx
+msgid "Already transparent"
+msgstr "Already transparent"
+
 #. placeholder {0}: item.senderEmail
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "Always use this template for {0}"
@@ -6705,6 +6709,10 @@ msgstr "No claimable domains are configured."
 msgid "No classifications defined yet"
 msgstr "No classifications defined yet"
 
+#: packages/ui/primitives/signature-pad/signature-pad-upload.tsx
+msgid "No clear background found — left as is"
+msgstr "No clear background found — left as is"
+
 #: apps/remix/app/components/general/export/export-builder-dialog.tsx
 msgid "No columns match “{search}”."
 msgstr "No columns match “{search}”."
@@ -8375,6 +8383,10 @@ msgstr "Reminders sent"
 msgid "Remove"
 msgstr "Remove"
 
+#: packages/ui/primitives/signature-pad/signature-pad-upload.tsx
+msgid "Remove background"
+msgstr "Remove background"
+
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 msgid "Remove seat"
 msgstr "Remove seat"
@@ -9723,6 +9735,10 @@ msgstr "Steps (JSON object keyed by step id)"
 #: packages/email/templates/approval.tsx
 msgid "Still waiting on your approval: {entityTitle}"
 msgstr "Still waiting on your approval: {entityTitle}"
+
+#: packages/ui/primitives/signature-pad/signature-pad-upload.tsx
+msgid "Strength"
+msgstr "Strength"
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx

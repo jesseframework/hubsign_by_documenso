@@ -1637,6 +1637,10 @@ msgstr ""
 msgid "Already have an account? <0>Sign in instead</0>"
 msgstr "Hai già un account? <0>Accedi al posto</0>"
 
+#: packages/ui/primitives/signature-pad/signature-pad-upload.tsx
+msgid "Already transparent"
+msgstr ""
+
 #. placeholder {0}: item.senderEmail
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "Always use this template for {0}"
@@ -6710,6 +6714,10 @@ msgstr ""
 msgid "No classifications defined yet"
 msgstr ""
 
+#: packages/ui/primitives/signature-pad/signature-pad-upload.tsx
+msgid "No clear background found — left as is"
+msgstr ""
+
 #: apps/remix/app/components/general/export/export-builder-dialog.tsx
 msgid "No columns match “{search}”."
 msgstr ""
@@ -8380,6 +8388,10 @@ msgstr ""
 msgid "Remove"
 msgstr "Rimuovi"
 
+#: packages/ui/primitives/signature-pad/signature-pad-upload.tsx
+msgid "Remove background"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/billing.tsx
 msgid "Remove seat"
 msgstr ""
@@ -9727,6 +9739,10 @@ msgstr ""
 
 #: packages/email/templates/approval.tsx
 msgid "Still waiting on your approval: {entityTitle}"
+msgstr ""
+
+#: packages/ui/primitives/signature-pad/signature-pad-upload.tsx
+msgid "Strength"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates._index.tsx
