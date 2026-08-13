@@ -2016,6 +2016,8 @@ export const orgRouter = router({
           days: z.number().int().min(1).max(731).default(90),
           /** A custom field key, or `vendor`. Unknown keys fall back to vendor. */
           groupBy: z.string().max(80).optional(),
+          /** A NUMBER field on the vendor record to compare actuals against. */
+          budgetField: z.string().max(80).optional(),
           /** Report currency. Defaults to the one with the most invoices. */
           currency: z.string().max(8).optional(),
         })
@@ -2045,6 +2047,7 @@ export const orgRouter = router({
         from: from.toJSDate(),
         to: to.toJSDate(),
         groupBy: input?.groupBy,
+        budgetField: input?.budgetField,
         currency: input?.currency,
       });
     }),

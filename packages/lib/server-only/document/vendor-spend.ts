@@ -101,6 +101,21 @@ export type SpendRow = {
    * field: "Approved · 4 suppliers" is the sentence that makes the row useful.
    */
   vendors: number;
+  /**
+   * The budget this row is measured against, when a budget field is selected:
+   * the vendor's own figure, or the sum across the vendors folded into the row.
+   *
+   * Null means no vendor in this row carries a figure — reported as unbudgeted
+   * rather than as a budget of zero, which would read as "100% overspent".
+   */
+  budget: number | null;
+  /** Vendors in this row that carry a figure, and vendors that do not. */
+  budgetVendors: number;
+  vendorsWithoutBudget: number;
+  /** Actual minus budget. Positive is an overrun. Null without a budget. */
+  variance: number | null;
+  /** Actual as a fraction of budget: 1.42 is 42% over. Null without a budget. */
+  usedShare: number | null;
   items: SpendItem[];
   moreItems: number;
 };
@@ -132,6 +147,33 @@ export type VendorSpendReport = {
   otherRowsTotal: number;
   /** What this report can be grouped by, driven by the org's own vendor fields. */
   groupOptions: { key: string; label: string }[];
+  /**
+   * Number fields on the vendor record, offered as a budget to compare against.
+   *
+   * Kept separate from `groupOptions` because a number is a terrible axis and an
+   * excellent baseline: grouping by a field holding 10000 produces one row per
+   * distinct amount, labelled with the amount, which answers nothing.
+   */
+  budgetOptions: { key: string; label: string }[];
+  /** The selected budget field, or null when comparing against nothing. */
+  budgetField: string | null;
+  budgetLabel: string | null;
+  /** Sum of the budgets in play — only the vendors that actually carry one. */
+  budgetTotal: number | null;
+  /**
+   * Actual spend of *those same vendors*, which is the only figure the budget can
+   * honestly be compared against.
+   *
+   * Comparing `totalSpend` to `budgetTotal` was the first thing this reported and
+   * it was nonsense: spend from vendors carrying no figure was counted on the
+   * actual side and nothing on the budget side, so a directory with one budgeted
+   * supplier out of six read as thousands of percent overspent.
+   */
+  budgetedActual: number | null;
+  /** Rows whose actual exceeds their budget. */
+  overBudgetRows: number;
+  /** Vendors with invoices in the window but no figure on the budget field. */
+  vendorsWithoutBudget: number;
 };
 
 /** Currency code as stated, normalized; empty means the invoice stated none. */
@@ -144,6 +186,7 @@ export const getVendorSpend = async ({
   from,
   to,
   groupBy = SPEND_GROUP_VENDOR,
+  budgetField,
   currency,
   now = new Date(),
 }: {
@@ -153,6 +196,8 @@ export const getVendorSpend = async ({
   /** Inclusive end of the window. */
   to: Date;
   groupBy?: string;
+  /** A NUMBER field on the vendor record to measure actuals against. */
+  budgetField?: string;
   /** Report currency. Defaults to whichever currency has the most invoices. */
   currency?: string;
   now?: Date;
@@ -191,12 +236,46 @@ export const getVendorSpend = async ({
     }),
   ]);
 
+  /*
+    A number field is offered as a budget, never as an axis.
+
+    Grouping by a field that holds 10000 produces a row per distinct amount,
+    labelled with the amount — which is what "Spend by spend" did before this,
+    and it answers nothing. The same field as a baseline answers the question the
+    figure was written down for.
+  */
+  const groupable = definitions.filter((definition) => definition.type !== 'NUMBER');
+  const numeric = definitions.filter((definition) => definition.type === 'NUMBER');
+
   const groupOptions = [
     { key: SPEND_GROUP_VENDOR, label: 'Vendor' },
-    ...definitions.map((definition) => ({ key: definition.key, label: definition.label })),
+    ...groupable.map((definition) => ({ key: definition.key, label: definition.label })),
   ];
+  const budgetOptions = numeric.map((definition) => ({
+    key: definition.key,
+    label: definition.label,
+  }));
 
-  const definition = definitions.find((candidate) => candidate.key === groupBy);
+  const budget = numeric.find((candidate) => candidate.key === budgetField) ?? null;
+
+  /** A vendor's budget figure, or null when it carries none. */
+  const budgetOf = (record: { data?: unknown } | null): number | null => {
+    if (!budget || !record) return null;
+
+    const bag =
+      record.data && typeof record.data === 'object' && !Array.isArray(record.data)
+        ? (record.data as Record<string, unknown>)
+        : {};
+    const raw = bag[budget.key];
+
+    // Stored as a number by the field's own coercion; a string here would be a
+    // value written before the field existed, so it is read rather than refused.
+    const value = typeof raw === 'number' ? raw : Number(raw);
+
+    return Number.isFinite(value) ? value : null;
+  };
+
+  const definition = groupable.find((candidate) => candidate.key === groupBy);
   // An unknown group key falls back to vendor rather than erroring: a saved link
   // or a bookmarked view must not break when a field is renamed away.
   const effectiveGroupBy = definition ? groupBy : SPEND_GROUP_VENDOR;
@@ -377,6 +456,15 @@ export const getVendorSpend = async ({
     overdueTotal: number;
     overdueInvoices: number;
     vendors: Set<string>;
+    /**
+     * Budget contributions, keyed by the vendor record so a supplier with twelve
+     * invoices contributes its figure once. Counting per invoice was the obvious
+     * bug to write here and would have multiplied every budget by its invoice
+     * count — an overspend would have looked like ample headroom.
+     */
+    budgets: Map<string, number>;
+    /** Vendors in this row with no figure on the budget field. */
+    unbudgeted: Set<string>;
     items: SpendItem[];
   };
 
@@ -418,12 +506,27 @@ export const getVendorSpend = async ({
       overdueTotal: 0,
       overdueInvoices: 0,
       vendors: new Set<string>(),
+      budgets: new Map<string, number>(),
+      unbudgeted: new Set<string>(),
       items: [],
     };
 
     bucket.total += entry.amount;
     bucket.invoices += 1;
     bucket.vendors.add(entry.vendorLabel.toLowerCase());
+
+    if (budget) {
+      const figure = budgetOf(entry.record);
+      // Keyed by record id where the vendor is in the directory, and by name
+      // otherwise, so two invoices from one unlisted vendor are still one vendor.
+      const vendorKey = entry.record?.id ?? entry.vendorLabel.toLowerCase();
+
+      if (figure === null) {
+        bucket.unbudgeted.add(vendorKey);
+      } else {
+        bucket.budgets.set(vendorKey, figure);
+      }
+    }
 
     if (entry.daysPastDue !== null && entry.daysPastDue > 0) {
       bucket.overdueTotal += entry.amount;
@@ -447,7 +550,54 @@ export const getVendorSpend = async ({
 
   const totalSpend = inCurrency.reduce((sum, entry) => sum + entry.amount, 0);
 
-  const ranked = [...buckets.values()].sort((a, b) => b.total - a.total);
+  /** A row's budget: null when no vendor in it carries a figure. */
+  const budgetOfBucket = (bucket: Bucket): number | null =>
+    bucket.budgets.size === 0
+      ? null
+      : [...bucket.budgets.values()].reduce((sum, value) => sum + value, 0);
+
+  /*
+    Org-wide budget, deduplicated across rows.
+
+    A vendor can only appear in one row of one grouping, but summing the rows
+    would still be wrong the moment a row is cut by `ROW_LIMIT` — the total has to
+    come from every vendor in the window, not from the ones that fit on screen.
+  */
+  const allBudgets = new Map<string, number>();
+  const allUnbudgeted = new Set<string>();
+
+  for (const bucket of buckets.values()) {
+    for (const [vendorKey, figure] of bucket.budgets) {
+      allBudgets.set(vendorKey, figure);
+    }
+    for (const vendorKey of bucket.unbudgeted) {
+      allUnbudgeted.add(vendorKey);
+    }
+  }
+
+  /*
+    Ordering: by overrun once a budget is in play, by size otherwise.
+
+    "Which supplier is furthest past its limit" is the only question a
+    budget comparison is opened to answer, and the biggest spender is often
+    comfortably inside its own budget while a small one is double it.
+  */
+  const ranked = [...buckets.values()].sort((a, b) => {
+    if (budget) {
+      const aBudget = budgetOfBucket(a);
+      const bBudget = budgetOfBucket(b);
+      const aOver = aBudget === null ? null : a.total - aBudget;
+      const bOver = bBudget === null ? null : b.total - bBudget;
+
+      // Unbudgeted rows sort last: they cannot be over or under anything, and
+      // putting them among the overruns would bury the ones that are.
+      if (aOver === null && bOver !== null) return 1;
+      if (bOver === null && aOver !== null) return -1;
+      if (aOver !== null && bOver !== null && aOver !== bOver) return bOver - aOver;
+    }
+
+    return b.total - a.total;
+  });
   const shown = ranked.slice(0, ROW_LIMIT);
 
   return {
@@ -466,19 +616,46 @@ export const getVendorSpend = async ({
     doubtfulTotal: inCurrency
       .filter((entry) => isDoubtful(entry.amount))
       .reduce((sum, entry) => sum + entry.amount, 0),
-    rows: shown.map((bucket) => ({
-      key: bucket.key,
-      label: bucket.label,
-      total: bucket.total,
-      invoices: bucket.invoices,
-      average: bucket.invoices > 0 ? bucket.total / bucket.invoices : 0,
-      overdueTotal: bucket.overdueTotal,
-      overdueInvoices: bucket.overdueInvoices,
-      share: totalSpend > 0 ? bucket.total / totalSpend : 0,
-      vendors: bucket.vendors.size,
-      items: bucket.items.sort((a, b) => b.amount - a.amount).slice(0, ITEMS_PER_ROW),
-      moreItems: Math.max(0, bucket.items.length - ITEMS_PER_ROW),
-    })),
+    rows: shown.map((bucket) => {
+      const rowBudget = budgetOfBucket(bucket);
+
+      return {
+        key: bucket.key,
+        label: bucket.label,
+        total: bucket.total,
+        invoices: bucket.invoices,
+        average: bucket.invoices > 0 ? bucket.total / bucket.invoices : 0,
+        overdueTotal: bucket.overdueTotal,
+        overdueInvoices: bucket.overdueInvoices,
+        share: totalSpend > 0 ? bucket.total / totalSpend : 0,
+        vendors: bucket.vendors.size,
+        budget: rowBudget,
+        budgetVendors: bucket.budgets.size,
+        vendorsWithoutBudget: bucket.unbudgeted.size,
+        variance: rowBudget === null ? null : bucket.total - rowBudget,
+        // Guarded against a budget of zero: dividing by it would report Infinity,
+        // and a zero budget means "no spend allowed", not "unlimited".
+        usedShare: rowBudget === null || rowBudget === 0 ? null : bucket.total / rowBudget,
+        items: bucket.items.sort((a, b) => b.amount - a.amount).slice(0, ITEMS_PER_ROW),
+        moreItems: Math.max(0, bucket.items.length - ITEMS_PER_ROW),
+      };
+    }),
+    budgetOptions,
+    budgetField: budget?.key ?? null,
+    budgetLabel: budget?.label ?? null,
+    budgetTotal: budget ? [...allBudgets.values()].reduce((sum, value) => sum + value, 0) : null,
+    budgetedActual: budget
+      ? inCurrency
+          .filter((entry) => budgetOf(entry.record) !== null)
+          .reduce((sum, entry) => sum + entry.amount, 0)
+      : null,
+    overBudgetRows: budget
+      ? ranked.filter((bucket) => {
+          const figure = budgetOfBucket(bucket);
+          return figure !== null && bucket.total > figure;
+        }).length
+      : 0,
+    vendorsWithoutBudget: budget ? allUnbudgeted.size : 0,
     otherRows: Math.max(0, ranked.length - shown.length),
     otherRowsTotal: ranked.slice(ROW_LIMIT).reduce((sum, bucket) => sum + bucket.total, 0),
     groupOptions,

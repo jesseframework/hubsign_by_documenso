@@ -44,10 +44,18 @@ export default function SpendPage() {
 
   const [days, setDays] = useState(90);
   const [groupBy, setGroupBy] = useState('vendor');
+  const [budgetField, setBudgetField] = useState('');
   const [currency, setCurrency] = useState<string | undefined>(undefined);
   const [expanded, setExpanded] = useState<string | null>(null);
 
-  const { data, isLoading } = trpc.org.getVendorSpend.useQuery({ days, groupBy, currency });
+  const { data, isLoading } = trpc.org.getVendorSpend.useQuery({
+    days,
+    groupBy,
+    budgetField: budgetField || undefined,
+    currency,
+  });
+
+  const budgeted = Boolean(data?.budgetField);
 
   const rows = data?.rows ?? [];
   // Bars are scaled against the biggest row, not against the total: with thirty
@@ -111,6 +119,33 @@ export default function SpendPage() {
           </select>
         </div>
 
+        {(data?.budgetOptions.length ?? 0) > 0 && (
+          <div>
+            <label
+              className="mb-1 block text-[11px] font-medium text-muted-foreground"
+              htmlFor="spend-budget"
+            >
+              <Trans>Compare against</Trans>
+            </label>
+            <select
+              id="spend-budget"
+              className="h-8 min-w-[170px] rounded-md border border-border bg-card px-2 text-[13px]"
+              value={budgetField}
+              onChange={(e) => {
+                setBudgetField(e.target.value);
+                setExpanded(null);
+              }}
+            >
+              <option value="">{_(msg`Nothing (spend only)`)}</option>
+              {data?.budgetOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {(data?.currencies.length ?? 0) > 1 && (
           <div>
             <label
@@ -149,6 +184,54 @@ export default function SpendPage() {
             </p>
             <p className="text-2xl font-semibold tabular-nums">{data?.invoices ?? 0}</p>
           </div>
+          {budgeted && (
+            <>
+              {/*
+                Like for like: the budgeted vendors' own spend against their
+                budgets. `totalSpend` includes vendors carrying no figure, and
+                comparing it against the budget total made one budgeted supplier
+                out of six read as thousands of percent overspent.
+              */}
+              <div>
+                <p className="text-[11px] font-medium uppercase text-muted-foreground">
+                  {data?.budgetLabel}
+                </p>
+                <p className="text-2xl font-semibold tabular-nums">
+                  {money(data?.currency ?? null, data?.budgetedActual ?? 0)}
+                  <span className="text-base font-normal text-muted-foreground">
+                    {' / '}
+                    {money(data?.currency ?? null, data?.budgetTotal ?? 0)}
+                  </span>
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] font-medium uppercase text-muted-foreground">
+                  <Trans>Variance</Trans>
+                </p>
+                {/*
+                  Signed and coloured: "over by" and "left" are different news, and
+                  an unsigned number here would be read as whichever the reader
+                  expected.
+                */}
+                <p
+                  className={`text-2xl font-semibold tabular-nums ${
+                    (data?.budgetedActual ?? 0) > (data?.budgetTotal ?? 0)
+                      ? 'text-red-600 dark:text-red-400'
+                      : 'text-emerald-600 dark:text-emerald-400'
+                  }`}
+                  title={_(
+                    msg`Across the vendors that carry a figure. Spend from vendors without one is excluded from both sides.`,
+                  )}
+                >
+                  {(data?.budgetedActual ?? 0) > (data?.budgetTotal ?? 0) ? '+' : '−'}
+                  {money(
+                    data?.currency ?? null,
+                    Math.abs((data?.budgetedActual ?? 0) - (data?.budgetTotal ?? 0)),
+                  )}
+                </p>
+              </div>
+            </>
+          )}
           <div>
             <p className="text-[11px] font-medium uppercase text-muted-foreground">
               {data?.groupBy === 'vendor' ? <Trans>Vendors</Trans> : <Trans>Groups</Trans>}
@@ -217,6 +300,24 @@ export default function SpendPage() {
                 </Trans>
               </li>
             )}
+            {budgeted && (
+              <li>
+                <Trans>
+                  {data?.budgetLabel} is a single figure on each vendor and carries no period of its
+                  own, so it is compared against the window selected above as-is — pick the window
+                  the figure was written for.
+                </Trans>
+              </li>
+            )}
+            {budgeted && (data?.vendorsWithoutBudget ?? 0) > 0 && (
+              <li>
+                <Trans>
+                  {data?.vendorsWithoutBudget} vendor(s) with invoices here have no{' '}
+                  {data?.budgetLabel} set. Their spend is in the total above but excluded from the
+                  variance, which compares only the vendors that carry a figure.
+                </Trans>
+              </li>
+            )}
             {data && data.invoices > 0 && data.datedByInvoice < data.invoices && (
               <li>
                 <Trans>
@@ -250,10 +351,25 @@ export default function SpendPage() {
         <div className="rounded-[var(--r)] border border-border bg-card">
           <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
             <p className="text-[13px] font-semibold">
-              <Trans>Spend by {data?.groupLabel.toLowerCase()}</Trans>
+              {budgeted ? (
+                <Trans>
+                  {data?.groupLabel} vs {data?.budgetLabel}
+                </Trans>
+              ) : (
+                <Trans>Spend by {data?.groupLabel.toLowerCase()}</Trans>
+              )}
+              {budgeted && (data?.overBudgetRows ?? 0) > 0 && (
+                <span className="ml-2 rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-medium text-red-600 dark:text-red-400">
+                  <Trans>{data?.overBudgetRows} over</Trans>
+                </span>
+              )}
             </p>
             <p className="text-[11px] text-muted-foreground">
-              <Trans>Largest first · click a row for its invoices</Trans>
+              {budgeted ? (
+                <Trans>Biggest overrun first · click a row for its invoices</Trans>
+              ) : (
+                <Trans>Largest first · click a row for its invoices</Trans>
+              )}
             </p>
           </div>
 
@@ -285,12 +401,40 @@ export default function SpendPage() {
                         </p>
                       </div>
 
-                      {/* One bar per row, scaled to the largest. */}
+                      {/*
+                        Without a budget the bar compares rows to each other; with
+                        one it compares the row to its own limit, and the scale
+                        stops at 100% so an overrun is visibly full rather than
+                        merely long. The overspend is drawn as a separate red
+                        segment past the mark it broke.
+                      */}
                       <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-[hsl(var(--brand-chart))]"
-                          style={{ width: `${biggest > 0 ? (row.total / biggest) * 100 : 0}%` }}
-                        />
+                        {row.usedShare === null ? (
+                          <div
+                            /*
+                              Muted while a budget is selected: a full-width brand
+                              bar on an unmeasured row sat beside a full-width red
+                              one on an overspent row and read as the same news.
+                            */
+                            className={`h-full rounded-full ${
+                              budgeted ? 'bg-muted-foreground/25' : 'bg-[hsl(var(--brand-chart))]'
+                            }`}
+                            style={{ width: `${biggest > 0 ? (row.total / biggest) * 100 : 0}%` }}
+                          />
+                        ) : (
+                          <div className="flex h-full">
+                            <div
+                              className={`h-full ${
+                                row.usedShare > 1
+                                  ? 'bg-red-500'
+                                  : row.usedShare >= 0.9
+                                    ? 'bg-amber-500'
+                                    : 'bg-emerald-500'
+                              }`}
+                              style={{ width: `${Math.min(100, row.usedShare * 100)}%` }}
+                            />
+                          </div>
+                        )}
                       </div>
 
                       <p className="mt-1 flex flex-wrap gap-x-3 text-[11px] text-muted-foreground">
@@ -309,6 +453,55 @@ export default function SpendPage() {
                         {data?.groupBy !== 'vendor' && (
                           <span>
                             <Trans>{row.vendors} vendor(s)</Trans>
+                          </span>
+                        )}
+                        {budgeted && row.budget !== null && (
+                          <span
+                            className={
+                              row.usedShare !== null && row.usedShare > 1
+                                ? 'font-medium text-red-600 dark:text-red-400'
+                                : row.usedShare !== null && row.usedShare >= 0.9
+                                  ? 'font-medium text-amber-600 dark:text-amber-400'
+                                  : 'text-emerald-700 dark:text-emerald-400'
+                            }
+                          >
+                            {row.usedShare !== null && (
+                              <>
+                                {Math.round(row.usedShare * 100)}%{' '}
+                                <Trans>of</Trans>{' '}
+                              </>
+                            )}
+                            <span className="tabular-nums">
+                              {money(data?.currency ?? null, row.budget)}
+                            </span>
+                            {row.variance !== null && row.variance > 0 ? (
+                              <>
+                                {' · '}
+                                <Trans>over by</Trans>{' '}
+                                <span className="tabular-nums">
+                                  {money(data?.currency ?? null, row.variance)}
+                                </span>
+                              </>
+                            ) : row.variance !== null ? (
+                              <>
+                                {' · '}
+                                <span className="tabular-nums">
+                                  {money(data?.currency ?? null, -row.variance)}
+                                </span>{' '}
+                                <Trans>left</Trans>
+                              </>
+                            ) : null}
+                            {row.budgetVendors > 1 && (
+                              <>
+                                {' '}
+                                <Trans>(across {row.budgetVendors} vendors)</Trans>
+                              </>
+                            )}
+                          </span>
+                        )}
+                        {budgeted && row.budget === null && (
+                          <span title={_(msg`No figure set on this vendor's record.`)}>
+                            <Trans>no {data?.budgetLabel} set</Trans>
                           </span>
                         )}
                         {row.overdueInvoices > 0 && (
