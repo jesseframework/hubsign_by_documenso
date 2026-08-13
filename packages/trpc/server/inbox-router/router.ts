@@ -6,6 +6,10 @@ import { getDocumentResponsibility } from '@documenso/lib/server-only/document/r
 import { bmsMlGetTemplates } from '@documenso/lib/server-only/bms-ml/client';
 import { sendDocument } from '@documenso/lib/server-only/document/send-document';
 import { ensureSignatureFields } from '@documenso/lib/server-only/field/ensure-signature-fields';
+import {
+  affectsDuplicateCheck,
+  flagDuplicateInboxItem,
+} from '@documenso/lib/server-only/inbox/flag-duplicate';
 import { describeBlocks, evaluateGate } from '@documenso/lib/server-only/rules/evaluate-gate';
 import { publishInboxEvent } from '@documenso/lib/server-only/inbox/inbox-events';
 import { markInboxEmailRead } from '@documenso/lib/server-only/inbox/mark-email-read';
@@ -42,6 +46,13 @@ export const inboxRouter = router({
         orderBy: { createdAt: 'desc' },
         take: input?.limit ?? 100,
         include: {
+          // The invoice this one repeats, and any later copies of it. Both sides
+          // are carried so the queue can say which row is the original rather
+          // than leaving two identical-looking invoices and one red flag.
+          duplicateOf: {
+            select: { id: true, subject: true, createdAt: true, status: true, document: { select: { title: true } } },
+          },
+          _count: { select: { duplicates: true } },
           document: {
             select: {
               id: true,
@@ -197,6 +208,22 @@ export const inboxRouter = router({
       const item = await prisma.signatureInboxItem.findFirst({
         where: { id: input.id, organizationId: membership.organizationId },
         include: {
+          duplicateOf: {
+            select: {
+              id: true,
+              subject: true,
+              createdAt: true,
+              status: true,
+              senderEmail: true,
+              document: { select: { title: true } },
+            },
+          },
+          // Copies that arrived after this one. Shown on the original so the two
+          // rows tell the same story from either end.
+          duplicates: {
+            orderBy: { createdAt: 'asc' },
+            select: { id: true, subject: true, createdAt: true, document: { select: { title: true } } },
+          },
           document: {
             include: {
               recipients: {
@@ -348,6 +375,14 @@ export const inboxRouter = router({
           },
         }),
       ]);
+
+      // Correcting a misread vendor or total is exactly how a duplicate becomes
+      // findable — the copy that OCR read as "Northgate Consuiting" only matches
+      // the original once someone fixes the spelling. Re-run outside the
+      // transaction: the correction is saved either way.
+      if (affectsDuplicateCheck(input.field)) {
+        await flagDuplicateInboxItem(item.id);
+      }
 
       return { field: input.field, value: next === '' ? null : next };
     }),

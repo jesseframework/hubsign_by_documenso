@@ -357,6 +357,7 @@ const fmtMoney = (currency: string, raw: string): string => {
 const STATUS_FILTERS = [
   { key: 'READY', label: 'Ready', icon: CheckCircle2Icon },
   { key: 'needs-review', label: 'Needs review', icon: AlertTriangleIcon },
+  { key: 'duplicate', label: 'Duplicates', icon: CopyIcon },
   { key: 'SENT_FOR_SIGNATURE', label: 'Sent to sign', icon: SendIcon },
   { key: 'OCR_FAILED', label: 'OCR failed', icon: XCircleIcon },
   { key: 'COMPLETED', label: 'Completed', icon: CheckCheckIcon },
@@ -419,6 +420,8 @@ export default function SignatureInboxPage() {
       if (statusFilter) {
         if (statusFilter === 'needs-review') {
           if (!it.needsReview) return false;
+        } else if (statusFilter === 'duplicate') {
+          if (!it.duplicateOf) return false;
         } else if (it.status !== statusFilter) return false;
       }
       if (typeFilter && (it.documentType ?? '').toLowerCase() !== typeFilter.toLowerCase()) {
@@ -851,19 +854,37 @@ export default function SignatureInboxPage() {
                 // It missed its target, which the SLA dashboard records, but it
                 // is finished and nothing about it needs doing today.
                 const isOverdue = item.sla?.state === 'breached' && item.sla.open;
+                // An invoice we already have. Outranks overdue in the row colour:
+                // a late invoice needs doing sooner, a duplicate needs not doing
+                // at all, and paying it twice costs more than paying it late.
+                const isDuplicate = Boolean(item.duplicateOf);
+                // Built here rather than inline: the translated string takes
+                // plain values, not expressions dug out of a nullable relation.
+                const originalName =
+                  item.duplicateOf?.subject || item.duplicateOf?.document.title || '';
+                const originalOn = item.duplicateOf
+                  ? new Date(item.duplicateOf.createdAt).toLocaleDateString()
+                  : '';
+                const matchedOn =
+                  item.duplicateMatchedOn === 'invoice-number'
+                    ? _(msg`the invoice number`)
+                    : _(msg`the invoice date`);
                 return (
                   <div
                     role="row"
                     key={item.id}
                     /*
-                      Card below xl, row at xl. The accent that marks unread and
-                      overdue moves to the container here — as a border on the first
-                      cell it would have striped only the top block of a card.
+                      Card below xl, row at xl. The accent that marks unread,
+                      duplicate and overdue moves to the container here — as a
+                      border on the first cell it would have striped only the top
+                      block of a card.
                     */
                     className={`grid grid-cols-2 gap-x-4 gap-y-2 border-b border-l-[3px] border-border p-4 last:border-b-0 xl:gap-x-0 xl:gap-y-0 xl:p-0 ${GRID_COLUMNS} ${
-                      isOverdue
-                        ? 'border-l-orange-500 bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-950/40 dark:hover:bg-orange-950/60'
-                        : `hover:bg-muted/20 ${isUnread ? 'border-l-primary' : 'border-l-transparent'}`
+                      isDuplicate
+                        ? 'border-l-red-600 bg-red-50 hover:bg-red-100/70 dark:bg-red-950/40 dark:hover:bg-red-950/60'
+                        : isOverdue
+                          ? 'border-l-orange-500 bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-950/40 dark:hover:bg-orange-950/60'
+                          : `hover:bg-muted/20 ${isUnread ? 'border-l-primary' : 'border-l-transparent'}`
                     }`}
                   >
                     {/* Invoice info */}
@@ -897,6 +918,37 @@ export default function SignatureInboxPage() {
                         {item.needsReview && (
                           <span className="rounded-full bg-amber-50 px-1.5 text-[10px] text-amber-700 dark:bg-amber-950 dark:text-amber-300">
                             review
+                          </span>
+                        )}
+                        {/*
+                          Named, not just flagged. "Duplicate" on its own sends
+                          someone hunting through the queue for the other copy;
+                          the link goes straight to it.
+                        */}
+                        {item.duplicateOf && (
+                          <Link
+                            to={`/org/inbox/${item.duplicateOf.id}`}
+                            className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-800 hover:underline dark:bg-red-900 dark:text-red-200"
+                            title={_(
+                              msg`Same vendor and total as "${originalName}", received ${originalOn}. Matched on ${matchedOn}.`,
+                            )}
+                          >
+                            <CopyIcon className="h-3 w-3" />
+                            <Trans>duplicate</Trans>
+                          </Link>
+                        )}
+                        {/*
+                          The other end of the same fact. Without it the original
+                          looks untouched next to a red row and there is no telling
+                          which of two identical invoices is the one to pay.
+                        */}
+                        {!item.duplicateOf && item._count.duplicates > 0 && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                            title={_(msg`This is the first copy received. Later copies are marked as duplicates.`)}
+                          >
+                            <CopyIcon className="h-3 w-3" />
+                            <Trans>original</Trans>
                           </span>
                         )}
                         {isOverdue && (

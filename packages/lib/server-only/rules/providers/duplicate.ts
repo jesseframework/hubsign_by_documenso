@@ -24,6 +24,12 @@
  *
  * Deliberately NOT matched on: amount alone (a recurring bill is identical every
  * month and is not a duplicate), or the file name (forwards rename).
+ *
+ * The test is asymmetric, and that matters: only copies that arrived AFTER an
+ * earlier one are duplicates. The first arrival is the invoice — flagging it too
+ * would mark both sides of every pair, leave nobody able to tell which one to
+ * pay, and (through a rule gating on `duplicate.isDuplicate`) block the original
+ * along with the copy.
  */
 
 import { prisma } from '@documenso/prisma';
@@ -120,10 +126,13 @@ export const findDuplicateInboxItems = async ({
   organizationId,
   inboxItemId,
   extractedData,
+  receivedAt,
 }: {
   organizationId: number;
   inboxItemId: string;
   extractedData: unknown;
+  /** When this copy arrived. Only items that predate it can be its original. */
+  receivedAt: Date;
 }): Promise<DuplicateFacts> => {
   const vendorKey = vendorKeyOf(extractedData);
 
@@ -145,17 +154,20 @@ export const findDuplicateInboxItems = async ({
     return EMPTY;
   }
 
-  const since = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+  const since = new Date(receivedAt.getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
 
   const candidates: Candidate[] = await prisma.signatureInboxItem.findMany({
     where: {
       organizationId,
-      id: { not: inboxItemId },
       createdAt: { gte: since },
       ocrProcessed: true,
+      // Strictly earlier arrivals. The id tiebreak covers two copies imported in
+      // the same millisecond — without it neither would be a duplicate of the
+      // other, or both would, depending on how the clock happened to fall.
+      OR: [{ createdAt: { lt: receivedAt } }, { createdAt: receivedAt, id: { lt: inboxItemId } }],
     },
     select: { id: true, createdAt: true, status: true, extractedData: true },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
   });
 
   let matchedOn: DuplicateFacts['matchedOn'] = null;
@@ -267,7 +279,7 @@ export const duplicateProvider: RuleFactProvider = {
 
     const item = await prisma.signatureInboxItem.findFirst({
       where: { documentId, organizationId: subject.organizationId },
-      select: { id: true, extractedData: true },
+      select: { id: true, extractedData: true, createdAt: true },
     });
 
     // Not an inbox-sourced document — nothing to compare against.
@@ -279,6 +291,7 @@ export const duplicateProvider: RuleFactProvider = {
       organizationId: subject.organizationId,
       inboxItemId: item.id,
       extractedData: item.extractedData,
+      receivedAt: item.createdAt,
     });
   },
 };

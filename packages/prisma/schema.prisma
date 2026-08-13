@@ -2530,6 +2530,14 @@ model SignatureInboxItem {
   extractedData Json? /// Flattened field_name → value map from BMS ML.
   ocrMeta       Json? /// Full OCR metadata (confidences, field_extractions, etc.).
 
+  // Duplicate detection, resolved when OCR lands and again after any correction
+  // to the fields it reads. Stored rather than computed on read so the queue can
+  // colour a duplicate without re-scanning every other item on every page load.
+  duplicateOfId      String? /// The earlier copy this one repeats. Null = not a duplicate.
+  duplicateMatchedOn String? /// "invoice-number" (conclusive) or "date-and-amount".
+  duplicateCount     Int       @default(0) /// How many earlier copies matched.
+  duplicateCheckedAt DateTime? /// Null means never checked — which is not the same as checked and clean.
+
   error      String?
   createdAt  DateTime  @default(now())
   receivedAt DateTime? /// True mailbox arrival time from the mail server. Null when upstream gave no date; SLA clocks fall back to createdAt (the ingest instant), which diverges from arrival whenever polling has been down.
@@ -2540,10 +2548,17 @@ model SignatureInboxItem {
   document   Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
   fieldEdits InboxFieldEdit[]
 
+  /// A real relation rather than a loose id, so deleting the original cannot
+  /// leave a copy pointing at a row that no longer exists — the pointer clears
+  /// and the copy stops claiming to duplicate something.
+  duplicateOf SignatureInboxItem?  @relation("InboxItemDuplicate", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates  SignatureInboxItem[] @relation("InboxItemDuplicate")
+
   @@index([organizationId])
   @@index([organizationId, status])
   @@index([createdAt])
   @@index([externalMessageId])
+  @@index([duplicateOfId])
 }
 
 /// A saved column layout for the export builder, scoped to one organization and

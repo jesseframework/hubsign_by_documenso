@@ -4617,6 +4617,10 @@ msgstr "Dropdown options"
 msgid "Due to an unpaid invoice, your team has been restricted. Please settle the payment to restore full access to your team."
 msgstr "Due to an unpaid invoice, your team has been restricted. Please settle the payment to restore full access to your team."
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "duplicate"
+msgstr "duplicate"
+
 #: apps/remix/app/components/tables/templates-table-action-dropdown.tsx
 #: apps/remix/app/components/tables/documents-table-action-dropdown.tsx
 #: apps/remix/app/components/general/document/document-page-view-dropdown.tsx
@@ -6103,6 +6107,10 @@ msgstr "Last used"
 #~ msgid "Late"
 #~ msgstr "Late"
 
+#: apps/remix/app/components/general/inbox/duplicate-banner.tsx
+msgid "Later copies of the same invoice arrived:"
+msgstr "Later copies of the same invoice arrived:"
+
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
 msgid "Layout"
 msgstr "Layout"
@@ -7437,6 +7445,10 @@ msgstr "Organization updated"
 msgid "Organizations let you share the Document Manager across your team with role-based permissions."
 msgstr "Organizations let you share the Document Manager across your team with role-based permissions."
 
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "original"
+msgstr "original"
+
 #: apps/remix/app/components/dialogs/template-use-dialog.tsx
 msgid "Otherwise, the document will be created as a draft."
 msgstr "Otherwise, the document will be created as a draft."
@@ -8209,6 +8221,11 @@ msgstr "Reauthentication is required to sign this field"
 msgid "Received"
 msgstr "Received"
 
+#. placeholder {0}: dateOf(duplicateOf)
+#: apps/remix/app/components/general/inbox/duplicate-banner.tsx
+msgid "received {0}"
+msgstr "received {0}"
+
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "received → fully signed · includes the signer"
 msgstr "received → fully signed · includes the signer"
@@ -8778,6 +8795,18 @@ msgstr "Running…"
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 msgid "Runs"
 msgstr "Runs"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "Same vendor and total as \"{originalName}\", received {originalOn}. Matched on {matchedOn}."
+msgstr "Same vendor and total as \"{originalName}\", received {originalOn}. Matched on {matchedOn}."
+
+#: apps/remix/app/components/general/inbox/duplicate-banner.tsx
+msgid "Same vendor, total and invoice date as an earlier item in this queue — no invoice number was extracted from one of them."
+msgstr "Same vendor, total and invoice date as an earlier item in this queue — no invoice number was extracted from one of them."
+
+#: apps/remix/app/components/general/inbox/duplicate-banner.tsx
+msgid "Same vendor, total and invoice number as an earlier item in this queue."
+msgstr "Same vendor, total and invoice number as an earlier item in this queue."
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
@@ -10222,6 +10251,10 @@ msgstr "Thank you for using HubSign to perform your electronic document signing.
 msgid "Thanks for subscribing, {name}!"
 msgstr "Thanks for subscribing, {name}!"
 
+#: apps/remix/app/components/general/inbox/duplicate-banner.tsx
+msgid "That copy has already gone out for signature. Sending this one risks paying the same invoice twice."
+msgstr "That copy has already gone out for signature. Sending this one risks paying the same invoice twice."
+
 #: apps/remix/app/components/forms/stamp-upload-dialog.tsx
 msgid "That image is too large (max 2 MB)."
 msgstr "That image is too large (max 2 MB)."
@@ -10384,6 +10417,14 @@ msgstr "The following team has been deleted by you"
 #: apps/remix/app/components/general/document/document-page-view-button.tsx
 msgid "The full signed record"
 msgstr "The full signed record"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "the invoice date"
+msgstr "the invoice date"
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "the invoice number"
+msgstr "the invoice number"
 
 #: apps/remix/app/components/general/inbox/signer-list.tsx
 msgid "The new signer is emailed the signing request now."
@@ -10794,6 +10835,14 @@ msgstr "This is a public verification page. It does not show the document conten
 #: packages/ui/primitives/template-flow/add-template-settings.tsx
 msgid "This is how the document will reach the recipients once the document is ready for signing."
 msgstr "This is how the document will reach the recipients once the document is ready for signing."
+
+#: apps/remix/app/components/general/inbox/duplicate-banner.tsx
+msgid "This is the first copy received."
+msgstr "This is the first copy received."
+
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "This is the first copy received. Later copies are marked as duplicates."
+msgstr "This is the first copy received. Later copies are marked as duplicates."
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "This is what reads the inbox. Generate it in WorkHub with email.read permission."
@@ -12343,6 +12392,10 @@ msgstr "You"
 #: apps/remix/app/routes/_recipient+/sign.$token+/complete.tsx
 msgid "You already have a HubSign account. Sign in to keep this document and your signature with the rest of your records."
 msgstr "You already have a HubSign account. Sign in to keep this document and your signature with the rest of your records."
+
+#: apps/remix/app/components/general/inbox/duplicate-banner.tsx
+msgid "You already have this invoice"
+msgstr "You already have this invoice"
 
 #: apps/remix/app/components/dialogs/document-delete-dialog.tsx
 msgid "You are about to delete <0>\"{documentTitle}\"</0>"
