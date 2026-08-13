@@ -1,9 +1,22 @@
 import type { Context, Next } from 'hono';
 import { deleteCookie, setCookie } from 'hono/cookie';
 
+import { useSecureCookies } from '@documenso/lib/constants/auth';
 import { AppDebugger } from '@documenso/lib/utils/debugger';
 
 const debug = new AppDebugger('Middleware');
+
+/**
+ * Not a session cookie, but it still has to carry `Secure` over HTTPS —
+ * every `Set-Cookie` we emit does (FIX-03). `httpOnly` because nothing on the
+ * client reads it; the server is the only consumer.
+ */
+const preferredTeamUrlCookieOptions = {
+  path: '/',
+  sameSite: 'lax',
+  httpOnly: true,
+  secure: useSecureCookies,
+} as const;
 
 /**
  * Middleware for initial page loads.
@@ -49,9 +62,7 @@ export const appMiddleware = async (c: Context, next: Next) => {
   if (pathname.startsWith('/t/')) {
     debug.log('Setting preferred team url cookie');
 
-    setCookie(c, 'preferred-team-url', pathname.split('/')[2], {
-      sameSite: 'lax',
-    });
+    setCookie(c, 'preferred-team-url', pathname.split('/')[2], preferredTeamUrlCookieOptions);
 
     return;
   }
@@ -60,7 +71,7 @@ export const appMiddleware = async (c: Context, next: Next) => {
   if (resetPreferredTeamUrl || pathname === '/documents') {
     debug.log('Deleting preferred team url cookie');
 
-    deleteCookie(c, 'preferred-team-url');
+    deleteCookie(c, 'preferred-team-url', preferredTeamUrlCookieOptions);
 
     return;
   }
