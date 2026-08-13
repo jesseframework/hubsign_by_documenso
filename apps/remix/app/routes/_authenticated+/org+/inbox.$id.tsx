@@ -16,7 +16,9 @@ import {
   DocumentTimeline,
   SigningStatusBanner,
 } from '~/components/general/inbox/document-timeline';
+import { DuplicateBanner } from '~/components/general/inbox/duplicate-banner';
 import { ExtractedFields } from '~/components/general/inbox/extracted-fields';
+import { SignerList } from '~/components/general/inbox/signer-list';
 import { useInboxEvents } from '~/hooks/use-inbox-events';
 import { appMetaTags } from '~/utils/meta';
 
@@ -179,6 +181,13 @@ export default function InboxItemPage() {
           {item.error}
         </p>
       )}
+
+      {/* Above the extracted data, because it changes whether to read it at all. */}
+      <DuplicateBanner
+        duplicateOf={item.duplicateOf}
+        duplicates={item.duplicates}
+        matchedOn={item.duplicateMatchedOn}
+      />
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* OCR results — fields are whatever the ML template extracted */}
@@ -359,16 +368,11 @@ export default function InboxItemPage() {
               <p className={label}>
                 <Trans>Existing signers</Trans>
               </p>
-              <ul className="space-y-1">
-                {item.document.recipients.map((r) => (
-                  <li key={r.id} className="text-[12px]">
-                    {r.name || r.email}{' '}
-                    <span className="text-muted-foreground">
-                      ({r.email}) · {r.signingStatus.toLowerCase()}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <SignerList
+                inboxItemId={id}
+                documentStatus={item.document.status}
+                signers={item.document.recipients}
+              />
             </div>
           )}
 

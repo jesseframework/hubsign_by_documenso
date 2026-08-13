@@ -3,6 +3,14 @@ import { z } from 'zod';
 
 import { bmsMlGetTemplates } from '@documenso/lib/server-only/bms-ml/client';
 import { normalizeMetadataKey } from '@documenso/lib/universal/metadata';
+import {
+  METADATA_FIELD_TYPES,
+  type MetadataFieldDefinitionLike,
+  coerceMetadataFieldValue,
+  coerceMetadataFieldValues,
+  deriveMetadataFieldKey,
+  isReservedMetadataFieldKey,
+} from '@documenso/lib/universal/metadata-fields';
 import { MAX_METADATA_IMPORT_ROWS } from '@documenso/lib/universal/metadata-import';
 import { prisma } from '@documenso/prisma';
 import { Prisma } from '@prisma/client';
@@ -33,6 +41,71 @@ const requireOrgWriteAccess = async (userId: number) => {
 };
 
 /**
+ * The org's custom field definitions for one or more categories.
+ *
+ * Read on every write so a value is validated against what the field promises.
+ * Coercion is applied here rather than trusted from the client because `data`
+ * accepts arbitrary keys by design — the public API and a stale browser tab both
+ * reach this code, and a NUMBER field holding the text "abt 400" would fail much
+ * later, in whatever read it.
+ */
+const definitionsByCategory = async (
+  organizationId: number,
+  categories: string[],
+): Promise<Map<string, MetadataFieldDefinitionLike[]>> => {
+  const rows = await prisma.metadataFieldDefinition.findMany({
+    where: { organizationId, category: { in: [...new Set(categories)] } },
+    orderBy: [{ order: 'asc' }, { label: 'asc' }],
+  });
+
+  const byCategory = new Map<string, MetadataFieldDefinitionLike[]>();
+
+  for (const row of rows) {
+    const list = byCategory.get(row.category) ?? [];
+    list.push({
+      key: row.key,
+      label: row.label,
+      type: row.type,
+      options: row.options,
+      helpText: row.helpText,
+      required: row.required,
+    });
+    byCategory.set(row.category, list);
+  }
+
+  return byCategory;
+};
+
+/**
+ * Validate one record's custom values, or refuse the save naming every problem.
+ *
+ * All of them at once rather than the first: a form with four custom fields
+ * should not be fixed one round-trip at a time.
+ */
+const checkCustomFields = async (
+  organizationId: number,
+  category: string,
+  data: Record<string, unknown> | undefined,
+): Promise<Record<string, unknown> | undefined> => {
+  const normalizedCategory = category.trim().toLowerCase();
+  const definitions =
+    (await definitionsByCategory(organizationId, [normalizedCategory])).get(normalizedCategory) ??
+    [];
+
+  if (definitions.length === 0) {
+    return data;
+  }
+
+  const result = coerceMetadataFieldValues(definitions, data ?? {});
+
+  if (result.errors.length > 0) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: result.errors.join(' ') });
+  }
+
+  return Object.keys(result.data).length > 0 ? result.data : undefined;
+};
+
+/**
  * Org-scoped lookup directory (e.g. vendor name → email) used by the
  * LOOKUP_METADATA workflow action.
  */
@@ -46,6 +119,143 @@ export const metadataRouter = router({
         where: { organizationId: membership.organizationId, category: input?.category },
         orderBy: [{ category: 'asc' }, { label: 'asc' }],
       });
+    }),
+
+  /** The org's custom field definitions, every category, in display order. */
+  listFields: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await requireOrgMember(ctx.user.id);
+    return prisma.metadataFieldDefinition.findMany({
+      where: { organizationId: membership.organizationId },
+      orderBy: [{ category: 'asc' }, { order: 'asc' }, { label: 'asc' }],
+    });
+  }),
+
+  /**
+   * Define a custom field, or edit one.
+   *
+   * The storage key is derived from the label on creation and then frozen: it is
+   * what workflow templates reference as `{{vars.vendor.<key>}}` and what every
+   * saved record's value is filed under, so re-deriving it on a rename would
+   * orphan the data and break the templates in the same move. Renaming the label
+   * is therefore always safe, which is the behaviour people expect.
+   */
+  upsertField: authenticatedProcedure
+    .input(
+      z.object({
+        id: z.string().optional(),
+        category: z.string().min(1).max(100),
+        label: z.string().min(1).max(120),
+        type: z.enum(METADATA_FIELD_TYPES),
+        options: z.array(z.string().min(1).max(120)).max(50).optional(),
+        helpText: z.string().max(300).nullable().optional(),
+        required: z.boolean().optional(),
+        order: z.number().int().min(0).max(999).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireOrgWriteAccess(ctx.user.id);
+      const category = input.category.trim().toLowerCase();
+      const label = input.label.trim();
+
+      // Deduped and trimmed here so the coercion's "must be one of" message and
+      // the dropdown can never list a blank or a repeat.
+      const options =
+        input.type === 'SELECT'
+          ? [...new Set((input.options ?? []).map((option) => option.trim()).filter(Boolean))]
+          : [];
+
+      if (input.type === 'SELECT' && options.length === 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'A dropdown needs at least one option.',
+        });
+      }
+
+      const common = {
+        label,
+        type: input.type,
+        options,
+        helpText: input.helpText?.trim() || null,
+        required: input.required ?? false,
+        order: input.order ?? 0,
+      };
+
+      if (input.id) {
+        const existing = await prisma.metadataFieldDefinition.findFirst({
+          where: { id: input.id, organizationId: membership.organizationId },
+          select: { id: true },
+        });
+
+        if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'Field not found.' });
+
+        return prisma.metadataFieldDefinition.update({
+          where: { id: existing.id },
+          // Category and key are both left alone: moving a field to another
+          // category would strand its values on records that no longer show it.
+          data: common,
+        });
+      }
+
+      const key = deriveMetadataFieldKey(label);
+
+      if (!key) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Give the field a name using letters or numbers.',
+        });
+      }
+
+      if (isReservedMetadataFieldKey(key)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `"${label}" is a built-in field on this record — pick another name.`,
+        });
+      }
+
+      const clash = await prisma.metadataFieldDefinition.findUnique({
+        where: {
+          organizationId_category_key: {
+            organizationId: membership.organizationId,
+            category,
+            key,
+          },
+        },
+        select: { label: true },
+      });
+
+      if (clash) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `"${clash.label}" already covers that name in ${category}.`,
+        });
+      }
+
+      return prisma.metadataFieldDefinition.create({
+        data: { organizationId: membership.organizationId, category, key, ...common },
+      });
+    }),
+
+  /**
+   * Remove a field definition.
+   *
+   * Values already saved on records are left in place. They stop being shown and
+   * stop being validated, but a workflow template still reading the key keeps
+   * resolving — and re-adding a field with the same name brings the old values
+   * back into view rather than finding every record blank.
+   */
+  deleteField: authenticatedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireOrgWriteAccess(ctx.user.id);
+      const field = await prisma.metadataFieldDefinition.findFirst({
+        where: { id: input.id, organizationId: membership.organizationId },
+        select: { id: true },
+      });
+
+      if (!field) throw new TRPCError({ code: 'NOT_FOUND', message: 'Field not found.' });
+
+      await prisma.metadataFieldDefinition.delete({ where: { id: field.id } });
+      return { success: true };
     }),
 
   /** Create or update a record (unique per org + category + normalized key). */
@@ -63,6 +273,8 @@ export const metadataRouter = router({
       const key = normalizeMetadataKey(input.label);
       if (!key) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Label is required.' });
 
+      const data = await checkCustomFields(membership.organizationId, input.category, input.data);
+
       return prisma.metadataRecord.upsert({
         where: {
           organizationId_category_key: {
@@ -77,12 +289,12 @@ export const metadataRouter = router({
           key,
           label: input.label.trim(),
           email: input.email ?? null,
-          data: (input.data ?? undefined) as Prisma.InputJsonValue | undefined,
+          data: (data ?? undefined) as Prisma.InputJsonValue | undefined,
         },
         update: {
           label: input.label.trim(),
           email: input.email ?? null,
-          data: (input.data ?? undefined) as Prisma.InputJsonValue | undefined,
+          data: (data ?? undefined) as Prisma.InputJsonValue | undefined,
         },
       });
     }),
@@ -158,6 +370,12 @@ export const metadataRouter = router({
         }
       }
 
+      // Every category the file touches, resolved in one read rather than per row.
+      const customFields = await definitionsByCategory(
+        membership.organizationId,
+        input.records.map((record) => record.category.trim().toLowerCase()),
+      );
+
       // A sheet can repeat the same vendor; later rows win, matching how the
       // file reads top to bottom.
       const pending = new Map<
@@ -197,6 +415,31 @@ export const metadataRouter = router({
           }
 
           data = { ...(data ?? {}), ocrTemplateId: template.id, ocrTemplateName: template.name };
+        }
+
+        // Custom values are checked per value and reported per row, in keeping
+        // with the rest of this import: one bad number in row 47 costs that one
+        // value, not the file and not the row. The row still lands, with the
+        // reason named, which is how the sheet gets corrected.
+        for (const definition of customFields.get(category) ?? []) {
+          if (!data || !(definition.key in data)) {
+            continue;
+          }
+
+          const coerced = coerceMetadataFieldValue(definition, data[definition.key]);
+
+          if (!coerced.ok) {
+            errors.push({ row: record.row, label: record.label, message: coerced.message });
+            delete data[definition.key];
+            continue;
+          }
+
+          if (coerced.value === null) {
+            delete data[definition.key];
+            continue;
+          }
+
+          data[definition.key] = coerced.value;
         }
 
         const mapKey = `${category}::${key}`;
@@ -305,6 +548,8 @@ export const metadataRouter = router({
       const key = normalizeMetadataKey(input.label);
       if (!key) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Label is required.' });
 
+      const data = await checkCustomFields(membership.organizationId, input.category, input.data);
+
       try {
         return await prisma.metadataRecord.update({
           where: { id: existing.id },
@@ -314,7 +559,7 @@ export const metadataRouter = router({
             label: input.label.trim(),
             email: input.email ?? null,
             // Empty data clears the extra fields (keywords/role/…).
-            data: input.data ? (input.data as Prisma.InputJsonValue) : Prisma.DbNull,
+            data: data ? (data as Prisma.InputJsonValue) : Prisma.DbNull,
           },
         });
       } catch (err) {

@@ -15,6 +15,7 @@ import { buildOcrCanonicalFields } from '../../universal/ocr-fields';
 import { getFileServerSide } from '../../universal/upload/get-file.server';
 import { bmsMlUploadDocument, isBmsMlConfigured } from '../bms-ml/client';
 import { triggerWorkflows } from '../workflow/trigger-workflows';
+import { flagDuplicateInboxItem } from './flag-duplicate';
 import { publishInboxEvent } from './inbox-events';
 import { resolveOcrTemplate } from './resolve-ocr-template';
 
@@ -28,10 +29,6 @@ const fireOcrCompleted = async (inboxItemId: string): Promise<void> => {
           title: true,
           status: true,
           userId: true,
-          // Who is actually operating this queue. An internal alert needs a
-          // person's address: sending it to the organization's inbound mailbox
-          // would deliver the warning into the very inbox being warned about.
-          user: { select: { id: true, email: true, name: true } },
         },
       },
     },
@@ -42,52 +39,10 @@ const fireOcrCompleted = async (inboxItemId: string): Promise<void> => {
   publishInboxEvent(item.organizationId, { type: 'ocr', inboxItemId: item.id, status: item.status });
 
   // Duplicate check runs here because this is the first moment the vendor and
-  // invoice number are known. Fired as its own event so a workflow can notify
-  // the vendor and the AP team without every OCR completion having to branch.
-  try {
-    const { findDuplicateInboxItems } = await import('../rules/providers/duplicate');
-
-    const duplicate = await findDuplicateInboxItems({
-      organizationId: item.organizationId,
-      inboxItemId: item.id,
-      extractedData: item.extractedData,
-    });
-
-    if (duplicate.isDuplicate) {
-      console.warn(
-        `[inbox] duplicate invoice: item ${item.id} matches ${duplicate.originalInboxItemId} ` +
-          `on ${duplicate.matchedOn}${duplicate.originalAlreadySent ? ' (original ALREADY SENT)' : ''}`,
-      );
-
-      await triggerWorkflows({
-        event: 'INBOX_DUPLICATE_DETECTED',
-        organizationId: item.organizationId,
-        data: {
-          inboxItemId: item.id,
-          duplicate,
-          sender: item.senderEmail,
-          extractedData: item.extractedData,
-          ...buildOcrCanonicalFields(item.extractedData),
-          owner: item.document.user
-            ? {
-                id: item.document.user.id,
-                email: item.document.user.email,
-                name: item.document.user.name,
-              }
-            : null,
-          document: {
-            id: item.document.id,
-            title: item.document.title,
-            status: item.document.status,
-            userId: item.document.userId,
-          },
-        },
-      });
-    }
-  } catch (err) {
-    // Detection is advisory; it must never stop OCR completing.
-    console.error('[inbox] duplicate detection failed:', err);
-  }
+  // invoice number are known. It stores its verdict on the item (so the queue can
+  // show it) and fires its own event, so a workflow can notify the vendor and the
+  // AP team without every OCR completion having to branch.
+  await flagDuplicateInboxItem(item.id);
 
   await triggerWorkflows({
     event: 'INBOX_OCR_COMPLETED',

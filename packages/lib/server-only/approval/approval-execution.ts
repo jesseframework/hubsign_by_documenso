@@ -20,6 +20,8 @@ import { ApprovalFlowStatus, ApprovalRequestStatus } from '@prisma/client';
 
 import { prisma } from '@documenso/prisma';
 
+import { RULE_OVERRIDE_ENTITY_TYPE } from '../rules/overrides';
+
 import { AppError, AppErrorCode } from '../../errors/app-error';
 import { nanoid } from '../../universal/id';
 import { sendApprovalOutcomeEmail, sendApprovalRequestEmail } from './approval-email';
@@ -394,6 +396,10 @@ async function finalizeApproved(requestId: string, depth = 0): Promise<ApprovalR
     runOnApproveAction(request.entityType, request.entityId, request.template?.onApproveAction, built),
   );
 
+  await safe('grant rule override', () =>
+    applyEntitySideEffect(request.entityType, request.entityId, true, null),
+  );
+
   // Notify the originator.
   if (built.ownerEmail) {
     await safe('approved outcome email', () =>
@@ -450,6 +456,10 @@ async function handleRejection(
     where: { id: requestId },
     data: { status: ApprovalRequestStatus.REJECTED, completedAt: new Date() },
   });
+
+  await safe('decline rule override', () =>
+    applyEntitySideEffect(request.entityType, request.entityId, false, comments),
+  );
 
   const built = await buildApprovalContext({
     organizationId: request.organizationId,
@@ -510,5 +520,34 @@ async function runOnApproveAction(
     userId: built.ownerUserId ?? 0,
     teamId: built.teamId ?? undefined,
     requestMetadata: { requestMetadata: {}, source: 'app', auth: null },
+  });
+}
+
+/**
+ * Carry a chain's verdict onto whatever the chain was gating.
+ *
+ * Keyed on entityType rather than on the template's `onApproveAction`, so an
+ * override is granted whichever template the organization happens to route it
+ * through — including one they created before this existed. Never allowed to
+ * throw: the approval itself has already been recorded by the time this runs, and
+ * losing the request's own state because a side effect failed would be worse.
+ */
+async function applyEntitySideEffect(
+  entityType: string,
+  entityId: string,
+  approved: boolean,
+  comments: string | null,
+): Promise<void> {
+  if (entityType !== RULE_OVERRIDE_ENTITY_TYPE) return;
+
+  const { decideRuleOverride } = await import('../rules/overrides');
+
+  await decideRuleOverride({
+    overrideId: entityId,
+    approved,
+    // The chain's approvers are recorded on the flow rows; the override row keeps
+    // no single decider because there may have been several.
+    decidedByUserId: null,
+    note: comments,
   });
 }

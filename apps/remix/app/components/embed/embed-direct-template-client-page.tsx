@@ -122,6 +122,9 @@ export const EmbedDirectTemplateClientPage = ({
               payload.value && !payload.value.startsWith('data:') ? payload.value : null,
             signaturePositionX: null,
             signaturePositionY: null,
+            // Null rather than a default: these are local placeholders for a
+            // signature the server has not written yet.
+            signatureFill: null,
           } satisfies Signature;
         }
 
@@ -315,6 +318,9 @@ export const EmbedDirectTemplateClientPage = ({
           typedSignature: signature?.startsWith('data:') ? null : signature,
           signaturePositionX: null,
           signaturePositionY: null,
+          // Null rather than a default: these are local placeholders for a
+          // signature the server has not written yet.
+          signatureFill: null,
         }}
       />
     );

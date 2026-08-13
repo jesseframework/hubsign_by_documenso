@@ -5,6 +5,8 @@ import { CheckCircle2Icon, ClipboardCheckIcon, InboxIcon, XCircleIcon } from 'lu
 import { Link } from 'react-router';
 
 import { trpc } from '@documenso/trpc/react';
+
+import { RuleOverrideQueue } from '~/components/general/rules/rule-override-queue';
 import { Button } from '@documenso/ui/primitives/button';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
@@ -59,7 +61,9 @@ export default function ApprovalsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">
+        <RuleOverrideQueue assignedToMe />
+
+      <h2 className="text-lg font-semibold">
           <Trans>Approvals</Trans>
         </h2>
         <p className="mt-0.5 text-[13px] text-muted-foreground">

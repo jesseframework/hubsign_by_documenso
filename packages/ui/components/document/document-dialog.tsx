@@ -25,14 +25,24 @@ export default function DocumentDialog({ trigger, documentData, ...props }: Docu
 
   return (
     <Dialog {...props}>
+      {/*
+        The trigger has to sit OUTSIDE the portal.
+
+        Radix only mounts a portal's children while the dialog is open, so a
+        trigger nested inside one is never rendered — and since the trigger is
+        what opens the dialog, it could never open. On the signing completion
+        page that made "View original document" silently absent for anyone
+        waiting on other signers: the element existed in the source and never
+        reached the page.
+      */}
+      {trigger && (
+        <DialogTrigger onClick={(e) => e.stopPropagation()} asChild={true}>
+          {trigger}
+        </DialogTrigger>
+      )}
+
       <DialogPortal>
         <DialogOverlay className="bg-black/80" />
-
-        {trigger && (
-          <DialogTrigger onClick={(e) => e.stopPropagation()} asChild={true}>
-            {trigger}
-          </DialogTrigger>
-        )}
 
         <DialogPrimitive.Content
           className={cn(

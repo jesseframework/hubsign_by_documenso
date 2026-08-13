@@ -123,7 +123,21 @@ export const attachmentOcrProvider: RuleFactProvider = {
       label: 'Both totals are present and the attachment looks like the PO',
       type: 'boolean',
       description:
-        'Test this alongside the difference so an unreadable total is not read as agreement. False when the attachment has no PO number, because then there is no evidence it is the purchase order.',
+        'Test this alongside the difference so an unreadable total is not read as agreement. False when the attachment has no PO number, because then there is no evidence it is the purchase order, and false when the total contradicts the subtotal.',
+    },
+    {
+      path: 'attachedPo.total_unreliable',
+      label: 'The attachment’s total contradicts its own subtotal',
+      type: 'boolean',
+      description:
+        'True when the extracted total is LESS than the extracted subtotal, which no real document can be — in practice the extractor has picked up a line-item price instead of the total. The totals are then not compared at all, so an amount rule stays silent rather than blocking on a misread. Block on this field itself if you would rather refuse to sign than proceed on figures that could not be verified.',
+    },
+    {
+      path: 'attachedPo.subtotal',
+      label: 'Subtotal read from the attachment',
+      type: 'number',
+      unreliable: true,
+      description: 'Exposed so a contradiction between it and the total can be seen from a rule.',
     },
   ],
 
@@ -189,6 +203,8 @@ export const attachmentOcrProvider: RuleFactProvider = {
         invoice_po_number: asTextValue(invoicePo),
         total_difference: null,
         total_comparable: false,
+        total_unreliable: false,
+        subtotal: null,
       };
     }
 
@@ -197,15 +213,38 @@ export const attachmentOcrProvider: RuleFactProvider = {
     const poNumber = readOcrField(data, 'poNumber');
     const vendorName = readOcrField(data, 'vendorName');
     const total = readOcrField(data, 'totalAmount');
+    const subtotal = readOcrField(data, 'subtotal');
 
-    const totalNumber = (() => {
-      if (total === null || total === undefined) return null;
-      const cleaned = String(total).replace(/[^0-9.-]/g, '');
+    const asNumber = (value: unknown): number | null => {
+      if (value === null || value === undefined) return null;
+      const cleaned = String(value).replace(/[^0-9.-]/g, '');
       if (!/\d/.test(cleaned)) return null;
       const parsed = Number(cleaned);
 
       return Number.isFinite(parsed) ? parsed : null;
-    })();
+    };
+
+    const totalNumber = asNumber(total);
+    const subtotalNumber = asNumber(subtotal);
+
+    /**
+     * A total below its own subtotal is not a discrepancy to report — it is
+     * proof the extraction is wrong, because tax and charges only ever add.
+     *
+     * Observed on a purchase order in this deployment: the extractor returned
+     * `subtotal: 57.9` and `total_amount: 28.95`, the latter being the unit
+     * price of a line whose amount was 57.90. It happens because a PO gets
+     * classified as an invoice and read with an invoice template.
+     *
+     * Comparing that 28.95 against the invoice's 66.59 yields a 37.64 "gap" and
+     * an amount rule blocks a signature over a number nobody mistyped. A
+     * payment control that fires on its own misreads gets switched off, and
+     * then it is protecting nothing — so the comparison is withheld and
+     * `total_unreliable` says why, leaving an org free to block on THAT if it
+     * would rather stop than proceed unverified.
+     */
+    const totalUnreliable =
+      totalNumber !== null && subtotalNumber !== null && totalNumber < subtotalNumber;
 
     const poComparison = referencesMatch(poNumber, invoicePo);
 
@@ -221,7 +260,8 @@ export const attachmentOcrProvider: RuleFactProvider = {
     // deployment: a "king.png" statement totalling 48,399 attached to a $20
     // invoice produced a 48,379 discrepancy.
     const looksLikeThePo = asTextValue(poNumber) !== null;
-    const difference = looksLikeThePo ? amountDifference(totalNumber, invoiceTotal) : null;
+    const difference =
+      looksLikeThePo && !totalUnreliable ? amountDifference(totalNumber, invoiceTotal) : null;
 
     return {
       applicable: true,
@@ -242,6 +282,8 @@ export const attachmentOcrProvider: RuleFactProvider = {
       invoice_po_number: asTextValue(invoicePo),
       total_difference: difference,
       total_comparable: difference !== null,
+      total_unreliable: totalUnreliable,
+      subtotal: subtotalNumber,
     };
   },
 };

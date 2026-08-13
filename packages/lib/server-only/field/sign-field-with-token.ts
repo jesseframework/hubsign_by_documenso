@@ -8,6 +8,7 @@ import { validateNumberField } from '@documenso/lib/advanced-fields-validation/v
 import { validateRadioField } from '@documenso/lib/advanced-fields-validation/validate-radio';
 import { validateTextField } from '@documenso/lib/advanced-fields-validation/validate-text';
 import { fromCheckboxValue } from '@documenso/lib/universal/field-checkbox';
+import { clampSignatureFill } from '../../constants/signature-size';
 import { prisma } from '@documenso/prisma';
 
 import { DEFAULT_DOCUMENT_DATE_FORMAT } from '../../constants/date-formats';
@@ -37,6 +38,8 @@ export type SignFieldWithTokenOptions = {
   signaturePositionY?: number;
   fieldSignedPositionX?: number;
   fieldSignedPositionY?: number;
+  /** Fraction of the field to draw the signature at, chosen by the signer. */
+  signatureFill?: number;
 };
 
 /**
@@ -61,6 +64,7 @@ export const signFieldWithToken = async ({
   signaturePositionY,
   fieldSignedPositionX,
   fieldSignedPositionY,
+  signatureFill,
 }: SignFieldWithTokenOptions) => {
   const recipient = await prisma.recipient.findFirstOrThrow({
     where: {
@@ -231,6 +235,20 @@ export const signFieldWithToken = async ({
       throw new Error('Signature coordinates must be between 0 and 100');
     }
   }
+
+  /*
+    The size the signer chose, clamped rather than rejected.
+
+    Clamped because this arrives with a signature attached: refusing the request
+    over a size would throw away the signature itself, and a value outside the
+    range can only come from a hand-made request or a stale tab — neither of which
+    is worth failing a signing over. `undefined` leaves the column null, which the
+    renderer reads as "signed before the control existed".
+  */
+  const chosenFill =
+    isSignatureField && signatureFill !== undefined && Number.isFinite(signatureFill)
+      ? clampSignatureFill(signatureFill)
+      : undefined;
   // For non-signature fields, compute field-level coords
   if (!isSignatureField) {
     const fallbackX = Number(field.positionX);
@@ -277,12 +295,14 @@ export const signFieldWithToken = async ({
           typedSignature: typedSignature,
           signaturePositionX: coordX,
           signaturePositionY: coordY,
+          signatureFill: chosenFill,
         },
         update: {
           signatureImageAsBase64: signatureImageAsBase64,
           typedSignature: typedSignature,
           signaturePositionX: coordX,
           signaturePositionY: coordY,
+          signatureFill: chosenFill,
         },
       });
 

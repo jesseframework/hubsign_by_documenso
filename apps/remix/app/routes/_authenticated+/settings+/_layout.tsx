@@ -7,15 +7,11 @@ export function meta() {
 }
 
 /**
- * Settings layout. The section nav now lives in the app sidebar (expandable
- * under "Settings"); this keeps the content card wrapper.
+ * Settings layout. The section rail and content card are supplied by
+ * `ConsoleShell` in the authenticated layout — these routes are split across
+ * the Account and Settings consoles (personal preferences versus organizational
+ * configuration), so the chrome is resolved per path rather than per folder.
  */
 export default function SettingsLayout() {
-  return (
-    <div className="w-full">
-      <div className="rounded-[var(--r)] border border-border bg-card p-4 sm:p-6">
-        <Outlet />
-      </div>
-    </div>
-  );
+  return <Outlet />;
 }

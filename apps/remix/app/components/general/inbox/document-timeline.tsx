@@ -1,5 +1,6 @@
 import { Trans } from '@lingui/react/macro';
 import {
+  ArrowRightLeftIcon,
   BellIcon,
   CheckCheckIcon,
   CheckCircle2Icon,
@@ -10,6 +11,9 @@ import {
   PenLineIcon,
   ScanLineIcon,
   SendIcon,
+  ShieldCheckIcon,
+  ShieldQuestionIcon,
+  ShieldXIcon,
   UserCogIcon,
   WorkflowIcon,
   XCircleIcon,
@@ -40,12 +44,16 @@ type Kind =
   | 'RECIPIENT_OPENED'
   | 'RECIPIENT_SIGNED'
   | 'RECIPIENT_REJECTED'
+  | 'RECIPIENT_REASSIGNED'
   | 'COMPLETED'
   | 'COPY_EMAILED'
   | 'WORKFLOW_RUN'
   | 'FIELD_CORRECTED'
   | 'FIELD_FROM_ATTACHMENT'
-  | 'ATTACHMENT_READ';
+  | 'ATTACHMENT_READ'
+  | 'OVERRIDE_REQUESTED'
+  | 'OVERRIDE_APPROVED'
+  | 'OVERRIDE_DECLINED';
 
 const ICONS: Record<Kind, typeof InboxIcon> = {
   ARRIVED: InboxIcon,
@@ -58,12 +66,16 @@ const ICONS: Record<Kind, typeof InboxIcon> = {
   RECIPIENT_OPENED: EyeIcon,
   RECIPIENT_SIGNED: PenLineIcon,
   RECIPIENT_REJECTED: XCircleIcon,
+  RECIPIENT_REASSIGNED: ArrowRightLeftIcon,
   COMPLETED: CheckCheckIcon,
   COPY_EMAILED: MailIcon,
   WORKFLOW_RUN: WorkflowIcon,
   FIELD_CORRECTED: UserCogIcon,
   FIELD_FROM_ATTACHMENT: ScanLineIcon,
   ATTACHMENT_READ: ScanLineIcon,
+  OVERRIDE_REQUESTED: ShieldQuestionIcon,
+  OVERRIDE_APPROVED: ShieldCheckIcon,
+  OVERRIDE_DECLINED: ShieldXIcon,
 };
 
 const TONES: Partial<Record<Kind, string>> = {
@@ -72,8 +84,16 @@ const TONES: Partial<Record<Kind, string>> = {
   RECIPIENT_REJECTED: 'text-red-600 dark:text-red-400',
   REMINDER_SENT: 'text-sky-600 dark:text-sky-400',
   SENT_FOR_SIGNATURE: 'text-violet-600 dark:text-violet-400',
+  // Amber: a request changing hands mid-flight is a deviation worth noticing,
+  // not routine progress.
+  RECIPIENT_REASSIGNED: 'text-amber-600 dark:text-amber-400',
   FIELD_CORRECTED: 'text-sky-600 dark:text-sky-400',
   FIELD_FROM_ATTACHMENT: 'text-sky-600 dark:text-sky-400',
+  // Amber, not green: an exception being granted is a control being stood down,
+  // and it should not read as routine progress the way a signature does.
+  OVERRIDE_REQUESTED: 'text-amber-600 dark:text-amber-400',
+  OVERRIDE_APPROVED: 'text-amber-600 dark:text-amber-400',
+  OVERRIDE_DECLINED: 'text-red-600 dark:text-red-400',
 };
 
 function Label({
@@ -128,6 +148,14 @@ function Label({
       ) : (
         <Trans>Declined by {who}</Trans>
       );
+    case 'RECIPIENT_REASSIGNED':
+      // Both addresses, because "who was it taken from" is the whole point of
+      // the row — and the previous signer's link stopped working at this moment.
+      return (
+        <Trans>
+          Reassigned from {note ?? '—'} to {detail ?? who}
+        </Trans>
+      );
     case 'COMPLETED':
       return <Trans>Everyone signed — document completed</Trans>;
     case 'COPY_EMAILED':
@@ -154,6 +182,32 @@ function Label({
         <Trans>
           Attachment “{note ?? 'file'}” read by OCR ({who})
         </Trans>
+      );
+    case 'OVERRIDE_REQUESTED':
+      return note ? (
+        <Trans>
+          {who} was blocked and asked to sign anyway — {note}
+        </Trans>
+      ) : (
+        <Trans>{who} was blocked and asked to sign anyway</Trans>
+      );
+    case 'OVERRIDE_APPROVED':
+      // A chain decision names no one: several approvers may have acted, and
+      // crediting one of them would misreport who authorised it.
+      return detail === 'chain' ? (
+        <Trans>Exception approved by the approval chain</Trans>
+      ) : actor ? (
+        <Trans>Exception approved by {who}</Trans>
+      ) : (
+        <Trans>Exception approved</Trans>
+      );
+    case 'OVERRIDE_DECLINED':
+      return note ? (
+        <Trans>
+          Exception declined by {who} — {note}
+        </Trans>
+      ) : (
+        <Trans>Exception declined by {who}</Trans>
       );
     case 'WORKFLOW_RUN':
       return (

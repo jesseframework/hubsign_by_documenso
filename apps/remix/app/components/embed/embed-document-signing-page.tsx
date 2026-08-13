@@ -268,6 +268,9 @@ export const EmbedSignDocumentClientPage = ({
           typedSignature: signature?.startsWith('data:') ? null : signature,
           signaturePositionX: null,
           signaturePositionY: null,
+          // Null rather than a default: these are local placeholders for a
+          // signature the server has not written yet.
+          signatureFill: null,
         }}
       />
     );

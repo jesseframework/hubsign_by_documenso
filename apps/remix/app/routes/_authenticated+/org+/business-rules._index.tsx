@@ -11,6 +11,7 @@ import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { OrgAdminGuard } from '~/components/general/org-admin-guard';
+import { RuleOverrideQueue } from '~/components/general/rules/rule-override-queue';
 import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
@@ -62,6 +63,25 @@ const PRESETS = [
     },
   },
   {
+    name: 'Attached file must be a purchase order',
+    gate: 'DOCUMENT_SIGN' as const,
+    message:
+      'We could not read a PO number from the file you attached. Attach the purchase order itself, as a PDF or a clear photo — Word and Excel files cannot be read.',
+    // Pairs with "Supporting document required", which only counts files and is
+    // therefore satisfied by a photo of anything. This one checks that what was
+    // attached is actually the purchase order.
+    //
+    // The `count > 0` guard is what keeps both messages truthful. Without it
+    // this fires on a document with nothing attached too, and the signer is told
+    // we could not read a file they never sent.
+    condition: {
+      and: [
+        { '>': [{ var: 'attachments.count' }, 0] },
+        { '!': [{ var: 'attachedPo.po_number' }] },
+      ],
+    },
+  },
+  {
     name: 'Attached PO must match the invoice',
     gate: 'DOCUMENT_SIGN' as const,
     message:
@@ -83,6 +103,45 @@ const PRESETS = [
       and: [
         { var: 'attachedPo.total_comparable' },
         { '>': [{ var: 'attachedPo.total_difference' }, 1] },
+      ],
+    },
+  },
+  {
+    name: 'PO figures could not be verified',
+    gate: 'DOCUMENT_SIGN' as const,
+    message:
+      'The purchase order total could not be read reliably, so it was not checked against the invoice. Verify the figures manually before signing.',
+    // The fail-closed counterpart to the amount rule above.
+    //
+    // When an attachment's total comes back below its own subtotal the
+    // extraction is provably wrong, so the amount comparison is withheld rather
+    // than blocking on a misread. That protects the signer from a false block,
+    // but it also means nothing checked the figures. Turn this on if unverified
+    // is worse than inconvenient for your organization.
+    condition: { var: 'attachedPo.total_unreliable' },
+  },
+  {
+    name: 'Attached PO required and must match',
+    gate: 'DOCUMENT_SIGN' as const,
+    message:
+      'Attach the purchase order for this invoice before signing. It must show the same PO number as the invoice, and be a PDF or a clear photo so it can be read.',
+    // The strict form of the three PO presets above, collapsed into one rule:
+    // nothing attached, an attachment carrying no PO number, and an attachment
+    // whose PO number disagrees all fail it. Use it INSTEAD of them rather than
+    // alongside — the trade-off for one rule is one message covering three
+    // different causes, which is why the layered version exists as well.
+    //
+    // Attaching a PO to an invoice that had no PO number of its own clears this:
+    // the attachment's number is copied onto the invoice, so the two then agree.
+    //
+    // The `fromInbox` guard is not optional. `po_matches_invoice` needs a number
+    // on BOTH sides, and the invoice's side comes from the inbox item's extracted
+    // data — on a hand-uploaded document there is none, nothing can ever match,
+    // and every signer is blocked with no way through.
+    condition: {
+      and: [
+        { var: 'document.fromInbox' },
+        { '!': [{ var: 'attachedPo.po_matches_invoice' }] },
       ],
     },
   },
@@ -122,6 +181,8 @@ function BusinessRulesPage() {
     outcome: string;
     message: string;
     condition: string;
+    /** Held as text so clearing the box isn't NaN mid-edit; parsed on submit. */
+    priority: string;
   } | null>(null);
 
   const [testDocumentId, setTestDocumentId] = useState('');
@@ -174,6 +235,18 @@ function BusinessRulesPage() {
       return;
     }
 
+    // Bounds match the API's own, so an out-of-range number says what's wrong
+    // here instead of coming back as a raw validation error.
+    const priority = draft.priority.trim() === '' ? 0 : Number(draft.priority);
+
+    if (!Number.isInteger(priority) || priority < 0 || priority > 1000) {
+      toast({
+        title: _(msg`Priority must be a whole number between 0 and 1000`),
+        variant: 'destructive',
+      });
+      return;
+    }
+
     const payload = {
       name: draft.name,
       gate: draft.gate as 'DOCUMENT_SIGN',
@@ -181,7 +254,7 @@ function BusinessRulesPage() {
       outcome: draft.outcome as 'BLOCK',
       message: draft.message,
       conditionConfig,
-      priority: 0,
+      priority,
     };
 
     if (draft.id) {
@@ -219,6 +292,7 @@ function BusinessRulesPage() {
                 outcome: 'BLOCK',
                 message: '',
                 condition: '{\n  "!": [{ "var": "ocr.po_number" }]\n}',
+                priority: '0',
               })
             }
           >
@@ -227,6 +301,12 @@ function BusinessRulesPage() {
           </Button>
         )}
       </div>
+
+      {/*
+        Above the rest: somebody is stuck right now and cannot proceed without an
+        answer, which outranks anything else on this page.
+      */}
+      <RuleOverrideQueue />
 
       {/*
         Stated up front because it changes how rules should be written: these
@@ -265,6 +345,7 @@ function BusinessRulesPage() {
                       outcome: 'BLOCK',
                       message: preset.message,
                       condition: JSON.stringify(preset.condition, null, 2),
+                      priority: '0',
                     })
                   }
                 >
@@ -328,17 +409,47 @@ function BusinessRulesPage() {
             </div>
           </div>
 
-          <div className="mt-3">
-            <label className={label}>
-              <Trans>Message shown when it fires</Trans>
-            </label>
-            <Input
-              className="h-8 text-[13px]"
-              placeholder="This invoice has no PO number. Add one before signing."
-              value={draft.message}
-              onChange={(e) => setDraft({ ...draft, message: e.target.value })}
-            />
+          {/*
+            Priority sits next to the message because that is all it affects.
+            Naming it "priority" invites the reading that it decides which rule
+            wins, so the hint below says plainly that it does not.
+          */}
+          <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_140px]">
+            <div>
+              <label className={label}>
+                <Trans>Message shown when it fires</Trans>
+              </label>
+              <Input
+                className="h-8 text-[13px]"
+                placeholder="This invoice has no PO number. Add one before signing."
+                value={draft.message}
+                onChange={(e) => setDraft({ ...draft, message: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className={label}>
+                <Trans>Priority</Trans>
+              </label>
+              <Input
+                className="h-8 text-[13px]"
+                type="number"
+                min={0}
+                max={1000}
+                step={1}
+                value={draft.priority}
+                onChange={(e) => setDraft({ ...draft, priority: e.target.value })}
+              />
+            </div>
           </div>
+
+          <p className="mt-1.5 text-[11px] text-muted-foreground">
+            <Trans>
+              Lower numbers are listed first. Priority only orders the messages when several rules
+              fire together — it does not decide which rule wins. Every active rule is checked, and
+              one blocking rule is enough to refuse the action.
+            </Trans>
+          </p>
 
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             <div>
@@ -436,6 +547,16 @@ function BusinessRulesPage() {
                         <Trans>off</Trans>
                       </span>
                     )}
+                    {/*
+                      Only when it has been changed from the default. The list is
+                      already sorted by it, so on an all-zero set the badge would
+                      be noise on every row and tell nobody anything.
+                    */}
+                    {rule.priority !== 0 && (
+                      <span className="ml-1 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        <Trans>priority {rule.priority}</Trans>
+                      </span>
+                    )}
                   </p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">{rule.message}</p>
                   <code className="mt-1 block overflow-x-auto font-mono text-[10px] text-muted-foreground">
@@ -456,6 +577,7 @@ function BusinessRulesPage() {
                         outcome: rule.outcome,
                         message: rule.message,
                         condition: JSON.stringify(rule.conditionConfig, null, 2),
+                        priority: String(rule.priority),
                       })
                     }
                   >

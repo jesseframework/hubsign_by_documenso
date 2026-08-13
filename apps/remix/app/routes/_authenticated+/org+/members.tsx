@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
-import { PlusIcon, Trash2Icon, UsersIcon } from 'lucide-react';
+import { ClockIcon, PlusIcon, RotateCwIcon, Trash2Icon, UsersIcon } from 'lucide-react';
 
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
@@ -24,6 +24,49 @@ const roleColors: Record<string, string> = {
   MANAGER: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
   MEMBER: 'bg-muted text-muted-foreground',
 };
+
+// `≥1h` rounds down to whole hours ("23h"); under an hour switches to minutes,
+// rounded up so a link with seconds left still reads "1m" rather than "0m".
+function formatRemaining(ms: number): string {
+  const totalMinutes = Math.ceil(ms / 60_000);
+  if (totalMinutes >= 60) {
+    return `${Math.floor(totalMinutes / 60)}h`;
+  }
+  return `${totalMinutes}m`;
+}
+
+/**
+ * Countdown to a member's set-password link expiring — only rendered for
+ * members still locked out (`mustChangePassword: true`). `null` covers both
+ * "no live token" and "already past its expiry", since a stranded member
+ * needs the same Resend action either way.
+ */
+function InviteExpiryBadge({ expiresAt }: { expiresAt: string | Date | null }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const remainingMs = expiresAt ? new Date(expiresAt).getTime() - now : 0;
+
+  if (remainingMs <= 0) {
+    return (
+      <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-destructive/10 px-2 py-0.5 text-[10px] font-medium text-destructive">
+        <ClockIcon className="h-3 w-3" />
+        <Trans>Expired</Trans>
+      </span>
+    );
+  }
+
+  return (
+    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-status-pending-bg px-2 py-0.5 text-[10px] font-medium text-status-pending-text">
+      <ClockIcon className="h-3 w-3" />
+      {formatRemaining(remainingMs)}
+    </span>
+  );
+}
 
 function OrgMembersPage() {
   const { _ } = useLingui();
@@ -70,6 +113,19 @@ function OrgMembersPage() {
     onSuccess: () => {
       void utils.org.getMyOrganization.invalidate();
       toast({ title: _(msg`Member removed`) });
+    },
+    onError: (err) => {
+      toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' });
+    },
+  });
+
+  const resendInvite = trpc.org.resendMemberInvite.useMutation({
+    onSuccess: (result) => {
+      void utils.org.getMyOrganization.invalidate();
+      toast({
+        title: _(msg`Invite resent`),
+        description: _(msg`A new link was emailed to ${result.email}.`),
+      });
     },
     onError: (err) => {
       toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' });
@@ -202,6 +258,9 @@ function OrgMembersPage() {
                 <td className="px-4 py-3">
                   <p className="text-[13px] font-medium">{member.user.name || 'Unnamed'}</p>
                   <p className="text-[11px] text-muted-foreground">{member.user.email}</p>
+                  {member.user.mustChangePassword && (
+                    <InviteExpiryBadge expiresAt={member.inviteExpiresAt} />
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   {isAdmin ? (
@@ -227,15 +286,30 @@ function OrgMembersPage() {
                 </td>
                 {isAdmin && (
                   <td className="px-4 py-3 text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 gap-1 text-[11px] text-destructive"
-                      onClick={() => void remove.mutateAsync({ memberId: member.id })}
-                    >
-                      <Trash2Icon className="h-3 w-3" />
-                      Remove
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      {member.user.mustChangePassword && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 gap-1 text-[11px]"
+                          loading={resendInvite.isPending && resendInvite.variables?.memberId === member.id}
+                          disabled={resendInvite.isPending}
+                          onClick={() => void resendInvite.mutateAsync({ memberId: member.id })}
+                        >
+                          <RotateCwIcon className="h-3 w-3" />
+                          Resend
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 text-[11px] text-destructive"
+                        onClick={() => void remove.mutateAsync({ memberId: member.id })}
+                      >
+                        <Trash2Icon className="h-3 w-3" />
+                        Remove
+                      </Button>
+                    </div>
                   </td>
                 )}
               </tr>

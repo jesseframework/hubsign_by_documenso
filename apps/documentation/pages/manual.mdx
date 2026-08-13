@@ -2,7 +2,7 @@
 
 **Organization administration, e-signature, and downstream integration**
 
-Version 2.3.0 · Last updated 2026-08-09
+Version 2.3.1 · Last updated 2026-08-12
 
 ---
 
@@ -10,6 +10,7 @@ Version 2.3.0 · Last updated 2026-08-09
 
 1. [What HubSign is](#1-what-hubsign-is)
 2. [Roles and access](#2-roles-and-access)
+   - [2.1 Finding your way around](#21-finding-your-way-around)
 3. [Part I — E-Signature](#part-i--e-signature)
    - [3.1 The signing lifecycle](#31-the-signing-lifecycle)
    - [3.2 Preparing a document](#32-preparing-a-document)
@@ -69,8 +70,9 @@ that affects the finished document — stamps, the certificate, field placement 
 is decided at that moment and cannot be changed afterwards.
 
 **The organization is the tenant.** Documents, rules, workflows and members
-belong to an organization. Most settings you will want are under
-**Organization**, not under personal Settings.
+belong to an organization. Almost everything you will want to configure is in
+**Settings**, which is organization-wide; your own profile, password and
+notification preferences are somewhere else entirely, under your avatar.
 
 **HubSign reaches out from the cloud, not from your office.** Anything HubSign
 calls — an ERP endpoint, a Teams webhook — is called from WorkHub Cloud. A system
@@ -101,6 +103,48 @@ flowchart TD
     D -- Manager --> F[Member access +<br/>Inbox, Approvals, Doc Manager]
     D -- Org Admin --> G[Everything:<br/>Settings, Members, Rules,<br/>Workflows, Billing, Integrations]
 ```
+
+---
+
+## 2.1 Finding your way around
+
+Three levels, and knowing which level a screen belongs to is usually enough to
+find it: the **sidebar** for daily work, **tabs** for views over the same thing,
+and **Settings** for configuration you set once.
+
+| Sidebar row | What it is | Tabs inside it |
+|---|---|---|
+| **Home** | Live signing activity for the organization | Overview · SLA · Activity |
+| **Inbox** | Invoices emailed in, waiting to be sent for signature | Incoming |
+| **E-Sign** | Documents going through signing — drafts, out for signature, completed | — |
+| **Repository** | The records library (Doc Manager) | Overview · Browse · Processing · Search · Favorites · Trash |
+| **Templates** | Reusable documents with fields already placed | — |
+| **Tasks** | Everything waiting on you | Approvals · Workflow Steps · Retrievals |
+| **Tools** | Utilities you run rather than places you go | Merge · Bulk Upload · Exports · AI Agent |
+| **Settings** | Organization configuration | see below |
+| **Admin** | Platform administration, for HubSign operators | — |
+
+**Inbox** means the *signature* inbox — invoices vendors emailed you, read by OCR,
+waiting for someone to send them for signature. It is not **Repository →
+Processing**, which reports OCR progress on the records library.
+
+Settings is a page of its own with four categories. The category holding the page
+you are on opens by itself, and a collapsed category with a dot beside it is the
+one you are currently in.
+
+| Settings category | Screens |
+|---|---|
+| **Organization** | Profile & Branding · Members & Roles · Teams · Billing & Plan · Integrations |
+| **Documents** | Filing Structure · Metadata Fields · Retention · Stamps · Access Control · Compliance · Repository Options |
+| **Automation** | Workflows · Business Rules · Approval Templates · Approver Roles & Rules · Email Templates |
+| **Developer** | API Tokens · Webhooks |
+
+The categories name **the thing being configured**, not the module that implements
+it — which is why retention and the filing structure sit beside stamps and
+metadata. Your own settings (profile, password, notifications, personal billing)
+are under your avatar, kept deliberately apart from the organization's.
+
+A per-screen lookup table lives on the [Navigation](/navigation) page.
 
 ---
 
@@ -240,7 +284,7 @@ the signature happened.
 
 ### Choosing whether to include it
 
-**Organization → Settings → Signed Documents** controls whether new documents
+**Settings → Organization → Profile & Branding**, *Signed Documents* card controls whether new documents
 get the certificate. This is the right switch if your documents are circulated
 externally and the extra page is unwanted. It applies to documents completed
 from that point on.
@@ -269,7 +313,7 @@ button.
 - **Resend** — re-send the invitation email to recipients who have not signed.
 - **Cancel** — withdraw a document that is out for signature.
 - **Recycle Bin** — deleted documents are recoverable from
-  **Organization → Recycle Bin** before permanent deletion.
+  **Repository → Trash** before permanent deletion.
 
 ## 3.8 Templates and document merging
 
@@ -286,7 +330,7 @@ cases where a signature packet spans multiple source files.
 
 ## 4.1 Dashboard
 
-**Organization → Dashboard** reports live signing activity for the organization:
+**Home** reports live signing activity for the organization:
 documents sent, completed, pending and rejected; completion rate; turnaround
 time; volume over time; per-member and per-recipient breakdowns.
 
@@ -301,7 +345,7 @@ the previous month rather than a full one.
 
 ## 4.2 Settings
 
-**Organization → Settings** is organized into cards. Each saves independently.
+**Settings → Organization → Profile & Branding** is organized into cards. Each saves independently.
 
 | Card | Controls |
 |---|---|
@@ -324,7 +368,7 @@ are told the organization exists and to ask an administrator for access.
 
 ## 4.3 Members, domains and seats
 
-**Organization → Members** lists members, their roles and their seat status.
+**Settings → Organization → Members & Roles** lists members, their roles and their seat status.
 
 **Domain discovery.** If you have set a member domain, users who register with an
 email on that domain appear here with **pending** status. **Convert** turns a
@@ -355,7 +399,7 @@ signature.
 **The mailbox comes from WorkHub.** The address vendors send to is an Exchange
 Online mailbox provisioned in the WorkHub console under *Email → Mailboxes*, and it
 consumes a mailbox licence there. HubSign reads that mailbox using the credentials
-entered under **Organization → Settings → Email-to-Sign**. If intake stops working,
+entered under **Settings → Organization → Profile & Branding**, *Email-to-Sign Inbox* card. If intake stops working,
 check the mailbox still exists and is licensed in WorkHub before looking at HubSign.
 
 ```mermaid
@@ -401,7 +445,7 @@ anything OCR misread, then send for signature. A confidence score and a
 
 ## 4.5 Business Rules
 
-**Organization → Business Rules** lets you refuse or flag an action based on the
+**Settings → Automation → Business Rules** lets you refuse or flag an action based on the
 document's own data. This is where "an invoice with no PO number cannot be
 signed" lives.
 
@@ -491,7 +535,10 @@ never be bypassed as a soft gate.
 
 ## 4.6 Approvals
 
-**Approval Setup** defines approval templates; **Approvals** is the queue.
+**Settings → Automation → Approval Templates** defines the chains, and
+**Settings → Automation → Approver Roles & Rules** names the groups a chain — or a
+blocked signer asking for an exception — can be routed to. **Tasks → Approvals** is
+the queue of decisions waiting on you.
 
 An approval chain gates a document before it goes out for signature — typically
 an emailed invoice that needs internal sign-off first. Templates support
@@ -515,7 +562,7 @@ flowchart TD
 
 ## 4.7 Workflows
 
-**Organization → Workflows** is a general automation engine: a trigger, an
+**Settings → Automation → Workflows** is a general automation engine: a trigger, an
 optional condition, and a graph of steps.
 
 **Triggers**
@@ -552,7 +599,7 @@ step failed and why.
 
 ## 4.8 Email Templates
 
-**Organization → Email Templates** stores reusable subject/HTML/text bodies,
+**Settings → Automation → Email Templates** stores reusable subject/HTML/text bodies,
 each with a **key**. A workflow's `SEND_EMAIL` step references the key instead of
 carrying markup inline, so the same wording is edited in one place.
 
@@ -571,13 +618,13 @@ positioned on a document and burned in at seal time.
 from an extracted string.
 
 **Doc Manager (DMS)** — filing structure, classification, search and retrieval
-requests over your document library, with **DMS Permissions** controlling who
+requests over your document library, with **Access Control** governing who
 sees what and a confidentiality classification per document. Filing and
 retrieval both emit workflow events.
 
 ## 4.10 Integrations (Microsoft Teams)
 
-**Organization → Integrations** connects one Microsoft Teams destination per
+**Settings → Organization → Integrations** connects one Microsoft Teams destination per
 organization, by either transport:
 
 - **Power Automate webhook** — paste an incoming webhook URL

@@ -6,7 +6,7 @@ import { bmsMlGetStatus, bmsMlGetTemplates, bmsMlUploadDocument, isBmsMlConfigur
 import { getFileServerSide } from '@documenso/lib/universal/upload/get-file.server';
 import { prisma } from '@documenso/prisma';
 
-import { authenticatedProcedure, router } from '../trpc';
+import { dmsEntitledProcedure, router } from '../trpc';
 
 // Helper: get document ownership filter based on org membership
 const getDocOwnerFilter = async (userId: number) => {
@@ -70,7 +70,7 @@ export const dmsRouter = router({
   // LOCATIONS
   // ═══════════════════════════════════════════
 
-  getLocations: authenticatedProcedure.query(async ({ ctx }) => {
+  getLocations: dmsEntitledProcedure.query(async ({ ctx }) => {
     const ownerFilter = await getLocationOwnerFilter(ctx.user.id);
     return prisma.dmsLocation.findMany({
       where: ownerFilter,
@@ -91,7 +91,7 @@ export const dmsRouter = router({
     });
   }),
 
-  createLocation: authenticatedProcedure
+  createLocation: dmsEntitledProcedure
     .input(ZCreateLocationSchema)
     .mutation(async ({ ctx, input }) => {
       const membership = await prisma.organizationMember.findFirst({
@@ -107,7 +107,7 @@ export const dmsRouter = router({
       });
     }),
 
-  updateLocation: authenticatedProcedure
+  updateLocation: dmsEntitledProcedure
     .input(ZUpdateLocationSchema)
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
@@ -117,7 +117,7 @@ export const dmsRouter = router({
       });
     }),
 
-  deleteLocation: authenticatedProcedure
+  deleteLocation: dmsEntitledProcedure
     .input(ZUpdateLocationSchema.pick({ id: true }))
     .mutation(async ({ ctx, input }) => {
       return prisma.dmsLocation.delete({
@@ -129,20 +129,20 @@ export const dmsRouter = router({
   // CABINETS
   // ═══════════════════════════════════════════
 
-  createCabinet: authenticatedProcedure
+  createCabinet: dmsEntitledProcedure
     .input(ZCreateCabinetSchema)
     .mutation(async ({ input }) => {
       return prisma.dmsCabinet.create({ data: input });
     }),
 
-  updateCabinet: authenticatedProcedure
+  updateCabinet: dmsEntitledProcedure
     .input(ZUpdateCabinetSchema)
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
       return prisma.dmsCabinet.update({ where: { id }, data });
     }),
 
-  deleteCabinet: authenticatedProcedure
+  deleteCabinet: dmsEntitledProcedure
     .input(ZUpdateCabinetSchema.pick({ id: true }))
     .mutation(async ({ input }) => {
       return prisma.dmsCabinet.delete({ where: { id: input.id } });
@@ -152,20 +152,20 @@ export const dmsRouter = router({
   // SHELVES
   // ═══════════════════════════════════════════
 
-  createShelf: authenticatedProcedure
+  createShelf: dmsEntitledProcedure
     .input(ZCreateShelfSchema)
     .mutation(async ({ input }) => {
       return prisma.dmsShelf.create({ data: input });
     }),
 
-  updateShelf: authenticatedProcedure
+  updateShelf: dmsEntitledProcedure
     .input(ZUpdateShelfSchema)
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
       return prisma.dmsShelf.update({ where: { id }, data });
     }),
 
-  deleteShelf: authenticatedProcedure
+  deleteShelf: dmsEntitledProcedure
     .input(ZUpdateShelfSchema.pick({ id: true }))
     .mutation(async ({ input }) => {
       return prisma.dmsShelf.delete({ where: { id: input.id } });
@@ -175,20 +175,20 @@ export const dmsRouter = router({
   // BINS
   // ═══════════════════════════════════════════
 
-  createBin: authenticatedProcedure
+  createBin: dmsEntitledProcedure
     .input(ZCreateBinSchema)
     .mutation(async ({ input }) => {
       return prisma.dmsBin.create({ data: input });
     }),
 
-  updateBin: authenticatedProcedure
+  updateBin: dmsEntitledProcedure
     .input(ZUpdateBinSchema)
     .mutation(async ({ input }) => {
       const { id, ...data } = input;
       return prisma.dmsBin.update({ where: { id }, data });
     }),
 
-  deleteBin: authenticatedProcedure
+  deleteBin: dmsEntitledProcedure
     .input(ZUpdateBinSchema.pick({ id: true }))
     .mutation(async ({ input }) => {
       return prisma.dmsBin.delete({ where: { id: input.id } });
@@ -198,17 +198,17 @@ export const dmsRouter = router({
   // DOCUMENT TYPES
   // ═══════════════════════════════════════════
 
-  getDocumentTypes: authenticatedProcedure.query(async () => {
+  getDocumentTypes: dmsEntitledProcedure.query(async () => {
     return prisma.dmsDocumentType.findMany({ orderBy: { name: 'asc' } });
   }),
 
-  createDocumentType: authenticatedProcedure
+  createDocumentType: dmsEntitledProcedure
     .input(ZCreateDocumentTypeSchema)
     .mutation(async ({ input }) => {
       return prisma.dmsDocumentType.create({ data: input });
     }),
 
-  deleteDocumentType: authenticatedProcedure
+  deleteDocumentType: dmsEntitledProcedure
     .input(ZCreateDocumentTypeSchema.pick({ name: true }))
     .mutation(async ({ input }) => {
       // Find by name and delete
@@ -217,7 +217,7 @@ export const dmsRouter = router({
       return prisma.dmsDocumentType.delete({ where: { id: docType.id } });
     }),
 
-  updateDocumentType: authenticatedProcedure
+  updateDocumentType: dmsEntitledProcedure
     .input(z.object({ id: z.string(), name: z.string().min(1) }))
     .mutation(async ({ input }) => {
       return prisma.dmsDocumentType.update({
@@ -226,7 +226,7 @@ export const dmsRouter = router({
       });
     }),
 
-  deleteDocumentTypeById: authenticatedProcedure
+  deleteDocumentTypeById: dmsEntitledProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       return prisma.dmsDocumentType.delete({ where: { id: input.id } });
@@ -236,7 +236,7 @@ export const dmsRouter = router({
   // CLASSIFICATIONS
   // ═══════════════════════════════════════════
 
-  getClassifications: authenticatedProcedure.query(async () => {
+  getClassifications: dmsEntitledProcedure.query(async () => {
     return prisma.dmsClassification.findMany({
       include: { children: true },
       where: { parentId: null },
@@ -244,13 +244,13 @@ export const dmsRouter = router({
     });
   }),
 
-  createClassification: authenticatedProcedure
+  createClassification: dmsEntitledProcedure
     .input(ZCreateClassificationSchema)
     .mutation(async ({ input }) => {
       return prisma.dmsClassification.create({ data: input });
     }),
 
-  updateClassification: authenticatedProcedure
+  updateClassification: dmsEntitledProcedure
     .input(z.object({ id: z.string(), name: z.string().min(1) }))
     .mutation(async ({ input }) => {
       return prisma.dmsClassification.update({
@@ -259,7 +259,7 @@ export const dmsRouter = router({
       });
     }),
 
-  deleteClassification: authenticatedProcedure
+  deleteClassification: dmsEntitledProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       return prisma.dmsClassification.delete({ where: { id: input.id } });
@@ -269,11 +269,11 @@ export const dmsRouter = router({
   // TAGS
   // ═══════════════════════════════════════════
 
-  getTags: authenticatedProcedure.query(async () => {
+  getTags: dmsEntitledProcedure.query(async () => {
     return prisma.dmsTag.findMany({ orderBy: { name: 'asc' } });
   }),
 
-  createTag: authenticatedProcedure
+  createTag: dmsEntitledProcedure
     .input(ZCreateTagSchema)
     .mutation(async ({ input }) => {
       return prisma.dmsTag.create({
@@ -281,7 +281,7 @@ export const dmsRouter = router({
       });
     }),
 
-  updateTag: authenticatedProcedure
+  updateTag: dmsEntitledProcedure
     .input(z.object({ id: z.string(), name: z.string().min(1) }))
     .mutation(async ({ input }) => {
       return prisma.dmsTag.update({
@@ -290,7 +290,7 @@ export const dmsRouter = router({
       });
     }),
 
-  deleteTag: authenticatedProcedure
+  deleteTag: dmsEntitledProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       return prisma.dmsTag.delete({ where: { id: input.id } });
@@ -300,7 +300,7 @@ export const dmsRouter = router({
   // DOCUMENTS (Core CRUD)
   // ═══════════════════════════════════════════
 
-  createDocument: authenticatedProcedure
+  createDocument: dmsEntitledProcedure
     .input(ZCreateDmsDocumentSchema)
     .mutation(async ({ ctx, input }) => {
       const { tagIds, ocrTemplateId, autoOcr, ...data } = input;
@@ -420,7 +420,7 @@ export const dmsRouter = router({
       return document;
     }),
 
-  getDocument: authenticatedProcedure
+  getDocument: dmsEntitledProcedure
     .input(ZUpdateDmsDocumentSchema.pick({ id: true }))
     .query(async ({ ctx, input }) => {
       return prisma.dmsDocument.findUniqueOrThrow({
@@ -452,7 +452,7 @@ export const dmsRouter = router({
       });
     }),
 
-  updateDocument: authenticatedProcedure
+  updateDocument: dmsEntitledProcedure
     .input(ZUpdateDmsDocumentSchema)
     .mutation(async ({ ctx, input }) => {
       const { id, tagIds, ...data } = input;
@@ -491,7 +491,7 @@ export const dmsRouter = router({
       return document;
     }),
 
-  deleteDocument: authenticatedProcedure
+  deleteDocument: dmsEntitledProcedure
     .input(ZUpdateDmsDocumentSchema.pick({ id: true }))
     .mutation(async ({ ctx, input }) => {
       const doc = await prisma.dmsDocument.findUniqueOrThrow({ where: { id: input.id } });
@@ -508,7 +508,7 @@ export const dmsRouter = router({
       return prisma.dmsDocument.delete({ where: { id: input.id } });
     }),
 
-  searchDocuments: authenticatedProcedure
+  searchDocuments: dmsEntitledProcedure
     .input(ZSearchDmsDocumentsSchema)
     .query(async ({ ctx, input }) => {
       const {
@@ -588,7 +588,7 @@ export const dmsRouter = router({
   // RETRIEVAL REQUESTS
   // ═══════════════════════════════════════════
 
-  getRetrievalRequests: authenticatedProcedure.query(async ({ ctx }) => {
+  getRetrievalRequests: dmsEntitledProcedure.query(async ({ ctx }) => {
     const docFilter = await getDocOwnerFilter(ctx.user.id);
     return prisma.dmsRetrievalRequest.findMany({
       where: {
@@ -603,7 +603,7 @@ export const dmsRouter = router({
     });
   }),
 
-  createRetrievalRequest: authenticatedProcedure
+  createRetrievalRequest: dmsEntitledProcedure
     .input(ZCreateRetrievalRequestSchema)
     .mutation(async ({ ctx, input }) => {
       const request = await prisma.dmsRetrievalRequest.create({
@@ -651,7 +651,7 @@ export const dmsRouter = router({
       return request;
     }),
 
-  updateRetrievalRequest: authenticatedProcedure
+  updateRetrievalRequest: dmsEntitledProcedure
     .input(ZUpdateRetrievalRequestSchema)
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
@@ -681,7 +681,7 @@ export const dmsRouter = router({
   // FILING RULES
   // ═══════════════════════════════════════════
 
-  getFilingRules: authenticatedProcedure.query(async ({ ctx }) => {
+  getFilingRules: dmsEntitledProcedure.query(async ({ ctx }) => {
     const membership = await prisma.organizationMember.findFirst({ where: { userId: ctx.user.id } });
     return prisma.dmsFilingRule.findMany({
       where: membership ? { organizationId: membership.organizationId } : { createdBy: ctx.user.id },
@@ -689,7 +689,7 @@ export const dmsRouter = router({
     });
   }),
 
-  createFilingRule: authenticatedProcedure
+  createFilingRule: dmsEntitledProcedure
     .input(ZCreateFilingRuleSchema)
     .mutation(async ({ ctx, input }) => {
       const { teamId, ...rest } = input;
@@ -707,7 +707,7 @@ export const dmsRouter = router({
   // VERSIONS
   // ═══════════════════════════════════════════
 
-  createVersion: authenticatedProcedure
+  createVersion: dmsEntitledProcedure
     .input(ZCreateVersionSchema)
     .mutation(async ({ ctx, input }) => {
       const latestVersion = await prisma.dmsVersion.findFirst({
@@ -739,7 +739,7 @@ export const dmsRouter = router({
   // COMMENTS
   // ═══════════════════════════════════════════
 
-  createComment: authenticatedProcedure
+  createComment: dmsEntitledProcedure
     .input(ZCreateCommentSchema)
     .mutation(async ({ ctx, input }) => {
       const comment = await prisma.dmsComment.create({
@@ -762,7 +762,7 @@ export const dmsRouter = router({
   // CHECK-OUT / CHECK-IN
   // ═══════════════════════════════════════════
 
-  checkoutDocument: authenticatedProcedure
+  checkoutDocument: dmsEntitledProcedure
     .input(ZUpdateDmsDocumentSchema.pick({ id: true }).extend({
       notes: ZCreateCommentSchema.shape.text.optional(),
     }))
@@ -798,7 +798,7 @@ export const dmsRouter = router({
       return updated;
     }),
 
-  checkinDocument: authenticatedProcedure
+  checkinDocument: dmsEntitledProcedure
     .input(ZUpdateDmsDocumentSchema.pick({ id: true }).extend({
       notes: ZCreateCommentSchema.shape.text.optional(),
     }))
@@ -838,7 +838,7 @@ export const dmsRouter = router({
   // RETENTION & DISPOSAL
   // ═══════════════════════════════════════════
 
-  getRetentionDue: authenticatedProcedure.query(async ({ ctx }) => {
+  getRetentionDue: dmsEntitledProcedure.query(async ({ ctx }) => {
     const now = new Date();
     const docFilter = await getDocOwnerFilter(ctx.user.id);
     return prisma.dmsDocument.findMany({
@@ -857,7 +857,7 @@ export const dmsRouter = router({
     });
   }),
 
-  updateDisposal: authenticatedProcedure
+  updateDisposal: dmsEntitledProcedure
     .input(ZUpdateDmsDocumentSchema.pick({ id: true }).extend({
       disposalStatus: z.enum(['NOT_DUE', 'DUE_FOR_REVIEW', 'APPROVED_FOR_DISPOSAL', 'DISPOSED', 'RETAINED']),
       disposalNotes: z.string().optional(),
@@ -901,7 +901,7 @@ export const dmsRouter = router({
       return doc;
     }),
 
-  markLabelPrinted: authenticatedProcedure
+  markLabelPrinted: dmsEntitledProcedure
     .input(ZUpdateDmsDocumentSchema.pick({ id: true }))
     .mutation(async ({ ctx, input }) => {
       await prisma.dmsAuditLog.create({
@@ -923,7 +923,7 @@ export const dmsRouter = router({
   // AUDIT LOG
   // ═══════════════════════════════════════════
 
-  getAuditLog: authenticatedProcedure
+  getAuditLog: dmsEntitledProcedure
     .input(ZUpdateDmsDocumentSchema.pick({ id: true }))
     .query(async ({ input }) => {
       return prisma.dmsAuditLog.findMany({
@@ -937,7 +937,7 @@ export const dmsRouter = router({
   // DASHBOARD STATS
   // ═══════════════════════════════════════════
 
-  getDashboardStats: authenticatedProcedure.query(async ({ ctx }) => {
+  getDashboardStats: dmsEntitledProcedure.query(async ({ ctx }) => {
     const where = await getDocOwnerFilter(ctx.user.id);
 
     const [
@@ -991,11 +991,11 @@ export const dmsRouter = router({
   // OCR / BMS ML INTEGRATION
   // ═══════════════════════════════════════════
 
-  getOcrStatus: authenticatedProcedure.query(async () => {
+  getOcrStatus: dmsEntitledProcedure.query(async () => {
     return bmsMlGetStatus();
   }),
 
-  getOcrTemplates: authenticatedProcedure.query(async ({ ctx }) => {
+  getOcrTemplates: dmsEntitledProcedure.query(async ({ ctx }) => {
     const orgMembership = await prisma.organizationMember.findFirst({
       where: { userId: ctx.user.id },
       include: { organization: true },
@@ -1011,7 +1011,7 @@ export const dmsRouter = router({
     return bmsMlGetTemplates(orgConfig);
   }),
 
-  triggerOcr: authenticatedProcedure
+  triggerOcr: dmsEntitledProcedure
     .input(ZUpdateDmsDocumentSchema.pick({ id: true }).extend({
       templateId: z.number().optional(),
       ocrEngine: z.string().optional(),
@@ -1137,7 +1137,7 @@ export const dmsRouter = router({
       }
     }),
 
-  updateOcrText: authenticatedProcedure
+  updateOcrText: dmsEntitledProcedure
     .input(
       ZUpdateDmsDocumentSchema.pick({ id: true }).extend({
         ocrText: ZCreateDmsDocumentSchema.shape.title,
@@ -1154,7 +1154,7 @@ export const dmsRouter = router({
   // USER LOOKUP (for workflows)
   // ═══════════════════════════════════════════
 
-  lookupUserByEmail: authenticatedProcedure
+  lookupUserByEmail: dmsEntitledProcedure
     .input(z.object({ email: z.string().email() }))
     .query(async ({ input }) => {
       const user = await prisma.user.findUnique({
@@ -1168,7 +1168,7 @@ export const dmsRouter = router({
   // APPROVAL WORKFLOWS
   // ═══════════════════════════════════════════
 
-  createWorkflow: authenticatedProcedure
+  createWorkflow: dmsEntitledProcedure
     .input(z.object({
       documentId: z.string(),
       name: z.string(),
@@ -1211,7 +1211,7 @@ export const dmsRouter = router({
       return workflow;
     }),
 
-  getWorkflows: authenticatedProcedure
+  getWorkflows: dmsEntitledProcedure
     .input(z.object({ documentId: z.string() }))
     .query(async ({ input }) => {
       return prisma.dmsWorkflow.findMany({
@@ -1227,7 +1227,7 @@ export const dmsRouter = router({
       });
     }),
 
-  getMyPendingApprovals: authenticatedProcedure.query(async ({ ctx }) => {
+  getMyPendingApprovals: dmsEntitledProcedure.query(async ({ ctx }) => {
     return prisma.dmsWorkflowStep.findMany({
       where: { assignedToId: ctx.user.id, status: 'PENDING' },
       include: {
@@ -1242,7 +1242,7 @@ export const dmsRouter = router({
     });
   }),
 
-  respondToWorkflowStep: authenticatedProcedure
+  respondToWorkflowStep: dmsEntitledProcedure
     .input(z.object({
       stepId: z.string(),
       status: z.enum(['APPROVED', 'REJECTED']),
@@ -1303,7 +1303,7 @@ export const dmsRouter = router({
   // FAVORITES
   // ═══════════════════════════════════════════
 
-  toggleFavorite: authenticatedProcedure
+  toggleFavorite: dmsEntitledProcedure
     .input(z.object({ documentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const existing = await prisma.dmsFavorite.findUnique({
@@ -1321,7 +1321,7 @@ export const dmsRouter = router({
       return { favorited: true };
     }),
 
-  getFavorites: authenticatedProcedure.query(async ({ ctx }) => {
+  getFavorites: dmsEntitledProcedure.query(async ({ ctx }) => {
     return prisma.dmsFavorite.findMany({
       where: { userId: ctx.user.id },
       include: {
@@ -1337,7 +1337,7 @@ export const dmsRouter = router({
   // DOCUMENT LINKS
   // ═══════════════════════════════════════════
 
-  linkDocuments: authenticatedProcedure
+  linkDocuments: dmsEntitledProcedure
     .input(z.object({
       sourceDocumentId: z.string(),
       targetDocumentId: z.string(),
@@ -1360,13 +1360,13 @@ export const dmsRouter = router({
       return link;
     }),
 
-  unlinkDocuments: authenticatedProcedure
+  unlinkDocuments: dmsEntitledProcedure
     .input(z.object({ linkId: z.string() }))
     .mutation(async ({ input }) => {
       return prisma.dmsDocumentLink.delete({ where: { id: input.linkId } });
     }),
 
-  getDocumentLinks: authenticatedProcedure
+  getDocumentLinks: dmsEntitledProcedure
     .input(z.object({ documentId: z.string() }))
     .query(async ({ input }) => {
       const [asSource, asTarget] = await Promise.all([
@@ -1386,7 +1386,7 @@ export const dmsRouter = router({
   // SHARE LINKS
   // ═══════════════════════════════════════════
 
-  createShareLink: authenticatedProcedure
+  createShareLink: dmsEntitledProcedure
     .input(z.object({
       documentId: z.string(),
       password: z.string().optional(),
@@ -1416,7 +1416,7 @@ export const dmsRouter = router({
       return link;
     }),
 
-  getShareLinks: authenticatedProcedure
+  getShareLinks: dmsEntitledProcedure
     .input(z.object({ documentId: z.string() }))
     .query(async ({ input }) => {
       return prisma.dmsShareLink.findMany({
@@ -1429,13 +1429,13 @@ export const dmsRouter = router({
   // COMPLIANCE TEMPLATES
   // ═══════════════════════════════════════════
 
-  getComplianceTemplates: authenticatedProcedure.query(async () => {
+  getComplianceTemplates: dmsEntitledProcedure.query(async () => {
     return prisma.dmsComplianceTemplate.findMany({
       orderBy: { industry: 'asc' },
     });
   }),
 
-  createComplianceTemplate: authenticatedProcedure
+  createComplianceTemplate: dmsEntitledProcedure
     .input(z.object({
       name: z.string(),
       description: z.string().optional(),
@@ -1452,7 +1452,7 @@ export const dmsRouter = router({
   // ACTIVITY FEED
   // ═══════════════════════════════════════════
 
-  getActivityFeed: authenticatedProcedure
+  getActivityFeed: dmsEntitledProcedure
     .input(z.object({ limit: z.number().default(50) }))
     .query(async ({ ctx, input }) => {
       const docFilter = await getDocOwnerFilter(ctx.user.id);
@@ -1473,13 +1473,13 @@ export const dmsRouter = router({
   // AUTO-FILING SETTINGS
   // ═══════════════════════════════════════════
 
-  getAutoFilingSettings: authenticatedProcedure.query(async ({ ctx }) => {
+  getAutoFilingSettings: dmsEntitledProcedure.query(async ({ ctx }) => {
     return prisma.dmsAutoFilingSettings.findUnique({
       where: { userId: ctx.user.id },
     });
   }),
 
-  saveAutoFilingSettings: authenticatedProcedure
+  saveAutoFilingSettings: dmsEntitledProcedure
     .input(z.object({
       enabled: z.boolean(),
       binId: z.string().nullable().optional(),
@@ -1503,7 +1503,7 @@ export const dmsRouter = router({
     }),
 
   // Auto-file a completed signed document into DMS
-  autoFileSignedDocument: authenticatedProcedure
+  autoFileSignedDocument: dmsEntitledProcedure
     .input(z.object({ signedDocumentId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       // Get settings
@@ -1571,7 +1571,7 @@ export const dmsRouter = router({
   // EXPORT
   // ═══════════════════════════════════════════
 
-  exportDocuments: authenticatedProcedure
+  exportDocuments: dmsEntitledProcedure
     .input(z.object({ format: z.enum(['json']).default('json') }))
     .query(async ({ ctx }) => {
       const docFilter = await getDocOwnerFilter(ctx.user.id);
@@ -1611,7 +1611,7 @@ export const dmsRouter = router({
   // AI AGENT
   // ═══════════════════════════════════════════
 
-  aiChat: authenticatedProcedure
+  aiChat: dmsEntitledProcedure
     .input(z.object({
       message: z.string().min(1),
       conversationId: z.string().optional(),
@@ -1629,17 +1629,17 @@ export const dmsRouter = router({
       });
     }),
 
-  aiGetConversations: authenticatedProcedure.query(async ({ ctx }) => {
+  aiGetConversations: dmsEntitledProcedure.query(async ({ ctx }) => {
     return getAiConversations(ctx.user.id);
   }),
 
-  aiGetMessages: authenticatedProcedure
+  aiGetMessages: dmsEntitledProcedure
     .input(z.object({ conversationId: z.string() }))
     .query(async ({ input }) => {
       return getAiConversationMessages(input.conversationId);
     }),
 
-  aiGetUsage: authenticatedProcedure.query(async ({ ctx }) => {
+  aiGetUsage: dmsEntitledProcedure.query(async ({ ctx }) => {
     const month = new Date().toISOString().substring(0, 7);
     const usage = await prisma.dmsAiUsage.findUnique({
       where: { userId_month: { userId: ctx.user.id, month } },

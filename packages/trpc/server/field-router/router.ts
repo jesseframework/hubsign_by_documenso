@@ -5,6 +5,7 @@ import { deleteTemplateField } from '@documenso/lib/server-only/field/delete-tem
 import { getFieldById } from '@documenso/lib/server-only/field/get-field-by-id';
 import { removeSignedFieldWithToken } from '@documenso/lib/server-only/field/remove-signed-field-with-token';
 import { setFieldsForDocument } from '@documenso/lib/server-only/field/set-fields-for-document';
+import { setSignatureFill } from '@documenso/lib/server-only/field/set-signature-fill';
 import { setFieldsForTemplate } from '@documenso/lib/server-only/field/set-fields-for-template';
 import { signFieldWithToken } from '@documenso/lib/server-only/field/sign-field-with-token';
 import { updateDocumentFields } from '@documenso/lib/server-only/field/update-document-fields';
@@ -26,6 +27,7 @@ import {
   ZGetFieldRequestSchema,
   ZGetFieldResponseSchema,
   ZRemovedSignedFieldWithTokenMutationSchema,
+  ZSetSignatureFillMutationSchema,
   ZSetDocumentFieldsRequestSchema,
   ZSetDocumentFieldsResponseSchema,
   ZSetFieldsForTemplateRequestSchema,
@@ -456,6 +458,7 @@ export const fieldRouter = router({
         signaturePositionY,
         fieldSignedPositionX,
         fieldSignedPositionY,
+        signatureFill,
       } = input;
 
       return await signFieldWithToken({
@@ -470,7 +473,19 @@ export const fieldRouter = router({
         signaturePositionY,
         fieldSignedPositionX,
         fieldSignedPositionY,
+        signatureFill,
       });
+    }),
+
+  /**
+   * Change how large an already-signed signature is drawn in its field.
+   *
+   * @private
+   */
+  setSignatureFill: procedure
+    .input(ZSetSignatureFillMutationSchema)
+    .mutation(async ({ input }) => {
+      return await setSignatureFill(input);
     }),
 
   /**

@@ -33,19 +33,22 @@ import {
 } from '@documenso/ui/primitives/command';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
-const DOCUMENTS_PAGES = [
+/**
+ * Prefixed with the surface name rather than called "documents": the Repository
+ * holds documents too, so an unqualified "Draft documents" in a search palette
+ * is exactly as ambiguous as an unqualified nav row would be. The prefix also
+ * keeps "e-sign" itself searchable.
+ */
+const ESIGN_PAGES = [
   {
-    label: msg`All documents`,
+    label: msg`E-Sign: All`,
     path: '/documents?status=ALL',
     shortcut: DOCUMENTS_PAGE_SHORTCUT.replace('+', ''),
   },
-  { label: msg`Draft documents`, path: '/documents?status=DRAFT' },
-  {
-    label: msg`Completed documents`,
-    path: '/documents?status=COMPLETED',
-  },
-  { label: msg`Pending documents`, path: '/documents?status=PENDING' },
-  { label: msg`Inbox documents`, path: '/documents?status=INBOX' },
+  { label: msg`E-Sign: Drafts`, path: '/documents?status=DRAFT' },
+  { label: msg`E-Sign: Pending`, path: '/documents?status=PENDING' },
+  { label: msg`E-Sign: Completed`, path: '/documents?status=COMPLETED' },
+  { label: msg`E-Sign: Inbox`, path: '/documents?status=INBOX' },
 ];
 
 const TEMPLATES_PAGES = [
@@ -58,12 +61,16 @@ const TEMPLATES_PAGES = [
 
 const SETTINGS_PAGES = [
   {
+    // The Settings console, matching where the sidebar's Settings row goes.
+    // `/settings` alone lands on personal preferences, which is a different
+    // thing wearing the same word.
     label: msg`Settings`,
-    path: '/settings',
+    path: '/org/settings',
     shortcut: SETTINGS_PAGE_SHORTCUT.replace('+', ''),
   },
   { label: msg`Profile`, path: '/settings/profile' },
-  { label: msg`Password`, path: '/settings/password' },
+  // Was `/settings/password`, which is not a route — the page is `security`.
+  { label: msg`Security`, path: '/settings/security' },
 ];
 
 export type AppCommandMenuProps = {
@@ -145,12 +152,12 @@ export function AppCommandMenu({ open, onOpenChange }: AppCommandMenuProps) {
   };
 
   const goToSettings = useCallback(() => push(SETTINGS_PAGES[0].path), [push]);
-  const goToDocuments = useCallback(() => push(DOCUMENTS_PAGES[0].path), [push]);
+  const goToEsign = useCallback(() => push(ESIGN_PAGES[0].path), [push]);
   const goToTemplates = useCallback(() => push(TEMPLATES_PAGES[0].path), [push]);
 
   useHotkeys(['ctrl+k', 'meta+k'], toggleOpen, { preventDefault: true });
   useHotkeys(SETTINGS_PAGE_SHORTCUT, goToSettings);
-  useHotkeys(DOCUMENTS_PAGE_SHORTCUT, goToDocuments);
+  useHotkeys(DOCUMENTS_PAGE_SHORTCUT, goToEsign);
   useHotkeys(TEMPLATES_PAGE_SHORTCUT, goToTemplates);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -197,8 +204,8 @@ export function AppCommandMenu({ open, onOpenChange }: AppCommandMenuProps) {
         )}
         {!currentPage && (
           <>
-            <CommandGroup className="mx-2 p-0 pb-2" heading={_(msg`Documents`)}>
-              <Commands push={push} pages={DOCUMENTS_PAGES} />
+            <CommandGroup className="mx-2 p-0 pb-2" heading={_(msg`E-Sign`)}>
+              <Commands push={push} pages={ESIGN_PAGES} />
             </CommandGroup>
             <CommandGroup className="mx-2 p-0 pb-2" heading={_(msg`Templates`)}>
               <Commands push={push} pages={TEMPLATES_PAGES} />

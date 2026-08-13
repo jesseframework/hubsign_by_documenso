@@ -6,23 +6,24 @@ import { TRPCError } from '@trpc/server';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
 
-import { getOrCreateOrgPrice } from '@documenso/ee/server-only/stripe/get-or-create-org-price';
+import {
+  getOrgSeatPrice,
+  matchOrgPrice,
+  searchActiveOrgPrices,
+} from '@documenso/lib/server-only/stripe/get-org-seat-price';
 import { onOrgSubscriptionUpdated } from '@documenso/ee/server-only/stripe/webhook/on-org-subscription-updated';
 import { onSubscriptionDeleted } from '@documenso/ee/server-only/stripe/webhook/on-subscription-deleted';
 import {
   getSubscriptionPeriodEndISO,
   resolveOrgPlanNameAndPrice,
 } from '@documenso/ee/server-only/stripe/webhook/resolve-org-plan-price';
-import { IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
+import { DEPLOYMENT_TYPE, IS_BILLING_ENABLED, NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 import { normalizeClaimableDomains } from '@documenso/lib/constants/public-email-domains';
 import { PUBLIC_EMAIL_DOMAINS } from '@documenso/lib/constants/public-email-domains';
 import { getI18nInstance } from '@documenso/lib/client-only/providers/i18n-server';
 import {
-  ORG_DMS_ADDON_PRICE_CENTS,
-  ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT,
   ORG_SEAT_TIERS,
   ORG_UNLIMITED_SENTINEL,
-  getOrgYearlyPriceCents,
 } from '@documenso/lib/constants/org-tiers';
 import type { OrgBillingInterval } from '@documenso/lib/constants/org-tiers';
 import { env } from '@documenso/lib/utils/env';
@@ -40,6 +41,12 @@ import {
 } from '@documenso/lib/server-only/license/redeem-license-key';
 import { stripe } from '@documenso/lib/server-only/stripe';
 import { getSigningBottlenecks } from '@documenso/lib/server-only/document/bottlenecks';
+import { getInvoiceReport } from '@documenso/lib/server-only/document/invoice-report';
+import {
+  BUILT_IN_REPORT_VIEW,
+  ZReportConfigSchema,
+} from '@documenso/lib/universal/report-config';
+import { getOrganizationDueDates } from '@documenso/lib/server-only/inbox/invoice-due';
 import { prisma } from '@documenso/prisma';
 
 import { authenticatedProcedure, router } from '../trpc';
@@ -267,6 +274,93 @@ async function createOrUpdateOrgSubscription(orgId: number) {
   }
 }
 
+/**
+ * Issues a fresh single-use set-password token (24h expiry) for a user who
+ * was auto-created by `inviteMember` and is still locked out, and emails them
+ * the welcome/set-password link. Shared by `inviteMember` (first send) and
+ * `resendMemberInvite` (recovery when the original link expired or was lost).
+ */
+async function sendOrgSetPasswordEmail(params: {
+  user: { id: number; email: string; name: string | null };
+  orgName: string;
+  inviterName: string;
+  roleLabel: string;
+  welcomeMessage?: string;
+  isNewUser: boolean;
+}) {
+  const { user, orgName, inviterName, roleLabel, welcomeMessage, isNewUser } = params;
+
+  const token = crypto.randomBytes(18).toString('hex');
+  await prisma.passwordResetToken.create({
+    data: {
+      token,
+      expiry: new Date(Date.now() + ONE_DAY),
+      userId: user.id,
+    },
+  });
+
+  const assetBaseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
+  const setPasswordLink = `${assetBaseUrl}/reset-password/${token}`;
+
+  const emailTemplate = createElement(OrgMemberWelcomeEmailTemplate, {
+    assetBaseUrl,
+    baseUrl: assetBaseUrl,
+    inviterName,
+    orgName,
+    role: roleLabel,
+    welcomeMessage: welcomeMessage || '',
+    setPasswordLink,
+  });
+
+  const [html, text] = await Promise.all([
+    renderEmailWithI18N(emailTemplate),
+    renderEmailWithI18N(emailTemplate, { plainText: true }),
+  ]);
+
+  const i18n = await getI18nInstance();
+
+  await mailer.sendMail({
+    to: {
+      address: user.email,
+      name: user.name || '',
+    },
+    from: {
+      name: env('NEXT_PRIVATE_SMTP_FROM_NAME') || 'HubSign',
+      address: env('NEXT_PRIVATE_SMTP_FROM_ADDRESS') || 'noreply@hubsign.io',
+    },
+    subject: i18n._(
+      isNewUser ? msg`Welcome to ${orgName} on HubSign` : msg`Your HubSign invite link was resent`,
+    ),
+    html,
+    text,
+  }).catch((err) => {
+    console.error('[Org Invite] Failed to send set-password email:', err);
+  });
+}
+
+/**
+ * The organization this request acts on.
+ *
+ * `joinedAt asc` because a user can belong to several: without an explicit order
+ * Postgres heap order decides which one a query describes, and an unrelated row
+ * update can silently switch it. Matches `resolveOrganizationId`.
+ */
+const requireOrgMembership = async (userId: number) => {
+  const membership = await prisma.organizationMember.findFirst({
+    where: { userId },
+    orderBy: { joinedAt: 'asc' },
+  });
+
+  if (!membership) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You are not a member of an organization.',
+    });
+  }
+
+  return membership;
+};
+
 export const orgRouter = router({
   // ═══════════════════════════════════════════
   // ORGANIZATION CRUD
@@ -390,7 +484,7 @@ export const orgRouter = router({
           include: {
             members: {
               include: {
-                user: { select: { id: true, name: true, email: true } },
+                user: { select: { id: true, name: true, email: true, mustChangePassword: true } },
               },
             },
             _count: { select: { teams: true, dmsDocuments: true, dmsLocations: true } },
@@ -399,7 +493,43 @@ export const orgRouter = router({
       },
     });
 
-    return membership;
+    if (!membership) {
+      return membership;
+    }
+
+    // Members still on `mustChangePassword` were auto-created by `inviteMember`
+    // and are locked out until they use their emailed set-password link — pull
+    // each one's latest token expiry so the UI can show a countdown/"Expired"
+    // state instead of silently stranding them.
+    const pendingUserIds = membership.organization.members
+      .filter((m) => m.user.mustChangePassword)
+      .map((m) => m.user.id);
+
+    const latestTokenByUser = new Map<number, Date>();
+    if (pendingUserIds.length > 0) {
+      const tokens = await prisma.passwordResetToken.findMany({
+        where: { userId: { in: pendingUserIds } },
+        orderBy: { expiry: 'desc' },
+      });
+      for (const token of tokens) {
+        if (!latestTokenByUser.has(token.userId)) {
+          latestTokenByUser.set(token.userId, token.expiry);
+        }
+      }
+    }
+
+    return {
+      ...membership,
+      organization: {
+        ...membership.organization,
+        members: membership.organization.members.map((m) => ({
+          ...m,
+          inviteExpiresAt: m.user.mustChangePassword
+            ? latestTokenByUser.get(m.user.id) ?? null
+            : null,
+        })),
+      },
+    };
   }),
 
   update: authenticatedProcedure
@@ -461,6 +591,7 @@ export const orgRouter = router({
         .optional(),
       slaDefaultInternalHours: z.number().int().min(1).max(2000).nullable().optional(),
       slaDefaultEndToEndHours: z.number().int().min(1).max(2000).nullable().optional(),
+      slaDefaultSigningHours: z.number().int().min(1).max(2000).nullable().optional(),
       // SSO / OIDC
       oidcEnabled: z.boolean().optional(),
       oidcClientId: z.string().nullable().optional(),
@@ -588,8 +719,8 @@ export const orgRouter = router({
 
       // Auto-create the user if they don't exist. The admin never sets a
       // password — we flag the user with `mustChangePassword=true` and send
-      // them a single-use set-password link via the password reset flow.
-      let setPasswordLink: string | null = null;
+      // them a single-use set-password link via the password reset flow
+      // (issued below, after the membership is confirmed).
       if (!user) {
         user = await prisma.user.create({
           data: {
@@ -601,19 +732,6 @@ export const orgRouter = router({
             emailVerified: new Date(),
           },
         });
-
-        // Generate a single-use set-password token (24-hour expiry).
-        const token = crypto.randomBytes(18).toString('hex');
-        await prisma.passwordResetToken.create({
-          data: {
-            token,
-            expiry: new Date(Date.now() + ONE_DAY),
-            userId: user.id,
-          },
-        });
-
-        const base = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
-        setPasswordLink = `${base}/reset-password/${token}`;
       }
 
       // Check if already a member
@@ -641,58 +759,110 @@ export const orgRouter = router({
         select: { name: true, email: true },
       });
 
-      const assetBaseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
       const roleLabel = input.role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const inviterName = inviter.name || inviter.email;
 
-      // Choose template: welcome (with set-password link) for new users,
-      // or existing-user invite for users who already had an account.
-      const emailTemplate =
-        isNewUser && setPasswordLink
-          ? createElement(OrgMemberWelcomeEmailTemplate, {
-              assetBaseUrl,
-              baseUrl: assetBaseUrl,
-              inviterName: inviter.name || inviter.email,
-              orgName: org.name,
-              role: roleLabel,
-              welcomeMessage: input.welcomeMessage || '',
-              setPasswordLink,
-            })
-          : createElement(OrgMemberInviteEmailTemplate, {
-              assetBaseUrl,
-              baseUrl: assetBaseUrl,
-              inviterName: inviter.name || inviter.email,
-              orgName: org.name,
-              role: roleLabel,
-            });
+      if (isNewUser) {
+        // Locked out until they use the emailed link — same helper backs
+        // `resendMemberInvite` for when this one expires or gets lost.
+        await sendOrgSetPasswordEmail({
+          user,
+          orgName: org.name,
+          inviterName,
+          roleLabel,
+          welcomeMessage: input.welcomeMessage,
+          isNewUser: true,
+        });
+      } else {
+        // Existing account — just a courtesy notification, no link/token.
+        const assetBaseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
+        const emailTemplate = createElement(OrgMemberInviteEmailTemplate, {
+          assetBaseUrl,
+          baseUrl: assetBaseUrl,
+          inviterName,
+          orgName: org.name,
+          role: roleLabel,
+        });
 
-      const [html, text] = await Promise.all([
-        renderEmailWithI18N(emailTemplate),
-        renderEmailWithI18N(emailTemplate, { plainText: true }),
-      ]);
+        const [html, text] = await Promise.all([
+          renderEmailWithI18N(emailTemplate),
+          renderEmailWithI18N(emailTemplate, { plainText: true }),
+        ]);
 
-      const i18n = await getI18nInstance();
+        const i18n = await getI18nInstance();
 
-      await mailer.sendMail({
-        to: {
-          address: user.email,
-          name: user.name || '',
-        },
-        from: {
-          name: env('NEXT_PRIVATE_SMTP_FROM_NAME') || 'HubSign',
-          address: env('NEXT_PRIVATE_SMTP_FROM_ADDRESS') || 'noreply@hubsign.io',
-        },
-        subject: i18n._(
-          isNewUser
-            ? msg`Welcome to ${org.name} on HubSign`
-            : msg`You've been added to ${org.name} on HubSign`,
-        ),
-        html,
-        text,
-      }).catch((err) => {
-        console.error('[Org Invite] Failed to send invite email:', err);
-      });
+        await mailer.sendMail({
+          to: {
+            address: user.email,
+            name: user.name || '',
+          },
+          from: {
+            name: env('NEXT_PRIVATE_SMTP_FROM_NAME') || 'HubSign',
+            address: env('NEXT_PRIVATE_SMTP_FROM_ADDRESS') || 'noreply@hubsign.io',
+          },
+          subject: i18n._(msg`You've been added to ${org.name} on HubSign`),
+          html,
+          text,
+        }).catch((err) => {
+          console.error('[Org Invite] Failed to send invite email:', err);
+        });
+      }
 
       return newMember;
+    }),
+
+  /**
+   * Re-issues the set-password link for a member still locked out
+   * (`mustChangePassword: true`) — recovers members whose original invite
+   * link expired or was lost, since re-running `inviteMember` for them
+   * would just throw `CONFLICT` (they're already a member).
+   */
+  resendMemberInvite: authenticatedProcedure
+    .input(z.object({ memberId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id, role: { in: ['ORG_ADMIN', 'DMS_ADMIN'] } },
+      });
+
+      if (!membership) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Insufficient permissions to resend invites' });
+      }
+
+      const target = await prisma.organizationMember.findUnique({
+        where: { id: input.memberId },
+        include: { user: true, organization: true },
+      });
+
+      if (!target || target.organizationId !== membership.organizationId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Member not found' });
+      }
+
+      if (!target.user.mustChangePassword) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This member has already set up their account.',
+        });
+      }
+
+      const inviter = await prisma.user.findUniqueOrThrow({
+        where: { id: ctx.user.id },
+        select: { name: true, email: true },
+      });
+
+      const roleLabel = target.role.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+      // Invalidate any outstanding link before issuing the new one, so only
+      // the freshest link works.
+      await prisma.passwordResetToken.deleteMany({ where: { userId: target.user.id } });
+      await sendOrgSetPasswordEmail({
+        user: target.user,
+        orgName: target.organization.name,
+        inviterName: inviter.name || inviter.email,
+        roleLabel,
+        isNewUser: false,
+      });
+
+      return { email: target.user.email, expiresAt: new Date(Date.now() + ONE_DAY) };
     }),
 
   updateMemberRole: authenticatedProcedure
@@ -862,12 +1032,58 @@ export const orgRouter = router({
     });
   }),
 
+  /**
+   * Live Stripe-authoritative pricing for every org seat/DMS/doc-block
+   * combination the billing page can display or purchase — one Stripe search
+   * call shared across all of them (see `searchActiveOrgPrices`) rather than
+   * a separate round trip per combination. `unitAmountCents: null` means
+   * that Price hasn't been configured in Stripe yet.
+   */
+  getSeatPricing: authenticatedProcedure.query(async () => {
+    const prices = await searchActiveOrgPrices();
+    const deployment = DEPLOYMENT_TYPE();
+
+    const amountFor = (options: Parameters<typeof matchOrgPrice>[1]) =>
+      matchOrgPrice(prices, options)?.unit_amount ?? null;
+
+    return {
+      seat: {
+        BUSINESS: {
+          month: amountFor({ type: 'org_seat', tier: 'BUSINESS', interval: 'month' }),
+          year: amountFor({ type: 'org_seat', tier: 'BUSINESS', interval: 'year' }),
+        },
+        ENTERPRISE: {
+          month: amountFor({ type: 'org_seat', tier: 'ENTERPRISE', interval: 'month', deployment }),
+          year: amountFor({ type: 'org_seat', tier: 'ENTERPRISE', interval: 'year', deployment }),
+        },
+      },
+      dms: {
+        BUSINESS: {
+          month: amountFor({ type: 'org_dms', tier: 'BUSINESS', interval: 'month' }),
+          year: amountFor({ type: 'org_dms', tier: 'BUSINESS', interval: 'year' }),
+        },
+        ENTERPRISE: {
+          month: amountFor({ type: 'org_dms', tier: 'ENTERPRISE', interval: 'month' }),
+          year: amountFor({ type: 'org_dms', tier: 'ENTERPRISE', interval: 'year' }),
+        },
+      },
+      // Business-only.
+      docBlock: {
+        month: amountFor({ type: 'org_doc_block', tier: 'BUSINESS', interval: 'month' }),
+        year: amountFor({ type: 'org_doc_block', tier: 'BUSINESS', interval: 'year' }),
+      },
+      deployment,
+    };
+  }),
+
   purchaseSeats: authenticatedProcedure
     .input(z.object({
       tier: z.enum(['BUSINESS', 'ENTERPRISE']),
       quantity: z.number().min(1).max(100),
       interval: z.enum(['month', 'year']).default('month'),
       dmsEnabled: z.boolean().optional(),
+      // Business-only: how many +100/mo document volume blocks to add.
+      docBlocks: z.number().int().min(0).optional(),
       acknowledgeCancelPersonalPlan: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -925,16 +1141,6 @@ export const orgRouter = router({
         ? ((anyExistingSeatPlan.billingInterval as OrgBillingInterval | undefined) ?? 'month')
         : input.interval;
 
-      const seatUnitAmountCents =
-        interval === 'year'
-          ? getOrgYearlyPriceCents(tierLimits.priceCents, tierLimits.yearlyDiscountPercent)
-          : tierLimits.priceCents;
-
-      const dmsUnitAmountCents =
-        interval === 'year'
-          ? getOrgYearlyPriceCents(ORG_DMS_ADDON_PRICE_CENTS, ORG_DMS_ADDON_YEARLY_DISCOUNT_PERCENT)
-          : ORG_DMS_ADDON_PRICE_CENTS;
-
       // The tier minimum only applies to establishing *that tier*, whether
       // it's the org's first tier ever or a second one added alongside an
       // existing one — once a tier already meets it, buying 1-2 more is fine.
@@ -976,10 +1182,13 @@ export const orgRouter = router({
       if (!IS_BILLING_ENABLED()) {
         // Billing not enabled — just track it locally, synchronously (no
         // Stripe involved either way, so there's nothing to wait on).
+        const docBlockQuantity =
+          (existingSeatPlan?.docBlockQuantity ?? 0) + (input.tier === 'BUSINESS' ? (input.docBlocks ?? 0) : 0);
+
         const seatPlan = existingSeatPlan
           ? await prisma.orgSeatPlan.update({
               where: { id: existingSeatPlan.id },
-              data: { quantity: existingSeatPlan.quantity + input.quantity, dmsEnabled },
+              data: { quantity: existingSeatPlan.quantity + input.quantity, dmsEnabled, docBlockQuantity },
             })
           : await prisma.orgSeatPlan.create({
               data: {
@@ -990,6 +1199,7 @@ export const orgRouter = router({
                 recipientsPerMonth: config.recipientsPerMonth,
                 directTemplates: config.directTemplates,
                 dmsEnabled,
+                docBlockQuantity,
                 billingInterval: interval,
               },
             });
@@ -1002,7 +1212,7 @@ export const orgRouter = router({
 
           await prisma.organizationMember.update({
             where: { id: membership.id },
-            data: { seatTier: input.tier, dmsAddon: input.tier === 'ENTERPRISE' ? true : dmsEnabled },
+            data: { seatTier: input.tier, dmsAddon: dmsEnabled },
           });
 
           return updatedSeatPlan;
@@ -1028,7 +1238,10 @@ export const orgRouter = router({
         // product metadata `{ type, tier }` (the same self-healing pattern
         // already used here for DMS) is what keeps this tier-correct instead
         // of accidentally grabbing another tier's item.
-        const findTierItem = (type: 'org_seat' | 'org_dms', cachedPriceId?: string | null) =>
+        const findTierItem = (
+          type: 'org_seat' | 'org_dms' | 'org_doc_block',
+          cachedPriceId?: string | null,
+        ) =>
           liveSubscription.items.data.find((item) => cachedPriceId && item.price.id === cachedPriceId) ??
           liveSubscription.items.data.find((item) => {
             const { product } = item.price;
@@ -1049,16 +1262,24 @@ export const orgRouter = router({
         } else {
           // This tier doesn't exist on the subscription yet — adding it
           // alongside whatever other tier(s) the org already has, rather
-          // than starting a second subscription.
-          const seatPriceId = await getOrCreateOrgPrice({
+          // than starting a second subscription. Pricing is Stripe-authoritative
+          // (see `getOrgSeatPrice`), so this is a lookup, not a get-or-create —
+          // a missing Price here means Stripe isn't configured for this plan yet.
+          const seatPrice = await getOrgSeatPrice({
             type: 'org_seat',
             tier: input.tier,
             interval,
-            unitAmountCents: seatUnitAmountCents,
-            productName: `HubSign ${input.tier.charAt(0) + input.tier.slice(1).toLowerCase()} Seat`,
+            deployment: input.tier === 'ENTERPRISE' ? DEPLOYMENT_TYPE() : undefined,
           });
 
-          items.push({ price: seatPriceId, quantity: newQuantity });
+          if (!seatPrice) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `No Stripe price configured for ${input.tier} seats (${interval}).`,
+            });
+          }
+
+          items.push({ price: seatPrice.id, quantity: newQuantity });
         }
 
         const existingDmsItem = findTierItem('org_dms', null);
@@ -1072,19 +1293,41 @@ export const orgRouter = router({
             items.push({ id: existingDmsItem.id, quantity: newQuantity });
           } else {
             // Unlike Checkout Session line items, `subscriptions.update`
-            // doesn't accept an inline `price_data.product_data` — it needs
-            // a real product/price to reference, hence the get-or-create
-            // lookup (also reused by the first-purchase branch below, so DMS
-            // Prices are never spawned by more than one code path).
-            const dmsPriceId = await getOrCreateOrgPrice({
-              type: 'org_dms',
-              tier: input.tier,
-              interval,
-              unitAmountCents: dmsUnitAmountCents,
-              productName: 'Document Manager (DMS) Add-On',
-            });
+            // doesn't accept an inline `price_data.product_data` — it needs a
+            // real Price to reference, hence the lookup (also reused by the
+            // first-purchase branch below, so both go through one place).
+            const dmsPrice = await getOrgSeatPrice({ type: 'org_dms', tier: input.tier, interval });
 
-            items.push({ price: dmsPriceId, quantity: newQuantity });
+            if (!dmsPrice) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: `No Stripe price configured for the DMS add-on (${interval}).`,
+              });
+            }
+
+            items.push({ price: dmsPrice.id, quantity: newQuantity });
+          }
+        }
+
+        // Doc volume blocks: Business-only, quantity = number of +100 blocks
+        // (independent of seat count, unlike seats/DMS above).
+        const newDocBlockQuantity = (existingSeatPlan?.docBlockQuantity ?? 0) + (input.docBlocks ?? 0);
+        const existingDocBlockItem = findTierItem('org_doc_block', null);
+
+        if (input.tier === 'BUSINESS' && newDocBlockQuantity > 0) {
+          if (existingDocBlockItem) {
+            items.push({ id: existingDocBlockItem.id, quantity: newDocBlockQuantity });
+          } else {
+            const docBlockPrice = await getOrgSeatPrice({ type: 'org_doc_block', tier: input.tier, interval });
+
+            if (!docBlockPrice) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: `No Stripe price configured for the document volume block add-on (${interval}).`,
+              });
+            }
+
+            items.push({ price: docBlockPrice.id, quantity: newDocBlockQuantity });
           }
         }
 
@@ -1148,32 +1391,55 @@ export const orgRouter = router({
       // email (`handler.ts`'s `checkout.session.completed` branch).
       const customerId = await getOrCreateStripeCustomer(org, ctx.user.email);
 
-      // Resolved via `getOrCreateOrgPrice` (same as the top-up branch) rather
-      // than inline `price_data` — a real, reusable Price per (tier, interval)
-      // instead of a brand-new ephemeral one on every first purchase.
-      const seatPriceId = await getOrCreateOrgPrice({
+      // Resolved via `getOrgSeatPrice` (same as the top-up branch) — pricing
+      // is Stripe-authoritative, so this is a lookup, not a get-or-create; a
+      // missing Price here means Stripe isn't configured for this plan yet.
+      const seatPrice = await getOrgSeatPrice({
         type: 'org_seat',
         tier: input.tier,
         interval,
-        unitAmountCents: seatUnitAmountCents,
-        productName: `HubSign ${input.tier.charAt(0) + input.tier.slice(1).toLowerCase()} Seat`,
+        deployment: input.tier === 'ENTERPRISE' ? DEPLOYMENT_TYPE() : undefined,
       });
 
+      if (!seatPrice) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `No Stripe price configured for ${input.tier} seats (${interval}).`,
+        });
+      }
+
       const lineItems: Array<{ price: string; quantity: number }> = [
-        { price: seatPriceId, quantity: input.quantity },
+        { price: seatPrice.id, quantity: input.quantity },
       ];
 
-      // Add DMS add-on line item if enabled
-      if (dmsEnabled && input.tier !== 'ENTERPRISE') {
-        const dmsPriceId = await getOrCreateOrgPrice({
-          type: 'org_dms',
-          tier: input.tier,
-          interval,
-          unitAmountCents: dmsUnitAmountCents,
-          productName: 'Document Manager (DMS) Add-On',
-        });
+      // DMS add-on — available on every tier now (no longer bundled into
+      // Enterprise), so no tier exclusion here.
+      if (dmsEnabled) {
+        const dmsPrice = await getOrgSeatPrice({ type: 'org_dms', tier: input.tier, interval });
 
-        lineItems.push({ price: dmsPriceId, quantity: input.quantity });
+        if (!dmsPrice) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `No Stripe price configured for the DMS add-on (${interval}).`,
+          });
+        }
+
+        lineItems.push({ price: dmsPrice.id, quantity: input.quantity });
+      }
+
+      // Doc volume blocks — Business-only, quantity = number of +100 blocks.
+      if (input.tier === 'BUSINESS' && (input.docBlocks ?? 0) > 0) {
+        const docBlockPrice = await getOrgSeatPrice({ type: 'org_doc_block', tier: input.tier, interval });
+
+        if (!docBlockPrice) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: `No Stripe price configured for the document volume block add-on (${interval}).`,
+          });
+        }
+
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        lineItems.push({ price: docBlockPrice.id, quantity: input.docBlocks as number });
       }
 
       const sessionParams = {
@@ -1763,6 +2029,146 @@ export const orgRouter = router({
    * user's documents as its own. Approvals, inbox items and workflows are
    * natively org-scoped and filter directly.
    */
+  /**
+   * Run one configured invoice report.
+   *
+   * A separate query from `getDashboardStats` rather than another slice of it:
+   * this one scans OCR totals across a window and resolves each invoice's vendor
+   * against the directory, which is work the overview does not need and should
+   * not pay for on every load.
+   */
+  getInvoiceReport: authenticatedProcedure
+    .input(z.object({ config: ZReportConfigSchema }))
+    .query(async ({ ctx, input }) => {
+      const membership = await requireOrgMembership(ctx.user.id);
+
+      const to = DateTime.utc().endOf('day');
+      // Inclusive of today, matching the dashboard toolbar's presets: "last 90
+      // days" spans 90 days, not 91.
+      const from = to.startOf('day').minus({ days: input.config.days - 1 });
+
+      return getInvoiceReport({
+        organizationId: membership.organizationId,
+        from: from.toJSDate(),
+        to: to.toJSDate(),
+        config: input.config,
+      });
+    }),
+
+  /**
+   * The organization's saved reports, with the built-in one first.
+   *
+   * The built-in view is prepended here rather than seeded into the table: a row
+   * in the database can be renamed, reconfigured or deleted, and every
+   * organization would then need re-seeding to get it back. As a constant it is
+   * always present and always the same.
+   *
+   * A stored config that no longer parses is dropped from the list rather than
+   * failing the query — one bad row must not take the page down — and reported so
+   * the count can say what happened.
+   */
+  listReportViews: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await requireOrgMembership(ctx.user.id);
+
+    const rows = await prisma.reportView.findMany({
+      where: { organizationId: membership.organizationId },
+      orderBy: [{ order: 'asc' }, { name: 'asc' }],
+    });
+
+    const views: { id: string; name: string; config: unknown; builtIn: boolean }[] = [
+      { ...BUILT_IN_REPORT_VIEW, builtIn: true },
+    ];
+    let unreadable = 0;
+
+    for (const row of rows) {
+      const parsed = ZReportConfigSchema.safeParse(row.config);
+
+      if (!parsed.success) {
+        unreadable += 1;
+        continue;
+      }
+
+      views.push({ id: row.id, name: row.name, config: parsed.data, builtIn: false });
+    }
+
+    return { views, unreadable };
+  }),
+
+  /** Save a report configuration under a name, or update one. */
+  upsertReportView: authenticatedProcedure
+    .input(
+      z.object({
+        id: z.string().optional(),
+        name: z.string().trim().min(1).max(80),
+        config: ZReportConfigSchema,
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireOrgMembership(ctx.user.id);
+
+      if (input.id) {
+        const existing = await prisma.reportView.findFirst({
+          where: { id: input.id, organizationId: membership.organizationId },
+          select: { id: true },
+        });
+
+        if (!existing) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Report not found.' });
+        }
+
+        return prisma.reportView.update({
+          where: { id: existing.id },
+          data: { name: input.name, config: input.config },
+        });
+      }
+
+      const clash = await prisma.reportView.findFirst({
+        where: { organizationId: membership.organizationId, name: input.name },
+        select: { id: true },
+      });
+
+      if (clash) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `A report called "${input.name}" already exists.`,
+        });
+      }
+
+      const count = await prisma.reportView.count({
+        where: { organizationId: membership.organizationId },
+      });
+
+      return prisma.reportView.create({
+        data: {
+          organizationId: membership.organizationId,
+          name: input.name,
+          config: input.config,
+          createdByUserId: ctx.user.id,
+          // Newest last, so the list stays in the order people added them.
+          order: count,
+        },
+      });
+    }),
+
+  deleteReportView: authenticatedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireOrgMembership(ctx.user.id);
+
+      const view = await prisma.reportView.findFirst({
+        where: { id: input.id, organizationId: membership.organizationId },
+        select: { id: true },
+      });
+
+      if (!view) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Report not found.' });
+      }
+
+      await prisma.reportView.delete({ where: { id: view.id } });
+
+      return { success: true };
+    }),
+
   getDashboardStats: authenticatedProcedure
     .input(
       z
@@ -1856,7 +2262,6 @@ export const orgRouter = router({
       approvalsByStatus,
       totalDocuments,
       inboxSourced,
-      pendingDocuments,
       documentsByMonth,
       approvalsByMonth,
       topSenders,
@@ -1878,21 +2283,6 @@ export const orgRouter = router({
       // SignatureInboxItem directly mixed org-scoped inbox rows with
       // member-scoped documents and needed a clamp to stay non-negative.
       prisma.document.count({ where: { ...documentWhere, inboxItem: { isNot: null } } }),
-      // Aging needs each pending document's send time, which lives in the audit
-      // log; `createdAt` is the fallback for documents sent before that log
-      // existed (or never logged).
-      prisma.document.findMany({
-        where: { ...documentWhere, status: 'PENDING' },
-        select: {
-          createdAt: true,
-          auditLogs: {
-            where: { type: 'DOCUMENT_SENT' },
-            select: { createdAt: true },
-            orderBy: { createdAt: 'asc' },
-            take: 1,
-          },
-        },
-      }),
       // `grain` is a literal from a two-value union, never user text, so it is
       // safe to interpolate into DATE_TRUNC — which cannot take a bound
       // parameter for its field argument.
@@ -1961,28 +2351,61 @@ export const orgRouter = router({
       }));
     };
 
-    // Aging is measured on documents still awaiting signature — how long each
-    // has been outstanding since it was SENT, which is what the card claims.
-    // Inbox-sourced documents are created when the email lands and sent much
-    // later, so createdAt would have aged them from the wrong instant.
+    /*
+      Aging, measured against the date the VENDOR is owed by.
+
+      It used to measure how long each pending document had been outstanding since
+      we sent it. That answers "how slow are our signers", which the "Waiting on"
+      and "Where it's stuck" tiles already answer better — and it is not what an
+      aging report means to anyone in finance. An invoice with three weeks of
+      credit left was shown in the same bucket as one a month past its due date.
+
+      Counted over exactly the population the "Overdue by vendor" card counts:
+      every unsettled invoice from the inbox, unwindowed. Two mismatches used to
+      make the pair irreconcilable on the same screen —
+
+        - It counted only PENDING documents, so an invoice still sitting in DRAFT
+          was absent from aging while appearing as overdue by vendor. A draft
+          invoice twenty-five days past due is the worst case, not an exempt one:
+          nobody has even sent it.
+        - It was filtered by the dashboard's date range, which the vendor card
+          deliberately ignores. An aging report that hides the oldest invoices
+          because they were created before the selected month is an aging report
+          with the answer removed.
+
+      Documents that never came through the inbox are outside this card entirely:
+      a contract awaiting signature has no invoice due date to be measured against,
+      and "Waiting on" is where it is accounted for.
+    */
+    const dueDates = await getOrganizationDueDates({ organizationId });
+    const openInvoices = dueDates.filter((due) => due.open);
+
     const ageBuckets = [
-      { key: 'current', label: 'Current', min: 0, max: 1, count: 0 },
-      { key: '1-30', label: '1-30 days', min: 1, max: 31, count: 0 },
-      { key: '31-60', label: '31-60 days', min: 31, max: 61, count: 0 },
-      { key: '61-90', label: '61-90 days', min: 61, max: 91, count: 0 },
-      { key: '90+', label: '90+ days', min: 91, max: Infinity, count: 0 },
+      // "Past due", not "late": the bucket is the invoice's age against its own
+      // due date, and a back-dated invoice lands in the 90+ bucket on the day it
+      // arrives. "Late" reads as a verdict on the queue, which it is not.
+      { key: 'current', label: 'Not yet due', min: -Infinity, max: 1, count: 0 },
+      { key: '1-30', label: '1-30 days past due', min: 1, max: 31, count: 0 },
+      { key: '31-60', label: '31-60 days past due', min: 31, max: 61, count: 0 },
+      { key: '61-90', label: '61-90 days past due', min: 61, max: 91, count: 0 },
+      { key: '90+', label: '90+ days past due', min: 91, max: Infinity, count: 0 },
+      { key: 'unknown', label: 'No due date', min: NaN, max: NaN, count: 0 },
     ];
 
-    for (const doc of pendingDocuments) {
-      const sentAt = doc.auditLogs[0]?.createdAt ?? doc.createdAt;
-      // Clamp at zero so a clock-skewed or future-dated row lands in "Current"
-      // rather than matching no bucket and vanishing from a donut that is
-      // supposed to sum to the headline.
-      const days = Math.max(
-        0,
-        Math.floor(DateTime.utc().diff(DateTime.fromJSDate(sentAt), 'days').days),
+    const unknownBucket = ageBuckets[ageBuckets.length - 1];
+
+    for (const due of openInvoices) {
+      // Neither the page nor the vendor's terms could date it. Counted rather
+      // than dropped: the donut has to sum to the headline above it, and "we
+      // cannot judge these" is a real answer that a silent omission hides.
+      if (due.daysPastDue === null) {
+        unknownBucket.count += 1;
+        continue;
+      }
+
+      const bucket = ageBuckets.find(
+        (b) => (due.daysPastDue as number) >= b.min && (due.daysPastDue as number) < b.max,
       );
-      const bucket = ageBuckets.find((b) => days >= b.min && days < b.max);
       if (bucket) bucket.count += 1;
     }
 
@@ -2045,6 +2468,15 @@ export const orgRouter = router({
       approvalsCharted: approvalTrend.reduce((sum, point) => sum + point.count, 0),
 
       ageBuckets: ageBuckets.map(({ key, label, count }) => ({ key, label, count })),
+      /*
+        The number the aging donut sums to.
+
+        Not `pending`: that counts documents of every kind in the selected date
+        range, while these buckets count unsettled invoices from the inbox
+        regardless of range. Putting one above the other left a donut whose slices
+        did not add up to its own headline.
+      */
+      agingOpenInvoices: openInvoices.length,
 
       // Where signatures are stuck and with whom. Deliberately NOT windowed by
       // the date filter: a bottleneck is about what is outstanding right now,

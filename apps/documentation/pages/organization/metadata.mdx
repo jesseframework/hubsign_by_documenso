@@ -7,7 +7,7 @@ import { Callout, Steps } from 'nextra/components';
 
 # Metadata
 
-**Organization → Metadata** is your own reference list — vendors, contacts, whoever
+**Settings → Documents → Metadata Fields** is your own reference list — vendors, contacts, whoever
 you deal with regularly — held as records that automation can look things up in.
 
 ## The problem it solves
@@ -39,9 +39,53 @@ flowchart LR
 | **Phone** | Reference |
 | **Keywords** | Alternative spellings that should match this record — see below |
 | **OCR template** | The extraction template to prefer for this vendor's documents |
+| **Terms code** | How long this vendor gives you to pay, e.g. `30d` — see below |
 
 Records are unique on **category + name**. Importing the same name twice in a
 category updates the existing record rather than creating a duplicate.
+
+## Terms code
+
+The terms code is how long a vendor gives you to pay. It is what dates an invoice
+that does not state a due date of its own.
+
+`30d` · `net30` · `NET 30` · `n/30` · `30` all mean thirty days. `0d`, `cod` and
+`due on receipt` mean due immediately. Anything that cannot be read is refused
+rather than guessed at — on the form you get a warning as you type, and on import
+the row lands with the code left unset and a note in the import errors.
+
+**Why it matters:** the dashboard's *Signature Aging* and *Overdue by vendor*
+figures are measured against each invoice's due date, in this order:
+
+<Steps>
+### The due date printed on the invoice
+
+Whatever OCR read off the page. What the document itself says always wins — a
+vendor's standing terms are a rule of thumb, the printed date is the agreement for
+that invoice.
+
+### The invoice date plus this vendor's terms code
+
+Terms run from the invoice date, not from the day the email happened to arrive.
+Otherwise a supplier who posts late is rewarded with extra credit.
+
+### Arrival plus this vendor's terms code
+
+Only when the invoice date is missing too, or is written in an all-numeric form
+like `03/04/2026` that could be either 3 April or 4 March. HubSign refuses to guess
+between those, because a month in the wrong direction either hides a late payment
+or starts a dunning letter that should not exist.
+</Steps>
+
+<Callout type="warning">
+  An invoice with no printed due date, from a vendor with no terms code, **cannot be
+  aged at all**. It is counted and labelled — "No due date" on the aging chart,
+  "undated" under the vendor chart — rather than quietly left out, because a queue
+  nobody can measure and a queue that is up to date look identical otherwise.
+</Callout>
+
+A new record created on the Metadata page starts at `30d`. That is a starting
+point, not a fact about your supplier — change it to whatever you actually agreed.
 
 ## The metadata file
 

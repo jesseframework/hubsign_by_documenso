@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Trans } from '@lingui/react/macro';
 import {
   CheckCircle2Icon,
+  DownloadIcon,
   FileIcon,
   Loader2Icon,
   PaperclipIcon,
@@ -181,10 +182,35 @@ export const SupportingFileUpload = ({
             >
               <div className="flex items-center gap-2">
               <FileIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate text-[12px]">{file.fileName}</span>
+              {/*
+                Checking what you just attached is the point of listing it — a
+                signer needs to confirm they sent the right purchase order, not
+                just that a file with roughly the right name went up.
+
+                The signing token is the only credential a signer has, so it
+                goes on the URL; the endpoint matches it against the file's own
+                document. A plain link, because the endpoint already sends
+                Content-Disposition: attachment and no JS need touch the bytes.
+              */}
+              <a
+                href={`/api/files/supporting/file/${file.id}?recipientToken=${encodeURIComponent(token)}`}
+                download={file.fileName}
+                className="min-w-0 flex-1 truncate text-[12px] hover:underline"
+                title={file.fileName}
+              >
+                {file.fileName}
+              </a>
               <span className="flex-shrink-0 text-[11px] text-muted-foreground">
                 {formatSize(file.sizeBytes)}
               </span>
+              <a
+                href={`/api/files/supporting/file/${file.id}?recipientToken=${encodeURIComponent(token)}`}
+                download={file.fileName}
+                className="flex-shrink-0 text-muted-foreground hover:text-foreground"
+                aria-label={`Download ${file.fileName}`}
+              >
+                <DownloadIcon className="h-3.5 w-3.5" />
+              </a>
               {!disabled && (
                 <button
                   type="button"

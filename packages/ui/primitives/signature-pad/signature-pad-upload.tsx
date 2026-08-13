@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 import { Trans } from '@lingui/react/macro';
 import { motion } from 'framer-motion';
@@ -8,6 +8,7 @@ import { unsafe_useEffectOnce } from '@documenso/lib/client-only/hooks/use-effec
 import { SIGNATURE_CANVAS_DPI } from '@documenso/lib/constants/signatures';
 
 import { cn } from '../../lib/utils';
+import { type RemoveBackgroundResult, removeSignatureBackground } from './remove-background';
 
 const loadImage = async (file: File | undefined): Promise<HTMLImageElement> => {
   if (!file) {
@@ -80,6 +81,60 @@ export const SignaturePadUpload = ({
   const $el = useRef<HTMLCanvasElement>(null);
   const $imageData = useRef<ImageData | null>(null);
   const $fileInput = useRef<HTMLInputElement>(null);
+  /**
+   * The file as uploaded, kept so a toggle can redraw from it.
+   *
+   * Re-processing the canvas instead would compound: each pass would judge the
+   * result of the last one, and turning the option off could not restore what the
+   * first pass had already deleted.
+   */
+  const $source = useRef<HTMLImageElement | null>(null);
+
+  /*
+    On by default. Nearly every upload here is a photograph or scan of a signature
+    on paper, and that paper is never wanted — it lands on the document as a white
+    box over whatever it covers. The preview shows the result immediately and the
+    switch is right there, so a default that occasionally guesses wrong costs one
+    click rather than a bad signature on a contract.
+  */
+  const [removeBackground, setRemoveBackground] = useState(true);
+  const [sensitivity, setSensitivity] = useState(0);
+  const [outcome, setOutcome] = useState<RemoveBackgroundResult | null>(null);
+  /*
+    State, not `$source.current`, because a ref does not re-render.
+
+    With the option switched off the only state write on upload was
+    `setOutcome(null)` — already null, so React bailed out and the controls never
+    appeared, leaving no way to switch it back on.
+  */
+  const [uploaded, setUploaded] = useState(false);
+
+  /** Draw the held source onto the canvas, cutting the paper if asked. */
+  const render = (options?: { enabled?: boolean; sensitivity?: number }) => {
+    const canvas = $el.current;
+    const image = $source.current;
+
+    if (!canvas || !image) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const enabled = options?.enabled ?? removeBackground;
+    const nudge = options?.sensitivity ?? sensitivity;
+
+    const imageData = loadImageOntoCanvas(image, canvas, ctx);
+
+    if (enabled) {
+      const result = removeSignatureBackground(imageData.data, { sensitivity: nudge });
+      setOutcome(result);
+      ctx.putImageData(imageData, 0, 0);
+    } else {
+      setOutcome(null);
+    }
+
+    $imageData.current = imageData;
+    onChange?.(canvas.toDataURL());
+  };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -87,11 +142,9 @@ export const SignaturePadUpload = ({
 
       if (!$el.current) return;
 
-      const ctx = $el.current.getContext('2d');
-      if (!ctx) return;
-
-      $imageData.current = loadImageOntoCanvas(img, $el.current, ctx);
-      onChange?.($el.current.toDataURL());
+      $source.current = img;
+      setUploaded(true);
+      render();
     } catch (error) {
       console.error(error);
     }
@@ -122,6 +175,9 @@ export const SignaturePadUpload = ({
       img.src = value;
     }
   });
+
+  /** Shown only once there is something to judge the result on. */
+  const hasUpload = uploaded;
 
   return (
     <div className={cn('relative h-full w-full', className)}>
@@ -161,6 +217,62 @@ export const SignaturePadUpload = ({
           </motion.div>
         )}
       </motion.button>
+
+      {/*
+        Overlaid rather than placed below the canvas: the tab is a fixed-aspect box
+        and adding a row beneath it would resize the dialog for one tab out of
+        three. Sits above the upload button so the controls are clickable.
+      */}
+      {hasUpload && (
+        <div className="absolute inset-x-0 bottom-0 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border/60 bg-background/85 px-2.5 py-1.5 backdrop-blur">
+          <label className="text-foreground flex cursor-pointer items-center gap-1.5 text-[11px]">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5 cursor-pointer"
+              checked={removeBackground}
+              onChange={(e) => {
+                setRemoveBackground(e.target.checked);
+                render({ enabled: e.target.checked });
+              }}
+            />
+            <Trans>Remove background</Trans>
+          </label>
+
+          {removeBackground && (
+            <label className="text-muted-foreground flex flex-1 items-center gap-1.5 text-[11px]">
+              <Trans>Strength</Trans>
+              <input
+                type="range"
+                min={-40}
+                max={40}
+                step={4}
+                value={sensitivity}
+                className="h-1 max-w-[120px] flex-1 cursor-pointer"
+                onChange={(e) => {
+                  const next = Number(e.target.value);
+                  setSensitivity(next);
+                  render({ sensitivity: next });
+                }}
+              />
+            </label>
+          )}
+
+          {/*
+            Said plainly when nothing happened, because a silent no-op is
+            indistinguishable from a broken feature — and both of these reasons are
+            good news rather than failures.
+          */}
+          {removeBackground && outcome?.applied === false && (
+            <span className="text-muted-foreground text-[10px]">
+              {outcome.skipped === 'already-transparent' ? (
+                <Trans>Already transparent</Trans>
+              ) : (
+                <Trans>No clear background found — left as is</Trans>
+              )}
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 };

@@ -29,6 +29,12 @@ export type DownloadButtonProps = HTMLAttributes<HTMLButtonElement> & {
    * to include the certificate. Default 0 (no dropdown — single button).
    */
   certificatePageCount?: number;
+  /**
+   * Button style. Defaults to `outline`, which is what this component has always
+   * rendered — pass `default` where download is the page's primary action and an
+   * outline button would disappear into the surface it sits on.
+   */
+  variant?: 'outline' | 'default' | 'secondary';
 };
 
 export const DocumentDownloadButton = ({
@@ -37,6 +43,7 @@ export const DocumentDownloadButton = ({
   documentData,
   disabled,
   certificatePageCount = 0,
+  variant = 'outline',
   ...props
 }: DownloadButtonProps) => {
   const { _ } = useLingui();
@@ -80,7 +87,7 @@ export const DocumentDownloadButton = ({
     return (
       <Button
         type="button"
-        variant="outline"
+        variant={variant}
         className={className}
         disabled={disabled || !documentData}
         onClick={() => void runDownload(0)}
@@ -100,7 +107,7 @@ export const DocumentDownloadButton = ({
     <div className={`inline-flex ${className ?? ''}`}>
       <Button
         type="button"
-        variant="outline"
+        variant={variant}
         className="rounded-r-none"
         disabled={disabled || !documentData}
         onClick={() => void runDownload(0)}
@@ -113,7 +120,7 @@ export const DocumentDownloadButton = ({
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
-            variant="outline"
+            variant={variant}
             className="border-l-0 rounded-l-none px-2"
             disabled={disabled || !documentData}
             aria-label="Download options"

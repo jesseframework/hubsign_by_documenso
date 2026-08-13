@@ -17,7 +17,10 @@ export const TeamSettingsNavMobile = ({ className, ...props }: TeamSettingsNavMo
   const teamUrl = typeof params?.teamUrl === 'string' ? params?.teamUrl : '';
 
   const settingsPath = `/t/${teamUrl}/settings`;
-  const preferencesPath = `/t/${teamUrl}/preferences`;
+  // Was `/t/${teamUrl}/preferences`, which has no route — the desktop twin and
+  // every other constant here include the `/settings` segment. Below the `md`
+  // breakpoint this button is the only way to Preferences, so it 404'd.
+  const preferencesPath = `/t/${teamUrl}/settings/preferences`;
   const publicProfilePath = `/t/${teamUrl}/settings/public-profile`;
   const membersPath = `/t/${teamUrl}/settings/members`;
   const tokensPath = `/t/${teamUrl}/settings/tokens`;
@@ -49,8 +52,11 @@ export const TeamSettingsNavMobile = ({ className, ...props }: TeamSettingsNavMo
           variant="ghost"
           className={cn(
             'w-full justify-start',
+            // 5 segments, not 4: /t/:teamUrl/settings/preferences. The old
+            // count matched the broken 4-segment URL, so the active highlight
+            // never fired even once the path was right.
             pathname?.startsWith(preferencesPath) &&
-              pathname.split('/').length === 4 &&
+              pathname.split('/').length === 5 &&
               'bg-secondary',
           )}
         >

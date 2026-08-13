@@ -11,7 +11,7 @@ import { useUpdateSearchParams } from '@documenso/lib/client-only/hooks/use-upda
 import { useSession } from '@documenso/lib/client-only/providers/session';
 import { isDocumentCompleted } from '@documenso/lib/utils/document';
 import { formatDocumentsPath } from '@documenso/lib/utils/teams';
-import type { TFindDocumentsResponse } from '@documenso/trpc/server/document-router/schema';
+import type { TFindDocumentsInternalResponse } from '@documenso/trpc/server/document-router/schema';
 import type { DataTableColumnDef } from '@documenso/ui/primitives/data-table';
 import { DataTable } from '@documenso/ui/primitives/data-table';
 import { DataTablePagination } from '@documenso/ui/primitives/data-table-pagination';
@@ -22,17 +22,24 @@ import { DocumentStatus } from '~/components/general/document/document-status';
 import { useOptionalCurrentTeam } from '~/providers/team';
 
 import { StackAvatarsWithTooltip } from '../general/stack-avatars-with-tooltip';
+import { DocumentOcrSummary } from './document-ocr-summary';
 import { DocumentsTableActionButton } from './documents-table-action-button';
 import { DocumentsTableActionDropdown } from './documents-table-action-dropdown';
 
 export type DocumentsTableProps = {
-  data?: TFindDocumentsResponse;
+  /*
+    The INTERNAL response, which is what both callers actually pass. It was typed
+    as the public one, which happened to compile because the public shape is a
+    subset — but it meant the table could not see fields the internal endpoint
+    returns, `ocr` among them.
+  */
+  data?: TFindDocumentsInternalResponse;
   isLoading?: boolean;
   isLoadingError?: boolean;
   onMoveDocument?: (documentId: number) => void;
 };
 
-type DocumentsTableRow = TFindDocumentsResponse['data'][number];
+type DocumentsTableRow = TFindDocumentsInternalResponse['data'][number];
 
 export const DocumentsTable = ({
   data,
@@ -67,7 +74,21 @@ export const DocumentsTable = ({
       },
       {
         header: _(msg`Title`),
-        cell: ({ row }) => <DataTableTitle row={row.original} teamUrl={team?.url} />,
+        cell: ({ row }) => (
+          <div className="min-w-0">
+            <DataTableTitle row={row.original} teamUrl={team?.url} />
+            {/*
+              What OCR read, under the title rather than as three more columns.
+
+              The table is already six columns wide and most of these documents
+              are invoices whose filename says little — "Invoice-RFSKPWP7-0018-1"
+              tells you nothing about who sent it or what it is for. Rendered only
+              when the document came through the inbox and something was read, so
+              a hand-uploaded contract looks exactly as it did before.
+            */}
+            <DocumentOcrSummary ocr={row.original.ocr} />
+          </div>
+        ),
       },
       {
         id: 'sender',

@@ -4,13 +4,14 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Trans } from '@lingui/react/macro';
 import type { Field } from '@prisma/client';
 import { RecipientRole } from '@prisma/client';
-import { AlertTriangleIcon } from 'lucide-react';
+import { AlertTriangleIcon, CheckCircle2Icon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { match } from 'ts-pattern';
 import { z } from 'zod';
 
 import { AppError } from '@documenso/lib/errors/app-error';
 import { fieldsContainUnsignedRequiredField } from '@documenso/lib/utils/advanced-fields-helpers';
+import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
 import {
   Dialog,
@@ -39,6 +40,14 @@ export type DocumentSigningCompleteDialogProps = {
   onSignatureComplete: (nextSigner?: { name: string; email: string }) => void | Promise<void>;
   role: RecipientRole;
   disabled?: boolean;
+  /**
+   * The signer's own signing token. Enables asking for an exception when a
+   * business rule refuses the signature.
+   *
+   * Optional because direct-template signing reaches this dialog too, and there
+   * is no recipient token — or organization rules — in that flow.
+   */
+  signingToken?: string;
   allowDictateNextSigner?: boolean;
   defaultNextSigner?: {
     name: string;
@@ -61,11 +70,23 @@ export const DocumentSigningCompleteDialog = ({
   onSignatureComplete,
   role,
   disabled = false,
+  signingToken,
   allowDictateNextSigner = false,
   defaultNextSigner,
 }: DocumentSigningCompleteDialogProps) => {
   const [showDialog, setShowDialog] = useState(false);
   const [isEditingNextSigner, setIsEditingNextSigner] = useState(false);
+
+  /** The signer's justification, sent to whoever decides the exception. */
+  const [overrideReason, setOverrideReason] = useState('');
+  const [overrideAsked, setOverrideAsked] = useState(false);
+  /** Which role group to send it to, as "roleType\u0000roleKey". */
+  const [overrideRole, setOverrideRole] = useState('');
+
+
+  const requestOverride = trpc.businessRule.requestOverride.useMutation({
+    onSuccess: () => setOverrideAsked(true),
+  });
 
   /**
    * Why the last attempt was refused, shown in the dialog.
@@ -77,6 +98,16 @@ export const DocumentSigningCompleteDialog = ({
    * explanation and looked to the signer like the button was broken.
    */
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  /*
+    Fetched only once the signer is actually blocked and offered the request, so a
+    normal signature costs no extra query. Returns labels only — see the endpoint.
+  */
+  const { data: approverOptions } = trpc.businessRule.overrideApproverOptions.useQuery(
+    { token: signingToken ?? '' },
+    { enabled: Boolean(signingToken) && Boolean(submissionError) },
+  );
+
+  const roleGroups = approverOptions?.roleGroups ?? [];
 
   const form = useForm<TNextSignerFormSchema>({
     resolver: allowDictateNextSigner ? zodResolver(ZNextSignerFormSchema) : undefined,
@@ -318,6 +349,110 @@ export const DocumentSigningCompleteDialog = ({
                 <p key={index}>{line}</p>
               ))}
             </div>
+                </div>
+              )}
+
+              {/*
+                The way out of a block.
+
+                A blocking rule is a dead end for the signer by design — they
+                cannot edit the invoice it objects to. Without this the only move
+                left is to close the tab, and the document then sits unsigned with
+                nobody in the organization aware there was a problem.
+
+                It is a request, not a bypass: nothing changes here until somebody
+                with authority approves it, and only the rules that actually
+                blocked this signature can be waived.
+              */}
+              {submissionError && signingToken && (
+                <div className="mt-3 rounded-md border border-border bg-muted/40 p-3">
+                  {overrideAsked ? (
+                    <div className="flex gap-2">
+                      <CheckCircle2Icon className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
+                      <div className="text-sm">
+                        <p className="font-medium">
+                          <Trans>Your request has been sent</Trans>
+                        </p>
+                        <p className="mt-0.5 text-[13px] text-muted-foreground">
+                          <Trans>
+                            We have asked the sender to approve an exception. You can close this
+                            page — come back to this link and press Sign again once they have.
+                          </Trans>
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm font-medium">
+                        <Trans>Cannot fix this?</Trans>
+                      </p>
+                      <p className="mt-0.5 text-[13px] text-muted-foreground">
+                        <Trans>
+                          Ask the sender to approve an exception for this document. They will see
+                          what blocked you.
+                        </Trans>
+                      </p>
+
+                      {/*
+                        Only when the organization has published groups. With none
+                        configured the request goes to whoever sent the document, and
+                        an empty dropdown would imply a choice that does not exist.
+                      */}
+                      {roleGroups.length > 0 && (
+                        <select
+                          className="mt-2 w-full rounded-md border border-border bg-background p-2 text-[13px]"
+                          value={overrideRole}
+                          onChange={(e) => setOverrideRole(e.target.value)}
+                        >
+                          <option value="">Send to the sender</option>
+                          {roleGroups.map((group) => (
+                            <option
+                              key={`${group.roleType}\u0000${group.roleKey}`}
+                              value={`${group.roleType}\u0000${group.roleKey}`}
+                            >
+                              {group.roleType}: {group.roleKey}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      <textarea
+                        className="mt-2 min-h-[60px] w-full resize-y rounded-md border border-border bg-background p-2 text-[13px]"
+                        placeholder="Why should this be allowed? (optional)"
+                        value={overrideReason}
+                        onChange={(e) => setOverrideReason(e.target.value)}
+                        maxLength={1000}
+                      />
+
+                      {requestOverride.error && (
+                        <p className="text-destructive mt-1 text-[12px]">
+                          {requestOverride.error.message}
+                        </p>
+                      )}
+
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-2 w-full"
+                        loading={requestOverride.isPending}
+                        onClick={() =>
+                          requestOverride.mutate({
+                            token: signingToken,
+                            reason: overrideReason.trim() || undefined,
+                            approverRole: overrideRole
+                              ? {
+                                  roleType: overrideRole.split('\u0000')[0],
+                                  roleKey: overrideRole.split('\u0000')[1],
+                                }
+                              : undefined,
+                          })
+                        }
+                      >
+                        <Trans>Request approval to sign</Trans>
+                      </Button>
+                    </>
+                  )}
                 </div>
               )}
 

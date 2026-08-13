@@ -27,6 +27,7 @@ import { TooltipProvider } from '@documenso/ui/primitives/tooltip';
 import type { Route } from './+types/root';
 import stylesheet from './app.css?url';
 import { GenericErrorLayout } from './components/general/generic-error-layout';
+import { useNonce } from './providers/nonce';
 import { langCookie } from './storage/lang-cookie.server';
 import { themeSessionResolver } from './storage/theme-session.server';
 import { appMetaTags } from './utils/meta';
@@ -126,6 +127,10 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
 
   const [theme] = useTheme();
 
+  // Every inline <script> below has to carry this or the CSP blocks it once
+  // NEXT_PRIVATE_CSP_MODE=enforce. Empty string on the client — see useNonce.
+  const nonce = useNonce();
+
   return (
     <html translate="no" lang={lang} data-theme={theme} className={theme ?? ''}>
       <head>
@@ -139,10 +144,10 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
         <Meta />
         <Links />
         <meta name="google" content="notranslate" />
-        <PreventFlashOnWrongTheme ssrTheme={Boolean(data.theme)} />
+        <PreventFlashOnWrongTheme ssrTheme={Boolean(data.theme)} nonce={nonce} />
 
         {/* Fix: https://stackoverflow.com/questions/21147149/flash-of-unstyled-content-fouc-in-firefox-only-is-ff-slow-renderer */}
-        <script>0</script>
+        <script nonce={nonce}>0</script>
       </head>
       <body>
         <SessionProvider initialSession={session}>
@@ -155,10 +160,11 @@ export function LayoutContent({ children }: { children: React.ReactNode }) {
           </TooltipProvider>
         </SessionProvider>
 
-        <ScrollRestoration />
-        <Scripts />
+        <ScrollRestoration nonce={nonce} />
+        <Scripts nonce={nonce} />
 
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `window.__ENV__ = ${JSON.stringify(publicEnv)}`,
           }}

@@ -85,6 +85,10 @@ function OrgSettingsPage() {
   const [slaHolidaysText, setSlaHolidaysText] = useState('');
   const [slaInternalHours, setSlaInternalHours] = useState('8');
   const [slaEndToEndHours, setSlaEndToEndHours] = useState('72');
+  // No default suggestion: an org that has never set one has nothing being
+  // measured, and pre-filling a number here would make the page claim otherwise
+  // until somebody pressed Save.
+  const [slaSigningHours, setSlaSigningHours] = useState('');
   const [slaInitialized, setSlaInitialized] = useState(false);
 
   const [includeCertificate, setIncludeCertificate] = useState(true);
@@ -236,6 +240,9 @@ function OrgSettingsPage() {
     );
     setSlaEndToEndHours(
       typeof orgRec.slaDefaultEndToEndHours === 'number' ? String(orgRec.slaDefaultEndToEndHours) : '',
+    );
+    setSlaSigningHours(
+      typeof orgRec.slaDefaultSigningHours === 'number' ? String(orgRec.slaDefaultSigningHours) : '',
     );
     setSlaInitialized(true);
   }
@@ -958,12 +965,15 @@ function OrgSettingsPage() {
 
           {slaEnabled && (
             <>
-              <div className="mt-4 grid grid-cols-2 gap-4">
+              {/* In the order the stages run, so the middle one is visibly the gap
+                  between the other two rather than an afterthought. */}
+              <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground">
+                  <label className="text-[12px] font-medium text-muted-foreground" htmlFor="sla-internal">
                     <Trans>Default internal target (business hours)</Trans>
                   </label>
                   <Input
+                    id="sla-internal"
                     className="mt-1 h-9 text-[13px]"
                     type="number"
                     min={1}
@@ -976,10 +986,31 @@ function OrgSettingsPage() {
                   </p>
                 </div>
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground">
+                  <label className="text-[12px] font-medium text-muted-foreground" htmlFor="sla-signing">
+                    <Trans>Default signing target (business hours)</Trans>
+                  </label>
+                  <Input
+                    id="sla-signing"
+                    className="mt-1 h-9 text-[13px]"
+                    type="number"
+                    min={1}
+                    value={slaSigningHours}
+                    onChange={(e) => setSlaSigningHours(e.target.value)}
+                    placeholder="48"
+                  />
+                  <p className="mt-1 text-[11px] text-muted-foreground">
+                    <Trans>
+                      Sent for signature → fully signed. Leave this empty and an invoice waiting on
+                      a signature is measured by nothing.
+                    </Trans>
+                  </p>
+                </div>
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground" htmlFor="sla-end-to-end">
                     <Trans>Default end-to-end target (business hours)</Trans>
                   </label>
                   <Input
+                    id="sla-end-to-end"
                     className="mt-1 h-9 text-[13px]"
                     type="number"
                     min={1}
@@ -988,7 +1019,7 @@ function OrgSettingsPage() {
                     placeholder="72"
                   />
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    <Trans>Received → fully signed. Includes the signer's time.</Trans>
+                    <Trans>Received → fully signed. Both stages together.</Trans>
                   </p>
                 </div>
               </div>
@@ -1095,6 +1126,7 @@ function OrgSettingsPage() {
                   slaHolidays: toPatternList(slaHolidaysText),
                   slaDefaultInternalHours: slaInternalHours ? Number(slaInternalHours) : null,
                   slaDefaultEndToEndHours: slaEndToEndHours ? Number(slaEndToEndHours) : null,
+                  slaDefaultSigningHours: slaSigningHours ? Number(slaSigningHours) : null,
                 })
               }
               loading={updateOrg.isPending}

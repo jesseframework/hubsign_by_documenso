@@ -9,10 +9,13 @@ import { SCHEDULED_JOBS } from '@documenso/lib/server-only/scheduler/jobs';
 import { startScheduler } from '@documenso/lib/server-only/scheduler/scheduler';
 import { openApiDocument } from '@documenso/trpc/server/open-api';
 
+import { cspReportRoute } from './api/csp-report';
 import { externalSignupRoute } from './api/external-signup';
 import { filesRoute } from './api/files';
 import { type AppContext, appContext } from './context';
+import { CSP_REPORT_PATH } from './csp';
 import { appMiddleware } from './middleware';
+import { enforceHttps, securityHeaders } from './security-headers';
 import { openApiTrpcServerHandler } from './trpc/hono-trpc-open-api';
 import { reactRouterTrpcServer } from './trpc/hono-trpc-remix';
 
@@ -23,6 +26,17 @@ export interface HonoEnv {
 }
 
 const app = new Hono<HonoEnv>();
+
+/**
+ * Security first, before anything does real work:
+ *  - bounce plaintext requests to HTTPS
+ *  - stamp the response security headers (CSP, XFO, HSTS, …)
+ *
+ * Registered here rather than in `main.js` so they also wrap the static asset
+ * handler, which `main.js` appends after this router.
+ */
+app.use('*', enforceHttps);
+app.use('*', securityHeaders);
 
 /**
  * Attach session and context to requests.
@@ -43,6 +57,9 @@ app.route('/api/files', filesRoute);
 
 // External signup API (secured).
 app.route('/api/external', externalSignupRoute);
+
+// CSP violation collector (unauthenticated — browsers post here with no credentials).
+app.route(CSP_REPORT_PATH, cspReportRoute);
 
 // API servers.
 app.route('/api/v1', tsRestHonoApp);

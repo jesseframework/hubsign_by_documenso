@@ -14,15 +14,9 @@ export async function loader({ request }: Route.LoaderArgs) {
 }
 
 /**
- * Admin layout. The section nav now lives in the app sidebar (expandable under
- * "Admin"); this keeps the admin gate and the content card wrapper.
+ * Admin layout. Keeps the admin gate; the rail, content card and the chrome
+ * that marks this as a separate platform-level context come from `ConsoleShell`.
  */
 export default function AdminLayout() {
-  return (
-    <div className="w-full">
-      <div className="rounded-[var(--r)] border border-border bg-card p-4 sm:p-6">
-        <Outlet />
-      </div>
-    </div>
-  );
+  return <Outlet />;
 }

@@ -244,7 +244,14 @@ export const DocumentPageViewDropdown = ({ document }: DocumentPageViewDropdownP
         )}
 
         <DropdownMenuItem asChild>
-          <Link to={`${documentsPath}/${document.id}/logs`}>
+          {/* Folder-aware: the flat logs route refuses a foldered document and
+              redirects to the documents list (`documents.$id.logs.tsx`), and a
+              foldered document can only be viewed on the foldered page — so the
+              flat href made Audit Log a dead menu item for every document filed
+              in a folder, along with the certificate download that lives on it. */}
+          <Link
+            to={`${documentsPath}${document.folderId ? `/f/${document.folderId}` : ''}/${document.id}/logs`}
+          >
             <ScrollTextIcon className="mr-2 h-4 w-4" />
             <Trans>Audit Log</Trans>
           </Link>

@@ -10,6 +10,8 @@ import { prisma } from '@documenso/prisma';
 import { isExtendedDocumentStatus } from '@documenso/prisma/guards/is-extended-document-status';
 import { ExtendedDocumentStatus } from '@documenso/prisma/types/extended-document-status';
 
+import { documentIdsMatchingOcr } from './ocr-search';
+
 export type GetStatsInput = {
   user: User;
   team?: Omit<GetTeamCountsOption, 'createdAt'>;
@@ -96,11 +98,16 @@ type GetCountsOption = {
 };
 
 const getCounts = async ({ user, createdAt, search, folderId }: GetCountsOption) => {
+  // Same OCR reach as the list itself, or the cards above the table would count a
+  // different set of documents than the rows below it while a search is active.
+  const ocrMatchIds = await documentIdsMatchingOcr(search ?? '');
+
   const searchFilter: Prisma.DocumentWhereInput = {
     OR: [
       { title: { contains: search, mode: 'insensitive' } },
       { recipients: { some: { name: { contains: search, mode: 'insensitive' } } } },
       { recipients: { some: { email: { contains: search, mode: 'insensitive' } } } },
+      ...(ocrMatchIds.length > 0 ? [{ id: { in: ocrMatchIds } }] : []),
     ],
   };
 
@@ -205,11 +212,14 @@ const getTeamCounts = async (options: GetTeamCountsOption) => {
         }
       : undefined;
 
+  const ocrMatchIds = await documentIdsMatchingOcr(options.search ?? '');
+
   const searchFilter: Prisma.DocumentWhereInput = {
     OR: [
       { title: { contains: options.search, mode: 'insensitive' } },
       { recipients: { some: { name: { contains: options.search, mode: 'insensitive' } } } },
       { recipients: { some: { email: { contains: options.search, mode: 'insensitive' } } } },
+      ...(ocrMatchIds.length > 0 ? [{ id: { in: ocrMatchIds } }] : []),
     ],
   };
 

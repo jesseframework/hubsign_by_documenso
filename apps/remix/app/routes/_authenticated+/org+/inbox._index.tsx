@@ -6,13 +6,16 @@ import { Trans } from '@lingui/react/macro';
 import {
   AlertTriangleIcon,
   ArchiveIcon,
+  AtSignIcon,
   CalendarIcon,
   CheckCheckIcon,
   CheckCircle2Icon,
+  CheckIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   CircleDashedIcon,
   CoinsIcon,
+  CopyIcon,
   DollarSignIcon,
   FileSpreadsheetIcon,
   InboxIcon,
@@ -51,6 +54,7 @@ import {
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { ExportBuilderDialog } from '~/components/general/export/export-builder-dialog';
+import { FilterChip } from '~/components/general/filter-chip';
 import { ResponsibilityCell } from '~/components/general/inbox/responsibility-cell';
 import { useInboxEvents } from '~/hooks/use-inbox-events';
 import { formatRelativeTime } from '~/utils/format-relative-time';
@@ -158,6 +162,52 @@ export function meta() {
 }
 
 /**
+ * The org's inbound address, as a click-to-copy chip.
+ *
+ * This used to be a full-width bar under the heading with its own label, code
+ * block and Copy button — three elements and a band of chrome for one string that
+ * is only needed the handful of times someone sets up a forwarding rule. Folding
+ * it into the header line keeps it available without spending vertical space on it
+ * every visit.
+ *
+ * The tick is shown on the chip itself rather than only in a toast: on a wide
+ * screen the toast lands far from where the click happened.
+ */
+function InboxAddressChip({ address }: { address: string }) {
+  const { _ } = useLingui();
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1600);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  return (
+    <button
+      type="button"
+      title={_(msg`Copy your organization's inbox address`)}
+      onClick={() => {
+        void navigator.clipboard?.writeText(address);
+        setCopied(true);
+      }}
+      className="group inline-flex max-w-full items-center gap-1.5 rounded-[var(--r-sm)] border border-border bg-muted/40 py-0.5 pl-1.5 pr-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:bg-muted hover:text-foreground"
+    >
+      <AtSignIcon className="h-3 w-3 flex-shrink-0 opacity-50" />
+      <span className="truncate">{address}</span>
+      {copied ? (
+        <CheckIcon className="h-3 w-3 flex-shrink-0 text-status-complete-text" />
+      ) : (
+        <CopyIcon className="h-3 w-3 flex-shrink-0 opacity-40 transition-opacity group-hover:opacity-80" />
+      )}
+      <span className="sr-only">
+        {copied ? <Trans>Copied</Trans> : <Trans>Copy inbox address</Trans>}
+      </span>
+    </button>
+  );
+}
+
+/**
  * Whether OCR is still reading this item, so its extracted data is not yet
  * trustworthy.
  *
@@ -262,6 +312,26 @@ const overdueLabel = (minutes: number): string => {
   return h ? `${d}d ${h}h` : `${d}d`;
 };
 
+/**
+ * The queue's column widths, shared by the header and every row.
+ *
+ * A CSS grid rather than a `<table>`, for one reason: the same six blocks have to
+ * be a dense row on a monitor and a card on a phone, and only one of those is a
+ * table. Restacking table cells with `display: block` gets the pixels roughly
+ * right but produces a column of orphaned values with no hierarchy — and strips
+ * the table semantics screen readers rely on, so it isn't even a fair trade. Here
+ * the row is `grid-cols-2` by default and picks up these columns at xl, from one
+ * set of markup.
+ *
+ * `minmax(0, Nfr)` on the three text columns lets them absorb every pixel of a
+ * wide monitor and shrink on a laptop without the auto-layout guesswork the table
+ * did. The three fixed columns are sized to their content and never move: amounts
+ * to `USD 2,843.38`, dates to a label plus `2026-08-02`, actions to Review and its
+ * two icon buttons. That is also why nothing scrolls sideways any more.
+ */
+const GRID_COLUMNS =
+  'xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1.2fr)_8rem_10.5rem_minmax(0,1fr)_10.5rem]';
+
 /** Format an OCR date value to YYYY-MM-DD (leaves unparseable values as-is). */
 const fmtDate = (raw: string | Date): string => {
   const s = typeof raw === 'string' ? raw : raw.toISOString();
@@ -287,6 +357,7 @@ const fmtMoney = (currency: string, raw: string): string => {
 const STATUS_FILTERS = [
   { key: 'READY', label: 'Ready', icon: CheckCircle2Icon },
   { key: 'needs-review', label: 'Needs review', icon: AlertTriangleIcon },
+  { key: 'duplicate', label: 'Duplicates', icon: CopyIcon },
   { key: 'SENT_FOR_SIGNATURE', label: 'Sent to sign', icon: SendIcon },
   { key: 'OCR_FAILED', label: 'OCR failed', icon: XCircleIcon },
   { key: 'COMPLETED', label: 'Completed', icon: CheckCheckIcon },
@@ -304,34 +375,6 @@ const AMOUNT_FILTERS = [
   { key: 'high', label: 'High value (>$10K)', icon: DollarSignIcon },
   { key: 'low', label: 'Small (<$1K)', icon: CoinsIcon },
 ] as const;
-
-/** A pill toggle in HubSign's palette. */
-function FilterChip({
-  active,
-  onClick,
-  icon: Icon,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon?: React.ComponentType<{ className?: string }>;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] font-medium transition ${
-        active
-          ? 'border-primary/40 bg-primary/10 text-primary'
-          : 'border-border bg-background text-muted-foreground hover:bg-muted/50'
-      }`}
-    >
-      {Icon && <Icon className="h-3 w-3" />}
-      {children}
-    </button>
-  );
-}
 
 export default function SignatureInboxPage() {
   const { _ } = useLingui();
@@ -377,6 +420,8 @@ export default function SignatureInboxPage() {
       if (statusFilter) {
         if (statusFilter === 'needs-review') {
           if (!it.needsReview) return false;
+        } else if (statusFilter === 'duplicate') {
+          if (!it.duplicateOf) return false;
         } else if (it.status !== statusFilter) return false;
       }
       if (typeFilter && (it.documentType ?? '').toLowerCase() !== typeFilter.toLowerCase()) {
@@ -462,6 +507,7 @@ export default function SignatureInboxPage() {
   ) => setter(current === key ? null : key);
   const { data: membership } = trpc.org.getMyOrganization.useQuery();
   const org = membership?.organization;
+  const { data: unreadCount } = trpc.inbox.unreadCount.useQuery();
 
   // Live-refresh the list when OCR finishes or new mail is ingested (SSE).
   useInboxEvents();
@@ -500,23 +546,57 @@ export default function SignatureInboxPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-semibold">
-            <Trans>Signature Inbox</Trans>
-          </h2>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            <Trans>
-              Documents emailed in for signature. Each is read by OCR (BMS ML) so you can review the
-              data, then send it off to sign.
-            </Trans>
-          </p>
+      {/*
+        One header band instead of three stacked ones. The title, the count, the
+        inbox address and the two actions all sit on a single line-pair closed by a
+        rule, so the grid starts near the top of the viewport — which is what the
+        page is actually for.
+      */}
+      <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-border pb-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold tracking-[-0.01em]">
+              <Trans>Signature Inbox</Trans>
+            </h2>
+            {/*
+              Same query the sidebar badge reads, so the two can never disagree —
+              a header saying "4 unopened" beside a nav badge saying 6 would put
+              every other number on the page in doubt.
+            */}
+            {typeof unreadCount === 'number' && unreadCount > 0 && (
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold leading-5 text-primary">
+                <Trans>{unreadCount} unopened</Trans>
+              </span>
+            )}
+          </div>
+
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-[12px] text-muted-foreground">
+            <span>
+              <Trans>Emailed in, read by OCR, then sent to sign.</Trans>
+            </span>
+            {inboxAddress && (
+              <>
+                {/* Hidden once the chip wraps to its own line, where a leading
+                    interpunct is just a stray dot. */}
+                <span className="hidden opacity-40 sm:inline">·</span>
+                <InboxAddressChip address={inboxAddress} />
+              </>
+            )}
+          </div>
         </div>
-        <div className="flex flex-shrink-0 items-center gap-2">
+
+        {/*
+          Both controls carry `border-border bg-card` rather than relying on the
+          outline variant. `--input` (97% L) is indistinguishable from the page
+          background (also 97% L), so an outline button here has a border only in
+          theory — on the page it reads as loose text. On a white card it is fine,
+          which is why "Export to Excel" below needs no such treatment.
+        */}
+        <div className="flex flex-shrink-0 items-center gap-1.5">
           <Button
             size="sm"
             variant="outline"
-            className="px-2"
+            className="h-8 w-8 border-border bg-card p-0 text-muted-foreground hover:text-foreground"
             title={
               chimeOn
                 ? _(msg`Sound on for new mail — click to mute`)
@@ -533,44 +613,28 @@ export default function SignatureInboxPage() {
             }}
           >
             {chimeOn ? (
-              <Volume2Icon className="h-3.5 w-3.5" />
+              <Volume2Icon className="h-4 w-4" />
             ) : (
-              <VolumeXIcon className="h-3.5 w-3.5" />
+              <VolumeXIcon className="h-4 w-4" />
             )}
+            <span className="sr-only">
+              <Trans>New mail sound</Trans>
+            </span>
           </Button>
           <Button
             size="sm"
             variant="outline"
+            className="h-8 border-border bg-card text-[12px] font-medium"
             disabled={fetchNow.isPending}
             onClick={() => fetchNow.mutate()}
           >
-            <RefreshCwIcon className="mr-1 h-3.5 w-3.5" />
+            <RefreshCwIcon
+              className={`mr-1.5 h-3.5 w-3.5 ${fetchNow.isPending ? 'animate-spin' : ''}`}
+            />
             <Trans>Fetch from WorkHub</Trans>
           </Button>
         </div>
-      </div>
-
-      {inboxAddress && (
-        <div className="flex flex-wrap items-center gap-2 rounded-[var(--r)] border border-border bg-muted/30 px-4 py-3 text-[12px]">
-          <span className="text-muted-foreground">
-            <Trans>Email PDFs to your organization's inbox:</Trans>
-          </span>
-          <code className="rounded bg-background px-1.5 py-0.5 font-mono text-[12px] font-medium">
-            {inboxAddress}
-          </code>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="h-6 text-[11px]"
-            onClick={() => {
-              void navigator.clipboard?.writeText(inboxAddress);
-              toast({ title: _(msg`Copied`) });
-            }}
-          >
-            <Trans>Copy</Trans>
-          </Button>
-        </div>
-      )}
+      </header>
 
       {isLoading ? (
         <div className="py-12 text-center text-muted-foreground">Loading…</div>
@@ -748,31 +812,35 @@ export default function SignatureInboxPage() {
               </Button>
             </div>
           ) : (
-            <div className="rounded-[var(--r)] border border-border bg-card">
-              <table className="w-full">
-            <thead>
-              <tr className="border-b border-border bg-[#faf9fe] dark:bg-muted/30">
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Invoice info</Trans>
-                </th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Vendor / Contact</Trans>
-                </th>
-                <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Amounts</Trans>
-                </th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Dates</Trans>
-                </th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Responsibility</Trans>
-                </th>
-                <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                  <Trans>Actions</Trans>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+            <div role="table" className="rounded-[var(--r)] border border-border bg-card">
+              {/* Column headers exist only in row mode; a card labels its own
+                  values. Never wrapped — "Vendor / Contact" over two lines makes
+                  the header band taller for no gain. */}
+              <div
+                role="row"
+                className={`hidden border-b border-border bg-[#faf9fe] dark:bg-muted/30 xl:grid ${GRID_COLUMNS}`}
+              >
+                {[
+                  <Trans key="a">Invoice info</Trans>,
+                  <Trans key="b">Vendor / Contact</Trans>,
+                  <Trans key="c">Amounts</Trans>,
+                  <Trans key="d">Dates</Trans>,
+                  <Trans key="e">Responsibility</Trans>,
+                  <Trans key="f">Actions</Trans>,
+                ].map((label, index) => (
+                  <div
+                    key={index}
+                    role="columnheader"
+                    className={`whitespace-nowrap px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground ${
+                      index === 2 || index === 5 ? 'text-right' : 'text-left'
+                    }`}
+                  >
+                    {label}
+                  </div>
+                ))}
+              </div>
+
+            <div role="rowgroup">
               {filteredItems.map((item) => {
                 const f = invoiceFields(item);
                 const headline = f.invoiceNumber || item.document.title;
@@ -786,28 +854,44 @@ export default function SignatureInboxPage() {
                 // It missed its target, which the SLA dashboard records, but it
                 // is finished and nothing about it needs doing today.
                 const isOverdue = item.sla?.state === 'breached' && item.sla.open;
+                // An invoice we already have. Outranks overdue in the row colour:
+                // a late invoice needs doing sooner, a duplicate needs not doing
+                // at all, and paying it twice costs more than paying it late.
+                const isDuplicate = Boolean(item.duplicateOf);
+                // Built here rather than inline: the translated string takes
+                // plain values, not expressions dug out of a nullable relation.
+                const originalName =
+                  item.duplicateOf?.subject || item.duplicateOf?.document.title || '';
+                const originalOn = item.duplicateOf
+                  ? new Date(item.duplicateOf.createdAt).toLocaleDateString()
+                  : '';
+                const matchedOn =
+                  item.duplicateMatchedOn === 'invoice-number'
+                    ? _(msg`the invoice number`)
+                    : _(msg`the invoice date`);
                 return (
-                  <tr
+                  <div
+                    role="row"
                     key={item.id}
-                    className={`border-b border-border last:border-0 ${
-                      isOverdue
-                        ? 'bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-950/40 dark:hover:bg-orange-950/60'
-                        : 'hover:bg-muted/20'
+                    /*
+                      Card below xl, row at xl. The accent that marks unread,
+                      duplicate and overdue moves to the container here — as a
+                      border on the first cell it would have striped only the top
+                      block of a card.
+                    */
+                    className={`grid grid-cols-2 gap-x-4 gap-y-2 border-b border-l-[3px] border-border p-4 last:border-b-0 xl:gap-x-0 xl:gap-y-0 xl:p-0 ${GRID_COLUMNS} ${
+                      isDuplicate
+                        ? 'border-l-red-600 bg-red-50 hover:bg-red-100/70 dark:bg-red-950/40 dark:hover:bg-red-950/60'
+                        : isOverdue
+                          ? 'border-l-orange-500 bg-orange-50 hover:bg-orange-100/70 dark:bg-orange-950/40 dark:hover:bg-orange-950/60'
+                          : `hover:bg-muted/20 ${isUnread ? 'border-l-primary' : 'border-l-transparent'}`
                     }`}
                   >
                     {/* Invoice info */}
-                    <td
-                      className={`border-l-[3px] px-4 py-3 align-top ${
-                        isOverdue
-                          ? 'border-l-orange-500'
-                          : isUnread
-                            ? 'border-l-primary'
-                            : 'border-l-transparent'
-                      }`}
-                    >
+                    <div role="cell" className="col-span-2 min-w-0 xl:col-span-1 xl:px-4 xl:py-3">
                       <Link
                         to={`/org/inbox/${item.id}`}
-                        className={`text-[13px] hover:text-primary hover:underline ${
+                        className={`text-[14px] hover:text-primary hover:underline xl:text-[13px] ${
                           isUnread ? 'font-bold' : 'font-medium text-foreground/80'
                         }`}
                       >
@@ -836,6 +920,43 @@ export default function SignatureInboxPage() {
                             review
                           </span>
                         )}
+                        {/*
+                          Named, not just flagged. "Duplicate" on its own sends
+                          someone hunting through the queue for the other copy;
+                          the link goes straight to it.
+                        */}
+                        {item.duplicateOf && (
+                          <Link
+                            to={`/org/inbox/${item.duplicateOf.id}`}
+                            className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-800 hover:underline dark:bg-red-900 dark:text-red-200"
+                            title={_(
+                              msg`Same vendor and total as "${originalName}", received ${originalOn}. Matched on ${matchedOn}.`,
+                            )}
+                          >
+                            <CopyIcon className="h-3 w-3" />
+                            <Trans>duplicate</Trans>
+                          </Link>
+                        )}
+                        {/*
+                          The other end of the same fact. Without it the original
+                          looks untouched next to a red row and there is no telling
+                          which of two identical invoices is the one to pay.
+                        */}
+                        {!item.duplicateOf && item._count.duplicates > 0 && (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+                            title={_(msg`This is the first copy received. Later copies are marked as duplicates.`)}
+                          >
+                            <CopyIcon className="h-3 w-3" />
+                            <Trans>original</Trans>
+                          </span>
+                        )}
+                        {/*
+                          Which stage is late, not just that something is. "Overdue"
+                          alone sends someone to process an invoice that went out
+                          days ago and is waiting on a signer — different problem,
+                          different person to chase.
+                        */}
                         {isOverdue && (
                           <span
                             className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-800 dark:bg-orange-900 dark:text-orange-200"
@@ -846,48 +967,79 @@ export default function SignatureInboxPage() {
                             }
                           >
                             <AlertTriangleIcon className="h-3 w-3" />
-                            <Trans>overdue {overdueLabel(item.sla?.overdueByMinutes ?? 0)}</Trans>
+                            {item.sla?.stage === 'signing' ? (
+                              <Trans>
+                                unsigned {overdueLabel(item.sla?.overdueByMinutes ?? 0)}
+                              </Trans>
+                            ) : (
+                              <Trans>overdue {overdueLabel(item.sla?.overdueByMinutes ?? 0)}</Trans>
+                            )}
                           </span>
                         )}
                         <SignatureStatus signature={item.signature} />
                         <WorkflowActivityIndicator item={item} />
                       </div>
-                    </td>
+                    </div>
 
-                    {/* Vendor / contact */}
-                    <td className="px-4 py-3 align-top">
+                    {/*
+                      Vendor / contact.
+
+                      The addresses truncate rather than wrap. An email is one
+                      unbreakable token, so a column narrower than the address either
+                      spills into its neighbour or forces the column wider at every
+                      other row's expense; an ellipsis with the full value in the
+                      title attribute costs a hover. The name above it wraps, because
+                      half a company name is not a company name.
+                    */}
+                    <div role="cell" className="col-span-2 min-w-0 xl:col-span-1 xl:px-4 xl:py-3">
                       <p className="text-[13px] font-medium">{f.vendorName || '—'}</p>
                       {f.vendorEmail && (
-                        <p className="text-[12px] text-muted-foreground">{f.vendorEmail}</p>
+                        <p className="truncate text-[12px] text-muted-foreground" title={f.vendorEmail}>
+                          {f.vendorEmail}
+                        </p>
                       )}
                       {item.senderEmail && (
-                        <p className="text-[11px] text-muted-foreground/70">from {item.senderEmail}</p>
+                        <p
+                          className="truncate text-[11px] text-muted-foreground/70"
+                          title={item.senderEmail}
+                        >
+                          from {item.senderEmail}
+                        </p>
                       )}
-                    </td>
+                    </div>
 
-                    {/* Amounts — single currency, straight from BMS ML metadata */}
-                    <td className="px-4 py-3 align-top text-right">
-                      {f.currency && (
-                        <div className="mb-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                          {f.currency}
-                        </div>
-                      )}
+                    {/*
+                      Amounts — single currency, straight from BMS ML metadata.
+
+                      Tinted on a card so the two figure blocks read as a pair of
+                      facts rather than more stacked text; in row mode the column
+                      itself provides that separation.
+                    */}
+                    <div
+                      role="cell"
+                      className="min-w-0 whitespace-nowrap rounded-[var(--r-sm)] bg-muted/40 p-2.5 text-left xl:rounded-none xl:bg-transparent xl:px-4 xl:py-3 xl:text-right"
+                    >
+                      {/*
+                        No separate currency line: `fmtMoney` already prefixes every
+                        figure with it, so a JMD header above "JMD 66.59" was saying
+                        it twice and costing a line in every row.
+                      */}
                       {hasAmounts ? (
                         <dl className="space-y-0.5 text-[12px]">
                           {f.total && (
-                            <div className="flex items-baseline justify-end gap-2">
+                            <div className="flex items-baseline justify-start gap-2 xl:justify-end">
                               <dt className="text-[10px] uppercase text-muted-foreground">Inv</dt>
                               <dd className="font-semibold tabular-nums">{fmtMoney(f.currency, f.total)}</dd>
                             </div>
                           )}
                           {f.tax && (
-                            <div className="flex items-baseline justify-end gap-2">
+                            <div className="flex items-baseline justify-start gap-2 xl:justify-end">
                               <dt className="text-[10px] uppercase text-muted-foreground">Tax</dt>
                               <dd className="tabular-nums">{fmtMoney(f.currency, f.tax)}</dd>
                             </div>
                           )}
                           {f.net && (
-                            <div className="flex items-baseline justify-end gap-2">
+                            <div className="flex items-baseline justify-start gap-2 xl:justify-end">
                               <dt className="text-[10px] uppercase text-muted-foreground">Net</dt>
                               <dd className="font-medium tabular-nums">{fmtMoney(f.currency, f.net)}</dd>
                             </div>
@@ -896,47 +1048,61 @@ export default function SignatureInboxPage() {
                       ) : (
                         <span className="text-[12px] text-muted-foreground">—</span>
                       )}
-                    </td>
+                    </div>
 
-                    {/* Dates */}
-                    <td className="px-4 py-3 align-top text-[12px]">
+                    {/*
+                      Dates.
+
+                      `whitespace-nowrap` is the whole point of this cell: a date is
+                      one token, and the layout was happily breaking 2026-08-02 after
+                      a hyphen to squeeze the column, which turns four dates into
+                      eight lines of hyphenated digits. The column is now sized to a
+                      label plus a date and never squeezed at all.
+                    */}
+                    <div
+                      role="cell"
+                      className="min-w-0 whitespace-nowrap rounded-[var(--r-sm)] bg-muted/40 p-2.5 text-[12px] xl:rounded-none xl:bg-transparent xl:px-4 xl:py-3"
+                    >
                       <dl className="space-y-0.5">
                         {f.invoiceDate && (
                           <div className="flex items-baseline gap-2">
-                            <dt className="w-16 text-[10px] uppercase text-muted-foreground">Invoice</dt>
+                            <dt className="w-14 text-[10px] uppercase text-muted-foreground">Invoice</dt>
                             <dd className="tabular-nums">{fmtDate(f.invoiceDate)}</dd>
                           </div>
                         )}
                         {f.dueDate && (
                           <div className="flex items-baseline gap-2">
-                            <dt className="w-16 text-[10px] uppercase text-muted-foreground">Due</dt>
+                            <dt className="w-14 text-[10px] uppercase text-muted-foreground">Due</dt>
                             <dd className="tabular-nums">{fmtDate(f.dueDate)}</dd>
                           </div>
                         )}
                         <div className="flex items-baseline gap-2">
-                          <dt className="w-16 text-[10px] uppercase text-muted-foreground">Created</dt>
+                          <dt className="w-14 text-[10px] uppercase text-muted-foreground">Created</dt>
                           <dd className="tabular-nums text-muted-foreground">{fmtDate(item.createdAt)}</dd>
                         </div>
                         <div className="flex items-baseline gap-2">
-                          <dt className="w-16 text-[10px] uppercase text-muted-foreground">Updated</dt>
+                          <dt className="w-14 text-[10px] uppercase text-muted-foreground">Updated</dt>
                           <dd className="tabular-nums text-muted-foreground">
                             {formatRelativeTime(item.updatedAt)}
                           </dd>
                         </div>
                       </dl>
-                    </td>
+                    </div>
 
                     {/* Responsibility — who owes a signature, and the chasing so far */}
-                    <td className="max-w-[13rem] px-4 py-3 align-top">
+                    <div role="cell" className="col-span-2 min-w-0 xl:col-span-1 xl:px-4 xl:py-3">
                       <ResponsibilityCell
                         responsibility={item.responsibility}
                         documentStatus={item.signature.documentStatus}
                       />
-                    </td>
+                    </div>
 
                     {/* Actions */}
-                    <td className="px-4 py-3 align-top">
-                      <div className="flex items-center justify-end gap-1">
+                    <div
+                      role="cell"
+                      className="col-span-2 min-w-0 whitespace-nowrap xl:col-span-1 xl:px-4 xl:py-3"
+                    >
+                      <div className="flex items-center justify-start gap-1 xl:justify-end">
                         {/*
                           Review is withheld while OCR is running: the extracted
                           fields are what the reviewer is there to check, and
@@ -1004,12 +1170,11 @@ export default function SignatureInboxPage() {
                           </Button>
                         )}
                       </div>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
             </div>
           )}
         </div>

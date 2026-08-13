@@ -64,8 +64,17 @@ export default function DmsOcrQueuePage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold"><Trans>OCR Processing Queue</Trans></h2>
+          {/*
+            Names the pipeline explicitly. Invoices emailed to the signature
+            inbox are read by their own OCR run and never appear here, so a
+            generic "uploaded documents" sent people looking for the wrong
+            things — which is why this screen moved out of Inbox.
+          */}
           <p className="mt-0.5 text-[13px] text-muted-foreground">
-            <Trans>Track OCR processing status for uploaded documents.</Trans>
+            <Trans>
+              OCR progress for documents uploaded to the repository. Invoices arriving in the
+              signature inbox are tracked on their own timeline.
+            </Trans>
           </p>
         </div>
         <div className="flex gap-2">

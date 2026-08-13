@@ -17,6 +17,7 @@ import { isSignatureFieldType } from '@documenso/prisma/guards/is-signature-fiel
 import type { FieldWithSignature } from '@documenso/prisma/types/field-with-signature';
 
 import { NEXT_PUBLIC_WEBAPP_URL } from '../../constants/app';
+import { signatureImageScale } from '../../constants/signature-size';
 import {
   ZCheckboxFieldMeta,
   ZDateFieldMeta,
@@ -154,7 +155,24 @@ export const insertFieldInPDF = async (pdf: PDFDocument, field: FieldWithSignatu
           let imageWidth = image.width;
           let imageHeight = image.height;
 
-          const scalingFactor = Math.min(fieldWidth / imageWidth, fieldHeight / imageHeight, 1);
+          /*
+            The size the signer asked for, or the original behaviour when they
+            never had the choice.
+
+            The old formula fitted the image to the field and never enlarged it,
+            which is why a signature captured on a wide canvas — most of it
+            transparent margin — printed small and thin in the middle of a large
+            field with no way for the signer to say otherwise.
+          */
+          const scalingFactor = signatureImageScale({
+            imageWidth,
+            imageHeight,
+            fieldWidth,
+            fieldHeight,
+            fill: field.signature?.signatureFill
+              ? Number(field.signature.signatureFill)
+              : null,
+          });
 
           imageWidth = imageWidth * scalingFactor;
           imageHeight = imageHeight * scalingFactor;

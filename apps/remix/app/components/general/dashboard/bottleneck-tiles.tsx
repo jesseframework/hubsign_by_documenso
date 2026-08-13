@@ -1,4 +1,5 @@
 import { Trans } from '@lingui/react/macro';
+import { Link } from 'react-router';
 
 import {
   Dialog,
@@ -33,7 +34,25 @@ export type Person = {
   openedNotSigned: number;
 };
 
-export type VendorRow = { vendor: string; breached: number; open: number };
+export type VendorInvoice = {
+  inboxItemId: string;
+  documentId: number;
+  label: string;
+  invoiceNumber: string | null;
+  documentTitle: string;
+  dueAt: string | Date | null;
+  daysPastDue: number;
+  daysHeld: number | null;
+  arrivedOverdue: boolean;
+};
+
+export type VendorRow = {
+  vendor: string;
+  overdue: number;
+  open: number;
+  invoices: VendorInvoice[];
+  moreOverdue: number;
+};
 
 export type Stages = { neverEmailed: number; emailedNotOpened: number; openedNotSigned: number };
 export type Chase = { none: number; once: number; repeatedly: number };
@@ -180,30 +199,30 @@ export const WhereItsStuckTile = ({
 // ---------------------------------------------------------------------------
 
 export const OverdueByVendorTile = ({
-  enabled,
   rows,
   unattributed,
+  noDueDate,
 }: {
-  enabled: boolean;
   rows: VendorRow[];
   unattributed: number;
+  /** Open invoices that carry no due date and no vendor terms code. */
+  noDueDate: number;
 }) => {
-  if (!enabled) {
-    // Not "0 overdue" — SLA tracking being off is a different statement from
-    // everything being on time, and the second would be a lie.
-    return <Empty>
-      <Trans>SLA tracking is off, so nothing can be judged late.</Trans>
-    </Empty>;
-  }
-
   if (rows.length === 0) {
     return (
       <Empty>
         <span>
-          <Trans>No vendor is past its SLA.</Trans>
+          <Trans>Nothing past its due date.</Trans>
           {unattributed > 0 && (
             <span className="mt-1 block">
-              <Trans>{unattributed} late with no vendor name.</Trans>
+              <Trans>{unattributed} overdue with no vendor name.</Trans>
+            </span>
+          )}
+          {/* Said out loud, because an unmeasured queue and a punctual one look
+              identical from a chart showing nothing. */}
+          {noDueDate > 0 && (
+            <span className="mt-1 block">
+              <Trans>{noDueDate} cannot be judged — no due date and no terms code.</Trans>
             </span>
           )}
         </span>
@@ -212,7 +231,7 @@ export const OverdueByVendorTile = ({
   }
 
   const top = rows.slice(0, 3);
-  const worst = Math.max(...top.map((row) => row.breached), 1);
+  const worst = Math.max(...top.map((row) => row.overdue), 1);
 
   return (
     <div className="flex flex-col justify-center" style={{ minHeight: PLOT_HEIGHT }}>
@@ -224,13 +243,13 @@ export const OverdueByVendorTile = ({
                 {row.vendor}
               </span>
               <span className="flex-shrink-0 text-[12px] font-semibold tabular-nums text-orange-600 dark:text-orange-400">
-                {row.breached}
+                {row.overdue}
               </span>
             </div>
             <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-orange-500"
-                style={{ width: `${Math.round((row.breached / worst) * 100)}%` }}
+                style={{ width: `${Math.round((row.overdue / worst) * 100)}%` }}
               />
             </div>
           </div>
@@ -247,6 +266,12 @@ export const OverdueByVendorTile = ({
           <span>
             {' · '}
             <Trans>{unattributed} unattributed</Trans>
+          </span>
+        )}
+        {noDueDate > 0 && (
+          <span>
+            {' · '}
+            <Trans>{noDueDate} undated</Trans>
           </span>
         )}
       </p>
@@ -278,7 +303,7 @@ export const BottleneckDetailDialog = ({
   stages: Stages;
   chase: Chase;
   totalOpen: number;
-  vendors: { enabled: boolean; rows: VendorRow[]; unattributed: number };
+  vendors: { rows: VendorRow[]; unattributed: number; noDueDate: number };
 }) => {
   return (
     <Dialog open={detail !== null} onOpenChange={(open) => !open && onClose()}>
@@ -431,41 +456,103 @@ export const BottleneckDetailDialog = ({
               </DialogTitle>
               <DialogDescription>
                 <Trans>
-                  Invoices past their SLA whose clock is still running. One already sent late is
-                  history and is not counted here.
+                  Invoices past the date the vendor is owed by, and still awaiting signature. The
+                  due date is the one printed on the invoice; where it states none, the vendor's
+                  terms code is applied to the invoice date. One already signed is history and is
+                  not counted here.
+                </Trans>{' '}
+                {/*
+                  Said plainly, because the figure is read as a reproach otherwise.
+                  It measures the invoice against its own due date, and an invoice
+                  can be months past due on the day it lands in the inbox.
+                */}
+                <Trans>
+                  Days past due are counted from that date, not from the day the invoice reached
+                  you — where it arrived already overdue, the row also says how long you have
+                  actually held it.
                 </Trans>
               </DialogDescription>
             </DialogHeader>
 
-            <div className="custom-scrollbar max-h-[60vh] overflow-y-auto">
-              <table className="w-full">
-                <thead className="sticky top-0 bg-card">
-                  <tr className="border-b border-border">
-                    <th className={th}>
-                      <Trans>Vendor</Trans>
-                    </th>
-                    <th className={`${th} text-right`}>
-                      <Trans>Late</Trans>
-                    </th>
-                    <th className={`${th} text-right`}>
-                      <Trans>Still running</Trans>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendors.rows.map((row) => (
-                    <tr key={row.vendor} className="border-b border-border last:border-0">
-                      <td className={td}>{row.vendor}</td>
-                      <td className={`${td} text-right font-semibold tabular-nums text-orange-600 dark:text-orange-400`}>
-                        {row.breached}
-                      </td>
-                      <td className={`${td} text-right tabular-nums text-muted-foreground`}>
-                        {row.open}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/*
+              The invoices, not only the counts. A count says a supplier is a
+              problem; the invoice number and how late it is are what someone acts
+              on, and they had to leave this panel and search the inbox to find
+              them. Each row opens the item it names.
+            */}
+            <div className="custom-scrollbar max-h-[60vh] space-y-4 overflow-y-auto">
+              {vendors.rows.map((row) => (
+                <div key={row.vendor}>
+                  <div className="sticky top-0 flex items-baseline justify-between gap-3 border-b border-border bg-card pb-1.5">
+                    <p className="min-w-0 truncate text-[13px] font-semibold" title={row.vendor}>
+                      {row.vendor}
+                    </p>
+                    <p className="flex-shrink-0 text-[11px] text-muted-foreground">
+                      <span className="font-semibold text-orange-600 dark:text-orange-400">
+                        {row.overdue}
+                      </span>{' '}
+                      <Trans>overdue</Trans>
+                      {' · '}
+                      <Trans>{row.open} open</Trans>
+                    </p>
+                  </div>
+
+                  <ul className="divide-y divide-border">
+                    {row.invoices.map((invoice) => (
+                      <li key={invoice.inboxItemId}>
+                        <Link
+                          to={`/org/inbox/${invoice.inboxItemId}`}
+                          className="flex items-baseline justify-between gap-3 py-1.5 hover:bg-muted/40"
+                        >
+                          <span
+                            className="min-w-0 flex-1 truncate text-[12px]"
+                            title={`${invoice.label} · ${invoice.documentTitle}`}
+                          >
+                            {invoice.label}
+                            {/* Only when it adds something: the title IS the label
+                                whenever no number extracted, and printing it twice
+                                would pad every such row. */}
+                            {invoice.documentTitle !== invoice.label && (
+                              <span className="ml-1.5 text-muted-foreground">
+                                {invoice.documentTitle}
+                              </span>
+                            )}
+                          </span>
+                          <span className="flex-shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                            {invoice.dueAt
+                              ? new Date(invoice.dueAt).toISOString().slice(0, 10)
+                              : '—'}
+                          </span>
+                          {/*
+                            Two numbers, because one of them was being misread as
+                            the other. The invoice is 161 days past due; we have
+                            had it for one afternoon. Only the second is shown
+                            when the two differ, so a normal overdue invoice — one
+                            that went past its date on our watch — stays a single
+                            figure.
+                          */}
+                          <span className="w-[6.5rem] flex-shrink-0 text-right text-[11px] tabular-nums">
+                            <span className="block font-medium text-orange-600 dark:text-orange-400">
+                              <Trans>{invoice.daysPastDue}d past due</Trans>
+                            </span>
+                            {invoice.arrivedOverdue && invoice.daysHeld !== null && (
+                              <span className="block text-muted-foreground">
+                                <Trans>here {dayLabel(invoice.daysHeld)}</Trans>
+                              </span>
+                            )}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {row.moreOverdue > 0 && (
+                    <p className="pt-1.5 text-[11px] text-muted-foreground">
+                      <Trans>+{row.moreOverdue} more overdue from this vendor</Trans>
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
 
             {vendors.unattributed > 0 && (

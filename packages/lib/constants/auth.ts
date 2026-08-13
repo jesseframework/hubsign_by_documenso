@@ -48,8 +48,21 @@ export const PASSKEY_TIMEOUT = 60000;
  */
 export const MAXIMUM_PASSKEYS = 50;
 
-export const useSecureCookies =
-  env('NODE_ENV') === 'production' && String(NEXT_PUBLIC_WEBAPP_URL()).startsWith('https://');
+/**
+ * Whether cookies get the `Secure` attribute and the `__Secure-` name prefix.
+ *
+ * Keyed off the URL the app is actually served from, not NODE_ENV. The
+ * production container runs without `NODE_ENV=production`, so the previous
+ * `NODE_ENV === 'production' && …` form evaluated false on app.hubsign.io and
+ * every cookie — session and CSRF included — shipped without `Secure`
+ * (FIX-03, 2026-08-13 blackbox assessment). An `https://` app URL is the
+ * honest signal: if we're served over TLS, the cookies must say so.
+ *
+ * Note that flipping this renames the session cookies (`sessionId` →
+ * `__Secure-sessionId`) and moves SameSite from `lax` to `none`, so the first
+ * deploy after this change signs existing sessions out once.
+ */
+export const useSecureCookies = String(NEXT_PUBLIC_WEBAPP_URL()).startsWith('https://');
 
 const secureCookiePrefix = useSecureCookies ? '__Secure-' : '';
 

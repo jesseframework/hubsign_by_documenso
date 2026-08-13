@@ -7,7 +7,7 @@ import { Callout, Steps } from 'nextra/components';
 
 # Dashboard
 
-**Organization → Dashboard** reports live signing activity for your whole
+**Home** reports live signing activity for your whole
 organization, not just your own documents.
 
 ## What it shows
@@ -21,6 +21,24 @@ organization, not just your own documents.
 
 Every number is computed from your organization's own documents. Nothing on this
 page is a sample or a placeholder.
+
+## Aging and overdue are measured against the invoice's due date
+
+**Signature Aging** and **Overdue by vendor** both answer "how late is this to the
+*vendor*" — not "how quickly did we turn it around", which is what the
+[SLA](/organization/signature-inbox) view reports.
+
+The due date is the one printed on the invoice where OCR read one, and otherwise
+the vendor's [terms code](/organization/metadata#terms-code) applied to the invoice
+date. Both cards say how many invoices they could not date: an invoice with no
+printed due date from a vendor with no terms code appears as **No due date** on the
+aging chart and **undated** beneath the vendor chart, rather than being dropped.
+
+<Callout type="info">
+  If a lot of invoices are undated, the fix is a terms code on those vendors —
+  **Settings → Documents → Metadata Fields**. Until then those invoices are outside
+  every aging figure on this page.
+</Callout>
 
 ## Using it
 

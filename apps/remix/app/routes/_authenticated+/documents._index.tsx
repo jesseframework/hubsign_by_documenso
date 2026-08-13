@@ -32,10 +32,9 @@ import { FolderDeleteDialog } from '~/components/dialogs/folder-delete-dialog';
 import { FolderMoveDialog } from '~/components/dialogs/folder-move-dialog';
 import { FolderSettingsDialog } from '~/components/dialogs/folder-settings-dialog';
 import { DocumentDropZoneWrapper } from '~/components/general/document/document-drop-zone-wrapper';
-import { DocumentSearch } from '~/components/general/document/document-search';
 import { DocumentUploadDropzone } from '~/components/general/document/document-upload';
 import { FolderCard } from '~/components/general/folder/folder-card';
-import { PeriodSelector } from '~/components/general/period-selector';
+import { DocumentsFilterCard } from '~/components/tables/documents-filter-card';
 import { DocumentsTable } from '~/components/tables/documents-table';
 import { DocumentsTableEmptyState } from '~/components/tables/documents-table-empty-state';
 import { DocumentsTableSenderFilter } from '~/components/tables/documents-table-sender-filter';
@@ -43,7 +42,7 @@ import { useOptionalCurrentTeam } from '~/providers/team';
 import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
-  return appMetaTags('E-Sign Document');
+  return appMetaTags('E-Sign');
 }
 
 const ZSearchParamsSchema = ZFindDocumentsInternalRequestSchema.pick({
@@ -149,11 +148,30 @@ export default function DocumentsPage() {
   return (
     <DocumentDropZoneWrapper>
       <div className="w-full">
-        {/* Actions bar */}
-        <div className="flex items-center justify-end gap-3">
-          <DocumentUploadDropzone />
-          <CreateFolderDialog />
-        </div>
+        {/*
+          Same header as the Signature Inbox: name, one line saying what the screen
+          holds, actions on the right, closed by a rule. The name used to sit
+          two-thirds down the page immediately above the table, which read as a
+          section heading for the table rather than the title of the screen — and at
+          text-xl it was a different size from every other page's heading.
+        */}
+        <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-b border-border pb-3">
+          <div className="min-w-0">
+            {/* Matches the sidebar row and the breadcrumb exactly — one surface,
+                one name, wherever the user reads it. */}
+            <h2 className="text-lg font-semibold tracking-[-0.01em]">
+              <Trans>E-Sign</Trans>
+            </h2>
+            <p className="mt-1 text-[12px] text-muted-foreground">
+              <Trans>Everything in signing — drafts, out for signature, and fully signed.</Trans>
+            </p>
+          </div>
+
+          <div className="flex flex-shrink-0 items-center gap-3">
+            <DocumentUploadDropzone />
+            <CreateFolderDialog />
+          </div>
+        </header>
 
         {/* Stats grid — clickable, each card filters the document list to
             its status. Mirrors the behaviour of the removed tab strip. */}
@@ -292,8 +310,12 @@ export default function DocumentsPage() {
                   ))}
               </div>
 
-              <div className="mt-6 flex items-center justify-center">
-                {foldersData && foldersData.folders?.length > 12 && (
+              {/* Only when there is something to show. The row used to render
+                  regardless, leaving 24px of margin and a button's worth of empty
+                  space under the folders on every account with twelve or fewer —
+                  a gap that was hidden behind the old mid-page heading. */}
+              {foldersData && foldersData.folders?.length > 12 && (
+                <div className="mt-6 flex items-center justify-center">
                   <Button
                     variant="link"
                     size="sm"
@@ -302,30 +324,27 @@ export default function DocumentsPage() {
                   >
                     View all folders
                   </Button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </>
         )}
 
-        {/* Documents section title */}
-        <div className="mt-8 mb-3">
-          <h2 className="text-xl font-semibold tracking-tight">
-            <Trans>E-Sign Document</Trans>
-          </h2>
-        </div>
+        {/*
+          The Signature Inbox's filter card, so the two lists filter alike. It
+          replaces a period dropdown and a bare search box: the period is a chip
+          now, the status chips reach Rejected (which has no metric card, and so
+          had no control at all), and the count line says how much of the queue you
+          are looking at. The sender dropdown is passed in rather than rebuilt —
+          a team can have more members than a chip row can hold.
+        */}
+        <DocumentsFilterCard
+          shown={data?.data.length ?? 0}
+          total={data?.count ?? 0}
+          senderFilter={team ? <DocumentsTableSenderFilter teamId={team.id} /> : undefined}
+        />
 
-        {/* Table card with filters inside */}
         <div className="overflow-hidden rounded-[var(--r)] border border-border bg-card">
-          {/* Filter bar inside card — tabs removed (the dashboard cards
-              above already show the same per-status counts). */}
-          <div className="flex items-center gap-2 border-b border-border p-2 sm:p-3">
-            <div className="ml-auto flex flex-shrink-0 items-center gap-2">
-              {team && <DocumentsTableSenderFilter teamId={team.id} />}
-              <PeriodSelector />
-              <DocumentSearch initialValue={findDocumentSearchParams.query} />
-            </div>
-          </div>
           {data &&
           data.count === 0 &&
           (!foldersData?.folders.length || foldersData.folders.length === 0) ? (

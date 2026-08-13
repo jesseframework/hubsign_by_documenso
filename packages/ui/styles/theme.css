@@ -251,6 +251,19 @@
 .sidebar-main {
   margin-left: var(--sidebar-w);
   flex: 1;
+  /*
+    A flex item defaults to `min-width: auto`, meaning it refuses to shrink below
+    its content. One wide table anywhere on a page therefore widened this column
+    past the viewport, and because the sidebar's width is a margin on it, the
+    document grew a horizontal scrollbar that dragged the sticky top bar and every
+    page header off to the right with it.
+
+    Zero lets the column keep to the viewport and leaves the scrolling to whatever
+    is actually too wide — which is why the inbox grid carries `overflow-x-auto`.
+    Nothing is clipped: content without its own scroll container still overflows
+    and is still reachable, exactly as before.
+  */
+  min-width: 0;
   min-height: 100vh;
   display: flex;
   flex-direction: column;

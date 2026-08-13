@@ -109,6 +109,9 @@ export const DirectTemplateSigningForm = ({
             typedSignature: value.value && !value.value.startsWith('data:') ? value.value : null,
             signaturePositionX: null,
             signaturePositionY: null,
+            // Null rather than a default: these are local placeholders for a
+            // signature the server has not written yet.
+            signatureFill: null,
           } satisfies Signature;
         }
 

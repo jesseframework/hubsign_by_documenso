@@ -16,6 +16,7 @@
 import { prisma } from '@documenso/prisma';
 
 import { evaluateCondition } from '../workflow/logic';
+import { waivedRuleIdsForDocument } from './overrides';
 import { buildRuleContext } from './registry';
 import type { GateVerdict, RuleContext, RuleGate, RuleHit, RuleSubject } from './types';
 
@@ -29,7 +30,13 @@ export const evaluateGate = async ({
   /** Pass a prebuilt context to avoid resolving providers twice in one request. */
   context?: RuleContext;
 }): Promise<GateVerdict> => {
-  const allow: GateVerdict = { allowed: true, blocks: [], warnings: [], evaluated: 0 };
+  const allow: GateVerdict = {
+    allowed: true,
+    blocks: [],
+    warnings: [],
+    waived: [],
+    evaluated: 0,
+  };
 
   try {
     const rules = await prisma.businessRule.findMany({
@@ -57,8 +64,27 @@ export const evaluateGate = async ({
 
     const context = providedContext ?? (await buildRuleContext(subject));
 
+    /*
+      Rules an approved override lets this document past.
+
+      Only looked up for a Document, and only when something could actually be
+      waived — the overwhelmingly common case is no override at all, and this sits
+      on the signing path.
+    */
+    const documentId = subject.entityType === 'Document' ? Number(subject.entityId) : NaN;
+    const waivedRuleIds = Number.isInteger(documentId)
+      ? await waivedRuleIdsForDocument(documentId).catch((err) => {
+          // Failing to read waivers must not become an inability to sign for
+          // everyone else, so this degrades to "no waivers" and logs.
+          console.error('[rules] could not read rule overrides:', err);
+
+          return new Set<string>();
+        })
+      : new Set<string>();
+
     const blocks: RuleHit[] = [];
     const warnings: RuleHit[] = [];
+    const waived: RuleHit[] = [];
 
     for (const rule of rules) {
       let fired = false;
@@ -81,11 +107,20 @@ export const evaluateGate = async ({
         message: rule.message,
       };
 
-      if (rule.outcome === 'BLOCK') {
-        blocks.push(hit);
-      } else {
+      if (rule.outcome !== 'BLOCK') {
         warnings.push(hit);
+        continue;
       }
+
+      // A waived block still fired — it is recorded as waived rather than
+      // dropped, so "this was approved as an exception" and "this never applied"
+      // stay distinguishable after the fact.
+      if (waivedRuleIds.has(rule.id)) {
+        waived.push(hit);
+        continue;
+      }
+
+      blocks.push(hit);
     }
 
     if (warnings.length > 0) {
@@ -95,10 +130,18 @@ export const evaluateGate = async ({
       );
     }
 
+    if (waived.length > 0) {
+      console.log(
+        `[rules] ${gate} allowed ${subject.entityType} ${subject.entityId} past an approved ` +
+          `override of: ${waived.map((w) => w.name).join(', ')}`,
+      );
+    }
+
     return {
       allowed: blocks.length === 0,
       blocks,
       warnings,
+      waived,
       evaluated: rules.length,
     };
   } catch (err) {

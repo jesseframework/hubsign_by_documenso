@@ -1,8 +1,7 @@
 import { prisma } from '@documenso/prisma';
 
-import { invoiceFields } from '../../universal/inbox-invoice-fields';
 import { vendorCoreName } from '../../universal/vendor-match';
-import { SLA_ORG_SELECT, evaluateItemsSla } from '../inbox/sla';
+import { getOrganizationDueDates } from '../inbox/invoice-due';
 import { getDocumentResponsibility } from './responsibility';
 
 /**
@@ -24,6 +23,8 @@ import { getDocumentResponsibility } from './responsibility';
  */
 const PEOPLE_LIMIT = 50;
 const VENDOR_LIMIT = 25;
+/** Overdue invoices listed under each vendor in the detail panel. */
+const INVOICES_PER_VENDOR = 20;
 
 /** Documents scanned. Far above any realistic pending queue. */
 const SCAN_LIMIT = 2_000;
@@ -61,15 +62,58 @@ export type SigningBottlenecks = {
     repeatedly: number;
   };
   vendors: {
-    /** False when SLA tracking is switched off — not zero, which reads as "all on time". */
-    enabled: boolean;
-    rows: { vendor: string; breached: number; open: number }[];
     /**
-     * Late invoices whose vendor could not be identified. Reported separately
+     * Invoices past the date the VENDOR is owed by, grouped by supplier.
+     *
+     * The due date comes from the invoice itself when OCR read one, and otherwise
+     * from the vendor's payment terms code (see `invoice-due.ts`). It used to be
+     * our own internal turnaround SLA, which answered a different question: an
+     * invoice with three weeks of credit left could appear here because our
+     * eight-hour target had lapsed, and a genuinely late payment could be absent
+     * because we happened to process it quickly.
+     */
+    rows: {
+      vendor: string;
+      overdue: number;
+      open: number;
+      /**
+       * The overdue invoices themselves, worst first.
+       *
+       * A count tells you a supplier is a problem; it does not tell you which
+       * invoice to go and look at, which is the only reason anyone opens this
+       * panel. Capped per vendor so one badly-behaved supplier cannot make the
+       * dashboard payload unbounded — `moreOverdue` says what was left out.
+       */
+      invoices: {
+        inboxItemId: string;
+        documentId: number;
+        label: string;
+        invoiceNumber: string | null;
+        documentTitle: string;
+        dueAt: Date | null;
+        daysPastDue: number;
+        /**
+         * How long the invoice has been in the queue, and whether it was already
+         * past its due date when it got here. Without these a back-dated invoice
+         * reads as months of neglect on the day it arrives.
+         */
+        daysHeld: number | null;
+        arrivedOverdue: boolean;
+      }[];
+      moreOverdue: number;
+    }[];
+    /**
+     * Overdue invoices whose vendor could not be identified. Reported separately
      * rather than ranked as a vendor called "Unknown": it is not a supplier,
      * and letting it top the chart buries the ones somebody can actually call.
      */
     unattributed: number;
+    /**
+     * Open invoices with no due date at all — no date on the page, and no terms
+     * code on the vendor. They cannot be judged late, and saying so is the point:
+     * silently omitting them makes an unmeasured queue look like a punctual one.
+     */
+    noDueDate: number;
   };
 };
 
@@ -89,11 +133,11 @@ export const getSigningBottlenecks = async (
     otherPeople: 0,
     stages: { neverEmailed: 0, emailedNotOpened: 0, openedNotSigned: 0 },
     chase: { none: 0, once: 0, repeatedly: 0 },
-    vendors: { enabled: false, rows: [], unattributed: 0 },
+    vendors: { rows: [], unattributed: 0, noDueDate: 0 },
   };
 
   if (documents.length === 0) {
-    return { ...empty, vendors: await vendorBreaches(organizationId) };
+    return { ...empty, vendors: await vendorOverdue(organizationId) };
   }
 
   const documentIds = documents.map((d) => d.id);
@@ -169,7 +213,7 @@ export const getSigningBottlenecks = async (
     otherPeople: Math.max(0, ranked.length - PEOPLE_LIMIT),
     stages,
     chase,
-    vendors: await vendorBreaches(organizationId),
+    vendors: await vendorOverdue(organizationId),
   };
 };
 
@@ -222,67 +266,81 @@ const whenEachRecipientWasAsked = async (documentIds: number[]): Promise<Map<num
 };
 
 /**
- * Open SLA breaches grouped by vendor.
+ * Overdue invoices grouped by vendor, on the invoice's own due date.
  *
- * Counts only breaches whose clock is still running: a late invoice that has
- * since been sent is history, and listing it would keep a supplier on the
- * naughty step forever.
+ * Counts only invoices still awaiting signature: one that went out late is
+ * history, and listing it would keep a supplier on the naughty step forever.
+ *
+ * Independent of whether SLA tracking is switched on. A due date is a fact about
+ * the invoice — the date the vendor is owed by — and it exists whether or not the
+ * organization has configured internal turnaround targets.
  */
-const vendorBreaches = async (organizationId: number): Promise<SigningBottlenecks['vendors']> => {
-  const org = await prisma.organization.findUnique({
-    where: { id: organizationId },
-    select: SLA_ORG_SELECT,
-  });
+const vendorOverdue = async (organizationId: number): Promise<SigningBottlenecks['vendors']> => {
+  const dues = await getOrganizationDueDates({ organizationId, limit: SCAN_LIMIT });
 
-  if (!org?.slaEnabled) {
-    return { enabled: false, rows: [], unattributed: 0 };
-  }
+  type VendorRow = SigningBottlenecks['vendors']['rows'][number];
 
-  const items = await prisma.signatureInboxItem.findMany({
-    where: { organizationId, status: { notIn: ['ARCHIVED'] } },
-    orderBy: { createdAt: 'desc' },
-    take: SCAN_LIMIT,
-    include: { document: { select: { status: true, completedAt: true } } },
-  });
-
-  if (items.length === 0) {
-    return { enabled: true, rows: [], unattributed: 0 };
-  }
-
-  const evaluated = await evaluateItemsSla({ organizationId, org, items });
-  const slaByItem = new Map(evaluated.map((result) => [result.inboxItemId, result]));
-
-  const byVendor = new Map<string, { vendor: string; breached: number; open: number }>();
+  const byVendor = new Map<string, VendorRow>();
   let unattributed = 0;
+  let noDueDate = 0;
 
-  for (const item of items) {
-    const sla = slaByItem.get(item.id);
-    if (!sla) continue;
+  for (const due of dues) {
+    // Settled invoices are excluded entirely, including from `noDueDate`: nobody
+    // needs to be told that a signed invoice could not have been judged.
+    if (!due.open) continue;
 
-    const isOpenBreach = sla.internal.state === 'breached' && !sla.internal.settled;
-
-    // Grouped on the normalised core name, so "Northgate Consulting Ltd." and
-    // "Northgate Consulting Limited" are one supplier rather than two.
-    const label = sla.vendorLabel || invoiceFields(item).vendorName || '';
-    const key = vendorCoreName(label) || label.trim().toLowerCase();
-
-    if (key === '') {
-      if (isOpenBreach) unattributed += 1;
+    if (due.daysPastDue === null) {
+      noDueDate += 1;
       continue;
     }
 
-    const row = byVendor.get(key) ?? { vendor: label, breached: 0, open: 0 };
+    const isOverdue = due.daysPastDue > 0;
 
-    if (!sla.internal.settled) row.open += 1;
-    if (isOpenBreach) row.breached += 1;
+    // Grouped on the normalised core name, so "Northgate Consulting Ltd." and
+    // "Northgate Consulting Limited" are one supplier rather than two.
+    const label = due.vendorLabel ?? '';
+    const key = vendorCoreName(label) || label.trim().toLowerCase();
+
+    if (key === '') {
+      if (isOverdue) unattributed += 1;
+      continue;
+    }
+
+    const row =
+      byVendor.get(key) ?? { vendor: label, overdue: 0, open: 0, invoices: [], moreOverdue: 0 };
+
+    row.open += 1;
+
+    if (isOverdue) {
+      row.overdue += 1;
+      row.invoices.push({
+        inboxItemId: due.inboxItemId,
+        documentId: due.documentId,
+        label: due.label,
+        invoiceNumber: due.invoiceNumber,
+        documentTitle: due.documentTitle,
+        dueAt: due.dueAt,
+        daysPastDue: due.daysPastDue,
+        daysHeld: due.daysHeld,
+        arrivedOverdue: due.arrivedOverdue,
+      });
+    }
 
     byVendor.set(key, row);
   }
 
   const rows = [...byVendor.values()]
-    .filter((row) => row.breached > 0)
-    .sort((a, b) => b.breached - a.breached || b.open - a.open)
-    .slice(0, VENDOR_LIMIT);
+    .filter((row) => row.overdue > 0)
+    .sort((a, b) => b.overdue - a.overdue || b.open - a.open)
+    .slice(0, VENDOR_LIMIT)
+    .map((row) => ({
+      ...row,
+      // Worst first: the invoice furthest past its due date is the one to chase.
+      invoices: [...row.invoices]
+        .sort((a, b) => b.daysPastDue - a.daysPastDue)
+        .slice(0, INVOICES_PER_VENDOR),
+      moreOverdue: Math.max(0, row.invoices.length - INVOICES_PER_VENDOR),
+    }));
 
-  return { enabled: true, rows, unattributed };
+  return { rows, unattributed, noDueDate };
 };

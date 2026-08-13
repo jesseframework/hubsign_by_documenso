@@ -11,6 +11,8 @@ import {
   ZApprovalValidationTypeSchema,
   ZOrganizationRoleSchema,
 } from '@documenso/lib/types/approval';
+import { RULE_OVERRIDE_ENTITY_TYPE } from '@documenso/lib/constants/rule-overrides';
+import { cancelRuleOverride } from '@documenso/lib/server-only/rules/overrides';
 import type { Prisma } from '@documenso/prisma/client';
 import { prisma } from '@documenso/prisma';
 
@@ -464,10 +466,29 @@ export const approvalRouter = router({
         where: { id: input.id, organizationId: membership.organizationId },
       });
       if (!existing) throw new TRPCError({ code: 'NOT_FOUND' });
-      return prisma.approvalRequest.update({
+
+      const cancelled = await prisma.approvalRequest.update({
         where: { id: existing.id },
         data: { status: 'CANCELLED', completedAt: new Date() },
       });
+
+      /*
+        Release whatever this chain was gating.
+
+        A cancelled request used to leave a signing exception PENDING with nothing
+        able to decide it, and that PENDING then blocked the signer from raising
+        another — a dead end produced by one click here. Only PENDING overrides are
+        touched, so cancelling the request behind an already-granted waiver cannot
+        retroactively revoke it.
+      */
+      if (existing.entityType === RULE_OVERRIDE_ENTITY_TYPE) {
+        await cancelRuleOverride({
+          overrideId: existing.entityId,
+          note: 'The approval request handling this was cancelled, so it was not decided.',
+        }).catch((err) => console.error('[approval] could not release the rule override:', err));
+      }
+
+      return cancelled;
     }),
 
   // ─── In-app actions ──────────────────────────────────────────────────────────

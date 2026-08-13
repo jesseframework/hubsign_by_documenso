@@ -24,12 +24,16 @@ export const TIMELINE_KINDS = [
   'RECIPIENT_OPENED',
   'RECIPIENT_SIGNED',
   'RECIPIENT_REJECTED',
+  'RECIPIENT_REASSIGNED',
   'COMPLETED',
   'COPY_EMAILED',
   'WORKFLOW_RUN',
   'FIELD_CORRECTED',
   'FIELD_FROM_ATTACHMENT',
   'ATTACHMENT_READ',
+  'OVERRIDE_REQUESTED',
+  'OVERRIDE_APPROVED',
+  'OVERRIDE_DECLINED',
 ] as const;
 
 export type TimelineKind = (typeof TIMELINE_KINDS)[number];
@@ -47,6 +51,7 @@ export type TimelineEvent = {
    * WORKFLOW_RUN    → the run status
    * FIELD_CORRECTED → the field name
    * ATTACHMENT_READ → 'ok' | 'failed'
+   * OVERRIDE_*      → 'chain' | 'direct', i.e. how it was decided
    */
   detail: string | null;
   /** Free text that is already a proper noun — a workflow name, a reason. */
@@ -61,8 +66,13 @@ type AuditData = {
   isResending?: boolean;
   recipientName?: string;
   recipientEmail?: string;
+  recipientId?: number;
   reason?: string;
+  changes?: { type?: string; from?: string; to?: string }[];
 };
+
+/** One recipient row changing hands, taken from a RECIPIENT_UPDATED audit entry. */
+type Reassignment = { at: Date; recipientId: number; from: string };
 
 export const getInboxItemTimeline = async ({
   inboxItemId,
@@ -88,7 +98,7 @@ export const getInboxItemTimeline = async ({
     return [];
   }
 
-  const [auditLogs, reminders, runs, fieldEdits, attachments] = await Promise.all([
+  const [auditLogs, reminders, runs, fieldEdits, attachments, overrides] = await Promise.all([
     prisma.documentAuditLog.findMany({
       where: { documentId: item.documentId },
       orderBy: { createdAt: 'asc' },
@@ -102,6 +112,7 @@ export const getInboxItemTimeline = async ({
         id: true,
         sentAt: true,
         kind: true,
+        recipientId: true,
         recipient: { select: { name: true, email: true } },
         sentBy: { select: { name: true, email: true } },
       },
@@ -140,9 +151,29 @@ export const getInboxItemTimeline = async ({
         ocrRanBy: { select: { name: true, email: true } },
       },
     }),
+    prisma.businessRuleOverride.findMany({
+      where: { documentId: item.documentId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+        decidedAt: true,
+        decisionNote: true,
+        reason: true,
+        approvalRequestId: true,
+        recipient: { select: { name: true, email: true } },
+        decidedBy: { select: { name: true, email: true } },
+        rules: { select: { ruleName: true } },
+      },
+    }),
   ]);
 
   const events: TimelineEvent[] = [];
+
+  // Filled from the audit log below, then used to attribute reminders that were
+  // sent before a recipient row changed hands.
+  const reassignments: Reassignment[] = [];
 
   // ---- The inbox item's own life ------------------------------------------
   events.push({
@@ -243,6 +274,36 @@ export const getInboxItemTimeline = async ({
         events.push({ id: log.id, at: log.createdAt, kind: 'COMPLETED', actor: null, detail: null, note: null });
         break;
 
+      // A recipient row whose email changed is a reassignment: the request was
+      // taken off one person and given to another. Name-only edits are a
+      // correction to the same person and are not worth a row.
+      case 'RECIPIENT_UPDATED': {
+        const emailChange = data.changes?.find((change) => change.type === 'EMAIL');
+
+        if (!emailChange?.from || !emailChange.to) break;
+
+        events.push({
+          id: log.id,
+          at: log.createdAt,
+          kind: 'RECIPIENT_REASSIGNED',
+          // Who it went to, with who it came from in `note` — both addresses, so
+          // the row explains itself without needing the row above it.
+          actor: data.recipientName || emailChange.to,
+          detail: emailChange.to,
+          note: emailChange.from,
+        });
+
+        if (typeof data.recipientId === 'number') {
+          reassignments.push({
+            at: log.createdAt,
+            recipientId: data.recipientId,
+            from: emailChange.from,
+          });
+        }
+
+        break;
+      }
+
       // FIELD_CREATED, RECIPIENT_CREATED and DOCUMENT_FIELD_INSERTED are
       // preparation mechanics. They belong in the audit certificate, not in a
       // history someone reads to find out where an invoice got stuck.
@@ -252,12 +313,24 @@ export const getInboxItemTimeline = async ({
   }
 
   // ---- Reminders ----------------------------------------------------------
+  //
+  // A reminder row points at the recipient *row*, not at a person, and that row
+  // can be reassigned. Read live, every nudge sent to the person who was removed
+  // would be reported as having gone to the person who replaced them — so a
+  // reminder that predates a reassignment is credited to the address it actually
+  // went to.
   for (const reminder of reminders) {
+    // Ascending, so this is the *first* reassignment after the reminder — whoever
+    // held the row at the time is the person that reassignment moved away from.
+    const supersededBy = reassignments.find(
+      (change) => change.recipientId === reminder.recipientId && reminder.sentAt < change.at,
+    );
+
     events.push({
       id: reminder.id,
       at: reminder.sentAt,
       kind: 'REMINDER_SENT',
-      actor: reminder.recipient?.name || reminder.recipient?.email || null,
+      actor: supersededBy?.from || reminder.recipient?.name || reminder.recipient?.email || null,
       detail: reminder.kind,
       note: reminder.sentBy?.name || reminder.sentBy?.email || null,
     });
@@ -292,6 +365,37 @@ export const getInboxItemTimeline = async ({
       detail: attachment.ocrError ? 'failed' : 'ok',
       note: attachment.fileName,
     });
+  }
+
+  // ---- Signing exceptions -------------------------------------------------
+  //
+  // Two rows per override, not one: "a signer was stopped and asked" and "it was
+  // granted" are separate facts, and the gap between them is the thing anyone
+  // reviewing this afterwards actually wants to see.
+  for (const override of overrides) {
+    events.push({
+      id: `${override.id}-requested`,
+      at: override.createdAt,
+      kind: 'OVERRIDE_REQUESTED',
+      actor: override.recipient?.name || override.recipient?.email || null,
+      detail: override.approvalRequestId ? 'chain' : 'direct',
+      // The rules at stake, so the row says what was asked for rather than just
+      // that something was.
+      note: override.rules.map((r) => r.ruleName).join(', ') || null,
+    });
+
+    if (override.decidedAt && override.status !== 'PENDING') {
+      events.push({
+        id: `${override.id}-decided`,
+        at: override.decidedAt,
+        kind: override.status === 'APPROVED' ? 'OVERRIDE_APPROVED' : 'OVERRIDE_DECLINED',
+        // Null for a chain decision: several approvers may have acted, and naming
+        // only one of them would misreport who authorised it.
+        actor: override.decidedBy?.name || override.decidedBy?.email || null,
+        detail: override.approvalRequestId ? 'chain' : 'direct',
+        note: override.decisionNote,
+      });
+    }
   }
 
   // ---- Workflow runs ------------------------------------------------------

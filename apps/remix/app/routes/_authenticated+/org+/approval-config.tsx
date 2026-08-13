@@ -268,9 +268,22 @@ export default function ApprovalConfigPage() {
 
       {/* Role mappings */}
       <section className={sectionCls}>
-        <h3 className="mb-3 text-[14px] font-semibold">
-          <Trans>Role → approver mappings</Trans>
+        <h3 className="text-[14px] font-semibold">
+          <Trans>Approver role groups</Trans>
         </h3>
+        {/*
+          Said here because this is the only page that can create them, and their
+          most visible effect is somewhere else entirely: a signer stopped by a
+          business rule picks one of these by name when asking for an exception.
+          Without a group configured, that dropdown does not appear at all.
+        */}
+        <p className="mb-3 mt-0.5 text-[12px] text-muted-foreground">
+          <Trans>
+            Used by approval steps set to "role mapping", and offered to a signer who is blocked by
+            a business rule and asks for an exception. They see the group name only — never the
+            approver's name or email.
+          </Trans>
+        </p>
         <div className="mb-3 space-y-2">
           {(mappings.data ?? []).map((m) => (
             <div

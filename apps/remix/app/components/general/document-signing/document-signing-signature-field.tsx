@@ -7,6 +7,11 @@ import { Loader } from 'lucide-react';
 import { useRevalidator } from 'react-router';
 
 import { useDraggableSignaturePosition } from '@documenso/lib/client-only/hooks/use-draggable-signature-position';
+import {
+  DEFAULT_SIGNATURE_FILL,
+  SIGNATURE_SIZE_PRESETS,
+  signatureSizePresetOf,
+} from '@documenso/lib/constants/signature-size';
 import { DO_NOT_INVALIDATE_QUERY_ON_MUTATION } from '@documenso/lib/constants/trpc';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import type { TRecipientActionAuth } from '@documenso/lib/types/document-auth';
@@ -70,6 +75,10 @@ export const DocumentSigningSignatureField = ({
     isPending: isRemoveSignedFieldWithTokenLoading,
   } = trpc.field.removeSignedFieldWithToken.useMutation(DO_NOT_INVALIDATE_QUERY_ON_MUTATION);
 
+  const { mutateAsync: setSignatureFill } = trpc.field.setSignatureFill.useMutation(
+    DO_NOT_INVALIDATE_QUERY_ON_MUTATION,
+  );
+
   const { signature } = field;
   const canDrag = !field.inserted;
   const drag = useDraggableSignaturePosition({ field, enabled: canDrag });
@@ -79,6 +88,17 @@ export const DocumentSigningSignatureField = ({
 
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [localSignature, setLocalSignature] = useState<string | null>(null);
+
+  /*
+    Held locally as well as on the signature so the field resizes on the click
+    rather than after the round trip. The server is the source of truth; this only
+    covers the moment in between, which is exactly when the signer is judging
+    whether the size is right.
+  */
+  const storedFill = signature?.signatureFill ? Number(signature.signatureFill) : null;
+  const [pendingFill, setPendingFill] = useState<number | null>(null);
+  const fill = pendingFill ?? storedFill ?? DEFAULT_SIGNATURE_FILL;
+  const selectedPreset = signatureSizePresetOf(fill);
 
   const state = useMemo<SignatureFieldState>(() => {
     if (!field.inserted) {
@@ -146,6 +166,7 @@ export const DocumentSigningSignatureField = ({
         authOptions,
         signaturePositionX: drag.posPercent.x,
         signaturePositionY: drag.posPercent.y,
+        signatureFill: pendingFill ?? storedFill ?? DEFAULT_SIGNATURE_FILL,
       };
 
       if (onSignField) {
@@ -167,6 +188,36 @@ export const DocumentSigningSignatureField = ({
       toast({
         title: _(msg`Error`),
         description: _(msg`An error occurred while signing the document.`),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  /**
+   * Resize an already-signed field.
+   *
+   * Its own mutation rather than re-signing: `signFieldWithToken` refuses a field
+   * that is already inserted, which is the guard that stops a signature being
+   * swapped after the fact. The first version of this called it anyway and every
+   * click failed with "Field has already been inserted" — the size changed on
+   * screen and was never saved, which is the worst of both.
+   */
+  const onResize = async (nextFill: number) => {
+    // Optimistic, so the field resizes on the click rather than after the round
+    // trip: judging the size is the entire point of the control.
+    const previous = pendingFill;
+    setPendingFill(nextFill);
+
+    try {
+      await setSignatureFill({ token: recipient.token, fieldId: field.id, fill: nextFill });
+      await revalidate();
+    } catch (err) {
+      // Put it back: a size that did not save must not keep showing as selected.
+      setPendingFill(previous);
+
+      toast({
+        title: _(msg`Could not change the size`),
+        description: AppError.parseError(err).message,
         variant: 'destructive',
       });
     }
@@ -262,11 +313,54 @@ export const DocumentSigningSignatureField = ({
       )}
 
       {state === 'signed-image' && signature?.signatureImageAsBase64 && (
-        <img
-          src={signature.signatureImageAsBase64}
-          alt={`Signature for ${recipient.name}`}
-          className="h-full w-full object-contain"
-        />
+        // Centred at the chosen fraction of the field, which is the same geometry
+        // the PDF is sealed with — so what the signer approves here is what the
+        // finished document carries.
+        <div className="flex h-full w-full items-center justify-center">
+          <img
+            src={signature.signatureImageAsBase64}
+            alt={`Signature for ${recipient.name}`}
+            className="object-contain"
+            style={{ width: `${fill * 100}%`, height: `${fill * 100}%` }}
+          />
+        </div>
+      )}
+
+      {/*
+        Above the field, not inside it: a signed field is covered edge to edge by
+        an invisible button that removes the signature, so a control placed within
+        it would delete the signature instead of resizing it.
+      */}
+      {state !== 'empty' && !isLoading && (
+        <div
+          className="absolute -top-8 left-0 z-20 flex items-center gap-0.5 rounded-md border border-border bg-background/95 px-1 py-0.5 shadow-sm backdrop-blur"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <span className="text-muted-foreground px-1 text-[10px] uppercase">
+            <Trans>Size</Trans>
+          </span>
+          {SIGNATURE_SIZE_PRESETS.map((preset) => (
+            <button
+              key={preset.key}
+              type="button"
+              className={`h-5 w-5 rounded text-[10px] font-semibold ${
+                preset.key === selectedPreset.key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-muted'
+              }`}
+              title={_(msg`Draw the signature at ${Math.round(preset.fill * 100)}% of the field`)}
+              onClick={(e) => {
+                // Both required: the click would otherwise reach the remove
+                // overlay beneath and unsign the field.
+                e.preventDefault();
+                e.stopPropagation();
+                void onResize(preset.fill);
+              }}
+            >
+              {preset.key}
+            </button>
+          ))}
+        </div>
       )}
 
       {state === 'signed-text' && (

@@ -9,6 +9,8 @@
 
 import { prisma } from '@documenso/prisma';
 
+import { RULE_OVERRIDE_ENTITY_TYPE } from '../../constants/rule-overrides';
+
 import type { TApprovalContext } from '../../types/approval';
 
 export type ApprovalEntityContext = {
@@ -75,6 +77,66 @@ export const buildApprovalContext = async ({
         ownerEmail: document.user.email,
         teamId: document.teamId,
         recipientCount: document._count.recipients,
+      };
+    }
+  }
+
+  /*
+    A signing exception. The entity is the override row, so the generic fallback
+    below would title it "RuleOverride cmsp8un8q000bywol7f0i4i8x" — which is what
+    the approver's email said before this, and no approver can act on a cuid.
+
+    Resolving it here also gives the chain the document's owner, so the outcome
+    notification reaches the person who sent the document rather than nobody.
+  */
+  if (entityType === RULE_OVERRIDE_ENTITY_TYPE) {
+    const override = await prisma.businessRuleOverride.findUnique({
+      where: { id: entityId },
+      select: {
+        blockedReason: true,
+        reason: true,
+        rules: { select: { ruleName: true } },
+        recipient: { select: { name: true, email: true } },
+        document: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            user: { select: { id: true, name: true, email: true } },
+          },
+        },
+      },
+    });
+
+    if (override?.document) {
+      const { document } = override;
+
+      return {
+        context: {
+          entityType,
+          entityId,
+          organization: { id: organizationId },
+          now,
+          // Named `override` rather than merged into `document` so a rule set can
+          // branch on what is being waived — e.g. route large exceptions higher.
+          override: {
+            blockedReason: override.blockedReason,
+            reason: override.reason,
+            rules: override.rules.map((r) => r.ruleName),
+            requestedBy: override.recipient?.email ?? null,
+          },
+          document: {
+            id: document.id,
+            title: document.title,
+            status: document.status,
+            user: document.user,
+          },
+        },
+        entityTitle: `Signing exception — ${document.title}`,
+        entityStatus: document.status,
+        ownerUserId: document.user.id,
+        ownerName: document.user.name,
+        ownerEmail: document.user.email,
       };
     }
   }

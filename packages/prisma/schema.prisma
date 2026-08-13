@@ -115,6 +115,8 @@ model User {
   sentReminders            RecipientReminder[]    @relation("UserSentReminders")
   inboxFieldEdits          InboxFieldEdit[]       @relation("UserInboxFieldEdits")
   attachmentOcrRuns        DocumentSupportingFile[] @relation("UserRanAttachmentOcr")
+  decidedRuleOverrides     BusinessRuleOverride[]   @relation("UserDecidedRuleOverrides")
+  assignedRuleOverrides    BusinessRuleOverride[]   @relation("UserAssignedRuleOverrides")
 
   @@index([email])
 }
@@ -456,6 +458,8 @@ model Document {
 
   supportingFiles DocumentSupportingFile[]
 
+  ruleOverrides BusinessRuleOverride[]
+
   @@unique([documentDataId])
   @@index([userId])
   @@index([status])
@@ -658,6 +662,7 @@ model Recipient {
   signatures           Signature[]
   supportingFiles      DocumentSupportingFile[]
   fieldSignedPositions FieldSignedPosition[]
+  ruleOverrideRequests BusinessRuleOverride[]
 
   // Sign reminder tracking. `remindersSent` is the scheduler's own counter —
   // it gates `signReminderMaxCount` and is deliberately NOT bumped by manual
@@ -776,6 +781,10 @@ model Signature {
   typedSignature         String?
   signaturePositionX     Decimal?
   signaturePositionY     Decimal?
+  /// Fraction of the field the signature is drawn at, chosen by the signer.
+  /// Null for signatures made before the size control existed — those keep the
+  /// original "fit the field, never enlarge" behaviour.
+  signatureFill          Decimal?
 
   recipient Recipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
   field     Field     @relation(fields: [fieldId], references: [id], onDelete: Cascade)
@@ -1699,6 +1708,10 @@ model Organization {
   /// Fallbacks in business hours, used when a vendor sets no target of its own.
   slaDefaultInternalHours Int?
   slaDefaultEndToEndHours Int?
+  /// Sent for signature → fully signed. The signer's half, measured on its own:
+  /// the internal clock stops at the send, so without this an invoice waiting a
+  /// fortnight on a signature is tracked by nothing.
+  slaDefaultSigningHours  Int?
 
   // Stripe billing
   stripeCustomerId                String?   @unique
@@ -1816,6 +1829,8 @@ model OrgSeatPlan {
   recipientsPerMonth Int     @default(50)
   directTemplates    Int     @default(5)
   dmsEnabled         Boolean @default(false)
+  // How many +100-doc volume blocks purchased (Business tier only).
+  docBlockQuantity   Int     @default(0)
 
   // How many seats purchased at this tier
   quantity Int @default(1)
@@ -2519,6 +2534,14 @@ model SignatureInboxItem {
   extractedData Json? /// Flattened field_name → value map from BMS ML.
   ocrMeta       Json? /// Full OCR metadata (confidences, field_extractions, etc.).
 
+  // Duplicate detection, resolved when OCR lands and again after any correction
+  // to the fields it reads. Stored rather than computed on read so the queue can
+  // colour a duplicate without re-scanning every other item on every page load.
+  duplicateOfId      String? /// The earlier copy this one repeats. Null = not a duplicate.
+  duplicateMatchedOn String? /// "invoice-number" (conclusive) or "date-and-amount".
+  duplicateCount     Int       @default(0) /// How many earlier copies matched.
+  duplicateCheckedAt DateTime? /// Null means never checked — which is not the same as checked and clean.
+
   error      String?
   createdAt  DateTime  @default(now())
   receivedAt DateTime? /// True mailbox arrival time from the mail server. Null when upstream gave no date; SLA clocks fall back to createdAt (the ingest instant), which diverges from arrival whenever polling has been down.
@@ -2529,10 +2552,17 @@ model SignatureInboxItem {
   document   Document         @relation(fields: [documentId], references: [id], onDelete: Cascade)
   fieldEdits InboxFieldEdit[]
 
+  /// A real relation rather than a loose id, so deleting the original cannot
+  /// leave a copy pointing at a row that no longer exists — the pointer clears
+  /// and the copy stops claiming to duplicate something.
+  duplicateOf SignatureInboxItem?  @relation("InboxItemDuplicate", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicates  SignatureInboxItem[] @relation("InboxItemDuplicate")
+
   @@index([organizationId])
   @@index([organizationId, status])
   @@index([createdAt])
   @@index([externalMessageId])
+  @@index([duplicateOfId])
 }
 
 /// A saved column layout for the export builder, scoped to one organization and
@@ -2576,6 +2606,63 @@ model MetadataRecord {
   data           Json? /// Arbitrary extra fields (phone, account number, …).
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  @@unique([organizationId, category, key])
+  @@index([organizationId, category])
+}
+
+/// A saved invoice report: a named configuration of measure, grouping, window and
+/// filters.
+///
+/// Org-scoped and shared, matching how the rest of this product works — the
+/// signature inbox is a shared queue, not a per-user mailbox, and a report worth
+/// saving is worth the team seeing. `config` is validated by ZReportConfigSchema
+/// on the way in and on the way out, so a config written by an older version
+/// either parses or is rejected rather than half-read.
+model ReportView {
+  id              String   @id @default(cuid())
+  organizationId  Int
+  name            String
+  config          Json
+  /// Who saved it, for provenance. Kept if that user is later removed.
+  createdByUserId Int?
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+/// What kind of value an organization-defined metadata field holds.
+enum MetadataFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SELECT
+}
+
+/// An organization-defined field on a metadata record.
+///
+/// The values live in `MetadataRecord.data` alongside the built-in keys — this
+/// table only declares that a field exists, so the form can render it, the table
+/// can show it and the CSV can carry it. `key` is derived from `label` and is
+/// what workflow templates reference (`{{vars.vendor.glAccount}}`), so it is
+/// fixed once created; renaming the label leaves the key alone.
+model MetadataFieldDefinition {
+  id             String            @id @default(cuid())
+  organizationId Int
+  category       String /// Which category the field applies to, e.g. "vendor".
+  key            String /// Storage key inside MetadataRecord.data.
+  label          String /// Shown on the form and used as the CSV column header.
+  type           MetadataFieldType @default(TEXT)
+  options        String[] /// Allowed values for SELECT; empty for other types.
+  helpText       String?
+  required       Boolean           @default(false)
+  order          Int               @default(0)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@unique([organizationId, category, key])
   @@index([organizationId, category])
@@ -2633,6 +2720,106 @@ model BusinessRule {
   @@index([organizationId])
   /// The evaluator's hot path: active rules for one org at one gate.
   @@index([organizationId, gate, isActive])
+
+  overrides BusinessRuleOverrideRule[]
+}
+
+enum BusinessRuleOverrideStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// A signer's request to be let past a blocking rule, and its outcome.
+///
+/// A BLOCK is a dead end by design — the signer cannot change the invoice, and
+/// before this there was no way forward at all: they closed the tab and the
+/// document sat unsigned with nobody in the organization aware. This is the
+/// documented way out, and it deliberately is not a bypass: nothing changes
+/// until somebody with authority approves it, and what they approved is kept.
+///
+/// Waives ONLY the rules that were blocking when it was asked for, recorded in
+/// `rules`. A rule that starts blocking later is not covered — the approver
+/// cannot sign off on something that had not happened yet.
+model BusinessRuleOverride {
+  id             String                     @id @default(cuid())
+  organizationId Int
+  documentId     Int
+  status         BusinessRuleOverrideStatus  @default(PENDING)
+
+  /// Why the signer says it should be waived. Shown to the approver.
+  reason String?
+
+  /// The block text as it read when requested, kept verbatim.
+  ///
+  /// Denormalised on purpose: rules get reworded and deleted, and an approval
+  /// record that can silently change meaning afterwards is not an audit trail.
+  blockedReason String
+
+  /// Which recipient asked. Null if the row outlives the recipient.
+  requestedByRecipientId Int?
+
+  /// The role group the signer chose to send this to, e.g. roleType
+  /// "Department" / roleKey "Finance". Labels only — the signer is an external
+  /// party and never sees who holds the role.
+  approverRoleType String?
+  approverRoleKey  String?
+
+  /// The person that role group resolved to when the request was raised.
+  ///
+  /// Resolved once and stored rather than looked up at decision time: a mapping
+  /// that changes later must not silently move a live request to somebody who was
+  /// never told about it.
+  assignedApproverId Int?
+
+  /// The approval chain handling this, when the org has a template for it.
+  /// Null means it is waiting on the document owner directly.
+  approvalRequestId String?
+
+  decidedById Int?
+  decidedAt   DateTime?
+  /// The approver's note when declining, so the signer is told why.
+  decisionNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  document         Document   @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  recipient        Recipient? @relation(fields: [requestedByRecipientId], references: [id], onDelete: SetNull)
+  decidedBy        User?      @relation("UserDecidedRuleOverrides", fields: [decidedById], references: [id], onDelete: SetNull)
+  assignedApprover User?      @relation("UserAssignedRuleOverrides", fields: [assignedApproverId], references: [id], onDelete: SetNull)
+  rules       BusinessRuleOverrideRule[]
+
+  /// The signing gate's lookup: approved waivers for one document.
+  @@index([documentId, status])
+  /// An approver's own queue.
+  @@index([assignedApproverId, status])
+  @@index([organizationId, status])
+  @@index([approvalRequestId])
+}
+
+/// Join row naming one rule waived by an override.
+///
+/// A table rather than a `String[]` of ids so the rule can be joined for display
+/// and so deleting a rule cannot leave a dangling id behind that reads as a
+/// waiver of something unknown. `ruleName` is kept alongside for the same reason
+/// `blockedReason` is.
+model BusinessRuleOverrideRule {
+  id         String @id @default(cuid())
+  overrideId String
+  /// Nullable so deleting a rule can null it rather than cascade-deleting the
+  /// audit row. A waiver of a rule that no longer exists then matches nothing at
+  /// the gate, which is correct — there is nothing left to waive.
+  ruleId     String?
+  /// The rule's name when waived, so a deleted rule still reads correctly.
+  ruleName   String
+
+  override BusinessRuleOverride @relation(fields: [overrideId], references: [id], onDelete: Cascade)
+  rule     BusinessRule?        @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+
+  @@unique([overrideId, ruleId])
+  @@index([ruleId])
 }
 
 /// Reusable HTML email body for workflow SEND_EMAIL steps.

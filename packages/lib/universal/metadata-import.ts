@@ -18,7 +18,9 @@ export const METADATA_IMPORT_COLUMNS = [
   'OCR template',
   'Signers',
   'SLA internal hours',
+  'SLA signing hours',
   'SLA end-to-end hours',
+  'Terms code',
 ] as const;
 
 /** The fields a parsed row can carry, keyed by our internal names. */
@@ -36,7 +38,9 @@ export type MetadataImportField =
   | 'signerEmail'
   | 'signerRole'
   | 'slaInternalHours'
-  | 'slaEndToEndHours';
+  | 'slaEndToEndHours'
+  | 'slaSigningHours'
+  | 'termsCode';
 
 /**
  * Header text (lowercased, trimmed) → internal field. Generous on purpose:
@@ -113,6 +117,14 @@ export const METADATA_IMPORT_HEADER_ALIASES: Record<string, MetadataImportField>
   'signee role': 'signerRole',
 
   // Turnaround targets in BUSINESS hours; blank means "use the org default".
+  'terms code': 'termsCode',
+  termscode: 'termsCode',
+  terms: 'termsCode',
+  'payment terms': 'termsCode',
+  'payment term': 'termsCode',
+  'credit terms': 'termsCode',
+  net: 'termsCode',
+
   'sla internal hours': 'slaInternalHours',
   slainternalhours: 'slaInternalHours',
   'internal sla': 'slaInternalHours',
@@ -122,6 +134,11 @@ export const METADATA_IMPORT_HEADER_ALIASES: Record<string, MetadataImportField>
   'sla end to end hours': 'slaEndToEndHours',
   slaendtoendhours: 'slaEndToEndHours',
   'end to end sla': 'slaEndToEndHours',
+
+  'sla signing hours': 'slaSigningHours',
+  slasigninghours: 'slaSigningHours',
+  'signing sla': 'slaSigningHours',
+  'sla signing': 'slaSigningHours',
 };
 
 /**
@@ -154,7 +171,9 @@ const TEMPLATE_EXAMPLE_ROWS: string[][] = [
     '',
     'alex.kim@example.com|SIGNER|Alex Kim;dana.reid@example.com|APPROVER|Dana Reid;ap@skiddview.com|CC|Finance',
     '8',
+    '48',
     '72',
+    '30d',
   ],
   // Just an address: role defaults to SIGNER and the name is optional.
   [
@@ -168,11 +187,13 @@ const TEMPLATE_EXAMPLE_ROWS: string[][] = [
     'Flow Bill v2.0',
     'dana.reid@example.com',
     '24',
+    '',
     '120',
+    'net45',
   ],
   // A vendor with no signer set is still valid — it just gets the confirmation
   // email and stops there.
-  ['vendor', 'Acme Freight', 'Billing Dept', 'billing@acmefreight.com', '', '', 'acme', '', '', '', ''],
+  ['vendor', 'Acme Freight', 'Billing Dept', 'billing@acmefreight.com', '', '', 'acme', '', '', '', '', '', '0d'],
 ];
 
 /** RFC 4180 quoting — only quote when the value would otherwise break the row. */
@@ -191,8 +212,58 @@ export const toCsv = (rows: readonly (readonly string[])[]): string =>
  */
 const UTF8_BOM = '﻿';
 
-export const buildMetadataTemplateCsv = (): string =>
-  UTF8_BOM + toCsv([METADATA_IMPORT_COLUMNS, ...TEMPLATE_EXAMPLE_ROWS]);
+/**
+ * The template file's contents, with the org's own fields appended.
+ *
+ * Custom columns go after the built-in ones and carry the field's label as the
+ * header, because that is the name the person filling the sheet in sees on the
+ * form. The example rows are padded to match so every row has the same number of
+ * cells — a short row is legal CSV but reads as corrupt in Excel.
+ *
+ * A SELECT field lists its options in the first example row rather than leaving
+ * the cell blank: the allowed values are otherwise invisible until an import
+ * rejects them.
+ */
+export const buildMetadataTemplateCsv = (
+  customFields: readonly { label: string; type?: string; options?: string[] }[] = [],
+): string => {
+  const headers = [...METADATA_IMPORT_COLUMNS, ...customFields.map((field) => field.label)];
+
+  const rows = TEMPLATE_EXAMPLE_ROWS.map((row, rowIndex) => [
+    ...row,
+    ...customFields.map((field) =>
+      rowIndex === 0 && field.type === 'SELECT' && field.options?.length
+        ? field.options.join(' / ')
+        : '',
+    ),
+  ]);
+
+  return UTF8_BOM + toCsv([headers, ...rows]);
+};
+
+/**
+ * Which column of a parsed row holds a custom field's value.
+ *
+ * `transformHeader` lowercases anything it does not recognise, so a column
+ * titled "GL Account" arrives as `gl account`. Both the label and the storage key
+ * are accepted: an export or a sheet written against the API would use the key.
+ */
+export const readCustomFieldCell = (
+  row: Record<string, string>,
+  field: { key: string; label: string },
+): string | undefined => {
+  const candidates = [field.label.trim().toLowerCase(), field.key.toLowerCase(), field.key];
+
+  for (const candidate of candidates) {
+    const value = row[candidate];
+
+    if (typeof value === 'string' && value.trim() !== '') {
+      return value.trim();
+    }
+  }
+
+  return undefined;
+};
 
 /**
  * Split a keywords cell. Accepts semicolons as well as commas: a comma-bearing
