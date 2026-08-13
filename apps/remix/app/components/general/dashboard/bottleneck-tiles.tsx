@@ -42,6 +42,8 @@ export type VendorInvoice = {
   documentTitle: string;
   dueAt: string | Date | null;
   daysPastDue: number;
+  daysHeld: number | null;
+  arrivedOverdue: boolean;
 };
 
 export type VendorRow = {
@@ -458,6 +460,16 @@ export const BottleneckDetailDialog = ({
                   due date is the one printed on the invoice; where it states none, the vendor's
                   terms code is applied to the invoice date. One already signed is history and is
                   not counted here.
+                </Trans>{' '}
+                {/*
+                  Said plainly, because the figure is read as a reproach otherwise.
+                  It measures the invoice against its own due date, and an invoice
+                  can be months past due on the day it lands in the inbox.
+                */}
+                <Trans>
+                  Days past due are counted from that date, not from the day the invoice reached
+                  you — where it arrived already overdue, the row also says how long you have
+                  actually held it.
                 </Trans>
               </DialogDescription>
             </DialogHeader>
@@ -511,8 +523,23 @@ export const BottleneckDetailDialog = ({
                               ? new Date(invoice.dueAt).toISOString().slice(0, 10)
                               : '—'}
                           </span>
-                          <span className="w-[5.5rem] flex-shrink-0 text-right text-[11px] font-medium tabular-nums text-orange-600 dark:text-orange-400">
-                            <Trans>{invoice.daysPastDue}d late</Trans>
+                          {/*
+                            Two numbers, because one of them was being misread as
+                            the other. The invoice is 161 days past due; we have
+                            had it for one afternoon. Only the second is shown
+                            when the two differ, so a normal overdue invoice — one
+                            that went past its date on our watch — stays a single
+                            figure.
+                          */}
+                          <span className="w-[6.5rem] flex-shrink-0 text-right text-[11px] tabular-nums">
+                            <span className="block font-medium text-orange-600 dark:text-orange-400">
+                              <Trans>{invoice.daysPastDue}d past due</Trans>
+                            </span>
+                            {invoice.arrivedOverdue && invoice.daysHeld !== null && (
+                              <span className="block text-muted-foreground">
+                                <Trans>here {dayLabel(invoice.daysHeld)}</Trans>
+                              </span>
+                            )}
                           </span>
                         </Link>
                       </li>

@@ -2380,11 +2380,14 @@ export const orgRouter = router({
     const openInvoices = dueDates.filter((due) => due.open);
 
     const ageBuckets = [
+      // "Past due", not "late": the bucket is the invoice's age against its own
+      // due date, and a back-dated invoice lands in the 90+ bucket on the day it
+      // arrives. "Late" reads as a verdict on the queue, which it is not.
       { key: 'current', label: 'Not yet due', min: -Infinity, max: 1, count: 0 },
-      { key: '1-30', label: '1-30 days late', min: 1, max: 31, count: 0 },
-      { key: '31-60', label: '31-60 days late', min: 31, max: 61, count: 0 },
-      { key: '61-90', label: '61-90 days late', min: 61, max: 91, count: 0 },
-      { key: '90+', label: '90+ days late', min: 91, max: Infinity, count: 0 },
+      { key: '1-30', label: '1-30 days past due', min: 1, max: 31, count: 0 },
+      { key: '31-60', label: '31-60 days past due', min: 31, max: 61, count: 0 },
+      { key: '61-90', label: '61-90 days past due', min: 61, max: 91, count: 0 },
+      { key: '90+', label: '90+ days past due', min: 91, max: Infinity, count: 0 },
       { key: 'unknown', label: 'No due date', min: NaN, max: NaN, count: 0 },
     ];
 

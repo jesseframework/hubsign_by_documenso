@@ -58,6 +58,18 @@ export type ItemDueDate = {
   basis: DueDateBasis;
   /** Whole days past due; negative while still in credit. Null when unknown. */
   daysPastDue: number | null;
+  /**
+   * Whole days since the invoice reached the inbox.
+   *
+   * Separate from `daysPastDue` because they answer different questions and get
+   * confused constantly. An invoice dated March that arrives in August is 161
+   * days past due on the hour it lands — a true statement about the invoice, and
+   * a false accusation against whoever runs the queue, who has had it for none of
+   * those days. Anything reporting lateness has to be able to say which it means.
+   */
+  daysHeld: number | null;
+  /** The due date had already passed before the invoice ever arrived. */
+  arrivedOverdue: boolean;
   /** The terms code that produced the date, when one did. */
   termsCode: string | null;
   /** Still awaiting signature — a settled invoice is history, not a problem. */
@@ -69,6 +81,19 @@ type DueEvaluableItem = Pick<
   'id' | 'documentId' | 'createdAt' | 'receivedAt' | 'senderEmail' | 'subject' | 'extractedData'
 > & {
   document: { status: string; completedAt: Date | null; title: string };
+};
+
+const DAY_MS = 86_400_000;
+
+/** Whole days from `from` to `to`, counted between UTC midnights — same basis as `daysPastDue`. */
+const wholeDaysBetween = (from: Date, to: Date): number => {
+  const day = (value: Date) => {
+    const date = new Date(value);
+    date.setUTCHours(0, 0, 0, 0);
+    return date.getTime();
+  };
+
+  return Math.floor((day(to) - day(from)) / DAY_MS);
 };
 
 /**
@@ -101,17 +126,21 @@ export const evaluateItemsDueDates = async ({
     const fields = invoiceFields(item);
     const targets = resolve(item);
 
+    // Arrival, not the row's insert instant, for the same reason the SLA clock
+    // uses it: a poller that was down for a week inserted a month of invoices
+    // in ten seconds, and dating terms from that evening would give every one
+    // of them a fortnight of credit it never had.
+    const arrivedAt = slaClockStart(item);
+
     const resolved = resolveDueDate({
       ocrDueDate: fields.dueDate || null,
       invoiceDate: fields.invoiceDate || null,
-      // Arrival, not the row's insert instant, for the same reason the SLA clock
-      // uses it: a poller that was down for a week inserted a month of invoices
-      // in ten seconds, and dating terms from that evening would give every one
-      // of them a fortnight of credit it never had.
-      arrivedAt: slaClockStart(item),
+      arrivedAt,
       termsCode: targets.termsCode ?? null,
       now,
     });
+
+    const daysHeld = arrivedAt ? wholeDaysBetween(arrivedAt, now) : null;
 
     return {
       inboxItemId: item.id,
@@ -126,6 +155,11 @@ export const evaluateItemsDueDates = async ({
       dueAt: resolved.dueAt,
       basis: resolved.basis,
       daysPastDue: resolved.daysPastDue,
+      daysHeld,
+      // Compared whole-day to whole-day. An invoice due the same day it arrived
+      // was not overdue on arrival, whatever the clock times were.
+      arrivedOverdue:
+        resolved.dueAt !== null && arrivedAt !== null && wholeDaysBetween(resolved.dueAt, arrivedAt) > 0,
       termsCode: targets.termsCode ?? null,
       open: item.document.status !== 'COMPLETED' && item.document.completedAt === null,
     };

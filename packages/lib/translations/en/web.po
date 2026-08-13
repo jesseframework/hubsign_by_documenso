@@ -466,11 +466,14 @@ msgid "{0}'s signing link stops working immediately."
 msgstr "{0}'s signing link stops working immediately."
 
 #. placeholder {0}: item.daysPastDue
-#. placeholder {0}: invoice.daysPastDue
 #: apps/remix/app/routes/_authenticated+/org+/reports.tsx
-#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "{0}d late"
 msgstr "{0}d late"
+
+#. placeholder {0}: invoice.daysPastDue
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "{0}d past due"
+msgstr "{0}d past due"
 
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 msgid "{charactersRemaining, plural, one {1 character remaining} other {{charactersRemaining} characters remaining}}"
@@ -3655,6 +3658,10 @@ msgstr "Day ends"
 msgid "Day starts"
 msgstr "Day starts"
 
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "Days past due are counted from that date, not from the day the invoice reached you — where it arrived already overdue, the row also says how long you have actually held it."
+msgstr "Days past due are counted from that date, not from the day the invoice reached you — where it arrived already overdue, the row also says how long you have actually held it."
+
 #: apps/remix/app/routes/_authenticated+/org+/approvals.$id.tsx
 msgid "Decision recorded"
 msgstr "Decision recorded"
@@ -5619,6 +5626,11 @@ msgstr "health"
 #: apps/remix/app/components/embed/embed-document-signing-page.tsx
 msgid "Help complete the document for other signers."
 msgstr "Help complete the document for other signers."
+
+#. placeholder {0}: dayLabel(invoice.daysHeld)
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "here {0}"
+msgstr "here {0}"
 
 #: apps/remix/app/routes/_authenticated+/settings+/profile.tsx
 msgid "Here you can edit your personal details."

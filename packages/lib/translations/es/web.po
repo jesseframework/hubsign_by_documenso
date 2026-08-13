@@ -471,10 +471,13 @@ msgid "{0}'s signing link stops working immediately."
 msgstr ""
 
 #. placeholder {0}: item.daysPastDue
-#. placeholder {0}: invoice.daysPastDue
 #: apps/remix/app/routes/_authenticated+/org+/reports.tsx
-#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "{0}d late"
+msgstr ""
+
+#. placeholder {0}: invoice.daysPastDue
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "{0}d past due"
 msgstr ""
 
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
@@ -3660,6 +3663,10 @@ msgstr ""
 msgid "Day starts"
 msgstr ""
 
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "Days past due are counted from that date, not from the day the invoice reached you — where it arrived already overdue, the row also says how long you have actually held it."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/approvals.$id.tsx
 msgid "Decision recorded"
 msgstr ""
@@ -5624,6 +5631,11 @@ msgstr ""
 #: apps/remix/app/components/embed/embed-document-signing-page.tsx
 msgid "Help complete the document for other signers."
 msgstr "Ayuda a completar el documento para otros firmantes."
+
+#. placeholder {0}: dayLabel(invoice.daysHeld)
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "here {0}"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/settings+/profile.tsx
 msgid "Here you can edit your personal details."

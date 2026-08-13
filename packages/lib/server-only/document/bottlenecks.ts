@@ -92,6 +92,13 @@ export type SigningBottlenecks = {
         documentTitle: string;
         dueAt: Date | null;
         daysPastDue: number;
+        /**
+         * How long the invoice has been in the queue, and whether it was already
+         * past its due date when it got here. Without these a back-dated invoice
+         * reads as months of neglect on the day it arrives.
+         */
+        daysHeld: number | null;
+        arrivedOverdue: boolean;
       }[];
       moreOverdue: number;
     }[];
@@ -314,6 +321,8 @@ const vendorOverdue = async (organizationId: number): Promise<SigningBottlenecks
         documentTitle: due.documentTitle,
         dueAt: due.dueAt,
         daysPastDue: due.daysPastDue,
+        daysHeld: due.daysHeld,
+        arrivedOverdue: due.arrivedOverdue,
       });
     }
 
