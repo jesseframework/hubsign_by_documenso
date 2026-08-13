@@ -29,6 +29,7 @@ import {
   HeartIcon,
   InboxIcon,
   KeyRoundIcon,
+  ReceiptIcon,
   LayoutDashboardIcon,
   ListChecksIcon,
   LockIcon,
@@ -258,6 +259,14 @@ export const SURFACES: SurfaceDef[] = [
         requiresOrg: true,
       },
       { to: '/org/sla', icon: GaugeIcon, label: <Trans>SLA</Trans>, requiresOrg: true },
+      // Beside SLA rather than under Repository: both are readings of the same
+      // invoice flow — how fast it moved, and what it came to.
+      {
+        to: '/org/spend',
+        icon: ReceiptIcon,
+        label: <Trans>Spend</Trans>,
+        requiresOrg: true,
+      },
       { to: '/dms/activity', icon: ActivityIcon, label: <Trans>Activity</Trans>, requiresDms: true },
     ],
   },

@@ -26,6 +26,11 @@ msgstr " Abilita la firma tramite link diretto"
 msgid " The events that will trigger a webhook to be sent to your URL."
 msgstr " Gli eventi che attiveranno un webhook da inviare al tuo URL."
 
+#. placeholder {0}: row.moreItems
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "…and {0} more invoice(s) in this group."
+msgstr ""
+
 #. placeholder {0}: importErrors.length - 10
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "…and {0} more."
@@ -86,9 +91,17 @@ msgstr ""
 msgid "({0} open)"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "(arrival)"
+msgstr ""
+
 #. placeholder {0}: vendor.avgSampleSize
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "(n={0})"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "(no number)"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
@@ -242,6 +255,39 @@ msgstr ""
 msgid "{0} invited you to {recipientActionVerb} a document"
 msgstr "{0} ti ha invitato a {recipientActionVerb} un documento"
 
+#. placeholder {0}: row.invoices
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "{0} invoice(s)"
+msgstr ""
+
+#. placeholder {0}: data?.unidentifiedVendors
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "{0} invoice(s) are from a vendor with no directory record, so they carry no custom field values."
+msgstr ""
+
+#. placeholder {0}: data.invoices - data.datedByInvoice
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "{0} invoice(s) had no readable invoice date and are dated by when the email arrived."
+msgstr ""
+
+#. placeholder {0}: data?.withoutAmount
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "{0} invoice(s) had no readable total and are counted in none of these figures."
+msgstr ""
+
+#. placeholder {0}: entry.invoices
+#. placeholder {1}: entry.label
+#. placeholder {2}: money(entry.code, entry.total)
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "{0} invoice(s) in {1} ({2}) — switch currency to see them. Amounts in different currencies are never added together."
+msgstr ""
+
+#. placeholder {0}: data?.doubtfulAmounts
+#. placeholder {1}: money(data?.currency ?? null, data?.doubtfulTotal ?? 0)
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "{0} invoice(s) totalling {1} are more than 25× the median invoice. They ARE counted above, but a figure that far out is usually OCR reading the wrong number off the page — open the flagged rows and check."
+msgstr ""
+
 #. placeholder {0}: data.truncated.inRange
 #. placeholder {1}: data.truncated.evaluated
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
@@ -331,6 +377,12 @@ msgstr ""
 msgid "{0} overdue and still unsent"
 msgstr ""
 
+#. placeholder {0}: money(data?.currency ?? null, row.overdueTotal)
+#. placeholder {1}: row.overdueInvoices
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "{0} past due on {1}"
+msgstr ""
+
 #. placeholder {0}: recipients.length
 #: apps/remix/app/routes/_authenticated+/documents.f.$folderId.$id._index.tsx
 #: apps/remix/app/routes/_authenticated+/documents.$id._index.tsx
@@ -353,10 +405,21 @@ msgstr ""
 msgid "{0} row(s) were skipped"
 msgstr ""
 
+#. placeholder {0}: data?.otherRows
+#. placeholder {1}: money(data?.currency ?? null, data?.otherRowsTotal ?? 0)
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "{0} smaller group(s) totalling {1} are not listed."
+msgstr ""
+
 #. placeholder {0}: String(detail ?? 'a field').replace(/_/g, ' ')
 #. placeholder {1}: note ? `: ${note}` : ''
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "{0} taken from the attached “{who}”{1}"
+msgstr ""
+
+#. placeholder {0}: row.vendors
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "{0} vendor(s)"
 msgstr ""
 
 #. placeholder {0}: signer.email
@@ -364,7 +427,9 @@ msgstr ""
 msgid "{0}'s signing link stops working immediately."
 msgstr ""
 
+#. placeholder {0}: item.daysPastDue
 #. placeholder {0}: invoice.daysPastDue
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "{0}d late"
 msgstr ""
@@ -2177,6 +2242,10 @@ msgstr "Avatar"
 msgid "Avatar Updated"
 msgstr "Avatar aggiornato"
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "avg"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "Avg time to send"
 msgstr ""
@@ -3419,6 +3488,10 @@ msgstr ""
 msgid "CSV Structure"
 msgstr "Struttura CSV"
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "Currency"
+msgstr ""
+
 #: apps/remix/app/components/forms/password.tsx
 msgid "Current Password"
 msgstr "Password attuale"
@@ -3488,6 +3561,10 @@ msgstr "Data di creazione"
 #: packages/ui/primitives/document-flow/add-settings.tsx
 msgid "Date Format"
 msgstr "Formato data"
+
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "Dated by when the email arrived — the invoice stated no date."
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "Dates"
@@ -5389,8 +5466,16 @@ msgstr "Verde"
 msgid "Grid"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "Group by"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "Grouped by when the invoice arrived, so each bar answers \"how well did we handle what came in then\". A bar counts clocks, not invoices — an invoice with both an internal and an end-to-end target contributes two."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "Groups"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
@@ -5781,6 +5866,7 @@ msgstr ""
 msgid "Invoice turnaround against target, measured in business hours from the moment the invoice reaches the inbox."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "Invoices"
 msgstr ""
@@ -5874,6 +5960,10 @@ msgstr "Etichetta"
 #: packages/ui/primitives/document-flow/add-settings.tsx
 msgid "Language"
 msgstr "Lingua"
+
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "Largest first · click a row for its invoices"
+msgstr ""
 
 #: apps/remix/app/components/tables/documents-filter-card.tsx
 #: apps/remix/app/components/general/period-selector.tsx
@@ -6019,6 +6109,7 @@ msgstr ""
 msgid "Loading..."
 msgstr "Caricamento in corso..."
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "Loading…"
@@ -6298,6 +6389,10 @@ msgstr "Utenti attivi mensili: Utenti che hanno creato almeno un documento"
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Monthly Active Users: Users that had at least one of their documents completed"
 msgstr "Utenti attivi mensili: Utenti con almeno uno dei loro documenti completati"
+
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "More than 25× the median invoice — check that OCR read the right figure."
+msgstr ""
 
 #. placeholder {0}: worst.label
 #. placeholder {1}: chase.none
@@ -6625,6 +6720,10 @@ msgstr ""
 msgid "No further action is required from you at this time."
 msgstr "Non sono richieste ulteriori azioni da parte tua in questo momento."
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "No invoice in this window had a total OCR could read. Widen the window, or check the extraction template on the vendors you expect to see."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "No invoices in this window."
 msgstr ""
@@ -6871,6 +6970,10 @@ msgstr "Niente da fare"
 msgid "Nothing to import"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "Nothing to measure yet"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
 msgid "Nothing waiting on you right now."
 msgstr ""
@@ -6948,6 +7051,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "OCR template"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "of total"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
@@ -9433,6 +9540,16 @@ msgstr ""
 msgid "Source"
 msgstr "Fonte"
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/components/general/nav-config.tsx
+msgid "Spend"
+msgstr ""
+
+#. placeholder {0}: data?.groupLabel.toLowerCase()
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "Spend by {0}"
+msgstr ""
+
 #: apps/remix/app/components/forms/stamp-upload-dialog.tsx
 msgid "Stamp added"
 msgstr ""
@@ -10748,6 +10865,10 @@ msgstr ""
 msgid "Tools"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "Total"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Total Documents"
 msgstr "Totale documenti"
@@ -11332,6 +11453,10 @@ msgstr ""
 msgid "Vendor / Contact"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "Vendors"
+msgstr ""
+
 #: apps/remix/app/components/general/verify-email-banner.tsx
 msgid "Verification Email Sent"
 msgstr "Email di Verifica Inviata"
@@ -11865,8 +11990,20 @@ msgstr ""
 msgid "What is actually holding them up"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "What the invoices in your inbox come to, grouped by supplier or by any field you defined on your vendor records. Measured from the totals OCR read off each invoice."
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 msgid "What this chain approves"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#~ msgid "What this total leaves out"
+#~ msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+msgid "What to know about this total"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx

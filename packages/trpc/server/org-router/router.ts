@@ -41,6 +41,7 @@ import {
 } from '@documenso/lib/server-only/license/redeem-license-key';
 import { stripe } from '@documenso/lib/server-only/stripe';
 import { getSigningBottlenecks } from '@documenso/lib/server-only/document/bottlenecks';
+import { getVendorSpend } from '@documenso/lib/server-only/document/vendor-spend';
 import { getOrganizationDueDates } from '@documenso/lib/server-only/inbox/invoice-due';
 import { prisma } from '@documenso/prisma';
 
@@ -2000,6 +2001,54 @@ export const orgRouter = router({
    * user's documents as its own. Approvals, inbox items and workflows are
    * natively org-scoped and filter directly.
    */
+  /**
+   * Spend by vendor, or by any field the organization defined on its vendors.
+   *
+   * A separate query from `getDashboardStats` rather than another slice of it:
+   * this one scans OCR totals across a window and resolves each invoice's vendor
+   * against the directory, which is work the overview does not need and should
+   * not pay for on every load.
+   */
+  getVendorSpend: authenticatedProcedure
+    .input(
+      z
+        .object({
+          days: z.number().int().min(1).max(731).default(90),
+          /** A custom field key, or `vendor`. Unknown keys fall back to vendor. */
+          groupBy: z.string().max(80).optional(),
+          /** Report currency. Defaults to the one with the most invoices. */
+          currency: z.string().max(8).optional(),
+        })
+        .optional(),
+    )
+    .query(async ({ ctx, input }) => {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id },
+        orderBy: { joinedAt: 'asc' },
+      });
+
+      if (!membership) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'You are not a member of an organization.',
+        });
+      }
+
+      const days = input?.days ?? 90;
+      const to = DateTime.utc().endOf('day');
+      // Inclusive of today, matching the dashboard toolbar's presets: "last 90
+      // days" spans 90 days, not 91.
+      const from = to.startOf('day').minus({ days: days - 1 });
+
+      return getVendorSpend({
+        organizationId: membership.organizationId,
+        from: from.toJSDate(),
+        to: to.toJSDate(),
+        groupBy: input?.groupBy,
+        currency: input?.currency,
+      });
+    }),
+
   getDashboardStats: authenticatedProcedure
     .input(
       z
