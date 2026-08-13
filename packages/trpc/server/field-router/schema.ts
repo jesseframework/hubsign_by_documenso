@@ -1,6 +1,11 @@
 import { FieldType } from '@prisma/client';
 import { z } from 'zod';
 
+import {
+  MAX_SIGNATURE_FILL,
+  MIN_SIGNATURE_FILL,
+} from '@documenso/lib/constants/signature-size';
+
 import { ZRecipientActionAuthSchema } from '@documenso/lib/types/document-auth';
 import {
   ZFieldHeightSchema,
@@ -160,9 +165,20 @@ export const ZSignFieldWithTokenMutationSchema = z.object({
   signaturePositionY: z.number().optional(),
   fieldSignedPositionX: z.number().optional(),
   fieldSignedPositionY: z.number().optional(),
+  /** Fraction of the field to draw the signature at. See `signature-size`. */
+  signatureFill: z.number().min(MIN_SIGNATURE_FILL).max(MAX_SIGNATURE_FILL).optional(),
 });
 
 export type TSignFieldWithTokenMutationSchema = z.infer<typeof ZSignFieldWithTokenMutationSchema>;
+
+/** Resizing an already-signed field, which `signFieldWithToken` refuses. */
+export const ZSetSignatureFillMutationSchema = z.object({
+  token: z.string(),
+  fieldId: z.number(),
+  fill: z.number().min(MIN_SIGNATURE_FILL).max(MAX_SIGNATURE_FILL),
+});
+
+export type TSetSignatureFillMutationSchema = z.infer<typeof ZSetSignatureFillMutationSchema>;
 
 export const ZRemovedSignedFieldWithTokenMutationSchema = z.object({
   token: z.string(),

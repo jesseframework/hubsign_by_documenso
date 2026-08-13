@@ -3268,6 +3268,10 @@ msgstr ""
 msgid "Correct or add a field"
 msgstr ""
 
+#: apps/remix/app/components/general/document-signing/document-signing-signature-field.tsx
+msgid "Could not change the size"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
 msgid "Could not delete the layout"
 msgstr ""
@@ -4550,6 +4554,11 @@ msgstr ""
 #: packages/lib/constants/document.ts
 msgid "Draw"
 msgstr "Zeichnen"
+
+#. placeholder {0}: Math.round(preset.fill * 100)
+#: apps/remix/app/components/general/document-signing/document-signing-signature-field.tsx
+msgid "Draw the signature at {0}% of the field"
+msgstr ""
 
 #: apps/remix/app/components/forms/stamp-upload-dialog.tsx
 msgid "Drop a PNG, JPEG, or SVG file in the upload box above."
@@ -9450,6 +9459,10 @@ msgstr "Website Banner"
 #: apps/remix/app/components/general/nav-config.tsx
 msgid "Site Settings"
 msgstr "Website Einstellungen"
+
+#: apps/remix/app/components/general/document-signing/document-signing-signature-field.tsx
+msgid "Size"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 #: apps/remix/app/components/general/nav-config.tsx

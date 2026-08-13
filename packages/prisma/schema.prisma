@@ -781,6 +781,10 @@ model Signature {
   typedSignature         String?
   signaturePositionX     Decimal?
   signaturePositionY     Decimal?
+  /// Fraction of the field the signature is drawn at, chosen by the signer.
+  /// Null for signatures made before the size control existed — those keep the
+  /// original "fit the field, never enlarge" behaviour.
+  signatureFill          Decimal?
 
   recipient Recipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
   field     Field     @relation(fields: [fieldId], references: [id], onDelete: Cascade)
