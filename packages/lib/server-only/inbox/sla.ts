@@ -1,13 +1,22 @@
 /**
  * SLA evaluation for Signature Inbox items.
  *
- * Two clocks run from the moment the email arrives:
+ * Three clocks, covering two consecutive stages and the whole span:
  *
  *   INTERNAL    received → sent for signature   (what this organization controls)
- *   END-TO-END  received → fully signed         (also depends on the signer)
+ *   SIGNING     sent for signature → fully signed  (what the signer controls)
+ *   END-TO-END  received → fully signed         (the sum of the two)
  *
  * Keeping them apart is the point: a single blended number tells you an invoice
  * was late but not whether your team sat on it or the signer did.
+ *
+ * The signing clock exists because the internal one STOPS at the send. Before it,
+ * an invoice sent within the hour and then left unsigned for three weeks was
+ * measured as a success by the internal clock and by nothing else — the only
+ * figure covering it was end-to-end, which blames the queue for the signer's
+ * delay and gives nobody a target to chase against. It starts at the first
+ * DOCUMENT_SENT and is simply absent until then; an invoice nobody has sent is
+ * not late to be signed.
  *
  * Targets resolve per vendor, falling back to the organization default — the
  * same precedence idea as OCR template routing, since "this vendor's invoices
@@ -38,6 +47,7 @@ export type OrgSlaConfig = Pick<
   | 'slaHolidays'
   | 'slaDefaultInternalHours'
   | 'slaDefaultEndToEndHours'
+  | 'slaDefaultSigningHours'
 >;
 
 export const SLA_ORG_SELECT = {
@@ -49,6 +59,7 @@ export const SLA_ORG_SELECT = {
   slaHolidays: true,
   slaDefaultInternalHours: true,
   slaDefaultEndToEndHours: true,
+  slaDefaultSigningHours: true,
 } as const;
 
 export const calendarFromOrg = (org: OrgSlaConfig): SlaCalendar =>
@@ -63,6 +74,7 @@ export const calendarFromOrg = (org: OrgSlaConfig): SlaCalendar =>
 export type SlaTargets = {
   internalHours: number | null;
   endToEndHours: number | null;
+  signingHours: number | null;
   /** Where the target came from, for display and for debugging a surprise. */
   source: 'vendor' | 'keyword' | 'org-default' | 'none';
   vendorLabel?: string;
@@ -85,9 +97,14 @@ const positiveInt = (value: unknown): number | null => {
 
 const readTargets = (
   data: unknown,
-): { internal: number | null; endToEnd: number | null; termsCode: string | null } => {
+): {
+  internal: number | null;
+  endToEnd: number | null;
+  signing: number | null;
+  termsCode: string | null;
+} => {
   if (!data || typeof data !== 'object' || Array.isArray(data)) {
-    return { internal: null, endToEnd: null, termsCode: null };
+    return { internal: null, endToEnd: null, signing: null, termsCode: null };
   }
 
   const bag = data as Record<string, unknown>;
@@ -95,6 +112,7 @@ const readTargets = (
   return {
     internal: positiveInt(bag.slaInternalHours),
     endToEnd: positiveInt(bag.slaEndToEndHours),
+    signing: positiveInt(bag.slaSigningHours),
     // Stored as typed, parsed at the point of use — so a code that will not parse
     // stays visible in the directory instead of being silently dropped on save.
     termsCode: typeof bag.termsCode === 'string' && bag.termsCode.trim() !== '' ? bag.termsCode : null,
@@ -115,6 +133,7 @@ type ResolverRecord = {
   keywords: string[];
   internal: number | null;
   endToEnd: number | null;
+  signing: number | null;
   termsCode: string | null;
 };
 
@@ -139,13 +158,16 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
       keywords: keywordsOf(record.data),
       internal: targets.internal,
       endToEnd: targets.endToEnd,
+      signing: targets.signing,
       termsCode: targets.termsCode,
     };
   });
 
   // Only records that actually carry a target can win; the rest of the
   // directory is noise for this purpose.
-  const withTargets = candidates.filter((c) => c.internal !== null || c.endToEnd !== null);
+  const withTargets = candidates.filter(
+    (c) => c.internal !== null || c.endToEnd !== null || c.signing !== null,
+  );
   /** Every directory key, including records that set no target of their own. */
   const byKey = new Map(candidates.map((c) => [c.key, c]));
 
@@ -199,7 +221,11 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
   const orgDefaults: SlaTargets = {
     internalHours: org.slaDefaultInternalHours ?? null,
     endToEndHours: org.slaDefaultEndToEndHours ?? null,
-    source: org.slaDefaultInternalHours || org.slaDefaultEndToEndHours ? 'org-default' : 'none',
+    signingHours: org.slaDefaultSigningHours ?? null,
+    source:
+      org.slaDefaultInternalHours || org.slaDefaultEndToEndHours || org.slaDefaultSigningHours
+        ? 'org-default'
+        : 'none',
   };
 
   return (item: Pick<SignatureInboxItem, 'senderEmail' | 'extractedData' | 'subject'>): SlaTargets => {
@@ -217,10 +243,14 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
     const identified = identity.record;
 
     // 1. That vendor's own target.
-    if (identified && (identified.internal !== null || identified.endToEnd !== null)) {
+    if (
+      identified &&
+      (identified.internal !== null || identified.endToEnd !== null || identified.signing !== null)
+    ) {
       return {
         internalHours: identified.internal ?? orgDefaults.internalHours,
         endToEndHours: identified.endToEnd ?? orgDefaults.endToEndHours,
+        signingHours: identified.signing ?? orgDefaults.signingHours,
         source: 'vendor',
         vendorLabel: identified.label ?? undefined,
         termsCode: identified.termsCode,
@@ -235,6 +265,7 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
         return {
           internalHours: hit.internal ?? orgDefaults.internalHours,
           endToEndHours: hit.endToEnd ?? orgDefaults.endToEndHours,
+          signingHours: hit.signing ?? orgDefaults.signingHours,
           source: 'vendor',
           vendorLabel: hit.label ?? undefined,
           termsCode: hit.termsCode ?? identified?.termsCode ?? null,
@@ -271,6 +302,7 @@ export const buildSlaResolver = async (organizationId: number, org: OrgSlaConfig
         return {
           internalHours: keywordHit.internal ?? orgDefaults.internalHours,
           endToEndHours: keywordHit.endToEnd ?? orgDefaults.endToEndHours,
+          signingHours: keywordHit.signing ?? orgDefaults.signingHours,
           source: 'keyword',
           vendorLabel: keywordHit.label ?? undefined,
           termsCode: keywordHit.termsCode,
@@ -294,6 +326,15 @@ export type ItemSlaResult = {
   targets: SlaTargets;
   internal: SlaEvaluation;
   endToEnd: SlaEvaluation;
+  /**
+   * Sent → signed. **Null until the document has been sent**, because there is no
+   * clock yet — and null is the honest way to say so. Folding an unsent invoice
+   * into this leg as `untracked` would have made it indistinguishable from one
+   * whose vendor set no signing target, and the page reports those separately.
+   */
+  signing: SlaEvaluation | null;
+  /** When the document first went out for signature, if it has. */
+  sentAt: Date | null;
   /**
    * Whether the clock started from the mail server's arrival time or from the
    * row's own insert instant. The fallback is only equivalent while polling is
@@ -378,6 +419,7 @@ export const evaluateItemsSla = async ({
       vendorLabel: resolveOcrVendorName(item.extractedData) ?? targets.vendorLabel ?? null,
       targets,
       startedFrom: item.receivedAt ? ('mail-server' as const) : ('ingest' as const),
+      sentAt,
       internal: evaluateSla({
         startedAt,
         completedAt: sentAt,
@@ -392,6 +434,24 @@ export const evaluateItemsSla = async ({
         calendar,
         now,
       }),
+      // From the send, not from arrival: this leg is the signer's, and starting
+      // it at arrival would charge them for however long the invoice sat with us
+      // before anyone asked for a signature.
+      //
+      // A rejected document has no clock either. The signer answered — with a
+      // refusal, which is a different problem — and leaving the clock running
+      // would park a permanently-growing "waiting on signature" breach in the
+      // chase list for something nobody is ever going to sign.
+      signing:
+        sentAt && item.document.status !== 'REJECTED'
+          ? evaluateSla({
+              startedAt: sentAt,
+              completedAt: item.document.completedAt,
+              targetHours: targets.signingHours,
+              calendar,
+              now,
+            })
+          : null,
     };
   });
 };

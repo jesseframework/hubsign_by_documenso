@@ -18,6 +18,7 @@ export const METADATA_IMPORT_COLUMNS = [
   'OCR template',
   'Signers',
   'SLA internal hours',
+  'SLA signing hours',
   'SLA end-to-end hours',
   'Terms code',
 ] as const;
@@ -38,6 +39,7 @@ export type MetadataImportField =
   | 'signerRole'
   | 'slaInternalHours'
   | 'slaEndToEndHours'
+  | 'slaSigningHours'
   | 'termsCode';
 
 /**
@@ -132,6 +134,11 @@ export const METADATA_IMPORT_HEADER_ALIASES: Record<string, MetadataImportField>
   'sla end to end hours': 'slaEndToEndHours',
   slaendtoendhours: 'slaEndToEndHours',
   'end to end sla': 'slaEndToEndHours',
+
+  'sla signing hours': 'slaSigningHours',
+  slasigninghours: 'slaSigningHours',
+  'signing sla': 'slaSigningHours',
+  'sla signing': 'slaSigningHours',
 };
 
 /**
@@ -164,6 +171,7 @@ const TEMPLATE_EXAMPLE_ROWS: string[][] = [
     '',
     'alex.kim@example.com|SIGNER|Alex Kim;dana.reid@example.com|APPROVER|Dana Reid;ap@skiddview.com|CC|Finance',
     '8',
+    '48',
     '72',
     '30d',
   ],
@@ -179,12 +187,13 @@ const TEMPLATE_EXAMPLE_ROWS: string[][] = [
     'Flow Bill v2.0',
     'dana.reid@example.com',
     '24',
+    '',
     '120',
     'net45',
   ],
   // A vendor with no signer set is still valid — it just gets the confirmation
   // email and stops there.
-  ['vendor', 'Acme Freight', 'Billing Dept', 'billing@acmefreight.com', '', '', 'acme', '', '', '', '', '0d'],
+  ['vendor', 'Acme Freight', 'Billing Dept', 'billing@acmefreight.com', '', '', 'acme', '', '', '', '', '', '0d'],
 ];
 
 /** RFC 4180 quoting — only quote when the value would otherwise break the row. */

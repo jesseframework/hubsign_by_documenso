@@ -98,7 +98,14 @@ export const inboxRouter = router({
 
       const slaByItem = new Map<
         string,
-        { state: string; open: boolean; overdueByMinutes: number; dueAt: Date | null }
+        {
+          state: string;
+          open: boolean;
+          overdueByMinutes: number;
+          dueAt: Date | null;
+          /** Which clock the row is reporting — they run one after the other. */
+          stage: 'internal' | 'signing';
+        }
       >();
 
       if (org?.slaEnabled) {
@@ -109,17 +116,31 @@ export const inboxRouter = router({
         });
 
         for (const result of evaluated) {
+          /*
+            Whichever clock is running NOW. Before the send that is the internal
+            one; after it, the signing one. Reporting only the internal clock
+            left the queue silent about an invoice that went out in ten minutes
+            and has been sitting unsigned for three weeks — the row went quiet at
+            exactly the moment the wait began.
+
+            A breach whose clock has stopped is history: colouring a fully-signed
+            invoice as urgent would put finished work at the top of someone's
+            to-do pile.
+          */
+          const active = !result.internal.settled
+            ? { leg: result.internal, stage: 'internal' as const }
+            : result.signing && !result.signing.settled
+              ? { leg: result.signing, stage: 'signing' as const }
+              : null;
+
           slaByItem.set(result.inboxItemId, {
-            state: result.internal.state,
-            // The clock is still running. A breach that has already been sent is
-            // history — colouring its row as urgent would put a finished,
-            // fully-signed invoice at the top of someone's to-do pile.
-            open: !result.internal.settled,
-            overdueByMinutes: Math.max(
-              0,
-              result.internal.elapsedMinutes - result.internal.targetMinutes,
-            ),
-            dueAt: result.internal.dueAt,
+            state: (active?.leg ?? result.internal).state,
+            open: active !== null,
+            overdueByMinutes: active
+              ? Math.max(0, active.leg.elapsedMinutes - active.leg.targetMinutes)
+              : 0,
+            dueAt: (active?.leg ?? result.internal).dueAt,
+            stage: active?.stage ?? 'internal',
           });
         }
       }
@@ -762,13 +783,20 @@ export const inboxRouter = router({
         leg.state === 'breached' && !leg.settled;
 
       const leg = (
-        pick: (r: (typeof results)[number]) => { state: string; settled: boolean },
+        // Nullable because the signing clock does not exist until the document is
+        // sent. An item with no clock is not "untracked" — it is not yet in this
+        // leg at all, and counting it either way would misstate the denominator.
+        pick: (r: (typeof results)[number]) => { state: string; settled: boolean } | null,
       ) => {
-        const tracked = results.filter((r) => pick(r).state !== 'untracked');
-        const met = tracked.filter((r) => pick(r).state === 'met').length;
-        const breached = tracked.filter((r) => pick(r).state === 'breached').length;
-        const atRisk = tracked.filter((r) => pick(r).state === 'at-risk').length;
-        const onTrack = tracked.filter((r) => pick(r).state === 'on-track').length;
+        const tracked = results.filter((r) => {
+          const value = pick(r);
+          return value !== null && value.state !== 'untracked';
+        });
+        const state = (r: (typeof results)[number]) => pick(r)?.state;
+        const met = tracked.filter((r) => state(r) === 'met').length;
+        const breached = tracked.filter((r) => state(r) === 'breached').length;
+        const atRisk = tracked.filter((r) => state(r) === 'at-risk').length;
+        const onTrack = tracked.filter((r) => state(r) === 'on-track').length;
         const decided = met + breached;
 
         return {
@@ -776,7 +804,10 @@ export const inboxRouter = router({
           met,
           breached,
           /** Of those breaches, the ones still outstanding right now. */
-          breachedOpen: tracked.filter((r) => isOpenBreach(pick(r))).length,
+          breachedOpen: tracked.filter((r) => {
+            const value = pick(r);
+            return value !== null && isOpenBreach(value);
+          }).length,
           atRisk,
           onTrack,
           // Only decided work can be scored; on-track items aren't yet pass or fail.
@@ -786,6 +817,9 @@ export const inboxRouter = router({
 
       const internal = leg((r) => r.internal);
       const endToEnd = leg((r) => r.endToEnd);
+      const signing = leg((r) => r.signing);
+      /** Sent, unsigned, and not yet judged either way — the population this leg can grow into. */
+      const awaitingSignature = results.filter((r) => r.signing !== null && !r.signing.settled).length;
 
       // ── Organization health ────────────────────────────────────────────
       // Counts a currently-overdue open item as a failure, not as "pending".
@@ -835,7 +869,7 @@ export const inboxRouter = router({
           (at >= buckets[buckets.length - 1].start ? buckets[buckets.length - 1] : undefined);
         if (!bucket) continue;
 
-        for (const state of [r.internal.state, r.endToEnd.state]) {
+        for (const state of [r.internal.state, r.endToEnd.state, r.signing?.state]) {
           if (state === 'met') bucket.met += 1;
           if (state === 'breached') bucket.breached += 1;
         }
@@ -890,22 +924,28 @@ export const inboxRouter = router({
       // had already been sent and even ones already fully signed, and then
       // labelled the total "will miss without action" — advertising finished
       // work as a to-do list.
-      const openBreached = results.filter(
-        (r) => isOpenBreach(r.internal) || isOpenBreach(r.endToEnd),
-      ).length;
+      // The signing leg belongs in every count here. An invoice sitting unsigned
+      // past its target is precisely "will miss without action" — the action is
+      // chasing the signer rather than processing the invoice, but it is still
+      // work somebody has to do today.
+      const anyOpenBreach = (r: (typeof results)[number]) =>
+        isOpenBreach(r.internal) || isOpenBreach(r.endToEnd) || (r.signing ? isOpenBreach(r.signing) : false);
+
+      const openBreached = results.filter(anyOpenBreach).length;
       const openAtRisk = results.filter(
         (r) =>
-          (r.internal.state === 'at-risk' || r.endToEnd.state === 'at-risk') &&
-          !isOpenBreach(r.internal) &&
-          !isOpenBreach(r.endToEnd),
+          (r.internal.state === 'at-risk' ||
+            r.endToEnd.state === 'at-risk' ||
+            r.signing?.state === 'at-risk') &&
+          !anyOpenBreach(r),
       ).length;
       /** Missed target, but the work is done — history, not something to chase. */
       const finishedLate = results.filter(
         (r) =>
-          !isOpenBreach(r.internal) &&
-          !isOpenBreach(r.endToEnd) &&
+          !anyOpenBreach(r) &&
           ((r.internal.state === 'breached' && r.internal.settled) ||
-            (r.endToEnd.state === 'breached' && r.endToEnd.settled)),
+            (r.endToEnd.state === 'breached' && r.endToEnd.settled) ||
+            (r.signing?.state === 'breached' && r.signing.settled)),
       ).length;
 
       // ── Per-vendor ─────────────────────────────────────────────────────
@@ -988,6 +1028,29 @@ export const inboxRouter = router({
         }))
         .sort((a, b) => b.overdueByMinutes - a.overdueByMinutes);
 
+      // The same list for the other half of the journey: sent, past the signing
+      // target, still unsigned. Kept apart from `overdueUnsent` because the two
+      // need different people doing different things, and one merged list of
+      // "late invoices" is how that distinction gets lost.
+      const overdueUnsigned = results
+        .flatMap((r) => {
+          const leg = r.signing;
+
+          if (!leg || !isOpenBreach(leg) || leg.dueAt === null) {
+            return [];
+          }
+
+          return [
+            {
+              inboxItemId: r.inboxItemId,
+              vendor: r.vendorLabel,
+              sentAt: r.sentAt,
+              overdueByMinutes: leg.elapsedMinutes - leg.targetMinutes,
+            },
+          ];
+        })
+        .sort((a, b) => b.overdueByMinutes - a.overdueByMinutes);
+
       return {
         enabled: true as const,
         days,
@@ -999,6 +1062,9 @@ export const inboxRouter = router({
         ingestTimed: results.filter((r) => r.startedFrom === 'ingest').length,
         internal,
         endToEnd,
+        signing,
+        /** Sent and still unsigned, whether or not a signing target is set. */
+        awaitingSignature,
         trend,
         vendors,
         forecast: {
@@ -1016,6 +1082,10 @@ export const inboxRouter = router({
           /** The true number outstanding — never the length of the capped list. */
           count: overdueUnsent.length,
           items: overdueUnsent.slice(0, OVERDUE_LIST_LIMIT),
+        },
+        unsignedOpen: {
+          count: overdueUnsigned.length,
+          items: overdueUnsigned.slice(0, OVERDUE_LIST_LIMIT),
         },
       };
     }),

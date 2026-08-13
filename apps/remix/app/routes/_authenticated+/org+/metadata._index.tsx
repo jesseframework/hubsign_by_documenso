@@ -104,6 +104,7 @@ export default function MetadataPage() {
   // Turnaround targets in business hours; blank = inherit the org default.
   const [slaInternalHours, setSlaInternalHours] = useState('');
   const [slaEndToEndHours, setSlaEndToEndHours] = useState('');
+  const [slaSigningHours, setSlaSigningHours] = useState('');
   /*
     How long this vendor gives us to pay, e.g. `30d`.
 
@@ -286,6 +287,7 @@ export default function MetadataPage() {
               'signerRole',
               'slaInternalHours',
               'slaEndToEndHours',
+              'slaSigningHours',
               'termsCode',
             ].some((f) => value(f));
 
@@ -335,8 +337,10 @@ export default function MetadataPage() {
 
           const slaInternal = Number(value('slaInternalHours'));
           const slaEndToEnd = Number(value('slaEndToEndHours'));
+          const slaSigning = Number(value('slaSigningHours'));
           if (Number.isFinite(slaInternal) && slaInternal > 0) extra.slaInternalHours = slaInternal;
           if (Number.isFinite(slaEndToEnd) && slaEndToEnd > 0) extra.slaEndToEndHours = slaEndToEnd;
+          if (Number.isFinite(slaSigning) && slaSigning > 0) extra.slaSigningHours = slaSigning;
 
           // Stored only when it parses. Nobody is watching an inline warning during
           // an import, and a code that cannot be read is worse than none: it looks
@@ -441,6 +445,7 @@ export default function MetadataPage() {
     setSigningOrder(readRecordSigningOrder(d));
     setSlaInternalHours(typeof d.slaInternalHours === 'number' ? String(d.slaInternalHours) : '');
     setSlaEndToEndHours(typeof d.slaEndToEndHours === 'number' ? String(d.slaEndToEndHours) : '');
+    setSlaSigningHours(typeof d.slaSigningHours === 'number' ? String(d.slaSigningHours) : '');
     // Empty stays empty on an existing record: pre-filling the default here would
     // silently give a vendor terms nobody agreed to the next time anything was saved.
     setTermsCode(typeof d.termsCode === 'string' ? d.termsCode : '');
@@ -483,6 +488,7 @@ export default function MetadataPage() {
     Object.assign(extra, writeRecordSigners(cleanSigners, signingOrder));
     if (Number(slaInternalHours) > 0) extra.slaInternalHours = Number(slaInternalHours);
     if (Number(slaEndToEndHours) > 0) extra.slaEndToEndHours = Number(slaEndToEndHours);
+    if (Number(slaSigningHours) > 0) extra.slaSigningHours = Number(slaSigningHours);
     if (termsCode.trim()) extra.termsCode = termsCode.trim();
 
     if (ocrTemplateId) {
@@ -724,6 +730,20 @@ export default function MetadataPage() {
               onChange={(e) => setSlaInternalHours(e.target.value)}
               placeholder="hours"
               title={_(msg`Business hours from email received to sent for signature. Blank uses the org default.`)}
+            />
+          </div>
+          <div className="w-[110px]">
+            <label className={label}>
+              <Trans>SLA signing</Trans>
+            </label>
+            <Input
+              className="h-8 text-[13px]"
+              type="number"
+              min={1}
+              value={slaSigningHours}
+              onChange={(e) => setSlaSigningHours(e.target.value)}
+              placeholder="hours"
+              title={_(msg`Business hours from sent for signature to fully signed. Blank uses the org default.`)}
             />
           </div>
           <div className="w-[110px]">

@@ -59,6 +59,7 @@ export const RESERVED_METADATA_DATA_KEYS = [
   'signerRole',
   'slaInternalHours',
   'slaEndToEndHours',
+  'slaSigningHours',
   'termsCode',
 ] as const;
 

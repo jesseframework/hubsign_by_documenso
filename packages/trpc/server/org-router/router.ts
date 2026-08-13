@@ -591,6 +591,7 @@ export const orgRouter = router({
         .optional(),
       slaDefaultInternalHours: z.number().int().min(1).max(2000).nullable().optional(),
       slaDefaultEndToEndHours: z.number().int().min(1).max(2000).nullable().optional(),
+      slaDefaultSigningHours: z.number().int().min(1).max(2000).nullable().optional(),
       // SSO / OIDC
       oidcEnabled: z.boolean().optional(),
       oidcClientId: z.string().nullable().optional(),

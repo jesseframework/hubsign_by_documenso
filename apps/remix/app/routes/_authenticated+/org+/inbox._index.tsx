@@ -951,6 +951,12 @@ export default function SignatureInboxPage() {
                             <Trans>original</Trans>
                           </span>
                         )}
+                        {/*
+                          Which stage is late, not just that something is. "Overdue"
+                          alone sends someone to process an invoice that went out
+                          days ago and is waiting on a signer — different problem,
+                          different person to chase.
+                        */}
                         {isOverdue && (
                           <span
                             className="inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-[10px] font-semibold text-orange-800 dark:bg-orange-900 dark:text-orange-200"
@@ -961,7 +967,13 @@ export default function SignatureInboxPage() {
                             }
                           >
                             <AlertTriangleIcon className="h-3 w-3" />
-                            <Trans>overdue {overdueLabel(item.sla?.overdueByMinutes ?? 0)}</Trans>
+                            {item.sla?.stage === 'signing' ? (
+                              <Trans>
+                                unsigned {overdueLabel(item.sla?.overdueByMinutes ?? 0)}
+                              </Trans>
+                            ) : (
+                              <Trans>overdue {overdueLabel(item.sla?.overdueByMinutes ?? 0)}</Trans>
+                            )}
                           </span>
                         )}
                         <SignatureStatus signature={item.signature} />

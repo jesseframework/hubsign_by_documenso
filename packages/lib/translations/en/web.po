@@ -265,6 +265,11 @@ msgstr "{0} invoice(s)"
 msgid "{0} invoice(s) are from a vendor with no directory record, so they carry no custom field values."
 msgstr "{0} invoice(s) are from a vendor with no directory record, so they carry no custom field values."
 
+#. placeholder {0}: data.awaitingSignature
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "{0} invoice(s) are out for signature and unsigned, and none of them is being measured — no signing target is set. Set one under Settings → SLA, or on an individual vendor's Metadata record."
+msgstr "{0} invoice(s) are out for signature and unsigned, and none of them is being measured — no signing target is set. Set one under Settings → SLA, or on an individual vendor's Metadata record."
+
 #. placeholder {0}: data.invoices - data.datedByInvoice
 #: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} invoice(s) had no readable invoice date and are dated by when the email arrived."
@@ -428,6 +433,11 @@ msgstr "{0} results found"
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "{0} row(s) were skipped"
 msgstr "{0} row(s) were skipped"
+
+#. placeholder {0}: data.unsignedOpen.count
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "{0} sent and still unsigned past target"
+msgstr "{0} sent and still unsigned past target"
 
 #. placeholder {0}: data?.otherRows
 #. placeholder {1}: isMoneyMeasure(config.measure) ? money0(data?.otherRowsTotal ?? 0) : (data?.otherRowsTotal ?? 0).toLocaleString()
@@ -1205,11 +1215,15 @@ msgstr "Accounts"
 msgid "Acknowledgment"
 msgstr "Acknowledgment"
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "Across {0} invoices in the last {1} days. Items already past target count against the score rather than waiting to be finished."
+#~ msgstr "Across {0} invoices in the last {1} days. Items already past target count against the score rather than waiting to be finished."
+
 #. placeholder {0}: data.total
 #. placeholder {1}: data.days
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
-msgid "Across {0} invoices in the last {1} days. Items already past target count against the score rather than waiting to be finished."
-msgstr "Across {0} invoices in the last {1} days. Items already past target count against the score rather than waiting to be finished."
+msgid "Across {0} invoices in the last {1} days. Items already past target count against the score rather than waiting to be finished. Scored on the internal and end-to-end clocks; the signing clock is reported beside them but not folded in, so this number means the same thing it did before it existed."
+msgstr "Across {0} invoices in the last {1} days. Items already past target count against the score rather than waiting to be finished. Scored on the internal and end-to-end clocks; the signing clock is reported beside them but not folded in, so this number means the same thing it did before it existed."
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 msgid "Across all organization members"
@@ -2499,6 +2513,10 @@ msgstr "Business hours from email received to fully signed. Blank uses the org d
 msgid "Business hours from email received to sent for signature. Blank uses the org default."
 msgstr "Business hours from email received to sent for signature. Blank uses the org default."
 
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "Business hours from sent for signature to fully signed. Blank uses the org default."
+msgstr "Business hours from sent for signature to fully signed. Blank uses the org default."
+
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 #: apps/remix/app/components/general/nav-config.tsx
 msgid "Business Rules"
@@ -3734,6 +3752,10 @@ msgstr "Default internal target (business hours)"
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Default Signature Settings"
 msgstr "Default Signature Settings"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Default signing target (business hours)"
+msgstr "Default signing target (business hours)"
 
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "Define the types of documents in your system (Invoice, Contract, ID, etc.)"
@@ -5579,8 +5601,12 @@ msgid "Group by"
 msgstr "Group by"
 
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
-msgid "Grouped by when the invoice arrived, so each bar answers \"how well did we handle what came in then\". A bar counts clocks, not invoices — an invoice with both an internal and an end-to-end target contributes two."
-msgstr "Grouped by when the invoice arrived, so each bar answers \"how well did we handle what came in then\". A bar counts clocks, not invoices — an invoice with both an internal and an end-to-end target contributes two."
+msgid "Grouped by when the invoice arrived, so each bar answers \"how well did we handle what came in then\". A bar counts clocks, not invoices — an invoice carrying all three targets contributes three."
+msgstr "Grouped by when the invoice arrived, so each bar answers \"how well did we handle what came in then\". A bar counts clocks, not invoices — an invoice carrying all three targets contributes three."
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "Grouped by when the invoice arrived, so each bar answers \"how well did we handle what came in then\". A bar counts clocks, not invoices — an invoice with both an internal and an end-to-end target contributes two."
+#~ msgstr "Grouped by when the invoice arrived, so each bar answers \"how well did we handle what came in then\". A bar counts clocks, not invoices — an invoice with both an internal and an end-to-end target contributes two."
 
 #: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "Groups"
@@ -7475,6 +7501,7 @@ msgstr "over by"
 
 #. placeholder {0}: shortDuration(item.overdueByMinutes)
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "over by {0}"
 msgstr "over by {0}"
 
@@ -8239,12 +8266,20 @@ msgid "received {0}"
 msgstr "received {0}"
 
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
-msgid "received → fully signed · includes the signer"
-msgstr "received → fully signed · includes the signer"
+msgid "received → fully signed · both stages together"
+msgstr "received → fully signed · both stages together"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "received → fully signed · includes the signer"
+#~ msgstr "received → fully signed · includes the signer"
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
-msgid "Received → fully signed. Includes the signer's time."
-msgstr "Received → fully signed. Includes the signer's time."
+msgid "Received → fully signed. Both stages together."
+msgstr "Received → fully signed. Both stages together."
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+#~ msgid "Received → fully signed. Includes the signer's time."
+#~ msgstr "Received → fully signed. Includes the signer's time."
 
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "received → sent for signature · what your team controls"
@@ -9154,6 +9189,10 @@ msgstr "Sending..."
 msgid "Sent"
 msgstr "Sent"
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "sent → fully signed · what the signer controls"
+msgstr "sent → fully signed · what the signer controls"
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "Sent for signature"
@@ -9165,6 +9204,10 @@ msgstr "Sent for signature"
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "Sent for signature — {0} of {1} signed, waiting on {2}."
 msgstr "Sent for signature — {0} of {1} signed, waiting on {2}."
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Sent for signature → fully signed. Leave this empty and an invoice waiting on a signature is measured by nothing."
+msgstr "Sent for signature → fully signed. Leave this empty and an invoice waiting on a signature is measured by nothing."
 
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "Sent for signature by {who}"
@@ -9286,7 +9329,10 @@ msgid "Showing {shown} of {total}"
 msgstr "Showing {shown} of {total}"
 
 #. placeholder {0}: data.breachedOpen.items.length
+#. placeholder {0}: data.unsignedOpen.items.length
 #. placeholder {1}: data.breachedOpen.count
+#. placeholder {1}: data.unsignedOpen.count
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "Showing the {0} longest-waiting of {1}."
 msgstr "Showing the {0} longest-waiting of {1}."
@@ -9597,6 +9643,10 @@ msgstr "SLA internal"
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "SLA Setup"
 msgstr "SLA Setup"
+
+#: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
+msgid "SLA signing"
+msgstr "SLA signing"
 
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "SLA tracking is off"
@@ -10319,10 +10369,14 @@ msgstr "The certificate is the signing audit trail, so it is normally kept. Turn
 msgid "The clock"
 msgstr "The clock"
 
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#~ msgid "The clock starts when the invoice reached the mailbox. Health is scored over {0} decided outcomes across both clocks, so an invoice with two targets counts twice."
+#~ msgstr "The clock starts when the invoice reached the mailbox. Health is scored over {0} decided outcomes across both clocks, so an invoice with two targets counts twice."
+
 #. placeholder {0}: data.health.judged
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
-msgid "The clock starts when the invoice reached the mailbox. Health is scored over {0} decided outcomes across both clocks, so an invoice with two targets counts twice."
-msgstr "The clock starts when the invoice reached the mailbox. Health is scored over {0} decided outcomes across both clocks, so an invoice with two targets counts twice."
+msgid "The clock starts when the invoice reached the mailbox. Health is scored over {0} decided outcomes across the internal and end-to-end clocks, so an invoice carrying both targets counts twice."
+msgstr "The clock starts when the invoice reached the mailbox. Health is scored over {0} decided outcomes across the internal and end-to-end clocks, so an invoice carrying both targets counts twice."
 
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 msgid "The condition isn't valid JSON"
@@ -10658,6 +10712,10 @@ msgstr "There are no completed documents yet. Documents that you have created or
 #: apps/remix/app/components/embed/authoring/configure-document-upload.tsx
 msgid "There was an error uploading your file. Please try again."
 msgstr "There was an error uploading your file. Please try again."
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "These are with the signer. A reminder is the action, not reprocessing."
+msgstr "These are with the signer. A reminder is the action, not reprocessing."
 
 #: apps/remix/app/routes/_authenticated+/org+/_index.tsx
 msgid "These figures couldn't be loaded, so nothing is shown rather than showing zeros. Refresh to try again."
@@ -11372,6 +11430,11 @@ msgstr "Unpaid"
 msgid "Unsettled inbox invoices, any date range"
 msgstr "Unsettled inbox invoices, any date range"
 
+#. placeholder {0}: overdueLabel(item.sla?.overdueByMinutes ?? 0)
+#: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
+msgid "unsigned {0}"
+msgstr "unsigned {0}"
+
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
 #: apps/remix/app/components/tables/settings-public-profile-templates-table.tsx
@@ -11877,6 +11940,10 @@ msgstr "Waiting for Your Turn"
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "Waiting on"
 msgstr "Waiting on"
+
+#: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+msgid "Waiting on signature"
+msgstr "Waiting on signature"
 
 #: apps/remix/app/routes/_authenticated+/org+/approvals._index.tsx
 msgid "Waiting on you"

@@ -1708,6 +1708,10 @@ model Organization {
   /// Fallbacks in business hours, used when a vendor sets no target of its own.
   slaDefaultInternalHours Int?
   slaDefaultEndToEndHours Int?
+  /// Sent for signature → fully signed. The signer's half, measured on its own:
+  /// the internal clock stops at the send, so without this an invoice waiting a
+  /// fortnight on a signature is tracked by nothing.
+  slaDefaultSigningHours  Int?
 
   // Stripe billing
   stripeCustomerId                String?   @unique

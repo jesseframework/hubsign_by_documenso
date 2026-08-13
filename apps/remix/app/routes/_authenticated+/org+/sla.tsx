@@ -308,7 +308,9 @@ export default function OrgSlaPage() {
             <p className="mt-1 text-[12px] text-muted-foreground">
               <Trans>
                 Across {data.total} invoices in the last {data.days} days. Items already past
-                target count against the score rather than waiting to be finished.
+                target count against the score rather than waiting to be finished. Scored on the
+                internal and end-to-end clocks; the signing clock is reported beside them but not
+                folded in, so this number means the same thing it did before it existed.
               </Trans>
             </p>
 
@@ -361,18 +363,43 @@ export default function OrgSlaPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/*
+        Three cards in the order the stages happen. The middle one is the whole
+        reason the internal clock going quiet at the send is no longer a blind
+        spot: it starts where that one stops.
+      */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <LegCard
           title={<Trans>Internal turnaround</Trans>}
           hint={<Trans>received → sent for signature · what your team controls</Trans>}
           leg={data.internal}
         />
         <LegCard
+          title={<Trans>Waiting on signature</Trans>}
+          hint={<Trans>sent → fully signed · what the signer controls</Trans>}
+          leg={data.signing}
+        />
+        <LegCard
           title={<Trans>End to end</Trans>}
-          hint={<Trans>received → fully signed · includes the signer</Trans>}
+          hint={<Trans>received → fully signed · both stages together</Trans>}
           leg={data.endToEnd}
         />
       </div>
+
+      {/*
+        Said plainly rather than left to be inferred from an empty card: a leg
+        with no target measures nothing, and a page of zeroes reads as "nothing
+        is late" instead of "nothing is being watched".
+      */}
+      {data.signing.tracked === 0 && data.awaitingSignature > 0 && (
+        <p className="rounded-[var(--r)] border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <Trans>
+            {data.awaitingSignature} invoice(s) are out for signature and unsigned, and none of them
+            is being measured — no signing target is set. Set one under Settings → SLA, or on an
+            individual vendor's Metadata record.
+          </Trans>
+        </p>
+      )}
 
       {/* Trend */}
       <div className="rounded-[var(--r)] border border-border bg-card p-4">
@@ -382,8 +409,8 @@ export default function OrgSlaPage() {
         <p className="mb-3 mt-0.5 text-[12px] text-muted-foreground">
           <Trans>
             Grouped by when the invoice arrived, so each bar answers "how well did we handle what
-            came in then". A bar counts clocks, not invoices — an invoice with both an internal and
-            an end-to-end target contributes two.
+            came in then". A bar counts clocks, not invoices — an invoice carrying all three
+            targets contributes three.
           </Trans>
         </p>
         <TrendChart data={data.trend} />
@@ -416,6 +443,46 @@ export default function OrgSlaPage() {
               <Trans>
                 Showing the {data.breachedOpen.items.length} longest-waiting of{' '}
                 {data.breachedOpen.count}.
+              </Trans>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/*
+        Its own panel, not appended to the one above. Both lists are late
+        invoices; only one of them is anybody here's fault, and merging them
+        produces a to-do list where half the entries have no action attached.
+      */}
+      {data.unsignedOpen.count > 0 && (
+        <div className="rounded-[var(--r)] border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
+          <h2 className="flex items-center gap-1.5 text-[14px] font-semibold text-amber-800 dark:text-amber-200">
+            <AlertTriangleIcon className="h-4 w-4" />
+            <Trans>{data.unsignedOpen.count} sent and still unsigned past target</Trans>
+          </h2>
+          <p className="mt-0.5 text-[12px] text-amber-800/80 dark:text-amber-200/80">
+            <Trans>These are with the signer. A reminder is the action, not reprocessing.</Trans>
+          </p>
+          <ul className="mt-2 space-y-1">
+            {data.unsignedOpen.items.map((item) => (
+              <li key={item.inboxItemId} className="flex justify-between text-[12px]">
+                <Link
+                  to={`/org/inbox/${item.inboxItemId}`}
+                  className="truncate pr-3 text-amber-800 hover:underline dark:text-amber-200"
+                >
+                  {item.vendor ?? 'Unknown vendor'}
+                </Link>
+                <span className="flex-shrink-0 tabular-nums text-muted-foreground">
+                  <Trans>over by {shortDuration(item.overdueByMinutes)}</Trans>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {data.unsignedOpen.count > data.unsignedOpen.items.length && (
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              <Trans>
+                Showing the {data.unsignedOpen.items.length} longest-waiting of{' '}
+                {data.unsignedOpen.count}.
               </Trans>
             </p>
           )}
@@ -539,8 +606,8 @@ export default function OrgSlaPage() {
         <p className="text-[11px] text-muted-foreground">
           <Trans>
             The clock starts when the invoice reached the mailbox. Health is scored over{' '}
-            {data.health.judged} decided outcomes across both clocks, so an invoice with two
-            targets counts twice.
+            {data.health.judged} decided outcomes across the internal and end-to-end clocks, so an
+            invoice carrying both targets counts twice.
           </Trans>
         </p>
       </div>
