@@ -22,7 +22,7 @@ msgid " The events that will trigger a webhook to be sent to your URL."
 msgstr " The events that will trigger a webhook to be sent to your URL."
 
 #. placeholder {0}: row.moreItems
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "…and {0} more invoice(s) in this group."
 msgstr "…and {0} more invoice(s) in this group."
 
@@ -87,11 +87,11 @@ msgid "({0} open)"
 msgstr "({0} open)"
 
 #. placeholder {0}: row.budgetVendors
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "(across {0} vendors)"
 msgstr "(across {0} vendors)"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "(arrival)"
 msgstr "(arrival)"
 
@@ -100,7 +100,7 @@ msgstr "(arrival)"
 msgid "(n={0})"
 msgstr "(n={0})"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "(no number)"
 msgstr "(no number)"
 
@@ -256,37 +256,46 @@ msgid "{0} invited you to {recipientActionVerb} a document"
 msgstr "{0} invited you to {recipientActionVerb} a document"
 
 #. placeholder {0}: row.invoices
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} invoice(s)"
 msgstr "{0} invoice(s)"
 
 #. placeholder {0}: data?.unidentifiedVendors
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} invoice(s) are from a vendor with no directory record, so they carry no custom field values."
 msgstr "{0} invoice(s) are from a vendor with no directory record, so they carry no custom field values."
 
 #. placeholder {0}: data.invoices - data.datedByInvoice
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} invoice(s) had no readable invoice date and are dated by when the email arrived."
 msgstr "{0} invoice(s) had no readable invoice date and are dated by when the email arrived."
 
 #. placeholder {0}: data?.withoutAmount
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "{0} invoice(s) had no readable total and are counted in none of these figures — including the invoice count, so no two figures here describe different sets."
+msgstr "{0} invoice(s) had no readable total and are counted in none of these figures — including the invoice count, so no two figures here describe different sets."
+
 #: apps/remix/app/routes/_authenticated+/org+/spend.tsx
-msgid "{0} invoice(s) had no readable total and are counted in none of these figures."
-msgstr "{0} invoice(s) had no readable total and are counted in none of these figures."
+#~ msgid "{0} invoice(s) had no readable total and are counted in none of these figures."
+#~ msgstr "{0} invoice(s) had no readable total and are counted in none of these figures."
 
 #. placeholder {0}: entry.invoices
 #. placeholder {1}: entry.label
 #. placeholder {2}: money(entry.code, entry.total)
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} invoice(s) in {1} ({2}) — switch currency to see them. Amounts in different currencies are never added together."
 msgstr "{0} invoice(s) in {1} ({2}) — switch currency to see them. Amounts in different currencies are never added together."
 
 #. placeholder {0}: data?.doubtfulAmounts
 #. placeholder {1}: money(data?.currency ?? null, data?.doubtfulTotal ?? 0)
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} invoice(s) totalling {1} are more than 25× the median invoice. They ARE counted above, but a figure that far out is usually OCR reading the wrong number off the page — open the flagged rows and check."
 msgstr "{0} invoice(s) totalling {1} are more than 25× the median invoice. They ARE counted above, but a figure that far out is usually OCR reading the wrong number off the page — open the flagged rows and check."
+
+#. placeholder {0}: data?.excludedByFilters
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "{0} invoice(s) were removed by this report's filters."
+msgstr "{0} invoice(s) were removed by this report's filters."
 
 #. placeholder {0}: data.truncated.inRange
 #. placeholder {1}: data.truncated.evaluated
@@ -295,7 +304,7 @@ msgid "{0} invoices arrived in this window but only the most recent {1} were mea
 msgstr "{0} invoices arrived in this window but only the most recent {1} were measured. Every figure above describes that subset."
 
 #. placeholder {0}: data?.budgetLabel
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} is a single figure on each vendor and carries no period of its own, so it is compared against the window selected above as-is — pick the window the figure was written for."
 msgstr "{0} is a single figure on each vendor and carries no period of its own, so it is compared against the window selected above as-is — pick the window the figure was written for."
 
@@ -372,7 +381,7 @@ msgid "{0} open"
 msgstr "{0} open"
 
 #. placeholder {0}: data?.overBudgetRows
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} over"
 msgstr "{0} over"
 
@@ -387,9 +396,14 @@ msgstr "{0} over target and still open, {1} past 80% with the clock running."
 msgid "{0} overdue and still unsent"
 msgstr "{0} overdue and still unsent"
 
-#. placeholder {0}: money(data?.currency ?? null, row.overdueTotal)
+#. placeholder {0}: row.overdueInvoices
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "{0} past due"
+msgstr "{0} past due"
+
+#. placeholder {0}: money0(row.overdueTotal)
 #. placeholder {1}: row.overdueInvoices
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} past due on {1}"
 msgstr "{0} past due on {1}"
 
@@ -416,8 +430,8 @@ msgid "{0} row(s) were skipped"
 msgstr "{0} row(s) were skipped"
 
 #. placeholder {0}: data?.otherRows
-#. placeholder {1}: money(data?.currency ?? null, data?.otherRowsTotal ?? 0)
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#. placeholder {1}: isMoneyMeasure(config.measure) ? money0(data?.otherRowsTotal ?? 0) : (data?.otherRowsTotal ?? 0).toLocaleString()
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} smaller group(s) totalling {1} are not listed."
 msgstr "{0} smaller group(s) totalling {1} are not listed."
 
@@ -428,7 +442,7 @@ msgid "{0} taken from the attached “{who}”{1}"
 msgstr "{0} taken from the attached “{who}”{1}"
 
 #. placeholder {0}: row.vendors
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} vendor(s)"
 msgstr "{0} vendor(s)"
 
@@ -438,15 +452,13 @@ msgstr "{0} vendor(s)"
 
 #. placeholder {0}: data?.vendorsWithoutBudget
 #. placeholder {1}: data?.budgetLabel
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} vendor(s) with invoices here have no {1} set. Their spend is in the total above but excluded from the variance, which compares only the vendors that carry a figure."
 msgstr "{0} vendor(s) with invoices here have no {1} set. Their spend is in the total above but excluded from the variance, which compares only the vendors that carry a figure."
 
-#. placeholder {0}: data?.groupLabel
-#. placeholder {1}: data?.budgetLabel
 #: apps/remix/app/routes/_authenticated+/org+/spend.tsx
-msgid "{0} vs {1}"
-msgstr "{0} vs {1}"
+#~ msgid "{0} vs {1}"
+#~ msgstr "{0} vs {1}"
 
 #. placeholder {0}: signer.email
 #: apps/remix/app/components/general/inbox/signer-list.tsx
@@ -455,7 +467,7 @@ msgstr "{0}'s signing link stops working immediately."
 
 #. placeholder {0}: item.daysPastDue
 #. placeholder {0}: invoice.daysPastDue
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "{0}d late"
 msgstr "{0}d late"
@@ -523,6 +535,17 @@ msgstr "{inviterName} on behalf of \"{teamName}\" has invited you to {0}<0/>\"{d
 #: packages/email/templates/document-invite.tsx
 msgid "{inviterName} on behalf of \"{teamName}\" has invited you to {action} {documentName}"
 msgstr "{inviterName} on behalf of \"{teamName}\" has invited you to {action} {documentName}"
+
+#. placeholder {0}: data?.groupLabel
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "{measureLabel} by {0}"
+msgstr "{measureLabel} by {0}"
+
+#. placeholder {0}: data?.groupLabel
+#. placeholder {1}: data?.budgetLabel
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "{measureLabel} by {0} vs {1}"
+msgstr "{measureLabel} by {0} vs {1}"
 
 #: packages/email/templates/team-join.tsx
 msgid "{memberEmail} joined the following team"
@@ -1189,7 +1212,7 @@ msgstr "Across {0} invoices in the last {1} days. Items already past target coun
 msgid "Across all organization members"
 msgstr "Across all organization members"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "Across the vendors that carry a figure. Spend from vendors without one is excluded from both sides."
 msgstr "Across the vendors that carry a figure. Spend from vendors without one is excluded from both sides."
 
@@ -1344,6 +1367,10 @@ msgstr "Add email"
 #: apps/remix/app/components/general/document/document-edit-form.tsx
 msgid "Add Fields"
 msgstr "Add Fields"
+
+#: apps/remix/app/components/general/org-dashboard/report-builder.tsx
+msgid "Add filter"
+msgstr "Add filter"
 
 #: apps/remix/app/routes/_authenticated+/dms+/filing.tsx
 msgid "Add Location"
@@ -2276,7 +2303,7 @@ msgstr "Avatar"
 msgid "Avatar Updated"
 msgstr "Avatar Updated"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "avg"
 msgstr "avg"
 
@@ -2338,7 +2365,7 @@ msgstr "Banner Updated"
 msgid "Before you get started, please confirm your email address by clicking the button below:"
 msgstr "Before you get started, please confirm your email address by clicking the button below:"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "Biggest overrun first · click a row for its invoices"
 msgstr "Biggest overrun first · click a row for its invoices"
 
@@ -2884,7 +2911,7 @@ msgstr "Comments"
 msgid "Communication"
 msgstr "Communication"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/components/general/org-dashboard/report-builder.tsx
 msgid "Compare against"
 msgstr "Compare against"
 
@@ -2988,6 +3015,10 @@ msgstr "Config (JSON) — e.g. { \"field\": \"document.title\" } or a JSONLogic 
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Config is not valid JSON"
 msgstr "Config is not valid JSON"
+
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "Configure"
+msgstr "Configure"
 
 #. placeholder {0}: parseMessageDescriptor(_, FRIENDLY_FIELD_TYPE[currentField.type])
 #: apps/remix/app/components/embed/authoring/field-advanced-settings-drawer.tsx
@@ -3534,7 +3565,7 @@ msgstr "Cron expression"
 msgid "CSV Structure"
 msgstr "CSV Structure"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/components/general/org-dashboard/report-builder.tsx
 msgid "Currency"
 msgstr "Currency"
 
@@ -3608,7 +3639,7 @@ msgstr "Date created"
 msgid "Date Format"
 msgstr "Date Format"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "Dated by when the email arrived — the invoice stated no date."
 msgstr "Dated by when the email arrived — the invoice stated no date."
 
@@ -3721,6 +3752,7 @@ msgstr "delete"
 #: apps/remix/app/routes/_authenticated+/settings+/webhooks._index.tsx
 #: apps/remix/app/routes/_authenticated+/settings+/tokens.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 #: apps/remix/app/components/tables/templates-table-action-dropdown.tsx
@@ -4437,6 +4469,7 @@ msgstr "Documents waiting for your review and approval."
 msgid "Don't have an account? <0>Sign up</0>"
 msgstr "Don't have an account? <0>Sign up</0>"
 
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 #: apps/remix/app/components/general/document/document-stamps-button.tsx
 msgid "Done"
 msgstr "Done"
@@ -4699,6 +4732,10 @@ msgstr "Edit webhook"
 msgid "Edit workflow"
 msgstr "Edit workflow"
 
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "edited"
+msgstr "edited"
+
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Electronic Delivery of Documents"
 msgstr "Electronic Delivery of Documents"
@@ -4958,6 +4995,7 @@ msgstr "Entity"
 #: apps/remix/app/routes/embed+/v1+/authoring+/document.edit.$id.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 #: apps/remix/app/routes/_authenticated+/org+/recycle-bin.tsx
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
@@ -5067,6 +5105,10 @@ msgstr "Events"
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 msgid "Events — leave all unchecked to receive every event"
 msgstr "Events — leave all unchecked to receive every event"
+
+#: apps/remix/app/components/general/org-dashboard/report-builder.tsx
+msgid "Every invoice in the window is included."
+msgstr "Every invoice in the window is included."
 
 #: apps/remix/app/components/forms/team-document-preferences-form.tsx
 msgid "Everyone can access and view the document"
@@ -5326,6 +5368,10 @@ msgstr "Filing Structure"
 msgid "Filing..."
 msgstr "Filing..."
 
+#: apps/remix/app/components/general/org-dashboard/report-builder.tsx
+msgid "Filters"
+msgstr "Filters"
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 msgid "Final Audit Report"
 msgstr "Final Audit Report"
@@ -5517,7 +5563,7 @@ msgstr "Green"
 msgid "Grid"
 msgstr "Grid"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/components/general/org-dashboard/report-builder.tsx
 msgid "Group by"
 msgstr "Group by"
 
@@ -5525,7 +5571,7 @@ msgstr "Group by"
 msgid "Grouped by when the invoice arrived, so each bar answers \"how well did we handle what came in then\". A bar counts clocks, not invoices — an invoice with both an internal and an end-to-end target contributes two."
 msgstr "Grouped by when the invoice arrived, so each bar answers \"how well did we handle what came in then\". A bar counts clocks, not invoices — an invoice with both an internal and an end-to-end target contributes two."
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "Groups"
 msgstr "Groups"
 
@@ -5917,8 +5963,8 @@ msgstr "Invoice info"
 msgid "Invoice turnaround against target, measured in business hours from the moment the invoice reaches the inbox."
 msgstr "Invoice turnaround against target, measured in business hours from the moment the invoice reaches the inbox."
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "Invoices"
 msgstr "Invoices"
 
@@ -6012,7 +6058,7 @@ msgstr "Label"
 msgid "Language"
 msgstr "Language"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "Largest first · click a row for its invoices"
 msgstr "Largest first · click a row for its invoices"
 
@@ -6082,7 +6128,7 @@ msgstr "Leave"
 msgid "Leave team"
 msgstr "Leave team"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "left"
 msgstr "left"
 
@@ -6164,7 +6210,7 @@ msgstr "Loading the available columns…"
 msgid "Loading..."
 msgstr "Loading..."
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "Loading…"
@@ -6352,6 +6398,10 @@ msgstr "Max reminders per recipient"
 msgid "Maximum file size: 4MB. Maximum 100 rows per upload. Blank values will use template defaults."
 msgstr "Maximum file size: 4MB. Maximum 100 rows per upload. Blank values will use template defaults."
 
+#: apps/remix/app/components/general/org-dashboard/report-builder.tsx
+msgid "Measure"
+msgstr "Measure"
+
 #: packages/lib/constants/teams.ts
 msgid "Member"
 msgstr "Member"
@@ -6445,7 +6495,7 @@ msgstr "Monthly Active Users: Users that created at least one Document"
 msgid "Monthly Active Users: Users that had at least one of their documents completed"
 msgstr "Monthly Active Users: Users that had at least one of their documents completed"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "More than 25× the median invoice — check that OCR read the right figure."
 msgstr "More than 25× the median invoice — check that OCR read the right figure."
 
@@ -6570,6 +6620,10 @@ msgstr "Name is required"
 msgid "Name required"
 msgstr "Name required"
 
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "Name this report…"
+msgstr "Name this report…"
+
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
 msgid "Name, key, subject and HTML body are all required"
 msgstr "Name, key, subject and HTML body are all required"
@@ -6678,7 +6732,7 @@ msgid "Next field"
 msgstr "Next field"
 
 #. placeholder {0}: data?.budgetLabel
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "no {0} set"
 msgstr "no {0} set"
 
@@ -6767,7 +6821,7 @@ msgstr "No favorites yet. Star documents from their detail page."
 msgid "No fields could be extracted from {0}."
 msgstr "No fields could be extracted from {0}."
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "No figure set on this vendor's record."
 msgstr "No figure set on this vendor's record."
 
@@ -6788,7 +6842,7 @@ msgstr "No filing locations yet"
 msgid "No further action is required from you at this time."
 msgstr "No further action is required from you at this time."
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "No invoice in this window had a total OCR could read. Widen the window, or check the extraction template on the vendors you expect to see."
 msgstr "No invoice in this window had a total OCR could read. Widen the window, or check the extraction template on the vendors you expect to see."
 
@@ -6985,9 +7039,13 @@ msgstr "Not sent for signature"
 msgid "Not supported"
 msgstr "Not supported"
 
+#: apps/remix/app/components/general/org-dashboard/report-builder.tsx
+msgid "Nothing"
+msgstr "Nothing"
+
 #: apps/remix/app/routes/_authenticated+/org+/spend.tsx
-msgid "Nothing (spend only)"
-msgstr "Nothing (spend only)"
+#~ msgid "Nothing (spend only)"
+#~ msgstr "Nothing (spend only)"
 
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "Nothing has finished in this window yet, so there is no trend to show."
@@ -7042,7 +7100,7 @@ msgstr "Nothing to do"
 msgid "Nothing to import"
 msgstr "Nothing to import"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "Nothing to measure yet"
 msgstr "Nothing to measure yet"
 
@@ -7125,11 +7183,11 @@ msgstr "OCR results"
 msgid "OCR template"
 msgstr "OCR template"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "of"
 msgstr "of"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "of total"
 msgstr "of total"
 
@@ -7387,7 +7445,7 @@ msgstr "Otherwise, the document will be created as a draft."
 msgid "Outstanding signatures, by person"
 msgstr "Outstanding signatures, by person"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "over by"
 msgstr "over by"
 
@@ -8412,6 +8470,10 @@ msgstr "Remove team member"
 msgid "Remove this field. Values already saved are kept."
 msgstr "Remove this field. Values already saved are kept."
 
+#: apps/remix/app/components/general/org-dashboard/report-builder.tsx
+msgid "Remove this filter"
+msgstr "Remove this filter"
+
 #: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
 msgid "Renaming the field keeps this the same."
 msgstr "Renaming the field keeps this the same."
@@ -8424,6 +8486,19 @@ msgstr "Renews: {formattedDate}"
 #: apps/remix/app/components/forms/password.tsx
 msgid "Repeat Password"
 msgstr "Repeat Password"
+
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "Report deleted"
+msgstr "Report deleted"
+
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "Report saved"
+msgstr "Report saved"
+
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+#: apps/remix/app/components/general/nav-config.tsx
+msgid "Reports"
+msgstr "Reports"
 
 #: apps/remix/app/components/general/nav-config.tsx
 #: apps/remix/app/components/general/nav-config.tsx
@@ -8721,10 +8796,15 @@ msgstr "Save"
 msgid "Save & Download Excel"
 msgstr "Save & Download Excel"
 
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "Save as new"
+msgstr "Save as new"
+
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Save Branding"
 msgstr "Save Branding"
 
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 msgid "Save changes"
 msgstr "Save changes"
@@ -9630,13 +9710,12 @@ msgstr "Source"
 
 #: apps/remix/app/routes/_authenticated+/org+/spend.tsx
 #: apps/remix/app/components/general/nav-config.tsx
-msgid "Spend"
-msgstr "Spend"
+#~ msgid "Spend"
+#~ msgstr "Spend"
 
-#. placeholder {0}: data?.groupLabel.toLowerCase()
 #: apps/remix/app/routes/_authenticated+/org+/spend.tsx
-msgid "Spend by {0}"
-msgstr "Spend by {0}"
+#~ msgid "Spend by {0}"
+#~ msgstr "Spend by {0}"
 
 #: apps/remix/app/components/forms/stamp-upload-dialog.tsx
 msgid "Stamp added"
@@ -10958,8 +11037,8 @@ msgid "Tools"
 msgstr "Tools"
 
 #: apps/remix/app/routes/_authenticated+/org+/spend.tsx
-msgid "Total"
-msgstr "Total"
+#~ msgid "Total"
+#~ msgstr "Total"
 
 #: apps/remix/app/routes/_authenticated+/admin+/stats.tsx
 msgid "Total Documents"
@@ -11530,6 +11609,10 @@ msgstr "Validation rules"
 msgid "Validation rules (block/warn before this step)"
 msgstr "Validation rules (block/warn before this step)"
 
+#: apps/remix/app/components/general/org-dashboard/report-builder.tsx
+msgid "value"
+msgstr "value"
+
 #: apps/remix/app/components/tables/admin-document-recipient-item-table.tsx
 #: apps/remix/app/components/general/inbox/extracted-fields.tsx
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/number-field.tsx
@@ -11537,7 +11620,7 @@ msgstr "Validation rules (block/warn before this step)"
 msgid "Value"
 msgstr "Value"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "Variance"
 msgstr "Variance"
 
@@ -11550,8 +11633,8 @@ msgid "Vendor / Contact"
 msgstr "Vendor / Contact"
 
 #: apps/remix/app/routes/_authenticated+/org+/spend.tsx
-msgid "Vendors"
-msgstr "Vendors"
+#~ msgid "Vendors"
+#~ msgstr "Vendors"
 
 #: apps/remix/app/components/general/verify-email-banner.tsx
 msgid "Verification Email Sent"
@@ -12087,8 +12170,12 @@ msgid "What is actually holding them up"
 msgstr "What is actually holding them up"
 
 #: apps/remix/app/routes/_authenticated+/org+/spend.tsx
-msgid "What the invoices in your inbox come to, grouped by supplier or by any field you defined on your vendor records. Measured from the totals OCR read off each invoice."
-msgstr "What the invoices in your inbox come to, grouped by supplier or by any field you defined on your vendor records. Measured from the totals OCR read off each invoice."
+#~ msgid "What the invoices in your inbox come to, grouped by supplier or by any field you defined on your vendor records. Measured from the totals OCR read off each invoice."
+#~ msgstr "What the invoices in your inbox come to, grouped by supplier or by any field you defined on your vendor records. Measured from the totals OCR read off each invoice."
+
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
+msgid "What the invoices in your inbox come to, grouped however you need — by supplier, by month, or by any field you defined on your vendor records. Save the ones you use."
+msgstr "What the invoices in your inbox come to, grouped however you need — by supplier, by month, or by any field you defined on your vendor records. Save the ones you use."
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
 msgid "What this chain approves"
@@ -12098,7 +12185,7 @@ msgstr "What this chain approves"
 #~ msgid "What this total leaves out"
 #~ msgstr "What this total leaves out"
 
-#: apps/remix/app/routes/_authenticated+/org+/spend.tsx
+#: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "What to know about this total"
 msgstr "What to know about this total"
 
@@ -12149,6 +12236,10 @@ msgstr "Who do you want to remind?"
 #: apps/remix/app/routes/_authenticated+/org+/sla.tsx
 msgid "Will miss without action"
 msgstr "Will miss without action"
+
+#: apps/remix/app/components/general/org-dashboard/report-builder.tsx
+msgid "Window"
+msgstr "Window"
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Withdrawing Consent"

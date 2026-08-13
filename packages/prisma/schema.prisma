@@ -2592,6 +2592,29 @@ model MetadataRecord {
   @@index([organizationId, category])
 }
 
+/// A saved invoice report: a named configuration of measure, grouping, window and
+/// filters.
+///
+/// Org-scoped and shared, matching how the rest of this product works — the
+/// signature inbox is a shared queue, not a per-user mailbox, and a report worth
+/// saving is worth the team seeing. `config` is validated by ZReportConfigSchema
+/// on the way in and on the way out, so a config written by an older version
+/// either parses or is rejected rather than half-read.
+model ReportView {
+  id              String   @id @default(cuid())
+  organizationId  Int
+  name            String
+  config          Json
+  /// Who saved it, for provenance. Kept if that user is later removed.
+  createdByUserId Int?
+  order           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
 /// What kind of value an organization-defined metadata field holds.
 enum MetadataFieldType {
   TEXT

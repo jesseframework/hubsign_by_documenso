@@ -262,9 +262,9 @@ export const SURFACES: SurfaceDef[] = [
       // Beside SLA rather than under Repository: both are readings of the same
       // invoice flow — how fast it moved, and what it came to.
       {
-        to: '/org/spend',
+        to: '/org/reports',
         icon: ReceiptIcon,
-        label: <Trans>Spend</Trans>,
+        label: <Trans>Reports</Trans>,
         requiresOrg: true,
       },
       { to: '/dms/activity', icon: ActivityIcon, label: <Trans>Activity</Trans>, requiresDms: true },

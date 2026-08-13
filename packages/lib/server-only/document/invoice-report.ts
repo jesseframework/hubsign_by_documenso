@@ -7,21 +7,33 @@ import {
 import { invoiceFields, parseAmount, parseOcrDate } from '../../universal/inbox-invoice-fields';
 import { normalizeMetadataKey } from '../../universal/metadata';
 import { matchVendorName, prepareVendorCandidates, vendorCoreName } from '../../universal/vendor-match';
+import {
+  BUILT_IN_GROUPINGS,
+  BUILT_IN_GROUPING_LABELS,
+  type TReportConfig,
+  type TReportFilter,
+  isBuiltInGrouping,
+  isMoneyMeasure,
+  isNumericFilterOp,
+} from '../../universal/report-config';
 import { getOrganizationDueDates } from '../inbox/invoice-due';
 
 /**
- * What the organization is spending, and with whom.
+ * One configurable report over the invoices in the inbox.
  *
- * The dashboard could say how many invoices arrived and how late they were, but
- * not what they came to — so "which suppliers are we spending the most with"
- * had no answer anywhere in the product, despite every figure needed for it
- * already being extracted off the page.
+ * This began as "spend by vendor" and then as "spend by a custom field", which
+ * was the right feature in the wrong shape: a page built around the two number
+ * fields one organization happened to define is dead weight for every other
+ * organization, and there is no way to add the report *they* need without
+ * shipping another page.
  *
- * The grouping is the point. Spend by vendor is the obvious cut, but the useful
- * ones are usually the organization's own: by GL account, by supplier status, by
- * contract owner, by region. Those are exactly the custom fields defined on the
- * vendor's directory record, so any of them can be the axis — a report the
- * organization shapes rather than one shipped fixed.
+ * So the report is a configuration — a measure, a grouping, a window, filters,
+ * and optionally a number field to compare against — and a configuration can be
+ * saved under a name. Spend by vendor is now simply the built-in one.
+ *
+ * The groupings and measures the product supplies exist for every organization
+ * (vendor, month, document status, sender). Everything beyond that comes from
+ * what the organization defined on its own vendor records.
  *
  * Three things this refuses to do, because each would produce a confident wrong
  * number rather than an honest gap:
@@ -64,6 +76,9 @@ const OUTLIER_MIN_SAMPLE = 6;
 
 /** Grouping by the vendor itself, rather than by one of its fields. */
 export const SPEND_GROUP_VENDOR = 'vendor';
+
+/** How a month bucket is labelled: `2026-08` sorts and reads unambiguously. */
+const monthOf = (isoDate: string): string => isoDate.slice(0, 7);
 
 export type SpendItem = {
   inboxItemId: string;
@@ -124,6 +139,8 @@ export type VendorSpendReport = {
   /** Inclusive window, ISO dates. */
   from: string;
   to: string;
+  /** Which measure the numbers are, so the client formats and labels them right. */
+  measure: TReportConfig['measure'];
   groupBy: string;
   groupLabel: string;
   /** The currency every figure below is in. Null when nothing measurable landed. */
@@ -134,6 +151,8 @@ export type VendorSpendReport = {
   invoices: number;
   /** Invoices in the window whose total could not be read — excluded from figures. */
   withoutAmount: number;
+  /** Invoices the configured filters removed, so a small answer explains itself. */
+  excludedByFilters: number;
   /** Of the counted invoices, how many are dated by the printed invoice date. */
   datedByInvoice: number;
   /** Counted invoices whose vendor is not in the directory. */
@@ -181,13 +200,11 @@ const currencyOf = (raw: string): string => raw.trim().toUpperCase();
 
 const UNSTATED_CURRENCY = '';
 
-export const getVendorSpend = async ({
+export const getInvoiceReport = async ({
   organizationId,
   from,
   to,
-  groupBy = SPEND_GROUP_VENDOR,
-  budgetField,
-  currency,
+  config,
   now = new Date(),
 }: {
   organizationId: number;
@@ -195,13 +212,11 @@ export const getVendorSpend = async ({
   from: Date;
   /** Inclusive end of the window. */
   to: Date;
-  groupBy?: string;
-  /** A NUMBER field on the vendor record to measure actuals against. */
-  budgetField?: string;
-  /** Report currency. Defaults to whichever currency has the most invoices. */
-  currency?: string;
+  config: TReportConfig;
   now?: Date;
 }): Promise<VendorSpendReport> => {
+  const { measure, groupBy, budgetField, currency, filters } = config;
+
   const [definitions, records, items] = await Promise.all([
     prisma.metadataFieldDefinition.findMany({
       where: { organizationId, category: SPEND_GROUP_VENDOR },
@@ -232,6 +247,9 @@ export const getVendorSpend = async ({
         receivedAt: true,
         senderEmail: true,
         extractedData: true,
+        // Grouping and filtering by where the document got to, which is a
+        // different question from what it came to.
+        document: { select: { status: true } },
       },
     }),
   ]);
@@ -248,7 +266,7 @@ export const getVendorSpend = async ({
   const numeric = definitions.filter((definition) => definition.type === 'NUMBER');
 
   const groupOptions = [
-    { key: SPEND_GROUP_VENDOR, label: 'Vendor' },
+    ...BUILT_IN_GROUPINGS.map((key) => ({ key, label: BUILT_IN_GROUPING_LABELS[key] })),
     ...groupable.map((definition) => ({ key: definition.key, label: definition.label })),
   ];
   const budgetOptions = numeric.map((definition) => ({
@@ -276,10 +294,14 @@ export const getVendorSpend = async ({
   };
 
   const definition = groupable.find((candidate) => candidate.key === groupBy);
-  // An unknown group key falls back to vendor rather than erroring: a saved link
-  // or a bookmarked view must not break when a field is renamed away.
-  const effectiveGroupBy = definition ? groupBy : SPEND_GROUP_VENDOR;
-  const groupLabel = definition?.label ?? 'Vendor';
+  // An unknown group key falls back to vendor rather than erroring: a saved view
+  // must not break when the field it grouped by is deleted or renamed away.
+  const effectiveGroupBy = definition || isBuiltInGrouping(groupBy) ? groupBy : SPEND_GROUP_VENDOR;
+  const groupLabel = definition
+    ? definition.label
+    : isBuiltInGrouping(groupBy)
+      ? BUILT_IN_GROUPING_LABELS[groupBy]
+      : 'Vendor';
 
   // ---- vendor identification ------------------------------------------------
   //
@@ -330,13 +352,17 @@ export const getVendorSpend = async ({
   // ---- measure every invoice ----------------------------------------------
   type Measured = {
     item: (typeof items)[number];
+    /** The invoice's total, always — filters read this whatever the measure is. */
     amount: number;
+    /** What this invoice contributes to the report's measure. */
+    value: number;
     currency: string;
     vendorLabel: string;
     record: VendorRecord | null;
     date: string;
     dateBasis: 'invoice' | 'arrival';
     daysPastDue: number | null;
+    status: string;
   };
 
   const measured: Measured[] = [];
@@ -380,9 +406,26 @@ export const getVendorSpend = async ({
     const printed = fields.invoiceDate ? parseOcrDate(fields.invoiceDate) : null;
     const arrival = item.receivedAt ?? item.createdAt;
 
+    /*
+      What this invoice contributes.
+
+      `count` contributes one and ignores the figures entirely — including whether
+      they could be read, which is why an invoice with no readable total is still
+      excluded above: a count that included it would not agree with the total that
+      did not, and two rows of the same report disagreeing is worse than a
+      slightly smaller count.
+
+      `average` contributes the amount and is divided by the row's invoice count
+      at the end, rather than averaging averages.
+    */
+    const tax = parseAmount(fields.tax) ?? 0;
+    const value = measure === 'count' ? 1 : measure === 'tax' ? tax : amount;
+
     measured.push({
       item,
       amount,
+      value,
+      status: item.document?.status ?? 'DRAFT',
       currency: currencyOf(fields.currency),
       // `||` throughout: an empty string is a missing name, and `??` would keep
       // it and label the row with nothing.
@@ -399,10 +442,67 @@ export const getVendorSpend = async ({
     });
   }
 
+  /*
+    Filters, applied to the measured invoices.
+
+    In memory rather than in SQL because everything worth filtering on — the
+    vendor's identity, its custom field values, the OCR'd amount — is resolved
+    here, not in a column. The window already bounds the set to a few thousand
+    rows, so this costs nothing next to the extraction work above.
+  */
+  const valueForFilter = (entry: Measured, field: string): string | number | null => {
+    if (field === 'amount') return entry.amount;
+    if (field === 'vendor') return entry.vendorLabel;
+    if (field === 'sender') return entry.item.senderEmail ?? '';
+    if (field === 'status') return entry.status;
+    if (field === 'month') return monthOf(entry.date);
+
+    const bag =
+      entry.record?.data && typeof entry.record.data === 'object' && !Array.isArray(entry.record.data)
+        ? (entry.record.data as Record<string, unknown>)
+        : {};
+    const raw = bag[field];
+
+    return raw === undefined || raw === null ? null : typeof raw === 'number' ? raw : String(raw);
+  };
+
+  const passesFilter = (entry: Measured, filter: TReportFilter): boolean => {
+    const actual = valueForFilter(entry, filter.field);
+
+    if (isNumericFilterOp(filter.op)) {
+      const bound = Number(filter.value.replace(/[^0-9.-]/g, ''));
+      const value = typeof actual === 'number' ? actual : Number(actual);
+
+      // A filter that cannot be evaluated excludes the row rather than including
+      // it: "over 10,000" must not be satisfied by an invoice whose figure is
+      // unknown.
+      if (!Number.isFinite(bound) || !Number.isFinite(value)) return false;
+
+      return filter.op === 'gt' ? value > bound : value < bound;
+    }
+
+    const left = String(actual ?? '').trim().toLowerCase();
+    const right = filter.value.trim().toLowerCase();
+
+    if (filter.op === 'contains') return left.includes(right);
+    // `is-not` is true for a row with no value at all — "supplier status is not
+    // Blocked" plainly includes a vendor nobody has classified.
+    if (filter.op === 'is-not') return left !== right;
+
+    return left === right;
+  };
+
+  const filtered =
+    filters.length === 0
+      ? measured
+      : measured.filter((entry) => filters.every((filter) => passesFilter(entry, filter)));
+
+  const excludedByFilters = measured.length - filtered.length;
+
   // ---- currencies ----------------------------------------------------------
   const byCurrency = new Map<string, { invoices: number; total: number }>();
 
-  for (const entry of measured) {
+  for (const entry of filtered) {
     const bucket = byCurrency.get(entry.currency) ?? { invoices: 0, total: 0 };
     bucket.invoices += 1;
     bucket.total += entry.amount;
@@ -427,8 +527,16 @@ export const getVendorSpend = async ({
       ? currencyOf(currency)
       : (currencies.at(0)?.code ?? null);
 
-  const inCurrency =
-    reportCurrency === null ? [] : measured.filter((entry) => entry.currency === reportCurrency);
+  /*
+    A count is not money and must not be split by currency: "how many invoices
+    arrived from each supplier" has one answer, and reporting it per currency
+    would give a different number for the same question depending on a dropdown.
+  */
+  const inCurrency = !isMoneyMeasure(measure)
+    ? filtered
+    : reportCurrency === null
+      ? []
+      : filtered.filter((entry) => entry.currency === reportCurrency);
 
   /*
     The threshold, from the median of the invoices actually being reported.
@@ -440,8 +548,19 @@ export const getVendorSpend = async ({
   */
   const sortedAmounts = inCurrency.map((entry) => entry.amount).sort((a, b) => a - b);
   const median = sortedAmounts.length > 0 ? sortedAmounts[Math.floor(sortedAmounts.length / 2)] : 0;
+
+  /*
+    Only for a money measure, and therefore only within one currency.
+
+    A count spans every currency by design — "how many invoices arrived" has one
+    answer — so its rows hold USD and JMD figures side by side. Taking a median
+    across those and flagging what sits 25× above it would be comparing amounts
+    that are not comparable, and the warning it printed summed them: exactly what
+    the top of this file promises never to do. The warning exists to protect a
+    money total; where there is no money total there is nothing to protect.
+  */
   const doubtfulAbove =
-    sortedAmounts.length >= OUTLIER_MIN_SAMPLE && median > 0
+    isMoneyMeasure(measure) && sortedAmounts.length >= OUTLIER_MIN_SAMPLE && median > 0
       ? median * OUTLIER_MEDIAN_MULTIPLE
       : Number.POSITIVE_INFINITY;
 
@@ -471,6 +590,27 @@ export const getVendorSpend = async ({
   const buckets = new Map<string, Bucket>();
 
   const groupOf = (entry: Measured): { key: string; label: string } => {
+    if (effectiveGroupBy === 'month') {
+      return { key: monthOf(entry.date), label: monthOf(entry.date) };
+    }
+
+    if (effectiveGroupBy === 'status') {
+      const status = entry.status;
+      return {
+        key: status.toLowerCase(),
+        // Title case rather than the enum: PENDING is a database value, "Pending"
+        // is what a person calls it.
+        label: status.charAt(0) + status.slice(1).toLowerCase(),
+      };
+    }
+
+    if (effectiveGroupBy === 'sender') {
+      const sender = entry.item.senderEmail?.trim().toLowerCase();
+      return sender
+        ? { key: sender, label: sender }
+        : { key: '__no_sender__', label: 'No sender recorded' };
+    }
+
     if (effectiveGroupBy === SPEND_GROUP_VENDOR) {
       // Core name, so "Company Ltd." and "Company Limited" are one row even
       // when neither is in the directory.
@@ -511,7 +651,7 @@ export const getVendorSpend = async ({
       items: [],
     };
 
-    bucket.total += entry.amount;
+    bucket.total += entry.value;
     bucket.invoices += 1;
     bucket.vendors.add(entry.vendorLabel.toLowerCase());
 
@@ -529,7 +669,7 @@ export const getVendorSpend = async ({
     }
 
     if (entry.daysPastDue !== null && entry.daysPastDue > 0) {
-      bucket.overdueTotal += entry.amount;
+      bucket.overdueTotal += entry.value;
       bucket.overdueInvoices += 1;
     }
 
@@ -548,7 +688,7 @@ export const getVendorSpend = async ({
     buckets.set(key, bucket);
   }
 
-  const totalSpend = inCurrency.reduce((sum, entry) => sum + entry.amount, 0);
+  const totalSpend = inCurrency.reduce((sum, entry) => sum + entry.value, 0);
 
   /** A row's budget: null when no vendor in it carries a figure. */
   const budgetOfBucket = (bucket: Bucket): number | null =>
@@ -575,6 +715,16 @@ export const getVendorSpend = async ({
     }
   }
 
+  /**
+   * A row's reported number.
+   *
+   * For every measure but `average` this is the accumulated total. An average has
+   * to be divided once, here — and it has to be the same value everywhere, or the
+   * rows would be ordered by one number and labelled with another.
+   */
+  const rowValue = (bucket: Bucket): number =>
+    measure === 'average' && bucket.invoices > 0 ? bucket.total / bucket.invoices : bucket.total;
+
   /*
     Ordering: by overrun once a budget is in play, by size otherwise.
 
@@ -586,8 +736,8 @@ export const getVendorSpend = async ({
     if (budget) {
       const aBudget = budgetOfBucket(a);
       const bBudget = budgetOfBucket(b);
-      const aOver = aBudget === null ? null : a.total - aBudget;
-      const bOver = bBudget === null ? null : b.total - bBudget;
+      const aOver = aBudget === null ? null : rowValue(a) - aBudget;
+      const bOver = bBudget === null ? null : rowValue(b) - bBudget;
 
       // Unbudgeted rows sort last: they cannot be over or under anything, and
       // putting them among the overruns would bury the ones that are.
@@ -596,8 +746,19 @@ export const getVendorSpend = async ({
       if (aOver !== null && bOver !== null && aOver !== bOver) return bOver - aOver;
     }
 
-    return b.total - a.total;
+    return rowValue(b) - rowValue(a);
   });
+
+  /**
+   * The headline figure, in the same terms as the rows.
+   *
+   * `share` is deliberately zero for an average: a row's mean as a fraction of
+   * the overall mean is not a share of anything, and printing "142% of total"
+   * beside it would be worse than printing nothing.
+   */
+  const reportTotal =
+    measure === 'average' && inCurrency.length > 0 ? totalSpend / inCurrency.length : totalSpend;
+  const shareable = measure !== 'average' && reportTotal > 0;
   const shown = ranked.slice(0, ROW_LIMIT);
 
   return {
@@ -605,10 +766,12 @@ export const getVendorSpend = async ({
     to: isoDay(to),
     groupBy: effectiveGroupBy,
     groupLabel,
-    currency: reportCurrency,
+    measure,
+    currency: isMoneyMeasure(measure) ? reportCurrency : null,
     currencies,
-    totalSpend,
+    totalSpend: reportTotal,
     invoices: inCurrency.length,
+    excludedByFilters,
     withoutAmount,
     datedByInvoice: inCurrency.filter((entry) => entry.dateBasis === 'invoice').length,
     unidentifiedVendors: inCurrency.filter((entry) => entry.record === null).length,
@@ -619,23 +782,25 @@ export const getVendorSpend = async ({
     rows: shown.map((bucket) => {
       const rowBudget = budgetOfBucket(bucket);
 
+      const value = rowValue(bucket);
+
       return {
         key: bucket.key,
         label: bucket.label,
-        total: bucket.total,
         invoices: bucket.invoices,
+        total: value,
         average: bucket.invoices > 0 ? bucket.total / bucket.invoices : 0,
         overdueTotal: bucket.overdueTotal,
         overdueInvoices: bucket.overdueInvoices,
-        share: totalSpend > 0 ? bucket.total / totalSpend : 0,
+        share: shareable ? value / reportTotal : 0,
         vendors: bucket.vendors.size,
         budget: rowBudget,
         budgetVendors: bucket.budgets.size,
         vendorsWithoutBudget: bucket.unbudgeted.size,
-        variance: rowBudget === null ? null : bucket.total - rowBudget,
+        variance: rowBudget === null ? null : value - rowBudget,
         // Guarded against a budget of zero: dividing by it would report Infinity,
         // and a zero budget means "no spend allowed", not "unlimited".
-        usedShare: rowBudget === null || rowBudget === 0 ? null : bucket.total / rowBudget,
+        usedShare: rowBudget === null || rowBudget === 0 ? null : value / rowBudget,
         items: bucket.items.sort((a, b) => b.amount - a.amount).slice(0, ITEMS_PER_ROW),
         moreItems: Math.max(0, bucket.items.length - ITEMS_PER_ROW),
       };
@@ -647,17 +812,17 @@ export const getVendorSpend = async ({
     budgetedActual: budget
       ? inCurrency
           .filter((entry) => budgetOf(entry.record) !== null)
-          .reduce((sum, entry) => sum + entry.amount, 0)
+          .reduce((sum, entry) => sum + entry.value, 0)
       : null,
     overBudgetRows: budget
       ? ranked.filter((bucket) => {
           const figure = budgetOfBucket(bucket);
-          return figure !== null && bucket.total > figure;
+          return figure !== null && rowValue(bucket) > figure;
         }).length
       : 0,
     vendorsWithoutBudget: budget ? allUnbudgeted.size : 0,
     otherRows: Math.max(0, ranked.length - shown.length),
-    otherRowsTotal: ranked.slice(ROW_LIMIT).reduce((sum, bucket) => sum + bucket.total, 0),
+    otherRowsTotal: ranked.slice(ROW_LIMIT).reduce((sum, bucket) => sum + rowValue(bucket), 0),
     groupOptions,
   };
 };

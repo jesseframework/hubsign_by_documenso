@@ -41,7 +41,11 @@ import {
 } from '@documenso/lib/server-only/license/redeem-license-key';
 import { stripe } from '@documenso/lib/server-only/stripe';
 import { getSigningBottlenecks } from '@documenso/lib/server-only/document/bottlenecks';
-import { getVendorSpend } from '@documenso/lib/server-only/document/vendor-spend';
+import { getInvoiceReport } from '@documenso/lib/server-only/document/invoice-report';
+import {
+  BUILT_IN_REPORT_VIEW,
+  ZReportConfigSchema,
+} from '@documenso/lib/universal/report-config';
 import { getOrganizationDueDates } from '@documenso/lib/server-only/inbox/invoice-due';
 import { prisma } from '@documenso/prisma';
 
@@ -333,6 +337,29 @@ async function sendOrgSetPasswordEmail(params: {
     console.error('[Org Invite] Failed to send set-password email:', err);
   });
 }
+
+/**
+ * The organization this request acts on.
+ *
+ * `joinedAt asc` because a user can belong to several: without an explicit order
+ * Postgres heap order decides which one a query describes, and an unrelated row
+ * update can silently switch it. Matches `resolveOrganizationId`.
+ */
+const requireOrgMembership = async (userId: number) => {
+  const membership = await prisma.organizationMember.findFirst({
+    where: { userId },
+    orderBy: { joinedAt: 'asc' },
+  });
+
+  if (!membership) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: 'You are not a member of an organization.',
+    });
+  }
+
+  return membership;
+};
 
 export const orgRouter = router({
   // ═══════════════════════════════════════════
@@ -2002,54 +2029,143 @@ export const orgRouter = router({
    * natively org-scoped and filter directly.
    */
   /**
-   * Spend by vendor, or by any field the organization defined on its vendors.
+   * Run one configured invoice report.
    *
    * A separate query from `getDashboardStats` rather than another slice of it:
    * this one scans OCR totals across a window and resolves each invoice's vendor
    * against the directory, which is work the overview does not need and should
    * not pay for on every load.
    */
-  getVendorSpend: authenticatedProcedure
-    .input(
-      z
-        .object({
-          days: z.number().int().min(1).max(731).default(90),
-          /** A custom field key, or `vendor`. Unknown keys fall back to vendor. */
-          groupBy: z.string().max(80).optional(),
-          /** A NUMBER field on the vendor record to compare actuals against. */
-          budgetField: z.string().max(80).optional(),
-          /** Report currency. Defaults to the one with the most invoices. */
-          currency: z.string().max(8).optional(),
-        })
-        .optional(),
-    )
+  getInvoiceReport: authenticatedProcedure
+    .input(z.object({ config: ZReportConfigSchema }))
     .query(async ({ ctx, input }) => {
-      const membership = await prisma.organizationMember.findFirst({
-        where: { userId: ctx.user.id },
-        orderBy: { joinedAt: 'asc' },
-      });
+      const membership = await requireOrgMembership(ctx.user.id);
 
-      if (!membership) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'You are not a member of an organization.',
-        });
-      }
-
-      const days = input?.days ?? 90;
       const to = DateTime.utc().endOf('day');
       // Inclusive of today, matching the dashboard toolbar's presets: "last 90
       // days" spans 90 days, not 91.
-      const from = to.startOf('day').minus({ days: days - 1 });
+      const from = to.startOf('day').minus({ days: input.config.days - 1 });
 
-      return getVendorSpend({
+      return getInvoiceReport({
         organizationId: membership.organizationId,
         from: from.toJSDate(),
         to: to.toJSDate(),
-        groupBy: input?.groupBy,
-        budgetField: input?.budgetField,
-        currency: input?.currency,
+        config: input.config,
       });
+    }),
+
+  /**
+   * The organization's saved reports, with the built-in one first.
+   *
+   * The built-in view is prepended here rather than seeded into the table: a row
+   * in the database can be renamed, reconfigured or deleted, and every
+   * organization would then need re-seeding to get it back. As a constant it is
+   * always present and always the same.
+   *
+   * A stored config that no longer parses is dropped from the list rather than
+   * failing the query — one bad row must not take the page down — and reported so
+   * the count can say what happened.
+   */
+  listReportViews: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await requireOrgMembership(ctx.user.id);
+
+    const rows = await prisma.reportView.findMany({
+      where: { organizationId: membership.organizationId },
+      orderBy: [{ order: 'asc' }, { name: 'asc' }],
+    });
+
+    const views: { id: string; name: string; config: unknown; builtIn: boolean }[] = [
+      { ...BUILT_IN_REPORT_VIEW, builtIn: true },
+    ];
+    let unreadable = 0;
+
+    for (const row of rows) {
+      const parsed = ZReportConfigSchema.safeParse(row.config);
+
+      if (!parsed.success) {
+        unreadable += 1;
+        continue;
+      }
+
+      views.push({ id: row.id, name: row.name, config: parsed.data, builtIn: false });
+    }
+
+    return { views, unreadable };
+  }),
+
+  /** Save a report configuration under a name, or update one. */
+  upsertReportView: authenticatedProcedure
+    .input(
+      z.object({
+        id: z.string().optional(),
+        name: z.string().trim().min(1).max(80),
+        config: ZReportConfigSchema,
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireOrgMembership(ctx.user.id);
+
+      if (input.id) {
+        const existing = await prisma.reportView.findFirst({
+          where: { id: input.id, organizationId: membership.organizationId },
+          select: { id: true },
+        });
+
+        if (!existing) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Report not found.' });
+        }
+
+        return prisma.reportView.update({
+          where: { id: existing.id },
+          data: { name: input.name, config: input.config },
+        });
+      }
+
+      const clash = await prisma.reportView.findFirst({
+        where: { organizationId: membership.organizationId, name: input.name },
+        select: { id: true },
+      });
+
+      if (clash) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `A report called "${input.name}" already exists.`,
+        });
+      }
+
+      const count = await prisma.reportView.count({
+        where: { organizationId: membership.organizationId },
+      });
+
+      return prisma.reportView.create({
+        data: {
+          organizationId: membership.organizationId,
+          name: input.name,
+          config: input.config,
+          createdByUserId: ctx.user.id,
+          // Newest last, so the list stays in the order people added them.
+          order: count,
+        },
+      });
+    }),
+
+  deleteReportView: authenticatedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireOrgMembership(ctx.user.id);
+
+      const view = await prisma.reportView.findFirst({
+        where: { id: input.id, organizationId: membership.organizationId },
+        select: { id: true },
+      });
+
+      if (!view) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Report not found.' });
+      }
+
+      await prisma.reportView.delete({ where: { id: view.id } });
+
+      return { success: true };
     }),
 
   getDashboardStats: authenticatedProcedure
