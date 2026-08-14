@@ -414,6 +414,12 @@ model Document {
   documentMeta   DocumentMeta?
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @default(now()) @updatedAt
+  /// Set once, the first time this document is actually sent for signature
+  /// (`sendDocument`) — never on creation, never again on resend/reminder.
+  /// This, not `createdAt`, is what "signature request" billing quota counts:
+  /// a saved draft costs nothing, and nudging a slow signer doesn't burn a
+  /// second unit. Null means never sent.
+  sentAt         DateTime?
   completedAt    DateTime?
   deletedAt      DateTime?
   teamId         Int?
@@ -468,6 +474,9 @@ model Document {
   /// The dashboard's hot path: every aggregate filters org + not-deleted, and
   /// most also filter or group by status.
   @@index([organizationId, deletedAt, status])
+  /// Serves the monthly signature-request quota count in `limits/server.ts`
+  /// (`userId` + `sentAt` range).
+  @@index([userId, sentAt])
 }
 
 /// A file a signer attached while signing — a PO, a spec sheet, a photo — kept
@@ -1816,6 +1825,7 @@ model Organization {
 }
 
 enum OrgSeatTier {
+  TEAM
   BUSINESS
   ENTERPRISE
 }

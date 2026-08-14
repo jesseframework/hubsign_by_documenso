@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { MessageDescriptor } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import type { PriceIntervals } from '@documenso/ee/server-only/stripe/get-prices-by-interval';
 import { useIsMounted } from '@documenso/lib/client-only/hooks/use-is-mounted';
+import { STRIPE_PLAN_TYPE } from '@documenso/lib/constants/billing';
 import { toHumanPrice } from '@documenso/lib/universal/stripe/to-human-price';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
@@ -33,9 +34,17 @@ const MotionCard = motion(Card);
 
 export type BillingPlansProps = {
   prices: PriceIntervals;
+  /**
+   * Arrived here from a marketing-site `?plan=individual` CTA — skip the
+   * click and open checkout for the Individual price automatically. Matched
+   * by `product.metadata.plan === 'regular'` rather than "the only price in
+   * the list", since this list can also include Platform/Enterprise-tagged
+   * personal prices if any are still active in Stripe.
+   */
+  autoSubscribe?: boolean;
 };
 
-export const BillingPlans = ({ prices }: BillingPlansProps) => {
+export const BillingPlans = ({ prices, autoSubscribe }: BillingPlansProps) => {
   const { _ } = useLingui();
   const { toast } = useToast();
 
@@ -44,6 +53,7 @@ export const BillingPlans = ({ prices }: BillingPlansProps) => {
   const [interval, setInterval] = useState<Interval>('month');
   const [checkoutSessionPriceId, setCheckoutSessionPriceId] = useState<string | null>(null);
   const [embeddedClientSecret, setEmbeddedClientSecret] = useState<string | null>(null);
+  const hasAutoSubscribed = useRef(false);
 
   const { mutateAsync: createEmbeddedCheckoutSession } =
     trpc.profile.createEmbeddedCheckoutSession.useMutation();
@@ -69,6 +79,20 @@ export const BillingPlans = ({ prices }: BillingPlansProps) => {
       setCheckoutSessionPriceId(null);
     }
   };
+
+  useEffect(() => {
+    if (!autoSubscribe || hasAutoSubscribed.current) return;
+
+    const individualPrice = prices[interval].find(
+      (price) => price.product.metadata?.plan === STRIPE_PLAN_TYPE.REGULAR,
+    );
+
+    if (individualPrice) {
+      hasAutoSubscribed.current = true;
+      void onSubscribeClick(individualPrice.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSubscribe, prices, interval]);
 
   if (embeddedClientSecret) {
     return (

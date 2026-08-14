@@ -11,6 +11,7 @@ import {
   matchOrgPrice,
   searchActiveOrgPrices,
 } from '@documenso/lib/server-only/stripe/get-org-seat-price';
+import { onOrgSubscriptionDeleted } from '@documenso/ee/server-only/stripe/webhook/on-org-subscription-deleted';
 import { onOrgSubscriptionUpdated } from '@documenso/ee/server-only/stripe/webhook/on-org-subscription-updated';
 import { onSubscriptionDeleted } from '@documenso/ee/server-only/stripe/webhook/on-subscription-deleted';
 import {
@@ -24,6 +25,7 @@ import { getI18nInstance } from '@documenso/lib/client-only/providers/i18n-serve
 import {
   ORG_SEAT_TIERS,
   ORG_UNLIMITED_SENTINEL,
+  resolveOrgTierDocuments,
 } from '@documenso/lib/constants/org-tiers';
 import type { OrgBillingInterval } from '@documenso/lib/constants/org-tiers';
 import { env } from '@documenso/lib/utils/env';
@@ -123,7 +125,7 @@ const assignSeatToMember = async ({
 }: {
   organizationId: number;
   memberId: string;
-  tier: 'BUSINESS' | 'ENTERPRISE';
+  tier: 'BUSINESS' | 'ENTERPRISE' | 'TEAM';
   acknowledgeCancelPersonalPlan?: boolean;
 }) => {
   const seatPlan = await prisma.orgSeatPlan.findFirst({
@@ -1048,6 +1050,10 @@ export const orgRouter = router({
 
     return {
       seat: {
+        TEAM: {
+          month: amountFor({ type: 'org_seat', tier: 'TEAM', interval: 'month' }),
+          year: amountFor({ type: 'org_seat', tier: 'TEAM', interval: 'year' }),
+        },
         BUSINESS: {
           month: amountFor({ type: 'org_seat', tier: 'BUSINESS', interval: 'month' }),
           year: amountFor({ type: 'org_seat', tier: 'BUSINESS', interval: 'year' }),
@@ -1057,7 +1063,14 @@ export const orgRouter = router({
           year: amountFor({ type: 'org_seat', tier: 'ENTERPRISE', interval: 'year', deployment }),
         },
       },
+      // Team has no `dmsAddonAvailable` — deliberately no Stripe Product will
+      // ever exist tagged `{type: 'org_dms', tier: 'TEAM'}`, so `amountFor`
+      // naturally resolves to `null` here without special-casing it.
       dms: {
+        TEAM: {
+          month: amountFor({ type: 'org_dms', tier: 'TEAM', interval: 'month' }),
+          year: amountFor({ type: 'org_dms', tier: 'TEAM', interval: 'year' }),
+        },
         BUSINESS: {
           month: amountFor({ type: 'org_dms', tier: 'BUSINESS', interval: 'month' }),
           year: amountFor({ type: 'org_dms', tier: 'BUSINESS', interval: 'year' }),
@@ -1078,7 +1091,7 @@ export const orgRouter = router({
 
   purchaseSeats: authenticatedProcedure
     .input(z.object({
-      tier: z.enum(['BUSINESS', 'ENTERPRISE']),
+      tier: z.enum(['BUSINESS', 'ENTERPRISE', 'TEAM']),
       quantity: z.number().min(1).max(100),
       interval: z.enum(['month', 'year']).default('month'),
       dmsEnabled: z.boolean().optional(),
@@ -1116,7 +1129,7 @@ export const orgRouter = router({
       const tierLimits = ORG_SEAT_TIERS[input.tier];
 
       const config = {
-        documentsPerMonth: tierLimits.documents ?? ORG_UNLIMITED_SENTINEL,
+        documentsPerMonth: resolveOrgTierDocuments(input.tier) ?? ORG_UNLIMITED_SENTINEL,
         recipientsPerMonth: tierLimits.recipients ?? ORG_UNLIMITED_SENTINEL,
         directTemplates: tierLimits.directTemplates ?? ORG_UNLIMITED_SENTINEL,
         dmsEnabled: tierLimits.dmsEnabled,
@@ -1124,6 +1137,13 @@ export const orgRouter = router({
       };
 
       const dmsEnabled = input.dmsEnabled ?? config.dmsEnabled;
+
+      if (!tierLimits.dmsAddonAvailable && dmsEnabled) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Repositories is not available on the ${tierLimits.name} tier.`,
+        });
+      }
 
       // Interval is chosen once, at the org's first-ever seat purchase, and
       // locked thereafter across *every* tier — a single Stripe subscription
@@ -1148,6 +1168,18 @@ export const orgRouter = router({
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: `${input.tier} plan requires a minimum of ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}.`,
+        });
+      }
+
+      // Some tiers (Team) have a hard seat ceiling — a guardrail, not a
+      // billing meter — covering both the first-ever purchase and any
+      // later top-up against the same running total.
+      const projectedQuantity = (existingSeatPlan?.quantity ?? 0) + input.quantity;
+
+      if (tierLimits.maxSeats !== undefined && projectedQuantity > tierLimits.maxSeats) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `${tierLimits.name} is limited to ${tierLimits.maxSeats} seats.`,
         });
       }
 
@@ -1477,6 +1509,108 @@ export const orgRouter = router({
     }),
 
   /**
+   * Cancels one tier's plan on an org that holds more than one at once
+   * (mixed licensing) — e.g. drop an unused Enterprise plan while keeping
+   * Business. Requires the tier to have zero assigned seats first: members
+   * must be unassigned or moved to another tier before it can go, the same
+   * way `purchaseSeats` requires a tier minimum to *establish* one.
+   */
+  cancelSeatPlan: authenticatedProcedure
+    .input(z.object({ tier: z.enum(['BUSINESS', 'ENTERPRISE', 'TEAM']) }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id, role: 'ORG_ADMIN' },
+        include: { organization: true },
+      });
+
+      if (!membership) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+
+      const org = membership.organization;
+
+      const seatPlan = await prisma.orgSeatPlan.findFirst({
+        where: { organizationId: membership.organizationId, tier: input.tier },
+      });
+
+      if (!seatPlan) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: `No ${input.tier} plan to cancel.` });
+      }
+
+      if (seatPlan.assigned > 0) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Unassign every member on ${ORG_SEAT_TIERS[input.tier].name} before cancelling it.`,
+        });
+      }
+
+      // License-key grants aren't reflected in Stripe at all — nothing to
+      // remove there, just drop the local row (mirrors the grace/expiry path
+      // in `limits/server.ts`, which already treats these as separate from
+      // Stripe-billed plans).
+      if (seatPlan.source !== 'stripe' || !IS_BILLING_ENABLED() || !org.stripeSubscriptionId) {
+        await prisma.orgSeatPlan.delete({ where: { id: seatPlan.id } });
+        return { success: true };
+      }
+
+      const liveSubscription = await stripe.subscriptions.retrieve(org.stripeSubscriptionId, {
+        expand: ['items.data.price.product'],
+      });
+
+      const tierItemIds = liveSubscription.items.data
+        .filter((item) => {
+          const { product } = item.price;
+          return typeof product !== 'string' && !product.deleted && product.metadata?.tier === input.tier;
+        })
+        .map((item) => item.id);
+
+      if (tierItemIds.length === 0) {
+        // Nothing on the live subscription for this tier already — just a
+        // stale local row (e.g. removed via the Stripe portal directly,
+        // which `onOrgSubscriptionUpdated` should have caught, but this
+        // keeps the explicit cancel path correct either way).
+        await prisma.orgSeatPlan.delete({ where: { id: seatPlan.id } });
+        return { success: true };
+      }
+
+      const removingEverything = tierItemIds.length === liveSubscription.items.data.length;
+
+      if (removingEverything) {
+        // Stripe subscriptions can't hold zero items — if this tier is the
+        // only thing on it, cancel the whole subscription instead of trying
+        // to remove its last item.
+        const canceledSubscription = await stripe.subscriptions.cancel(liveSubscription.id, {
+          invoice_now: true,
+          prorate: true,
+        });
+
+        await onOrgSubscriptionDeleted({ organizationId: membership.organizationId });
+        await onSubscriptionDeleted({ subscription: canceledSubscription });
+      } else {
+        const updatedSubscription = await stripe.subscriptions.update(liveSubscription.id, {
+          items: tierItemIds.map((id) => ({ id, deleted: true })),
+          proration_behavior: 'always_invoice',
+        });
+
+        await onOrgSubscriptionUpdated({
+          organizationId: membership.organizationId,
+          subscription: updatedSubscription,
+        });
+      }
+
+      // Belt-and-braces: the sync functions above are what's supposed to
+      // remove the row (`onOrgSubscriptionUpdated` deletes any tier no
+      // longer on the live subscription; a full cancel leaves nothing to
+      // sync from), but delete it directly too rather than trust that
+      // indirect effect for an explicit, user-initiated cancel.
+      await prisma.orgSeatPlan.deleteMany({
+        where: { organizationId: membership.organizationId, tier: input.tier },
+      });
+
+      return { success: true };
+    }),
+
+  /**
    * Checks whether assigning a seat to this member would strand an active
    * personal subscription (org seat limits supersede personal ones — see
    * `getServerLimits` — so the personal plan becomes wasted spend). Called by
@@ -1515,7 +1649,7 @@ export const orgRouter = router({
       memberId: z.string(),
       // An org can hold more than one tier at once now (mixed licensing) —
       // the caller has to say which tier's seat to assign.
-      tier: z.enum(['BUSINESS', 'ENTERPRISE']),
+      tier: z.enum(['BUSINESS', 'ENTERPRISE', 'TEAM']),
       acknowledgeCancelPersonalPlan: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -1921,7 +2055,7 @@ export const orgRouter = router({
          * Omit to add them unlicensed — membership and licensing are separate,
          * and an org may not have seats to spare.
          */
-        seatTier: z.enum(['BUSINESS', 'ENTERPRISE']).optional(),
+        seatTier: z.enum(['BUSINESS', 'ENTERPRISE', 'TEAM']).optional(),
         /** Required when the user holds a personal plan the seat will cancel. */
         acknowledgeCancelPersonalPlan: z.boolean().optional(),
       }),

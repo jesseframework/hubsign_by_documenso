@@ -191,6 +191,16 @@ export const sendDocument = async ({
   );
 
   if (allRecipientsHaveNoActionToTake) {
+    // Goes straight to sealing without ever passing through PENDING (e.g.
+    // CC-only recipients, or everyone already signed) — still a genuine send
+    // for signature-request billing purposes, so it still needs `sentAt`.
+    if (!document.sentAt) {
+      await prisma.document.update({
+        where: { id: documentId },
+        data: { sentAt: new Date() },
+      });
+    }
+
     await jobs.triggerJob({
       name: 'internal.seal-document',
       payload: {
@@ -229,6 +239,7 @@ export const sendDocument = async ({
       },
       data: {
         status: DocumentStatus.PENDING,
+        sentAt: document.sentAt ?? new Date(),
       },
       include: {
         documentMeta: true,

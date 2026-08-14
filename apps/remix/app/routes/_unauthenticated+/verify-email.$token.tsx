@@ -13,7 +13,27 @@ import { EMAIL_VERIFICATION_STATE } from '@documenso/lib/constants/email';
 import { Button } from '@documenso/ui/primitives/button';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
+import { clearPendingPlanCookie, getPendingPlanCookie } from '~/utils/pending-plan-cookie';
+
 import type { Route } from './+types/verify-email.$token';
+
+/**
+ * Where a freshly-verified user lands, based on the plan they picked on a
+ * marketing-site CTA at signup (see `pending-plan-cookie.ts` for why this is
+ * a cookie rather than threaded through the verification link itself).
+ * `individual` goes straight to checkout; org tiers go through org creation
+ * first since a brand-new signup has no org yet — `org+/settings.tsx`
+ * forwards `?plan=` on to `/org/billing` once the org exists.
+ */
+const resolvePostVerificationDestination = (): string => {
+  const plan = getPendingPlanCookie();
+  clearPendingPlanCookie();
+
+  if (plan === 'individual') return '/settings/billing?plan=individual';
+  if (plan === 'team' || plan === 'business' || plan === 'enterprise') return `/org/settings?plan=${plan}`;
+
+  return '/';
+};
 
 export const loader = ({ params }: Route.LoaderArgs) => {
   const { token } = params;
@@ -151,10 +171,8 @@ export default function VerifyEmailPage({ loaderData }: Route.ComponentProps) {
               </Trans>
             </p>
 
-            <Button className="mt-4" asChild>
-              <Link to="/">
-                <Trans>Continue</Trans>
-              </Link>
+            <Button className="mt-4" onClick={() => void navigate(resolvePostVerificationDestination())}>
+              <Trans>Continue</Trans>
             </Button>
           </div>
         </div>

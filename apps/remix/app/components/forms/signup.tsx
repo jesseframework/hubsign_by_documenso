@@ -35,6 +35,7 @@ import { SignaturePadDialog } from '@documenso/ui/primitives/signature-pad/signa
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { Turnstile } from '~/components/general/turnstile';
+import { isPendingPlanSlug, setPendingPlanCookie } from '~/utils/pending-plan-cookie';
 
 type SignUpStep = 'BASIC_DETAILS' | 'CLAIM_USERNAME';
 
@@ -101,6 +102,7 @@ export const SignUpForm = ({
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const utmSrc = searchParams.get('utm_source') ?? null;
+  const planParam = searchParams.get('plan');
 
   const baseUrl = new URL(NEXT_PUBLIC_WEBAPP_URL() ?? 'http://localhost:3000');
 
@@ -131,6 +133,14 @@ export const SignUpForm = ({
         url,
         turnstileToken: turnstileToken ?? undefined,
       });
+
+      // A marketing-site CTA can route here with `?plan=<slug>` — stash it in
+      // a cookie (not query state) since email verification happens via a
+      // mailed link, outside this navigation. Consumed and cleared once the
+      // user verifies (see `verify-email.$token.tsx`).
+      if (isPendingPlanSlug(planParam)) {
+        setPendingPlanCookie(planParam);
+      }
 
       await navigate(`/unverified-account`);
 

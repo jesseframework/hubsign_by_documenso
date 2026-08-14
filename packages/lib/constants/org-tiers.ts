@@ -1,20 +1,33 @@
 import type { OrgSeatTier } from '@prisma/client';
 
+import { DEPLOYMENT_TYPE } from './app';
+
 export type OrgTierLimits = {
   name: string;
   minSeats: number;
-  /** `null` means unlimited — resolve per-consumer (e.g. `Infinity` for in-memory checks, a sentinel int for Prisma columns). */
+  /** Seat ceiling for this tier — `undefined` means no cap (Business/Enterprise). Team caps at 20 as a guardrail, not a billing meter. */
+  maxSeats?: number;
+  /** `null` means unlimited — resolve per-consumer (e.g. `Infinity` for in-memory checks, a sentinel int for Prisma columns). Enterprise's canonical value here is the *dedicated*-deployment one; on a shared deployment it's overridden — see `resolveOrgTierDocuments`. */
   documents: number | null;
   recipients: number | null;
   directTemplates: number | null;
   /**
-   * Whether DMS is bundled into this tier for free. Always `false` now — DMS
-   * is a paid add-on for every tier (see `ORG_DOC_BLOCK_SIZE` below for the
-   * other org-level add-on). Kept as an explicit field rather than deleted so
-   * `getOrgSeatLimits`'s bundling check stays uniform across tiers rather
-   * than special-casing "no tier ever bundles it."
+   * Whether DMS ("Repositories") is bundled into this tier for free. Always
+   * `false` now — DMS is a paid add-on for every tier that offers it (see
+   * `dmsAddonAvailable` below for which do, and `ORG_DOC_BLOCK_SIZE` below
+   * for the other org-level add-on). Kept as an explicit field rather than
+   * deleted so `getOrgSeatLimits`'s bundling check stays uniform across
+   * tiers rather than special-casing "no tier ever bundles it."
    */
   dmsEnabled: boolean;
+  /**
+   * Whether DMS ("Repositories") can be purchased as a paid add-on at all on
+   * this tier. Distinct from `dmsEnabled` (which is about free bundling,
+   * always `false`) — this is the actual purchasability fence. `false` on
+   * Team by design: it's the deliberate upgrade path to Business, not an
+   * oversight.
+   */
+  dmsAddonAvailable: boolean;
 };
 
 /**
@@ -36,6 +49,20 @@ export type OrgTierLimits = {
  * starting point, per the billing roadmap's Phase 5.
  */
 export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
+  TEAM: {
+    name: 'Team',
+    minSeats: 2,
+    maxSeats: 20,
+    // documents/recipients/directTemplates below 50/150/8 are the only
+    // doc-sourced figure (documents); recipients/directTemplates are
+    // proportional judgment calls scaled from Business's 500/20 — revisit if
+    // product has stronger opinions.
+    documents: 50,
+    recipients: 150,
+    directTemplates: 8,
+    dmsEnabled: false,
+    dmsAddonAvailable: false,
+  },
   BUSINESS: {
     name: 'Business',
     minSeats: 2,
@@ -43,6 +70,7 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     recipients: 500,
     directTemplates: 20,
     dmsEnabled: false,
+    dmsAddonAvailable: true,
   },
   ENTERPRISE: {
     name: 'Enterprise',
@@ -51,21 +79,41 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     recipients: null,
     directTemplates: null,
     dmsEnabled: false,
+    dmsAddonAvailable: true,
   },
 };
+
+/**
+ * Enterprise's document allowance is deployment-aware: the shared
+ * multi-tenant instance (app.hubsign.io) meters it at 500/mo, matching what's
+ * actually sold there; a dedicated single-tenant deployment (a separate
+ * instance of this same codebase, per customer) stays unlimited —
+ * `ORG_SEAT_TIERS.ENTERPRISE.documents` above (`null`) is that dedicated/
+ * canonical value. Must agree with the deployment-conditional Enterprise seat
+ * *price* lookup (`GetOrgSeatPriceOptions.deployment`) — a shared instance
+ * charging the 500/mo price while silently still granting unlimited documents
+ * would be a real mismatch between what's sold and what's enforced.
+ */
+export const resolveOrgTierDocuments = (
+  tier: OrgSeatTier,
+  deployment: 'shared' | 'dedicated' = DEPLOYMENT_TYPE(),
+): number | null =>
+  tier === 'ENTERPRISE' && deployment === 'shared' ? 500 : ORG_SEAT_TIERS[tier].documents;
 
 /** Business-only add-on: an extra 100 documents/mo, stacked as many times as purchased. Purely a limit — its price is Stripe-authoritative, same as everything else priced. */
 export const ORG_DOC_BLOCK_SIZE = 100;
 
 /**
  * Marketing copy for the DMS add-on, shown alongside its (Stripe-authoritative)
- * price wherever it's offered on the org billing page. Copied verbatim from
- * the Stripe product ("Document Manager Add-On") rather than fetched live,
- * since Stripe Product descriptions aren't structured enough to reuse as UI
- * copy directly. Keep in sync manually if the Stripe product copy changes.
+ * price wherever it's offered on the org billing page. Rather than fetched
+ * live from the Stripe product description (not structured enough to reuse
+ * as UI copy directly). Keep in sync manually if the underlying feature set
+ * changes. User-facing name is "Repositories" (renamed from "DMS"/"Document
+ * Manager" in copy only — internal identifiers like `dmsEnabled` and this
+ * constant's own name are unchanged).
  */
 export const ORG_DMS_ADDON_DESCRIPTION =
-  'Document Manager add-on — email documents into your organization inbox, OCR-extract the data, and route them for review and signing.';
+  'Repositories add-on — email documents into your organization inbox, OCR-extract the data, and route them for review and signing.';
 
 export const ORG_DMS_ADDON_FEATURES = [
   'Bulk document upload',

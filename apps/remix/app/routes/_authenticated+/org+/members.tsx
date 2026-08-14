@@ -478,7 +478,7 @@ const DomainCandidates = () => {
                     convert.mutate({
                       userId: candidate.id,
                       role: (roleByUser[candidate.id] ?? 'MEMBER') as 'MEMBER',
-                      seatTier: seatTier as 'BUSINESS' | undefined,
+                      seatTier: seatTier as 'BUSINESS' | 'ENTERPRISE' | 'TEAM' | undefined,
                       // Only pre-acknowledged when the admin can actually see the
                       // warning above AND chose to consume a seat, so the
                       // cancellation is never a surprise.

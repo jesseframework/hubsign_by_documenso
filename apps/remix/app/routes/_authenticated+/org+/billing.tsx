@@ -18,6 +18,7 @@ import {
   ORG_DMS_ADDON_FEATURES,
   ORG_DOC_BLOCK_SIZE,
   ORG_SEAT_TIERS,
+  resolveOrgTierDocuments,
 } from '@documenso/lib/constants/org-tiers';
 import type { OrgBillingInterval } from '@documenso/lib/constants/org-tiers';
 import { trpc } from '@documenso/trpc/react';
@@ -46,38 +47,58 @@ export function meta() {
 }
 
 const TIER_COLORS: Record<keyof typeof ORG_SEAT_TIERS, string> = {
+  TEAM: 'text-emerald-600',
   BUSINESS: 'text-blue-600',
   ENTERPRISE: 'text-amber-600',
+};
+
+// Member seat-badge background/text pairing per tier — a separate palette
+// from `TIER_COLORS` (which is a bare text accent used elsewhere) since
+// badges need a matching background too.
+const TIER_BADGE_CLASSES: Record<keyof typeof ORG_SEAT_TIERS, string> = {
+  TEAM: 'bg-emerald-50 text-emerald-700',
+  BUSINESS: 'bg-blue-50 text-blue-700',
+  ENTERPRISE: 'bg-amber-50 text-amber-700',
 };
 
 // Display-friendly view over the canonical `ORG_SEAT_TIERS` table (limits
 // only — '∞' instead of `null`, plus a UI-only accent color per tier).
 // Pricing is Stripe-authoritative (see `trpc.org.getSeatPricing`), not part
-// of this table.
+// of this table. Document allowance isn't here — Enterprise's is
+// deployment-aware (see `resolveOrgTierDocuments`/`docsForTier` below) and a
+// module-level constant can't be reactive to that.
 const TIER_CONFIG = Object.fromEntries(
   Object.entries(ORG_SEAT_TIERS).map(([tier, config]) => [
     tier,
     {
       name: config.name,
-      docs: config.documents ?? '∞',
       color: TIER_COLORS[tier as keyof typeof ORG_SEAT_TIERS],
       minSeats: config.minSeats,
+      maxSeats: config.maxSeats,
+      dmsAddonAvailable: config.dmsAddonAvailable,
     },
   ]),
 ) as Record<
   keyof typeof ORG_SEAT_TIERS,
   {
     name: string;
-    docs: number | string;
     color: string;
     minSeats: number;
+    maxSeats: number | undefined;
+    dmsAddonAvailable: boolean;
   }
 >;
 
+// Deployment-aware document allowance for display — `resolveOrgTierDocuments`
+// defaults to reading `DEPLOYMENT_TYPE()` itself, so this is correct
+// immediately on render with no dependency on `getSeatPricing` resolving.
+const docsForTier = (tier: string) =>
+  resolveOrgTierDocuments(tier as keyof typeof ORG_SEAT_TIERS) ?? '∞';
+
 type SeatPricing =
   | {
-      seat: Record<'BUSINESS' | 'ENTERPRISE', { month: number | null; year: number | null }>;
-      dms: Record<'BUSINESS' | 'ENTERPRISE', { month: number | null; year: number | null }>;
+      seat: Record<'TEAM' | 'BUSINESS' | 'ENTERPRISE', { month: number | null; year: number | null }>;
+      dms: Record<'TEAM' | 'BUSINESS' | 'ENTERPRISE', { month: number | null; year: number | null }>;
       docBlock: { month: number | null; year: number | null };
       deployment: 'shared' | 'dedicated';
     }
@@ -105,7 +126,7 @@ const docBlockPriceFor = (pricing: SeatPricing, interval: string) =>
 const DmsFeaturesHoverCard = () => (
   <HoverCard openDelay={120} closeDelay={120}>
     <HoverCardTrigger asChild>
-      <button type="button" className="inline-flex items-center" aria-label="What's included with DMS">
+      <button type="button" className="inline-flex items-center" aria-label="What's included with Repositories">
         <InfoIcon className="h-3.5 w-3.5 text-muted-foreground" />
       </button>
     </HoverCardTrigger>
@@ -185,6 +206,25 @@ function OrgBillingPage() {
     }
   }, [seatPlans]);
 
+  // Arrived from a marketing-site plan CTA, forwarded here (via org
+  // creation) with `?plan=<tier>` — preselect and open the purchase form
+  // rather than auto-charging, since seat quantity still needs user input.
+  // Waits for `seatPlans` to load so it doesn't reopen the form for a tier
+  // the org already holds.
+  useEffect(() => {
+    const plan = searchParams.get('plan')?.toUpperCase();
+    if (!seatPlans || !plan || !(plan in TIER_CONFIG)) return;
+
+    const alreadyHasTier = seatPlans.some((p) => p.tier === plan);
+    if (!alreadyHasTier) {
+      setBuyTier(plan);
+      setShowBuy(true);
+    }
+
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seatPlans]);
+
   // Keep quantity/DMS defaults in sync with whichever tier is currently
   // selected: topping up an existing tier resets to a single additional
   // seat mirroring its current DMS status; picking a tier with no plan yet
@@ -262,6 +302,22 @@ function OrgBillingPage() {
     },
   });
 
+  const cancelSeatPlan = trpc.org.cancelSeatPlan.useMutation({
+    onSuccess: () => {
+      void utils.org.getSeatPlans.invalidate();
+      void utils.org.getMyOrganization.invalidate();
+      setPendingCancelTier(null);
+      toast({ title: _(msg`Plan cancelled`) });
+    },
+    onError: (err) => {
+      toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // A tier can only be cancelled with zero assigned seats — confirmed via a
+  // dialog since it's a real, billed cancellation, not a reversible toggle.
+  const [pendingCancelTier, setPendingCancelTier] = useState<string | null>(null);
+
   // Checks whether purchasing would strand the admin's own active personal
   // subscription (they auto-consume seat #1 if they don't already have one).
   const handlePurchaseClick = async () => {
@@ -288,7 +344,7 @@ function OrgBillingPage() {
     }
 
     void purchaseSeats.mutateAsync({
-      tier: buyTier as 'BUSINESS' | 'ENTERPRISE',
+      tier: buyTier as 'BUSINESS' | 'ENTERPRISE' | 'TEAM',
       quantity: finalQty,
       docBlocks,
       interval: buyInterval,
@@ -313,7 +369,7 @@ function OrgBillingPage() {
       return;
     }
 
-    void assignSeat.mutateAsync({ memberId, tier: tier as 'BUSINESS' | 'ENTERPRISE' });
+    void assignSeat.mutateAsync({ memberId, tier: tier as 'BUSINESS' | 'ENTERPRISE' | 'TEAM' });
   };
 
   if (isLoading) return <div className="py-12 text-center text-muted-foreground">Loading...</div>;
@@ -397,7 +453,7 @@ function OrgBillingPage() {
             {membership.dmsAddon && (
               <>
                 {' '}
-                · DMS included <DmsFeaturesHoverCard />
+                · Repositories included <DmsFeaturesHoverCard />
               </>
             )}
           </p>
@@ -482,10 +538,13 @@ function OrgBillingPage() {
                     return (
                       <option key={tier} value={tier}>
                         {config.name} — ${seatPriceFor(pricing, tier, 'month')}/seat/mo (
-                        {config.docs === '∞' ? 'unlimited' : `${config.docs} docs`}
+                        {docsForTier(tier) === '∞'
+                          ? 'unlimited'
+                          : `${docsForTier(tier)} signature requests`}
                         {existingPlan
                           ? `, ${existingPlan.quantity} seats active`
                           : `, min ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}`}
+                        {config.maxSeats !== undefined && `, max ${config.maxSeats} seats`}
                         )
                       </option>
                     );
@@ -533,36 +592,45 @@ function OrgBillingPage() {
                   className="mt-1 h-8 w-20 text-[13px]"
                   type="number"
                   min={isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1}
-                  max={100}
+                  max={TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.maxSeats ?? 100}
                   value={buyQty}
                   onChange={(e) => setBuyQty(Number(e.target.value))}
                 />
               </div>
-              {/* DMS is a paid add-on on every tier now — no longer bundled
-                  into Enterprise, so no tier restriction here. */}
-              <label
-                className="flex items-center gap-1.5 text-[12px]"
-                title={
-                  dmsLockedOn
-                    ? "Your plan includes DMS — it can't be removed when buying additional seats."
-                    : undefined
-                }
-              >
-                <input
-                  type="checkbox"
-                  checked={buyDms}
-                  disabled={dmsLockedOn}
-                  onChange={(e) => setBuyDms(e.target.checked)}
-                  className="rounded"
-                />
-                <span className="font-medium text-muted-foreground">
-                  + DMS Add-On (${dmsPriceFor(pricing, buyTier, buyInterval)}/seat/
-                  {buyInterval === 'year' ? 'yr' : 'mo'})
+              {/* Repositories (DMS) is a paid add-on, but not every tier can
+                  buy it — Team deliberately can't, that's the fence that
+                  pushes growing teams to Business rather than an oversight. */}
+              {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.dmsAddonAvailable ? (
+                <>
+                  <label
+                    className="flex items-center gap-1.5 text-[12px]"
+                    title={
+                      dmsLockedOn
+                        ? "Your plan includes Repositories — it can't be removed when buying additional seats."
+                        : undefined
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      checked={buyDms}
+                      disabled={dmsLockedOn}
+                      onChange={(e) => setBuyDms(e.target.checked)}
+                      className="rounded"
+                    />
+                    <span className="font-medium text-muted-foreground">
+                      + Repositories Add-On (${dmsPriceFor(pricing, buyTier, buyInterval)}/seat/
+                      {buyInterval === 'year' ? 'yr' : 'mo'})
+                    </span>
+                  </label>
+                  <div className="-ml-2">
+                    <DmsFeaturesHoverCard />
+                  </div>
+                </>
+              ) : (
+                <span className="text-[12px] text-muted-foreground">
+                  Repositories available on Business and up.
                 </span>
-              </label>
-              <div className="-ml-2">
-                <DmsFeaturesHoverCard />
-              </div>
+              )}
               {buyTier === 'BUSINESS' && (
                 <div>
                   <label className="text-[12px] font-medium text-muted-foreground">
@@ -590,7 +658,9 @@ function OrgBillingPage() {
                 onClick={() => void handlePurchaseClick()}
                 loading={purchaseSeats.isPending}
                 disabled={
-                  buyQty < (isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1)
+                  buyQty < (isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1) ||
+                  (existingPlanForSelectedTier?.quantity ?? 0) + buyQty >
+                    (TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.maxSeats ?? Infinity)
                 }
               >
                 Purchase
@@ -611,10 +681,11 @@ function OrgBillingPage() {
               const dmsPrice = plan.dmsEnabled ? dmsPriceFor(pricing, plan.tier, plan.billingInterval) : 0;
               const allInSeatPrice = seatPriceFor(pricing, plan.tier, plan.billingInterval) + dmsPrice;
               const docBlockCost = plan.docBlockQuantity * docBlockPriceFor(pricing, plan.billingInterval);
+              const planDocs = docsForTier(plan.tier);
               const effectiveDocs =
-                typeof config?.docs === 'number'
-                  ? config.docs + plan.docBlockQuantity * ORG_DOC_BLOCK_SIZE
-                  : config?.docs;
+                typeof planDocs === 'number'
+                  ? planDocs + plan.docBlockQuantity * ORG_DOC_BLOCK_SIZE
+                  : planDocs;
               return (
                 <div key={plan.id} className="flex items-center justify-between px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -623,12 +694,12 @@ function OrgBillingPage() {
                     </div>
                     <span className="inline-flex items-center gap-1 text-[12px] text-muted-foreground">
                       ${allInSeatPrice}/seat/
-                      {plan.billingInterval === 'year' ? 'yr' : 'mo'} · {effectiveDocs} docs/mo
+                      {plan.billingInterval === 'year' ? 'yr' : 'mo'} · {effectiveDocs} signature requests/mo
                       {plan.docBlockQuantity > 0 && ` (+${plan.docBlockQuantity} block${plan.docBlockQuantity > 1 ? 's' : ''})`}
                       {plan.dmsEnabled && (
                         <>
                           {' '}
-                          · DMS add-on <DmsFeaturesHoverCard />
+                          · Repositories add-on <DmsFeaturesHoverCard />
                         </>
                       )}
                       {plan.billingInterval === 'year' && ' · Yearly'}
@@ -645,6 +716,21 @@ function OrgBillingPage() {
                       ${allInSeatPrice * plan.quantity + docBlockCost}
                       /{plan.billingInterval === 'year' ? 'yr' : 'mo'}
                     </span>
+                    {isAdmin && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={plan.assigned > 0}
+                        title={
+                          plan.assigned > 0
+                            ? 'Unassign every member on this tier before cancelling it.'
+                            : undefined
+                        }
+                        onClick={() => setPendingCancelTier(plan.tier)}
+                      >
+                        <Trans>Cancel plan</Trans>
+                      </Button>
+                    )}
                   </div>
                 </div>
               );
@@ -686,12 +772,13 @@ function OrgBillingPage() {
 
               <div className="flex items-center gap-2">
                 {member.seatTier ? (
-                  <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
-                    member.seatTier === 'ENTERPRISE' ? 'bg-amber-50 text-amber-700'
-                    : 'bg-blue-50 text-blue-700'
-                  }`}>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium ${
+                      TIER_BADGE_CLASSES[member.seatTier as keyof typeof TIER_BADGE_CLASSES]
+                    }`}
+                  >
                     {member.seatTier}
-                    {member.dmsAddon && ' + DMS'}
+                    {member.dmsAddon && ' + Repositories'}
                   </span>
                 ) : (
                   <span className="text-[11px] text-muted-foreground">No seat</span>
@@ -777,12 +864,12 @@ function OrgBillingPage() {
                 if (pendingConflict?.kind === 'assign') {
                   void assignSeat.mutateAsync({
                     memberId: pendingConflict.memberId,
-                    tier: pendingConflict.tier as 'BUSINESS' | 'ENTERPRISE',
+                    tier: pendingConflict.tier as 'BUSINESS' | 'ENTERPRISE' | 'TEAM',
                     acknowledgeCancelPersonalPlan: true,
                   });
                 } else if (pendingConflict?.kind === 'purchase') {
                   void purchaseSeats.mutateAsync({
-                    tier: buyTier as 'BUSINESS' | 'ENTERPRISE',
+                    tier: buyTier as 'BUSINESS' | 'ENTERPRISE' | 'TEAM',
                     quantity: pendingConflict.quantity,
                     docBlocks: pendingConflict.docBlocks,
                     interval: buyInterval,
@@ -794,6 +881,44 @@ function OrgBillingPage() {
               }}
             >
               <Trans>Cancel plan & continue</Trans>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingCancelTier !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingCancelTier(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              <Trans>Cancel {pendingCancelTier ? TIER_CONFIG[pendingCancelTier as keyof typeof TIER_CONFIG]?.name : ''}?</Trans>
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <Trans>
+                This cancels the plan immediately — unused time is credited to the account
+                balance, not refunded to the card. This can't be undone; buying the tier again
+                later starts a new plan.
+              </Trans>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingCancelTier(null)}>
+              <Trans>Keep plan</Trans>
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingCancelTier) {
+                  void cancelSeatPlan.mutateAsync({
+                    tier: pendingCancelTier as 'BUSINESS' | 'ENTERPRISE' | 'TEAM',
+                  });
+                }
+              }}
+            >
+              <Trans>Cancel plan</Trans>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

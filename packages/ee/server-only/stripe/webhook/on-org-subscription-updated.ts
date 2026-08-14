@@ -1,7 +1,11 @@
 import type { OrgSeatTier } from '@prisma/client';
 import { match } from 'ts-pattern';
 
-import { ORG_SEAT_TIERS, ORG_UNLIMITED_SENTINEL } from '@documenso/lib/constants/org-tiers';
+import {
+  ORG_SEAT_TIERS,
+  ORG_UNLIMITED_SENTINEL,
+  resolveOrgTierDocuments,
+} from '@documenso/lib/constants/org-tiers';
 import { stripe } from '@documenso/lib/server-only/stripe';
 import type { Stripe } from '@documenso/lib/server-only/stripe';
 import { prisma } from '@documenso/prisma';
@@ -83,6 +87,21 @@ export const onOrgSubscriptionUpdated = async ({
   // land here as `checkout.session.completed` / `customer.subscription.updated`.
   const tiersOnThisSubscription = new Set(classifiedItems.map((c) => c.tier));
 
+  // A tier can leave the subscription entirely — cancelled in-app (see
+  // `cancelSeatPlan`) or removed directly via the Stripe billing portal —
+  // and this sync is the one place that's ever true, so it's the one place
+  // that should drop the now-stale `OrgSeatPlan` row rather than leaving it
+  // to linger with no matching Stripe item behind it. Scoped to
+  // `source: 'stripe'` — a license-key-granted plan isn't reflected on the
+  // Stripe subscription at all and must never be touched by this sync.
+  await prisma.orgSeatPlan.deleteMany({
+    where: {
+      organizationId,
+      source: 'stripe',
+      tier: { notIn: Array.from(tiersOnThisSubscription) },
+    },
+  });
+
   for (const tier of tiersOnThisSubscription) {
     const seatItem = classifiedItems.find((c) => c.tier === tier && c.type === 'org_seat')?.item;
     const dmsItem = classifiedItems.find((c) => c.tier === tier && c.type === 'org_dms')?.item;
@@ -94,7 +113,7 @@ export const onOrgSubscriptionUpdated = async ({
     const dmsEnabled = tierLimits.dmsEnabled || Boolean(dmsItem);
 
     const seatPlanData = {
-      documentsPerMonth: tierLimits.documents ?? ORG_UNLIMITED_SENTINEL,
+      documentsPerMonth: resolveOrgTierDocuments(tier) ?? ORG_UNLIMITED_SENTINEL,
       recipientsPerMonth: tierLimits.recipients ?? ORG_UNLIMITED_SENTINEL,
       directTemplates: tierLimits.directTemplates ?? ORG_UNLIMITED_SENTINEL,
       dmsEnabled,

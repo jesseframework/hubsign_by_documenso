@@ -64,7 +64,7 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
     if (remaining.documents === 0) {
       return team
         ? msg`Document upload disabled due to unpaid invoices`
-        : msg`You have reached your document limit.`;
+        : msg`You have reached your signature request limit.`;
     }
 
     if (!user.emailVerified) {
@@ -138,7 +138,7 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
         .with('INVALID_DOCUMENT_FILE', () => msg`You cannot upload encrypted PDFs`)
         .with(
           AppErrorCode.LIMIT_EXCEEDED,
-          () => msg`You have reached your document limit for this month. Please upgrade your plan.`,
+          () => msg`You have reached your signature request limit for this month. Please upgrade your plan.`,
         )
         .otherwise(() => msg`An error occurred while uploading your document.`);
 
@@ -188,7 +188,7 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
                   )}
                 >
                   <Trans>
-                    {remaining.documents} of {quota.documents} documents remaining this month.
+                    {remaining.documents} of {quota.documents} signature requests remaining this month.
                   </Trans>
                 </p>
               </TooltipContent>

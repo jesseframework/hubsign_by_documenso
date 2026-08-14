@@ -204,11 +204,11 @@ export const TemplatesTable = ({
         <Alert variant="warning" className="mb-4">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>
-            <Trans>Document Limit Exceeded!</Trans>
+            <Trans>Signature Request Limit Exceeded!</Trans>
           </AlertTitle>
           <AlertDescription className="mt-2">
             <Trans>
-              You have reached your document limit.{' '}
+              You have reached your signature request limit.{' '}
               <Link className="underline underline-offset-4" to="/settings/billing">
                 Upgrade your account to continue!
               </Link>
@@ -221,11 +221,11 @@ export const TemplatesTable = ({
         <Alert variant="secondary" className="mb-4">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>
-            <Trans>Approaching your document limit</Trans>
+            <Trans>Approaching your signature request limit</Trans>
           </AlertTitle>
           <AlertDescription className="mt-2">
             <Trans>
-              You have {remaining.documents} of {quota.documents} documents remaining this month.{' '}
+              You have {remaining.documents} of {quota.documents} signature requests remaining this month.{' '}
               <Link className="underline underline-offset-4" to="/settings/billing">
                 Upgrade your account
               </Link>{' '}

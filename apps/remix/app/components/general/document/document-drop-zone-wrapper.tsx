@@ -100,7 +100,7 @@ export const DocumentDropZoneWrapper = ({ children, className }: DocumentDropZon
         .with('INVALID_DOCUMENT_FILE', () => msg`You cannot upload encrypted PDFs`)
         .with(
           AppErrorCode.LIMIT_EXCEEDED,
-          () => msg`You have reached your document limit for this month. Please upgrade your plan.`,
+          () => msg`You have reached your signature request limit for this month. Please upgrade your plan.`,
         )
         .otherwise(() => msg`An error occurred while uploading your document.`);
 
@@ -184,7 +184,7 @@ export const DocumentDropZoneWrapper = ({ children, className }: DocumentDropZon
                   )}
                 >
                   <Trans>
-                    {remaining.documents} of {quota.documents} documents remaining this month.
+                    {remaining.documents} of {quota.documents} signature requests remaining this month.
                   </Trans>
                 </p>
               )}

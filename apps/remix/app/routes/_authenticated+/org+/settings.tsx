@@ -4,6 +4,7 @@ import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import { BuildingIcon, CopyIcon, PencilIcon, PlusIcon } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router';
 
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
@@ -46,6 +47,8 @@ function OrgSettingsPage() {
   const { _ } = useLingui();
   const { toast } = useToast();
   const utils = trpc.useUtils();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const { data: membership, isLoading } = trpc.org.getMyOrganization.useQuery();
 
@@ -131,6 +134,14 @@ function OrgSettingsPage() {
     onSuccess: () => {
       void utils.org.getMyOrganization.invalidate();
       toast({ title: _(msg`Organization created`) });
+
+      // Arrived here from a marketing-site plan CTA, routed through org
+      // creation first since a brand-new signup has no org yet — forward
+      // straight to the purchase form for that tier.
+      const plan = searchParams.get('plan');
+      if (plan === 'team' || plan === 'business' || plan === 'enterprise') {
+        void navigate(`/org/billing?plan=${plan}`);
+      }
     },
   });
 

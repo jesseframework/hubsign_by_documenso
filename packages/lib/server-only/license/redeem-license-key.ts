@@ -16,7 +16,11 @@
  */
 import { OrganizationRole, OrgSeatTier, SubscriptionStatus } from '@prisma/client';
 
-import { ORG_SEAT_TIERS, ORG_UNLIMITED_SENTINEL } from '@documenso/lib/constants/org-tiers';
+import {
+  ORG_SEAT_TIERS,
+  ORG_UNLIMITED_SENTINEL,
+  resolveOrgTierDocuments,
+} from '@documenso/lib/constants/org-tiers';
 import { prisma } from '@documenso/prisma';
 
 import {
@@ -115,7 +119,7 @@ async function redeemOrgGrant(key: string, userId: number, organizationId: numbe
     // what the limits resolver checks for expiry.
     const planData = {
       tier,
-      documentsPerMonth: limits.documents ?? ORG_UNLIMITED_SENTINEL,
+      documentsPerMonth: resolveOrgTierDocuments(tier) ?? ORG_UNLIMITED_SENTINEL,
       recipientsPerMonth: limits.recipients ?? ORG_UNLIMITED_SENTINEL,
       directTemplates: limits.directTemplates ?? ORG_UNLIMITED_SENTINEL,
       dmsEnabled: dms,

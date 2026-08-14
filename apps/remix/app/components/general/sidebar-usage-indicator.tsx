@@ -107,7 +107,7 @@ export const SidebarUsageIndicator = ({
     >
       {showDocuments && (
         <UsageRow
-          label={<Trans>Documents this month</Trans>}
+          label={<Trans>Signature requests this month</Trans>}
           used={documentsUsed}
           quota={quota.documents}
           sidebarTextColor={sidebarTextColor}

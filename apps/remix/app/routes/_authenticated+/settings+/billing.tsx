@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
+
 import { Trans, useLingui } from '@lingui/react/macro';
 import { SubscriptionStatus } from '@prisma/client';
-import { redirect, Link } from 'react-router';
+import { redirect, Link, useSearchParams } from 'react-router';
 import { match } from 'ts-pattern';
 
 import { getSession } from '@documenso/auth/server/lib/utils/get-session';
@@ -142,6 +144,18 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function TeamsSettingBillingPage() {
   const data = useSuperLoaderData<typeof loader>();
   const { i18n } = useLingui();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const autoSubscribeIndividual = searchParams.get('plan') === 'individual';
+
+  // Clear the param once read — `BillingPlans`' own auto-subscribe guard
+  // already fired for this mount, so leaving it in the URL would just
+  // re-trigger checkout on every future reload/bookmark of this page.
+  useEffect(() => {
+    if (autoSubscribeIndividual) {
+      setSearchParams({}, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (data.isOrgManaged) {
     return (
@@ -254,7 +268,7 @@ export default function TeamsSettingBillingPage() {
       <hr className="my-4" />
 
       {isMissingOrInactiveOrFreePlan ? (
-        <BillingPlans prices={prices} />
+        <BillingPlans prices={prices} autoSubscribe={autoSubscribeIndividual} />
       ) : (
         <>
           <BillingPortalButton />

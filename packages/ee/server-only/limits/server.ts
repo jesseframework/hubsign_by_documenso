@@ -2,7 +2,11 @@ import { DocumentSource, SubscriptionStatus } from '@prisma/client';
 import { DateTime } from 'luxon';
 
 import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
-import { ORG_DOC_BLOCK_SIZE, ORG_SEAT_TIERS } from '@documenso/lib/constants/org-tiers';
+import {
+  ORG_DOC_BLOCK_SIZE,
+  ORG_SEAT_TIERS,
+  resolveOrgTierDocuments,
+} from '@documenso/lib/constants/org-tiers';
 import { prisma } from '@documenso/prisma';
 
 import { getDocumentRelatedPrices } from '../stripe/get-document-related-prices.ts';
@@ -71,7 +75,7 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
 
   const seatLimits: TLimitsSchema = tierConfig
     ? {
-        documents: tierConfig.documents ?? Infinity,
+        documents: resolveOrgTierDocuments(membership.seatTier) ?? Infinity,
         recipients: tierConfig.recipients ?? Infinity,
         directTemplates: tierConfig.directTemplates ?? Infinity,
         dmsEnabled: tierConfig.dmsEnabled,
@@ -97,12 +101,14 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
     }
   }
 
-  // Count usage this month
+  // Count usage this month — signature requests are counted at send, not
+  // creation (a saved draft costs nothing), and `sentAt` is set once so a
+  // resend/reminder never re-counts the same document. See `sendDocument`.
   const [documents, directTemplates] = await Promise.all([
     prisma.document.count({
       where: {
         userId: user.id,
-        createdAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+        sentAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
         source: { not: 'TEMPLATE_DIRECT_LINK' },
       },
     }),
@@ -239,12 +245,14 @@ const handleUserLimits = async ({ email }: HandleUserLimitsOptions) => {
     remaining.directTemplates = Infinity;
   }
 
+  // Signature requests are counted at send, not creation — see
+  // `getOrgSeatLimits` above and `sendDocument` for why.
   const [documents, directTemplates] = await Promise.all([
     prisma.document.count({
       where: {
         userId: user.id,
         teamId: null,
-        createdAt: {
+        sentAt: {
           gte: DateTime.utc().startOf('month').toJSDate(),
         },
         source: {
