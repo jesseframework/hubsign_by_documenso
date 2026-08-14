@@ -1,12 +1,10 @@
 import { prisma } from '@documenso/prisma';
 
+import { invoiceFields, parseAmount, parseOcrDate } from '../../universal/inbox-invoice-fields';
 import {
   type MetadataFieldDefinitionLike,
   formatMetadataFieldValue,
 } from '../../universal/metadata-fields';
-import { invoiceFields, parseAmount, parseOcrDate } from '../../universal/inbox-invoice-fields';
-import { normalizeMetadataKey } from '../../universal/metadata';
-import { matchVendorName, prepareVendorCandidates, vendorCoreName } from '../../universal/vendor-match';
 import {
   BUILT_IN_GROUPINGS,
   BUILT_IN_GROUPING_LABELS,
@@ -16,7 +14,9 @@ import {
   isMoneyMeasure,
   isNumericFilterOp,
 } from '../../universal/report-config';
+import { vendorCoreName } from '../../universal/vendor-match';
 import { getOrganizationDueDates } from '../inbox/invoice-due';
+import { buildVendorIdentifier } from './vendor-directory';
 
 /**
  * One configurable report over the invoices in the inbox.
@@ -311,34 +311,14 @@ export const getInvoiceReport = async ({
   // not shared with that resolver because the branches there are about which
   // *target* applies and deliberately only consider records carrying one; here
   // the question is only which record an invoice belongs to.
-  const byKey = new Map(records.map((record) => [record.key, record]));
-  const byEmail = new Map(
-    records
-      .filter((record) => record.email?.trim())
-      .map((record) => [record.email!.trim().toLowerCase(), record]),
-  );
-  const prepared = prepareVendorCandidates(
-    records.map((record) => ({ name: record.label ?? record.key, value: record })),
-  );
-
+  //
+  // Shared with the signing page's spend meter, which asks the same question
+  // about one vendor — see `vendor-directory.ts`. Two answers to "whose invoice
+  // is this" would put a different number in front of the approver than on this
+  // page, with nothing to say which was right.
   type VendorRecord = (typeof records)[number];
 
-  const identityCache = new Map<string, VendorRecord | null>();
-
-  const identify = (vendorName: string): VendorRecord | null => {
-    const cached = identityCache.get(vendorName);
-    if (cached !== undefined) return cached;
-
-    const exact = byKey.get(normalizeMetadataKey(vendorName));
-    const outcome = exact ? null : matchVendorName(vendorName, prepared);
-    // An ambiguous match resolves to nothing: the directory holds the same
-    // company twice, and attributing spend to one of them would be a coin flip
-    // that moves money between two rows of this very report.
-    const resolved = exact ?? (outcome?.ambiguousWith ? null : (outcome?.match?.value ?? null));
-
-    identityCache.set(vendorName, resolved);
-    return resolved;
-  };
+  const { identifyItem } = buildVendorIdentifier<VendorRecord>(records);
 
   // ---- how overdue each invoice is -----------------------------------------
   //
@@ -381,27 +361,13 @@ export const getInvoiceReport = async ({
       continue;
     }
 
-    const record = fields.vendorName ? identify(fields.vendorName) : null;
-
-    /*
-      The sender's address is a fallback ONLY when OCR read no vendor name at all.
-
-      Applying it whenever the name failed to match the directory looks harmless
-      and is not: several vendors' invoices routinely arrive from one shared
-      mailbox — a forwarding address, an AP inbox, this deployment's own test
-      account — so a single directory record holding that address would capture
-      every invoice whose vendor is simply not in the directory yet. That is how a
-      bank statement for 6,017,047 was attributed to a landscaping supplier and
-      became 99% of the report.
-
-      A named vendor that is not in the directory belongs in its own row under its
-      own name. The report says how many of those there are.
-    */
-    const resolved =
-      record ??
-      (!fields.vendorName && item.senderEmail
-        ? (byEmail.get(item.senderEmail.trim().toLowerCase()) ?? null)
-        : null);
+    // Name first, sender address only when no name was read — the reasoning for
+    // that ordering is in `vendor-directory.ts`. The report says how many named
+    // vendors ended up in no directory record at all.
+    const resolved = identifyItem({
+      vendorName: fields.vendorName,
+      senderEmail: item.senderEmail,
+    });
 
     const printed = fields.invoiceDate ? parseOcrDate(fields.invoiceDate) : null;
     const arrival = item.receivedAt ?? item.createdAt;
@@ -458,7 +424,9 @@ export const getInvoiceReport = async ({
     if (field === 'month') return monthOf(entry.date);
 
     const bag =
-      entry.record?.data && typeof entry.record.data === 'object' && !Array.isArray(entry.record.data)
+      entry.record?.data &&
+      typeof entry.record.data === 'object' &&
+      !Array.isArray(entry.record.data)
         ? (entry.record.data as Record<string, unknown>)
         : {};
     const raw = bag[field];
@@ -481,7 +449,9 @@ export const getInvoiceReport = async ({
       return filter.op === 'gt' ? value > bound : value < bound;
     }
 
-    const left = String(actual ?? '').trim().toLowerCase();
+    const left = String(actual ?? '')
+      .trim()
+      .toLowerCase();
     const right = filter.value.trim().toLowerCase();
 
     if (filter.op === 'contains') return left.includes(right);
@@ -615,13 +585,16 @@ export const getInvoiceReport = async ({
       // Core name, so "Company Ltd." and "Company Limited" are one row even
       // when neither is in the directory.
       return {
-        key: entry.record?.id ?? vendorCoreName(entry.vendorLabel) ?? entry.vendorLabel.toLowerCase(),
+        key:
+          entry.record?.id ?? vendorCoreName(entry.vendorLabel) ?? entry.vendorLabel.toLowerCase(),
         label: entry.vendorLabel,
       };
     }
 
     const bag =
-      entry.record?.data && typeof entry.record.data === 'object' && !Array.isArray(entry.record.data)
+      entry.record?.data &&
+      typeof entry.record.data === 'object' &&
+      !Array.isArray(entry.record.data)
         ? (entry.record.data as Record<string, unknown>)
         : {};
     const shown = definition
@@ -632,7 +605,10 @@ export const getInvoiceReport = async ({
     // usually the finding, and a report that hid it would be reassuring and
     // wrong.
     return shown === ''
-      ? { key: '__unset__', label: entry.record ? `No ${groupLabel.toLowerCase()}` : 'Vendor not in directory' }
+      ? {
+          key: '__unset__',
+          label: entry.record ? `No ${groupLabel.toLowerCase()}` : 'Vendor not in directory',
+        }
       : { key: shown.toLowerCase(), label: shown };
   };
 

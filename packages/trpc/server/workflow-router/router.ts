@@ -172,6 +172,7 @@ export const workflowRouter = router({
           : undefined;
 
       const generated = await generateWorkflowFromPrompt({
+        organizationId: membership.organizationId,
         prompt: input.prompt,
         organizationName: organization?.name ?? undefined,
         metadataContext,

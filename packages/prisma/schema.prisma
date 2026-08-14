@@ -1713,6 +1713,24 @@ model Organization {
   /// fortnight on a signature is tracked by nothing.
   slaDefaultSigningHours  Int?
 
+  // Spend meter — shown to an org member signing a vendor's invoice, so the
+  // decision to approve is made against what the organization has already spent
+  // with that vendor rather than in isolation.
+  //
+  // Deliberately a single org-wide choice rather than a per-report one. A saved
+  // ReportView also names a budget field, but a view can be renamed, edited or
+  // deleted by anyone, and the meter on a signing page must not change meaning
+  // because someone was tuning a report.
+  spendMeterEnabled Boolean @default(false)
+  /// Key of the NUMBER MetadataFieldDefinition (category "vendor") holding the
+  /// limit. Null means the feature is configured but has nothing to measure
+  /// against, which reads the same as off.
+  spendMeterField   String?
+  /// How far back the actual spend is summed. The limit itself carries no period
+  /// — it is one figure on the vendor record — so this is what gives the
+  /// percentage a meaning, and the meter states it on screen.
+  spendMeterDays    Int     @default(90)
+
   // Stripe billing
   stripeCustomerId                String?   @unique
   stripeSubscriptionId            String?   @unique
@@ -1778,6 +1796,14 @@ model Organization {
   workhubPassword  String? /// WorkHub BulkSender credential password (optional Basic fallback).
   workhubMailboxId String? /// Optional mailbox override (?mailboxId=).
   workhubApiBase   String? /// Optional per-org WorkHub API base override.
+
+  // Per-org WorkHub AI credential. A `whk_` key carrying the `ai.invoke` scope,
+  // used for every AI call this org makes (Aubrey, workflow generation, DMS
+  // chat, AI stamps). Separate from `workhubApiKey` above, which is mailbox-only
+  // — WorkHub scopes them independently, and one key per org is what gives them
+  // per-org usage attribution. Configured from the AI Credits screen, never from
+  // the environment.
+  workhubAiApiKey String?
 
   /// Inbound filtering, to stop the inbox re-ingesting mail the platform itself
   /// produced. A completed document is emailed to every recipient WITH the
@@ -2012,6 +2038,39 @@ model DmsAiUsage {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, month])
+}
+
+// ═══════════════════════════════════════════════════════════
+// AUBREY AI — WORKHUB CREDITS
+// ═══════════════════════════════════════════════════════════
+
+// Per-org shared pool of purchased Aubrey AI credits (1 credit = 1 message).
+// The monthly free allotment is tracked separately, per-user, in
+// DmsAiUsage.totalQueries; this table holds only the topped-up pool that all
+// members draw from once the monthly free allotment is exhausted.
+model AiCreditBalance {
+  id             String @id @default(cuid())
+  organizationId Int    @unique
+  balance        Int    @default(0) // purchased credits remaining
+  totalPurchased Int    @default(0) // lifetime purchased (for display)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Local ledger of redeemed WorkHub AI-credit keys — audit + idempotency,
+// mirroring LicenseKeyRedemption. WorkHub enforces GLOBAL single-use; the
+// @unique jti makes local re-application a no-op.
+model AiCreditRedemption {
+  id               String   @id @default(cuid())
+  jti              String   @unique // WorkHub key id
+  subject          String // org id (as string)
+  credits          Int
+  redeemedAt       DateTime @default(now())
+  organizationId   Int?
+  redeemedByUserId Int?
+
+  @@index([organizationId])
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

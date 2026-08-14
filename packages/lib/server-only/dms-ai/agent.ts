@@ -1,6 +1,8 @@
 import { prisma } from '@documenso/prisma';
 
 import { env } from '../../utils/env';
+import { AiBridgeError, callAiBridge } from '../ai/bridge';
+import { resolveAiApiKey } from '../ai/resolve-ai-key';
 
 /**
  * Per-account upgrade: emails or user ids in NEXT_PRIVATE_DMS_AI_UNLIMITED_USERS
@@ -149,9 +151,11 @@ async function checkUsage(userId: number, organizationId?: number | null) {
  * Main AI chat function.
  */
 export async function dmsAiChat({ userId, organizationId, message, conversationId }: AiChatOptions): Promise<AiChatResult> {
-  const apiKey = env('NEXT_PRIVATE_OPENAI_API_KEY');
+  const apiKey = await resolveAiApiKey(organizationId ?? null);
   if (!apiKey) {
-    throw new Error('OpenAI API key not configured. Set NEXT_PRIVATE_OPENAI_API_KEY.');
+    throw new Error(
+      'AI is not set up yet — an organization admin needs to add an AI key on the AI Credits screen.',
+    );
   }
 
   // Check usage limits
@@ -218,35 +222,32 @@ Respond to the user's question based on this data. If they ask for something not
     { role: 'user' as const, content: message },
   ];
 
-  // Call OpenAI
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
+  // One turn through the WorkHub AI bridge — no tools, and pinned to the
+  // cheaper model, which is the deliberate cost split against Aubrey.
+  let result;
+  try {
+    result = await callAiBridge({
+      apiKey,
       messages,
-      max_tokens: 4000,
+      model: 'gpt-4o-mini',
+      maxTokens: 4000,
       temperature: 0.3,
-    }),
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error((error as { error?: { message?: string } }).error?.message || 'OpenAI API error');
+    });
+  } catch (err) {
+    // The provider's own wording never reaches the user. This path used to
+    // rethrow `error.error.message` verbatim, which is how a user holding 500
+    // HubSign credits got told they had none and was pointed at a third-party
+    // billing page. The bridge maps the code; the upstream text stays in its log.
+    if (err instanceof AiBridgeError) {
+      throw new Error(err.userMessage);
+    }
+    throw err;
   }
 
-  const result = await response.json() as {
-    choices: Array<{ message: { content: string } }>;
-    usage: { prompt_tokens: number; completion_tokens: number };
-  };
-
-  const aiContent = result.choices[0]?.message?.content || 'No response generated.';
+  const aiContent = result.content || 'No response generated.';
   const tokensUsed = {
-    prompt: result.usage?.prompt_tokens || 0,
-    completion: result.usage?.completion_tokens || 0,
+    prompt: result.usage.input,
+    completion: result.usage.output,
   };
 
   // Save user message

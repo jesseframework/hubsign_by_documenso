@@ -379,6 +379,7 @@ function OrgBillingPage() {
 
       {isAdmin && <RedeemLicenseKeyCard organizationId={org.id} />}
 
+
       {/* Your Plan — org seat limits supersede personal billing entirely, so
           this is the one place that actually reflects what governs you. */}
       <div className="rounded-[var(--r)] border border-border bg-card p-3">

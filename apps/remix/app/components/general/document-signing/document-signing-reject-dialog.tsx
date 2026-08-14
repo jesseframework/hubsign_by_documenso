@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { msg } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import type { Document } from '@prisma/client';
+import { XCircleIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import { useSearchParams } from 'react-router';
@@ -109,7 +110,18 @@ export function DocumentSigningRejectDialog({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">
+        {/*
+          `border-input` is all but white in this theme, so the outline variant on
+          its own rendered as floating text with no edge to it. Naming the border
+          gives the button a visible shape without promoting declining to sign to
+          the same weight as signing.
+        */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-border text-muted-foreground hover:text-destructive text-[13px]"
+        >
+          <XCircleIcon className="mr-1.5 h-4 w-4" />
           <Trans>Reject Document</Trans>
         </Button>
       </DialogTrigger>

@@ -1,6 +1,7 @@
 import { adminRouter } from './admin-router/router';
 import { apiTokenRouter } from './api-token-router/router';
 import { approvalRouter } from './approval-router/router';
+import { aubreyRouter } from './aubrey-router/router';
 import { authRouter } from './auth-router/router';
 import { dmsRouter } from './dms-router/router';
 import { documentRouter } from './document-router/router';
@@ -51,6 +52,7 @@ export const appRouter = router({
   metadata: metadataRouter,
   export: exportRouter,
   msTeams: msTeamsRouter,
+  aubrey: aubreyRouter,
 });
 
 export type AppRouter = typeof appRouter;

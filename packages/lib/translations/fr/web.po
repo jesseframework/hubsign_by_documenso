@@ -182,6 +182,12 @@ msgstr "{0}"
 msgid "{0} — {1} rule(s) evaluated, {2}"
 msgstr ""
 
+#. placeholder {0}: meter.limitLabel
+#. placeholder {1}: meter.days
+#: apps/remix/app/components/general/document-signing/vendor-spend-meter-panel.tsx
+msgid "{0} · last {1} days"
+msgstr ""
+
 #. placeholder {0}: result.email
 #: apps/remix/app/routes/_authenticated+/org+/members.tsx
 msgid "{0} added to the organization"
@@ -296,6 +302,11 @@ msgstr ""
 msgid "{0} invoice(s) in {1} ({2}) — switch currency to see them. Amounts in different currencies are never added together."
 msgstr ""
 
+#. placeholder {0}: meter.otherCurrency
+#: apps/remix/app/components/general/document-signing/vendor-spend-meter-panel.tsx
+msgid "{0} invoice(s) in another currency are counted separately."
+msgstr ""
+
 #. placeholder {0}: data?.doubtfulAmounts
 #. placeholder {1}: money(data?.currency ?? null, data?.doubtfulTotal ?? 0)
 #: apps/remix/app/routes/_authenticated+/org+/reports.tsx
@@ -305,6 +316,11 @@ msgstr ""
 #. placeholder {0}: data?.excludedByFilters
 #: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "{0} invoice(s) were removed by this report's filters."
+msgstr ""
+
+#. placeholder {0}: meter.unreadable
+#: apps/remix/app/components/general/document-signing/vendor-spend-meter-panel.tsx
+msgid "{0} invoice(s) with no readable total are not counted."
 msgstr ""
 
 #. placeholder {0}: data.truncated.inRange
@@ -863,6 +879,20 @@ msgstr ""
 msgid "+{0} older, not shown"
 msgstr ""
 
+#. placeholder {0}: money(meter.currency, projected)
+#. placeholder {1}: money(meter.currency, limit)
+#. placeholder {2}: money(meter.currency, remaining)
+#: apps/remix/app/components/general/document-signing/vendor-spend-meter-panel.tsx
+msgid "<0>{0}</0> of <1>{1}</1> — <2>{2}</2> left"
+msgstr ""
+
+#. placeholder {0}: money(meter.currency, projected)
+#. placeholder {1}: money(meter.currency, limit)
+#. placeholder {2}: money(meter.currency, -remaining)
+#: apps/remix/app/components/general/document-signing/vendor-spend-meter-panel.tsx
+msgid "<0>{0}</0> of <1>{1}</1> — over by <2>{2}</2>"
+msgstr ""
+
 #: packages/email/templates/org-member-invite.tsx
 msgid "<0>{inviterName}</0> has added you to the organization <1>{orgName}</1> as a <2>{role}</2>."
 msgstr ""
@@ -1056,6 +1086,10 @@ msgstr "Un nouveau membre a rejoint votre équipe"
 msgid "A new token was created successfully."
 msgstr "Un nouveau token a été créé avec succès."
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "A number field on your vendor records. Vendors with no figure show no meter."
+msgstr ""
+
 #: packages/ui/primitives/document-flow/add-settings.tsx
 msgid "A password is already set. Enter a new one to replace it, or uncheck to remove the lock."
 msgstr ""
@@ -1211,6 +1245,10 @@ msgstr "Compte activé"
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 msgid "Account Re-Authentication"
 msgstr "Ré-authentification de compte"
+
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "account since removed"
+msgstr ""
 
 #: apps/remix/app/components/general/nav-config.tsx
 msgid "Accounts"
@@ -1567,7 +1605,52 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/dms+/ai.tsx
 #: apps/remix/app/components/general/nav-config.tsx
-msgid "AI Agent"
+#~ msgid "AI Agent"
+#~ msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "AI answered. Every AI feature is available to this organization."
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "AI connected"
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "AI connection"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+#: apps/remix/app/components/general/nav-config.tsx
+msgid "AI Credits"
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "AI disconnected"
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "AI features are now available to everyone in this organization."
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "AI features are switched off for this organization."
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+#~ msgid "AI is connected for this organization."
+#~ msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+#~ msgid "AI is not connected yet. An organization admin can set it up."
+#~ msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "AI is not set up yet. An organization admin can configure it."
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "AI is set up for this organization."
 msgstr ""
 
 #: apps/remix/app/components/general/export/export-builder-dialog.tsx
@@ -1995,6 +2078,10 @@ msgstr ""
 msgid "Applies to documents completed from now on. Documents already signed keep the pages they were sealed with — use the Download menu on those to get a copy without the certificate."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Applies to invoices that arrived through the Signature Inbox and match a vendor in your directory."
+msgstr ""
+
 #. placeholder {0}: files.length
 #: apps/remix/app/routes/_authenticated+/dms+/bulk-upload.tsx
 msgid "Apply to all {0} files"
@@ -2145,12 +2232,20 @@ msgstr "Êtes-vous sûr ?"
 msgid "Arrange the columns you want once, save the layout, and it will be here next month."
 msgstr ""
 
-#: apps/remix/app/routes/_authenticated+/dms+/ai.tsx
-msgid "Ask questions about your documents, generate reports, and get insights."
+#: apps/remix/app/components/general/aubrey/aubrey-chat.tsx
+msgid "Ask an organization admin to redeem an AI credit pack."
 msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/dms+/ai.tsx
+#~ msgid "Ask questions about your documents, generate reports, and get insights."
+#~ msgstr ""
 
 #: apps/remix/app/components/general/document-signing/document-signing-complete-dialog.tsx
 msgid "Ask the sender to approve an exception for this document. They will see what blocked you."
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "Ask your WorkHub administrator to re-issue this key with the \"ai.invoke\" permission."
 msgstr ""
 
 #. placeholder {0}: item.recipient?.name || item.recipient?.email || 'a signer'
@@ -2251,6 +2346,23 @@ msgstr ""
 #: apps/remix/app/routes/_authenticated+/admin+/documents.$id.tsx
 msgid "Attempts sealing the document again, useful for after a code change has occurred to resolve an erroneous document."
 msgstr "Essaye de sceller le document à nouveau, utile après qu'un changement de code ait eu lieu pour résoudre un document erroné."
+
+#: apps/remix/app/components/general/nav-config.tsx
+#: apps/remix/app/components/general/aubrey/aubrey-chat.tsx
+msgid "Aubrey AI"
+msgstr ""
+
+#: apps/remix/app/components/general/redeem-ai-credits-card.tsx
+msgid "Aubrey AI credits"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "Aubrey draws on a monthly free allowance per person first, then on this shared pool."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "Aubrey still works on each person's monthly free allowance. Redeem a key above to add a shared pool for when that runs out."
+msgstr ""
 
 #: apps/remix/app/components/general/document/document-page-view-dropdown.tsx
 msgid "Audit Log"
@@ -2528,6 +2640,7 @@ msgid "Business Rules"
 msgstr ""
 
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
 msgid "By"
 msgstr ""
 
@@ -2600,6 +2713,7 @@ msgstr "Peut préparer"
 #: apps/remix/app/routes/_authenticated+/dms+/doc.$id.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
 #: apps/remix/app/components/tables/settings-security-passkey-table-actions.tsx
+#: apps/remix/app/components/general/ai-connection-card.tsx
 #: apps/remix/app/components/general/teams/team-transfer-status.tsx
 #: apps/remix/app/components/general/teams/team-email-usage.tsx
 #: apps/remix/app/components/general/metadata/custom-fields-manager.tsx
@@ -3145,6 +3259,10 @@ msgstr "Confirmer l'email"
 msgid "Confirmation email sent"
 msgstr "Email de confirmation envoyé"
 
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "Connect"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 msgid "Connect Microsoft Teams to post document notifications into a channel. The connection belongs to your organization — every member's documents flow through it."
 msgstr ""
@@ -3160,6 +3278,10 @@ msgstr ""
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Connect your BMS ML service for automatic OCR, field extraction, and document classification."
 msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+#~ msgid "Connected"
+#~ msgstr ""
 
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Consent to Electronic Transactions"
@@ -3337,6 +3459,7 @@ msgstr ""
 msgid "Could not read the file"
 msgstr ""
 
+#: apps/remix/app/components/general/ai-connection-card.tsx
 #: apps/remix/app/components/general/inbox/extracted-fields.tsx
 msgid "Could not save"
 msgstr ""
@@ -3578,6 +3701,14 @@ msgstr "Créé le"
 #: apps/remix/app/routes/_authenticated+/settings+/tokens.tsx
 msgid "Created on {0}"
 msgstr "Créé le {0}"
+
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "Credits"
+msgstr ""
+
+#: apps/remix/app/components/general/redeem-ai-credits-card.tsx
+msgid "credits in pool"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 msgid "Cron (5-field)"
@@ -4062,6 +4193,7 @@ msgid "Disabling the user results in the user not being able to use the account.
 msgstr "Désactiver l'utilisateur a pour résultat que l'utilisateur ne peut pas utiliser le compte. Cela désactive également tous les contenus associés tels que l'abonnement, les webhooks, les équipes et les clés API."
 
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
+#: apps/remix/app/components/general/ai-connection-card.tsx
 msgid "Disconnect"
 msgstr ""
 
@@ -5144,6 +5276,10 @@ msgstr ""
 msgid "Events — leave all unchecked to receive every event"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "Every credit key redeemed for this organization."
+msgstr ""
+
 #: apps/remix/app/components/general/org-dashboard/report-builder.tsx
 msgid "Every invoice in the window is included."
 msgstr ""
@@ -5848,6 +5984,10 @@ msgstr ""
 msgid "In Teams, open the channel → ⋯ → Workflows → \"Post to a channel when a webhook request is received\". Once the flow is saved, use \"Copy webhook link\" and paste the URL here. Do not use the legacy \"Incoming Webhook\" connector — Microsoft is retiring it."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "In the pool"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates._index.tsx
 msgid "Inactive"
 msgstr ""
@@ -6078,11 +6218,16 @@ msgid "Just the signed document pages"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
 msgid "Key"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
 msgid "Key — referenced from workflow steps"
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "Key saved — untested"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
@@ -6203,6 +6348,10 @@ msgstr "Mode clair"
 msgid "Like to have your own public profile with agreements?"
 msgstr "Vous voulez avoir votre propre profil public avec des accords ?"
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Limit field"
+msgstr ""
+
 #: packages/email/templates/team-transfer-request.tsx
 #: packages/email/templates/confirm-team-email.tsx
 msgid "Link expires in 1 hour."
@@ -6263,6 +6412,7 @@ msgstr "Chargement..."
 
 #: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
 #: apps/remix/app/components/general/inbox/document-timeline.tsx
 msgid "Loading…"
 msgstr ""
@@ -6831,6 +6981,10 @@ msgstr ""
 msgid "No columns match “{search}”."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "No credits have been redeemed yet"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/dms+/settings.tsx
 msgid "No document types defined yet"
 msgstr ""
@@ -6908,6 +7062,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 msgid "No metadata yet"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "No number fields defined"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
@@ -7070,6 +7228,10 @@ msgstr ""
 msgid "Not affected by the selected date range"
 msgstr ""
 
+#: apps/remix/app/components/general/ai-connection-card.tsx
+#~ msgid "Not connected"
+#~ msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/integrations._index.tsx
 msgid "Not connected yet."
 msgstr ""
@@ -7086,9 +7248,17 @@ msgstr ""
 msgid "Not sent for signature"
 msgstr ""
 
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "Not set up"
+msgstr ""
+
 #: apps/remix/app/components/forms/signin.tsx
 msgid "Not supported"
 msgstr "Non pris en charge"
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "Not working"
+msgstr ""
 
 #: apps/remix/app/components/general/org-dashboard/report-builder.tsx
 msgid "Nothing"
@@ -8120,6 +8290,10 @@ msgstr "Les modèles publics sont connectés à votre profil public. Toute modif
 msgid "Purchase seats and assign plans to members."
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "Purchased all time"
+msgstr ""
+
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "Push notifications aren't configured"
 msgstr ""
@@ -8394,8 +8568,21 @@ msgstr ""
 msgid "Red"
 msgstr "Rouge"
 
+#: apps/remix/app/components/general/redeem-ai-credits-card.tsx
+#: apps/remix/app/components/general/aubrey/aubrey-chat.tsx
+msgid "Redeem"
+msgstr ""
+
 #: apps/remix/app/components/general/redeem-license-key-card.tsx
 msgid "Redeem a license key"
+msgstr ""
+
+#: apps/remix/app/components/general/aubrey/aubrey-chat.tsx
+msgid "Redeem an AI credit pack to continue."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "Redeemed"
 msgstr ""
 
 #: apps/remix/app/components/embed/authoring/configure-document-advanced-settings.tsx
@@ -8555,6 +8742,10 @@ msgstr "Renouvelle : {formattedDate}"
 #: apps/remix/app/components/forms/password.tsx
 msgid "Repeat Password"
 msgstr "Répéter le mot de passe"
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "Replace key"
+msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/reports.tsx
 msgid "Report deleted"
@@ -8923,6 +9114,10 @@ msgid "Save SLA Settings"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Save Spend Meter"
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Save SSO Settings"
 msgstr ""
 
@@ -9050,6 +9245,10 @@ msgstr ""
 #: packages/ui/primitives/document-flow/field-items-advanced-settings/dropdown-field.tsx
 msgid "Select"
 msgstr "Sélectionner"
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Select a field…"
+msgstr ""
 
 #: apps/remix/app/components/dialogs/document-move-to-folder-dialog.tsx
 msgid "Select a folder to move this document to."
@@ -9311,6 +9510,10 @@ msgstr "Afficher des informations supplémentaires"
 msgid "Show advanced settings"
 msgstr "Afficher les paramètres avancés"
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Show spend while signing"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/settings+/public-profile.tsx
 msgid "Show templates in your public profile for your audience to sign and get started quickly"
 msgstr "Afficher des modèles dans votre profil public pour que votre audience puisse signer et commencer rapidement"
@@ -9348,6 +9551,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Shows SLA performance on the dashboard and flags overdue items."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Shows what you have already spent with a vendor — and what this invoice adds — to members signing that vendor's invoice. Only your own members see it: a signing link works for anyone holding it, and the person signing a vendor's invoice may work for that vendor."
 msgstr ""
 
 #: apps/remix/app/routes/_profile+/p.$url.tsx
@@ -9812,6 +10019,15 @@ msgstr "Source"
 #: apps/remix/app/routes/_authenticated+/org+/spend.tsx
 #~ msgid "Spend by {0}"
 #~ msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Spend Meter"
+msgstr ""
+
+#. placeholder {0}: meter.invoices
+#: apps/remix/app/components/general/document-signing/vendor-spend-meter-panel.tsx
+msgid "spent on {0} invoice(s)"
+msgstr ""
 
 #: apps/remix/app/components/forms/stamp-upload-dialog.tsx
 msgid "Stamp added"
@@ -10289,6 +10505,10 @@ msgstr ""
 msgid "Test against a document"
 msgstr ""
 
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "Test connection"
+msgstr ""
+
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 #: packages/ui/primitives/template-flow/add-template-fields.tsx
@@ -10349,6 +10569,10 @@ msgstr "Le compte a été désactivé avec succès."
 #: apps/remix/app/components/dialogs/admin-user-enable-dialog.tsx
 msgid "The account has been enabled successfully."
 msgstr "Le compte a été activé avec succès."
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "The AI service rejected this key."
+msgstr ""
 
 #: packages/ui/components/recipient/recipient-action-auth-select.tsx
 msgid "The authentication required for recipients to sign fields"
@@ -10495,6 +10719,18 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "the invoice number"
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "The key is stored for this organization and is never shown again after saving."
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "The key that authorizes this organization's AI. It covers Aubrey, workflow generation, DMS chat and AI stamps. Ask your WorkHub administrator for a key with the \"ai.invoke\" permission."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "The limit is a single figure with no period of its own, so this is what the percentage means. The meter says which window it used."
 msgstr ""
 
 #: apps/remix/app/components/general/inbox/signer-list.tsx
@@ -10738,6 +10974,10 @@ msgstr ""
 msgid "They have permission on your behalf to:"
 msgstr "Ils ont la permission en votre nom de:"
 
+#: apps/remix/app/components/general/aubrey/aubrey-chat.tsx
+msgid "Thinking…"
+msgstr ""
+
 #: apps/remix/app/components/forms/signin.tsx
 msgid "This account has been disabled. Please contact support."
 msgstr "Ce compte a été désactivé. Veuillez contacter le support."
@@ -10901,6 +11141,10 @@ msgstr ""
 msgid "This gate has no enforcement point yet, so a rule saved against it will never run."
 msgstr ""
 
+#: apps/remix/app/components/general/document-signing/vendor-spend-meter-panel.tsx
+msgid "This invoice's total could not be read, so it is not in the figure above."
+msgstr ""
+
 #: apps/remix/app/routes/_share+/verify.$token.tsx
 msgid "This is a public verification page. It does not show the document contents or signatures."
 msgstr ""
@@ -10933,6 +11177,10 @@ msgstr "Ce lien est invalide ou a expiré. Veuillez contacter votre équipe pour
 msgid "This link is invalid or has expired. Please contact your team to resend a verification."
 msgstr "Ce lien est invalide ou a expiré. Veuillez contacter votre équipe pour renvoyer une vérification."
 
+#: apps/remix/app/components/general/document-signing/vendor-spend-meter-panel.tsx
+msgid "this one"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
 msgid "This passkey has already been registered."
 msgstr "Cette clé d'accès a déjà été enregistrée."
@@ -10951,6 +11199,10 @@ msgstr "Ce destinataire ne peut plus être modifié car il a signé un champ ou 
 
 #: apps/remix/app/components/general/org-admin-guard.tsx
 msgid "This section is restricted to organization administrators. Ask an admin if you need access."
+msgstr ""
+
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "This server has no AI service address configured, so a key alone won't be enough. Whoever runs the server needs to set it."
 msgstr ""
 
 #: apps/remix/app/components/forms/signin.tsx
@@ -11156,6 +11408,14 @@ msgstr ""
 
 #: apps/remix/app/components/general/nav-config.tsx
 msgid "Tools"
+msgstr ""
+
+#: apps/remix/app/components/general/redeem-ai-credits-card.tsx
+msgid "Top up the shared pool your team draws from once monthly free messages run out. Keys are single-use."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "Top-up history"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/spend.tsx
@@ -11681,6 +11941,10 @@ msgstr "Utiliser le modèle"
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Used by approval steps set to \"role mapping\", and offered to a signer who is blocked by a business rule and asks for an exception. They see the group name only — never the approver's name or email."
+msgstr ""
+
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "Used from the pool"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
@@ -12372,6 +12636,10 @@ msgstr ""
 msgid "Window"
 msgstr ""
 
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Window (days)"
+msgstr ""
+
 #: apps/remix/app/routes/_unauthenticated+/articles.signature-disclosure.tsx
 msgid "Withdrawing Consent"
 msgstr "Retrait du consentement"
@@ -12435,6 +12703,10 @@ msgstr ""
 msgid "WorkHub inbox not configured"
 msgstr ""
 
+#: apps/remix/app/components/general/ai-connection-card.tsx
+msgid "Working"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/settings.tsx
 msgid "Working days"
 msgstr ""
@@ -12453,6 +12725,10 @@ msgstr "Écrivez sur vous-même"
 
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Write what should happen in plain English. Example: \"When an inbox document finishes OCR and the vendor email contains bms, send it to the finance team to sign.\""
+msgstr ""
+
+#: apps/remix/app/components/general/aubrey/aubrey-chat.tsx
+msgid "Writing the answer…"
 msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/t.$teamUrl+/settings.billing.tsx
@@ -12831,6 +13107,10 @@ msgstr ""
 msgid "You're not part of an organization"
 msgstr ""
 
+#: apps/remix/app/components/general/aubrey/aubrey-chat.tsx
+msgid "You're out of Aubrey AI credits."
+msgstr ""
+
 #. placeholder {0}: org.name
 #: packages/trpc/server/org-router/router.ts
 msgid "You've been added to {0} on HubSign"
@@ -12882,6 +13162,10 @@ msgstr "Votre compte a été supprimé avec succès."
 
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "Your administrator hasn't enabled push notifications for this deployment."
+msgstr ""
+
+#: apps/remix/app/components/general/aubrey/aubrey-chat.tsx
+msgid "Your assistant across documents, signing, filing, inbox and approvals."
 msgstr ""
 
 #: apps/remix/app/components/forms/avatar-image.tsx
@@ -12998,6 +13282,12 @@ msgstr ""
 msgid "Your new password cannot be the same as your old password."
 msgstr "Ton nouveau mot de passe ne peut pas être le même que l'ancien."
 
+#. placeholder {0}: usage.monthlyUsed
+#. placeholder {1}: usage.monthlyLimit
+#: apps/remix/app/routes/_authenticated+/org+/ai-credits.tsx
+msgid "Your own free allowance this month: {0} of {1} used. The pool is only drawn on once that runs out, and it is shared across everyone in the organization."
+msgstr ""
+
 #: apps/remix/app/components/forms/reset-password.tsx
 #: apps/remix/app/components/forms/password.tsx
 msgid "Your password has been updated successfully."
@@ -13113,3 +13403,7 @@ msgstr "Votre token a été créé avec succès ! Assurez-vous de le copier car 
 #: apps/remix/app/routes/_authenticated+/settings+/tokens.tsx
 msgid "Your tokens will be shown here once you create them."
 msgstr "Vos tokens seront affichés ici une fois que vous les aurez créés."
+
+#: apps/remix/app/routes/_authenticated+/org+/settings.tsx
+msgid "Your vendor records have no number fields yet. Add one under Metadata — a field of type Number holding each vendor's limit — then choose it here."
+msgstr ""

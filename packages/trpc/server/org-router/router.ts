@@ -592,6 +592,15 @@ export const orgRouter = router({
       slaDefaultInternalHours: z.number().int().min(1).max(2000).nullable().optional(),
       slaDefaultEndToEndHours: z.number().int().min(1).max(2000).nullable().optional(),
       slaDefaultSigningHours: z.number().int().min(1).max(2000).nullable().optional(),
+      // Spend meter. `spendMeterField` is the key of a NUMBER vendor field; it is
+      // not validated against the definitions here because a field can be deleted
+      // later regardless, so the meter has to tolerate a stale key at read time
+      // and does — it resolves to no meter rather than to an error.
+      spendMeterEnabled: z.boolean().optional(),
+      spendMeterField: z.string().max(80).nullable().optional(),
+      // Bounded like the report window it mirrors: two years of invoices is the
+      // most the report will scan, and a longer meter would disagree with it.
+      spendMeterDays: z.number().int().min(1).max(731).optional(),
       // SSO / OIDC
       oidcEnabled: z.boolean().optional(),
       oidcClientId: z.string().nullable().optional(),
