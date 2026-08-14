@@ -314,9 +314,38 @@ function OrgBillingPage() {
     },
   });
 
-  // A tier can only be cancelled with zero assigned seats — confirmed via a
-  // dialog since it's a real, billed cancellation, not a reversible toggle.
+  // Cancelling a tier unassigns every member on it (including the admin
+  // clicking it) as part of the same action — confirmed via a dialog since
+  // it's a real, billed cancellation with real member impact, not a
+  // reversible toggle.
   const [pendingCancelTier, setPendingCancelTier] = useState<string | null>(null);
+
+  const unassignSeats = trpc.org.unassignSeats.useMutation({
+    onSuccess: ({ removed, errors }) => {
+      void utils.org.getMyOrganization.invalidate();
+      void utils.org.getSeatPlans.invalidate();
+      setSelectedMemberIds(new Set());
+      setPendingBulkRemove(false);
+
+      if (errors.length === 0) {
+        toast({ title: _(msg`${removed.length} seat${removed.length === 1 ? '' : 's'} removed`) });
+      } else {
+        toast({
+          title: _(msg`${removed.length} removed, ${errors.length} failed`),
+          description: errors[0]?.message,
+          variant: 'destructive',
+        });
+      }
+    },
+    onError: (err) => {
+      toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // Multi-select for bulk seat removal — only seat-holding members are
+  // selectable candidates (nothing to bulk-remove from a "No seat" row).
+  const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set());
+  const [pendingBulkRemove, setPendingBulkRemove] = useState(false);
 
   // Checks whether purchasing would strand the admin's own active personal
   // subscription (they auto-consume seat #1 if they don't already have one).
@@ -399,6 +428,10 @@ function OrgBillingPage() {
   // Tiers with at least one open seat — when there's more than one, "Give
   // seat" needs to ask which tier rather than assuming the org's only one.
   const availableTiers = seatPlans?.filter((p) => p.assigned < p.quantity) ?? [];
+
+  // Bulk-removal candidates — only members currently holding a seat have
+  // anything to remove.
+  const seatHoldingMembers = org.members.filter((m) => m.seatTier);
 
   // Calculate totals — every tier still shares one `billingInterval` (a
   // single Stripe subscription can't mix monthly/yearly items), even though
@@ -720,12 +753,6 @@ function OrgBillingPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        disabled={plan.assigned > 0}
-                        title={
-                          plan.assigned > 0
-                            ? 'Unassign every member on this tier before cancelling it.'
-                            : undefined
-                        }
                         onClick={() => setPendingCancelTier(plan.tier)}
                       >
                         <Trans>Cancel plan</Trans>
@@ -745,11 +772,39 @@ function OrgBillingPage() {
 
       {/* Member Seat Assignment */}
       <div className="rounded-[var(--r)] border border-border bg-card">
-        <div className="border-b border-border px-4 py-3">
-          <h3 className="text-[14px] font-semibold"><Trans>Member Seat Assignment</Trans></h3>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            <Trans>Assign a plan tier to each member. Members without a seat have no access.</Trans>
-          </p>
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <div>
+            <h3 className="text-[14px] font-semibold"><Trans>Member Seat Assignment</Trans></h3>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              <Trans>Assign a plan tier to each member. Members without a seat have no access.</Trans>
+            </p>
+          </div>
+
+          {isAdmin && seatHoldingMembers.length > 0 && (
+            <div className="flex items-center gap-3">
+              {selectedMemberIds.size > 0 && (
+                <Button size="sm" variant="outline" onClick={() => setPendingBulkRemove(true)}>
+                  <Trans>Remove {selectedMemberIds.size} seat{selectedMemberIds.size > 1 ? 's' : ''}</Trans>
+                </Button>
+              )}
+              <label className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="rounded"
+                  checked={
+                    selectedMemberIds.size > 0 &&
+                    seatHoldingMembers.every((m) => selectedMemberIds.has(m.id))
+                  }
+                  onChange={(e) =>
+                    setSelectedMemberIds(
+                      e.target.checked ? new Set(seatHoldingMembers.map((m) => m.id)) : new Set(),
+                    )
+                  }
+                />
+                <Trans>Select all</Trans>
+              </label>
+            </div>
+          )}
         </div>
 
         <div className="divide-y divide-border">
@@ -761,6 +816,25 @@ function OrgBillingPage() {
             return (
             <div key={member.id} className="flex items-center justify-between px-4 py-3">
               <div className="flex items-center gap-3">
+                {isAdmin && member.seatTier && (
+                  <input
+                    type="checkbox"
+                    className="rounded"
+                    checked={selectedMemberIds.has(member.id)}
+                    onChange={(e) =>
+                      setSelectedMemberIds((prev) => {
+                        const next = new Set(prev);
+                        if (e.target.checked) {
+                          next.add(member.id);
+                        } else {
+                          next.delete(member.id);
+                        }
+                        return next;
+                      })
+                    }
+                    aria-label={`Select ${member.user.name || member.user.email}`}
+                  />
+                )}
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
                   {(member.user.name || member.user.email)[0].toUpperCase()}
                 </div>
@@ -898,11 +972,26 @@ function OrgBillingPage() {
               <Trans>Cancel {pendingCancelTier ? TIER_CONFIG[pendingCancelTier as keyof typeof TIER_CONFIG]?.name : ''}?</Trans>
             </AlertDialogTitle>
             <AlertDialogDescription>
-              <Trans>
-                This cancels the plan immediately — unused time is credited to the account
-                balance, not refunded to the card. This can't be undone; buying the tier again
-                later starts a new plan.
-              </Trans>
+              {(() => {
+                const assignedCount =
+                  seatPlans?.find((p) => p.tier === pendingCancelTier)?.assigned ?? 0;
+
+                return assignedCount > 0 ? (
+                  <Trans>
+                    {assignedCount} member{assignedCount > 1 ? 's are' : ' is'} currently on this
+                    tier — including you, if you're one of them — and will lose access
+                    immediately, along with the plan itself. Unused time is credited to the
+                    account balance, not refunded to the card. This can't be undone; buying the
+                    tier again later starts a new plan.
+                  </Trans>
+                ) : (
+                  <Trans>
+                    This cancels the plan immediately — unused time is credited to the account
+                    balance, not refunded to the card. This can't be undone; buying the tier
+                    again later starts a new plan.
+                  </Trans>
+                );
+              })()}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -919,6 +1008,36 @@ function OrgBillingPage() {
               }}
             >
               <Trans>Cancel plan</Trans>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={pendingBulkRemove} onOpenChange={(open) => !open && setPendingBulkRemove(false)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              <Trans>
+                Remove {selectedMemberIds.size} seat{selectedMemberIds.size > 1 ? 's' : ''}?
+              </Trans>
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              <Trans>
+                These members lose access immediately. If you've selected yourself and another
+                admin exists, your own removal will fail while the rest still go through.
+              </Trans>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingBulkRemove(false)}>
+              <Trans>Cancel</Trans>
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() =>
+                void unassignSeats.mutateAsync({ memberIds: Array.from(selectedMemberIds) })
+              }
+            >
+              <Trans>Remove seats</Trans>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1537,10 +1537,22 @@ export const orgRouter = router({
         throw new TRPCError({ code: 'NOT_FOUND', message: `No ${input.tier} plan to cancel.` });
       }
 
+      // Cancelling the tier unassigns everyone on it, including the calling
+      // admin — deliberately bypassing `unassignSeat`'s single-member
+      // self-block guard. That guard exists to stop one admin unilaterally
+      // stripping *their own* seat while everyone else keeps theirs; that
+      // concern doesn't apply here since nobody keeps a seat on this tier
+      // once it's cancelled. Zeroing `assigned` in the same call keeps the
+      // row consistent for the moment before it's deleted below.
       if (seatPlan.assigned > 0) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Unassign every member on ${ORG_SEAT_TIERS[input.tier].name} before cancelling it.`,
+        await prisma.organizationMember.updateMany({
+          where: { organizationId: membership.organizationId, seatTier: input.tier },
+          data: { seatTier: null, dmsAddon: false },
+        });
+
+        await prisma.orgSeatPlan.update({
+          where: { id: seatPlan.id },
+          data: { assigned: 0 },
         });
       }
 
@@ -1738,6 +1750,80 @@ export const orgRouter = router({
         where: { id: input.memberId },
         data: { seatTier: null, dmsAddon: false },
       });
+    }),
+
+  /**
+   * Bulk version of `unassignSeat`, for removing seats from many members at
+   * once (e.g. an offboarding pass on a large org) rather than one row at a
+   * time. Applies the exact same self-block guard per member — including
+   * yourself in a batch alongside another `ORG_ADMIN` fails just that one
+   * item, not the whole batch, mirroring `metadata-router`'s `bulkUpsert`
+   * per-row error collection rather than an all-or-nothing transaction.
+   */
+  unassignSeats: authenticatedProcedure
+    .input(z.object({ memberIds: z.array(z.string()).min(1).max(200) }))
+    .mutation(async ({ ctx, input }) => {
+      const myMembership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id, role: 'ORG_ADMIN' },
+      });
+
+      if (!myMembership) throw new TRPCError({ code: 'FORBIDDEN' });
+
+      // Computed once — unassigning seats never changes anyone's `role`, so
+      // this can't shift mid-batch the way it could if role changes were
+      // involved.
+      const otherEligibleAdmin = await prisma.organizationMember.findFirst({
+        where: {
+          organizationId: myMembership.organizationId,
+          role: 'ORG_ADMIN',
+          id: { not: myMembership.id },
+        },
+      });
+
+      const removed: string[] = [];
+      const errors: Array<{ memberId: string; message: string }> = [];
+
+      for (const memberId of input.memberIds) {
+        try {
+          const member = await prisma.organizationMember.findUnique({
+            where: { id: memberId },
+          });
+
+          if (!member || member.organizationId !== myMembership.organizationId) {
+            errors.push({ memberId, message: 'Member not found in this organization.' });
+            continue;
+          }
+
+          if (member.id === myMembership.id && otherEligibleAdmin) {
+            errors.push({
+              memberId,
+              message: "You can't change your own seat assignment — ask another admin to do it.",
+            });
+            continue;
+          }
+
+          if (member.seatTier) {
+            await prisma.orgSeatPlan.updateMany({
+              where: { organizationId: myMembership.organizationId, tier: member.seatTier },
+              data: { assigned: { decrement: 1 } },
+            });
+          }
+
+          await prisma.organizationMember.update({
+            where: { id: memberId },
+            data: { seatTier: null, dmsAddon: false },
+          });
+
+          removed.push(memberId);
+        } catch (err) {
+          errors.push({
+            memberId,
+            message: err instanceof Error ? err.message : 'Failed to remove seat.',
+          });
+        }
+      }
+
+      return { removed, errors };
     }),
 
   // ═══════════════════════════════════════════
