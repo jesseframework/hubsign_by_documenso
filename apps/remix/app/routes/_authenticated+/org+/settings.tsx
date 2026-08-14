@@ -11,6 +11,7 @@ import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
 import { OrgAdminGuard } from '~/components/general/org-admin-guard';
+import { RealtimeMailCard } from '~/components/general/realtime-mail-card';
 import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
@@ -1705,6 +1706,8 @@ function OrgSettingsPage() {
                 the Signature Inbox after OCR. The BulkSender fields are an optional fallback.
               </Trans>
             </p>
+
+            <RealtimeMailCard />
 
             {/*
               Loop prevention. Mail from HubSign's own address and from this org's

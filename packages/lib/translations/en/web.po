@@ -1521,6 +1521,10 @@ msgstr "Add the people who will sign the document."
 msgid "Add the recipients to create the document with"
 msgstr "Add the recipients to create the document with"
 
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Add this address in the WorkHub portal"
+msgstr "Add this address in the WorkHub portal"
+
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Add validation rule"
 msgstr "Add validation rule"
@@ -2947,6 +2951,7 @@ msgstr "Classifications"
 msgid "classified as {0}"
 msgstr "classified as {0}"
 
+#: apps/remix/app/components/general/realtime-mail-card.tsx
 #: apps/remix/app/components/general/export/export-builder-dialog.tsx
 msgid "Clear"
 msgstr "Clear"
@@ -3454,6 +3459,11 @@ msgstr "Could not read the attachment"
 msgid "Could not read the file"
 msgstr "Could not read the file"
 
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Could not register"
+msgstr "Could not register"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
 #: apps/remix/app/components/general/ai-connection-card.tsx
 #: apps/remix/app/components/general/inbox/extracted-fields.tsx
 msgid "Could not save"
@@ -6453,6 +6463,10 @@ msgstr "Lower numbers are listed first. Priority only orders the messages when s
 msgid "Mailbox ID (optional)"
 msgstr "Mailbox ID (optional)"
 
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Mailbox registered"
+msgstr "Mailbox registered"
+
 #: apps/remix/app/components/tables/user-settings-current-teams-table.tsx
 msgid "Manage"
 msgstr "Manage"
@@ -6835,6 +6849,10 @@ msgstr "Need to sign documents?"
 #: apps/remix/app/components/tables/documents-filter-card.tsx
 msgid "Needs action"
 msgstr "Needs action"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Needs the API key above to carry the \"email.update\" permission, and the mailbox to have a Proxy Profile linked in WorkHub."
+msgstr "Needs the API key above to carry the \"email.update\" permission, and the mailbox to have a Proxy Profile linked in WorkHub."
 
 #: packages/ui/components/recipient/recipient-role-select.tsx
 msgid "Needs to approve"
@@ -7331,9 +7349,17 @@ msgstr "Nothing waiting on you right now."
 msgid "Notifications"
 msgstr "Notifications"
 
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Notifications are delivered over the public internet, so HubSign needs a public address. It is currently running on a local one. Everything below can be set up now and will start working once it is deployed."
+msgstr "Notifications are delivered over the public internet, so HubSign needs a public address. It is currently running on a local one. Everything below can be set up now and will start working once it is deployed."
+
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
 msgid "Notify me about"
 msgstr "Notify me about"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Now open the portal, add the endpoint, and paste the signing secret below."
+msgstr "Now open the portal, add the endpoint, and paste the signing secret below."
 
 #: apps/remix/app/components/general/document-signing/document-signing-number-field.tsx
 #: packages/ui/primitives/template-flow/add-template-fields.tsx
@@ -7411,9 +7437,17 @@ msgstr "of total"
 msgid "off"
 msgstr "off"
 
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Off"
+msgstr "Off"
+
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "Oldest"
 msgstr "Oldest"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "On"
+msgstr "On"
 
 #. placeholder {0}: document.team?.name
 #: apps/remix/app/components/general/document-signing/document-signing-page-view.tsx
@@ -7565,6 +7599,10 @@ msgstr "Open SLA Setup"
 #: apps/remix/app/components/general/document/document-stamps-button.tsx
 msgid "Open the library"
 msgstr "Open the library"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Open the WorkHub portal"
+msgstr "Open the WorkHub portal"
 
 #: apps/remix/app/components/general/stack-avatars-with-tooltip.tsx
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
@@ -7831,6 +7869,10 @@ msgstr "Past the invoice due date, still unsigned"
 #: apps/remix/app/routes/_authenticated+/org+/workflows.$id._index.tsx
 msgid "Paste or edit a complete workflow definition (trigger + steps), then apply it to the builder. Use this to import/export workflows."
 msgstr "Paste or edit a complete workflow definition (trigger + steps), then apply it to the builder. Use this to import/export workflows."
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Paste the signing secret"
+msgstr "Paste the signing secret"
 
 #: apps/remix/app/components/tables/user-settings-pending-teams-table-actions.tsx
 msgid "Pay"
@@ -8318,6 +8360,10 @@ msgstr "Radio"
 msgid "Radio values"
 msgstr "Radio values"
 
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Re-register"
+msgstr "Re-register"
+
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/inbox.$id.tsx
 msgid "Re-run OCR"
@@ -8377,6 +8423,14 @@ msgstr "Reading…"
 #: apps/remix/app/components/general/document/document-page-view-recipients.tsx
 msgid "Ready"
 msgstr "Ready"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Realtime mail delivery"
+msgstr "Realtime mail delivery"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Realtime mail is on"
+msgstr "Realtime mail is on"
 
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 msgid "Reason"
@@ -8594,6 +8648,18 @@ msgstr "Reference tables"
 #: apps/remix/app/components/general/org-dashboard/dashboard-toolbar.tsx
 msgid "Refresh"
 msgstr "Refresh"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Register mailbox"
+msgstr "Register mailbox"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Register the mailbox with WorkHub"
+msgstr "Register the mailbox with WorkHub"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Registered. Re-run this if you ever change the mailbox."
+msgstr "Registered. Re-run this if you ever change the mailbox."
 
 #: apps/remix/app/components/general/claim-account.tsx
 #: apps/remix/app/components/forms/signup.tsx
@@ -9050,6 +9116,7 @@ msgstr "Same vendor, total and invoice number as an earlier item in this queue."
 #: apps/remix/app/routes/_authenticated+/org+/metadata._index.tsx
 #: apps/remix/app/routes/_authenticated+/org+/email-templates.$id.tsx
 #: apps/remix/app/routes/_authenticated+/org+/approval-templates.$id.tsx
+#: apps/remix/app/components/general/realtime-mail-card.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-text-field.tsx
 #: apps/remix/app/components/general/document-signing/document-signing-number-field.tsx
 #: apps/remix/app/components/embed/authoring/configure-fields-view.tsx
@@ -9798,6 +9865,10 @@ msgstr "Signing order is enabled."
 msgid "Signing request emailed to {who}"
 msgstr "Signing request emailed to {who}"
 
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Signing secret cleared"
+msgstr "Signing secret cleared"
+
 #: apps/remix/app/routes/_authenticated+/admin+/leaderboard.tsx
 #: apps/remix/app/components/tables/admin-leaderboard-table.tsx
 msgid "Signing Volume"
@@ -10165,6 +10236,10 @@ msgstr "Submitting..."
 #: apps/remix/app/components/general/billing-plans.tsx
 msgid "Subscribe"
 msgstr "Subscribe"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Subscribe it to the \"email.mail-received\" event, then copy the signing secret."
+msgstr "Subscribe it to the \"email.mail-received\" event, then copy the signing secret."
 
 #: apps/remix/app/components/tables/admin-dashboard-users-table.tsx
 msgid "Subscription"
@@ -10801,6 +10876,10 @@ msgstr "The recipient is required to view the document for it to be completed."
 msgid "The recipient was never sent a request. This is a send that did not happen, not a slow signer — chasing the person will not help."
 msgstr "The recipient was never sent a request. This is a send that did not happen, not a slow signer — chasing the person will not help."
 
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "The regular check keeps running at a slower pace as a safety net, so nothing is missed if a notification is ever dropped."
+msgstr "The regular check keeps running at a slower pace as a safety net, so nothing is missed if a notification is ever dropped."
+
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 msgid "The request went out and has never been opened. Often a delivery problem — a wrong address, or the mail sitting in a spam folder."
 msgstr "The request went out and has never been opened. Often a delivery problem — a wrong address, or the mail sitting in a spam folder."
@@ -11013,6 +11092,10 @@ msgstr "This browser is registered to receive push notifications."
 msgid "This can be overriden by setting the authentication requirements directly on each recipient in the next step."
 msgstr "This can be overriden by setting the authentication requirements directly on each recipient in the next step."
 
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "This deployment cannot receive notifications yet."
+msgstr "This deployment cannot receive notifications yet."
+
 #: packages/email/template-components/template-document-super-delete.tsx
 msgid "This document can not be recovered, if you would like to dispute the reason for future documents please contact support."
 msgstr "This document can not be recovered, if you would like to dispute the reason for future documents please contact support."
@@ -11145,6 +11228,10 @@ msgstr "This invoice's total could not be read, so it is not in the figure above
 #: apps/remix/app/routes/_share+/verify.$token.tsx
 msgid "This is a public verification page. It does not show the document contents or signatures."
 msgstr "This is a public verification page. It does not show the document contents or signatures."
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "This is how HubSign proves a notification really came from WorkHub. Without it every notification is refused."
+msgstr "This is how HubSign proves a notification really came from WorkHub. Without it every notification is refused."
 
 #: packages/ui/primitives/template-flow/add-template-settings.tsx
 msgid "This is how the document will reach the recipients once the document is ready for signing."
@@ -12699,6 +12786,10 @@ msgstr "WorkHub inbox connection"
 #: apps/remix/app/routes/_authenticated+/org+/inbox._index.tsx
 msgid "WorkHub inbox not configured"
 msgstr "WorkHub inbox not configured"
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "WorkHub notifies HubSign the moment mail arrives, instead of HubSign checking every two minutes. This also stops the checks counting against your mailbox quota."
+msgstr "WorkHub notifies HubSign the moment mail arrives, instead of HubSign checking every two minutes. This also stops the checks counting against your mailbox quota."
 
 #: apps/remix/app/components/general/ai-connection-card.tsx
 msgid "Working"

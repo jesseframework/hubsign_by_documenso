@@ -1797,6 +1797,16 @@ model Organization {
   workhubMailboxId String? /// Optional mailbox override (?mailboxId=).
   workhubApiBase   String? /// Optional per-org WorkHub API base override.
 
+  // Realtime inbound mail. WorkHub pushes `email.mail-received` through Svix
+  // instead of HubSign polling on a timer. The watch id is WorkHub's; the secret
+  // is Svix's, copied out of their portal by an admin — there is no API that
+  // hands it to us.
+  //
+  // The webhook is only a wake-up signal: the handler calls the same poller the
+  // timer does, so dedup, attachments and OCR dispatch all stay on one path.
+  workhubWebhookId     String? /// WorkHub watch id, from POST /v1/email/webhooks.
+  workhubWebhookSecret String? /// Svix signing secret (whsec_…) for verifying deliveries.
+
   // Per-org WorkHub AI credential. A `whk_` key carrying the `ai.invoke` scope,
   // used for every AI call this org makes (Aubrey, workflow generation, DMS
   // chat, AI stamps). Separate from `workhubApiKey` above, which is mailbox-only
