@@ -205,7 +205,15 @@ export default function DocumentPage() {
           gradient
         >
           <CardContent className="p-2">
-            <PDFViewer document={document} key={documentData.id} documentData={documentData} />
+            {/* See the note on the unfoldered document view — markup stops at
+                the seal, because that is the last moment it can reach the PDF. */}
+            <PDFViewer
+              document={document}
+              key={documentData.id}
+              documentData={documentData}
+              enableAnnotations={document.status !== DocumentStatus.COMPLETED}
+              annotationDocumentId={document.id}
+            />
           </CardContent>
         </Card>
 

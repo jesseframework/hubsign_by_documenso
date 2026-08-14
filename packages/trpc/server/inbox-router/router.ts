@@ -18,6 +18,7 @@ import { runAttachmentOcr } from '@documenso/lib/server-only/inbox/run-attachmen
 import { rememberTemplateForSender } from '@documenso/lib/server-only/inbox/resolve-ocr-template';
 import {
   WorkHubWebhookError,
+  getMailWatchPortalUrl,
   registerMailWatch,
 } from '@documenso/lib/server-only/inbox/workhub-mail-webhook';
 import { SLA_ORG_SELECT, evaluateItemsSla, slaClockStart } from '@documenso/lib/server-only/inbox/sla';
@@ -1140,6 +1141,47 @@ export const inboxRouter = router({
       deliverable: Boolean(appUrl) && !isLocal,
       endpointUrl: appUrl ? `${appUrl.replace(/\/$/, '')}/api/webhooks/workhub-mail` : null,
     };
+  }),
+
+  /**
+   * The Svix portal link, re-fetched on demand.
+   *
+   * Registration returns this once, and the signing secret exists ONLY inside
+   * that portal — so an admin who reloads the page before finishing setup would
+   * otherwise be stranded with no way back in. Kept out of `realtimeMailStatus`
+   * deliberately: that query runs on every settings page load, and it should not
+   * start depending on WorkHub being reachable.
+   *
+   * Returns null rather than throwing, so a WorkHub outage degrades the card to
+   * "no link right now" instead of breaking the page.
+   */
+  realtimeMailPortal: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await requireOrgMember(ctx.user.id);
+
+    if (membership.role !== OrganizationRole.ORG_ADMIN) {
+      return { portalUrl: null };
+    }
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: membership.organizationId },
+      select: { workhubApiKey: true, workhubApiBase: true },
+    });
+
+    if (!organization?.workhubApiKey) {
+      return { portalUrl: null };
+    }
+
+    try {
+      const portalUrl = await getMailWatchPortalUrl({
+        apiKey: organization.workhubApiKey,
+        apiBase: organization.workhubApiBase,
+      });
+
+      return { portalUrl };
+    } catch (err) {
+      console.error('[realtime-mail] could not fetch the portal link:', err);
+      return { portalUrl: null };
+    }
   }),
 
   /** Register this org's mailbox for push notifications. Returns the Svix portal URL. */

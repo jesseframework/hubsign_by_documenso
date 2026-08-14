@@ -1456,6 +1456,10 @@ msgstr "Mich selbst hinzufügen"
 msgid "Add Myself"
 msgstr "Mich hinzufügen"
 
+#: packages/ui/primitives/pdf-annotations/pdf-annotation-layer.tsx
+msgid "Add note"
+msgstr ""
+
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx
 msgid "Add passkey"
@@ -1527,8 +1531,12 @@ msgid "Add the recipients to create the document with"
 msgstr "Fügen Sie die Empfänger hinzu, um das Dokument zu erstellen"
 
 #: apps/remix/app/components/general/realtime-mail-card.tsx
-msgid "Add this address in the WorkHub portal"
+msgid "Add this address in the delivery portal"
 msgstr ""
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+#~ msgid "Add this address in the WorkHub portal"
+#~ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/approval-config.tsx
 msgid "Add validation rule"
@@ -2039,6 +2047,10 @@ msgstr ""
 #: apps/remix/app/components/dialogs/template-folder-move-dialog.tsx
 #: apps/remix/app/components/dialogs/folder-move-dialog.tsx
 msgid "An unknown error occurred while moving the folder."
+msgstr ""
+
+#: packages/ui/primitives/pdf-annotations/use-pdf-annotations.ts
+msgid "Annotation not saved"
 msgstr ""
 
 #: apps/remix/app/components/dialogs/team-transfer-dialog.tsx
@@ -2769,6 +2781,7 @@ msgstr "Kann vorbereiten"
 #: apps/remix/app/components/dialogs/document-delete-dialog.tsx
 #: apps/remix/app/components/dialogs/assistant-confirmation-dialog.tsx
 #: packages/ui/primitives/signature-pad/signature-pad-dialog.tsx
+#: packages/ui/primitives/pdf-annotations/pdf-annotation-layer.tsx
 #: packages/ui/primitives/document-flow/send-document-action-dialog.tsx
 #: packages/ui/primitives/document-flow/field-item-advanced-settings.tsx
 msgid "Cancel"
@@ -3453,6 +3466,10 @@ msgstr ""
 
 #: apps/remix/app/routes/_authenticated+/org+/exports._index.tsx
 msgid "Could not delete the layout"
+msgstr ""
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Could not fetch the portal link just now. Use \"Re-register\" above to get a fresh one."
 msgstr ""
 
 #: apps/remix/app/components/general/inbox/attachment-ocr-panel.tsx
@@ -5270,6 +5287,10 @@ msgstr ""
 msgid "Escalation recipients (comma-separated emails)"
 msgstr ""
 
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "est. from arrival"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/business-rules._index.tsx
 msgid "Evaluates every signing rule against a real document without enforcing anything, and shows the data the rules saw."
 msgstr ""
@@ -5639,6 +5660,14 @@ msgstr ""
 
 #: apps/remix/app/components/general/inbox/extracted-fields.tsx
 msgid "from attachment"
+msgstr ""
+
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "from invoice terms"
+msgstr ""
+
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "from vendor terms"
 msgstr ""
 
 #: apps/remix/app/components/general/document-signing/document-signing-name-field.tsx
@@ -6174,8 +6203,12 @@ msgid "Invoices from this vendor's email extract with this template."
 msgstr ""
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
-msgid "Invoices past the date the vendor is owed by, and still awaiting signature. The due date is the one printed on the invoice; where it states none, the vendor's terms code is applied to the invoice date. One already signed is history and is not counted here."
+msgid "Invoices past the date the vendor is owed by, and still awaiting signature. The due date is the one printed on the invoice; where it states none, the terms printed on the invoice are applied to the invoice date, and failing those the vendor's terms code. Any date not taken straight off the page is labelled as such. One already signed is history and is not counted here."
 msgstr ""
+
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+#~ msgid "Invoices past the date the vendor is owed by, and still awaiting signature. The due date is the one printed on the invoice; where it states none, the vendor's terms code is applied to the invoice date. One already signed is history and is not counted here."
+#~ msgstr ""
 
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
 #~ msgid "Invoices past their SLA whose clock is still running. One already sent late is history and is not counted here."
@@ -7031,6 +7064,10 @@ msgstr ""
 msgid "No documents yet. Upload your first document to get started."
 msgstr ""
 
+#: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
+msgid "no due date printed"
+msgstr ""
+
 #: apps/remix/app/routes/_authenticated+/org+/email-templates._index.tsx
 msgid "No email templates yet"
 msgstr ""
@@ -7601,13 +7638,17 @@ msgstr ""
 msgid "Open SLA Setup"
 msgstr ""
 
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "Open the delivery portal"
+msgstr ""
+
 #: apps/remix/app/components/general/document/document-stamps-button.tsx
 msgid "Open the library"
 msgstr ""
 
 #: apps/remix/app/components/general/realtime-mail-card.tsx
-msgid "Open the WorkHub portal"
-msgstr ""
+#~ msgid "Open the WorkHub portal"
+#~ msgstr ""
 
 #: apps/remix/app/components/general/stack-avatars-with-tooltip.tsx
 #: apps/remix/app/components/general/dashboard/bottleneck-tiles.tsx
@@ -9216,6 +9257,10 @@ msgstr ""
 msgid "Saved spreadsheet layouts. Build one here, or from the Export button on any grid."
 msgstr ""
 
+#: packages/ui/primitives/pdf-annotations/pdf-annotation-toolbar.tsx
+msgid "Saving…"
+msgstr ""
+
 #: apps/remix/app/routes/_internal+/[__htmltopdf]+/certificate.tsx
 msgid "Scan the QR code or visit the URL below to confirm this document is authentic."
 msgstr ""
@@ -10059,6 +10104,7 @@ msgid "Something went wrong. Please try again or contact support."
 msgstr "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut oder kontaktieren Sie den Support."
 
 #: apps/remix/app/components/forms/push-notification-preferences.tsx
+#: packages/ui/primitives/pdf-annotations/use-pdf-annotations.ts
 msgid "Something went wrong. Please try again."
 msgstr ""
 
@@ -10243,8 +10289,8 @@ msgid "Subscribe"
 msgstr "Abonnieren"
 
 #: apps/remix/app/components/general/realtime-mail-card.tsx
-msgid "Subscribe it to the \"email.mail-received\" event, then copy the signing secret."
-msgstr ""
+#~ msgid "Subscribe it to the \"email.mail-received\" event, then copy the signing secret."
+#~ msgstr ""
 
 #: apps/remix/app/components/tables/admin-dashboard-users-table.tsx
 msgid "Subscription"
@@ -11266,6 +11312,10 @@ msgstr "Dieser Link ist ungültig oder abgelaufen. Bitte kontaktieren Sie Ihr Te
 
 #: apps/remix/app/components/general/document-signing/vendor-spend-meter-panel.tsx
 msgid "this one"
+msgstr ""
+
+#: apps/remix/app/components/general/realtime-mail-card.tsx
+msgid "This opens a separate delivery portal — it is not part of the WorkHub dashboard, so you can only reach it through this link. Add the address below as an endpoint, subscribe it to \"email.mail-received\", then copy the signing secret it shows you."
 msgstr ""
 
 #: apps/remix/app/components/dialogs/passkey-create-dialog.tsx

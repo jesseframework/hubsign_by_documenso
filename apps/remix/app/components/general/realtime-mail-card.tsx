@@ -27,6 +27,16 @@ export const RealtimeMailCard = () => {
 
   const { data: status } = trpc.inbox.realtimeMailStatus.useQuery();
 
+  /*
+    Fetched separately and only once registered. The signing secret lives solely
+    inside the portal, so an admin who reloads before finishing setup needs a way
+    back in — the link from the registration response alone would strand them.
+  */
+  const { data: portal } = trpc.inbox.realtimeMailPortal.useQuery(undefined, {
+    enabled: Boolean(status?.registered && status?.isAdmin),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const enable = trpc.inbox.enableRealtimeMail.useMutation({
     onSuccess: (result) => {
       setPortalUrl(result.portalUrl);
@@ -133,26 +143,43 @@ export const RealtimeMailCard = () => {
           </Button>
         </Step>
 
-        <Step n={2} done={false} title={<Trans>Add this address in the WorkHub portal</Trans>}>
+        <Step n={2} done={false} title={<Trans>Add this address in the delivery portal</Trans>}>
           <p className="text-muted-foreground text-[11px]">
-            <Trans>Subscribe it to the "email.mail-received" event, then copy the signing secret.</Trans>
+            {/*
+              Said explicitly because it is not guessable: WorkHub hands delivery
+              to Svix, and the portal is a separate hosted page. Looking for a
+              webhooks screen in the WorkHub dashboard finds nothing.
+            */}
+            <Trans>
+              This opens a separate delivery portal — it is not part of the WorkHub dashboard, so
+              you can only reach it through this link. Add the address below as an endpoint,
+              subscribe it to "email.mail-received", then copy the signing secret it shows you.
+            </Trans>
           </p>
           {status.endpointUrl && (
             <code className="bg-muted mt-1.5 block break-all rounded px-2 py-1 font-mono text-[11px]">
               {status.endpointUrl}
             </code>
           )}
-          {portalUrl && (
+
+          {(portalUrl ?? portal?.portalUrl) ? (
             <a
-              href={portalUrl}
+              href={portalUrl ?? portal?.portalUrl ?? undefined}
               target="_blank"
               rel="noreferrer noopener"
-              className="text-primary mt-1.5 inline-flex items-center gap-1 text-[11px] hover:underline"
+              className="text-primary mt-2 inline-flex items-center gap-1 text-[11px] font-medium hover:underline"
             >
-              <Trans>Open the WorkHub portal</Trans>
+              <Trans>Open the delivery portal</Trans>
               <ExternalLinkIcon className="h-3 w-3" />
             </a>
-          )}
+          ) : status.registered ? (
+            <p className="text-muted-foreground mt-2 text-[11px]">
+              <Trans>
+                Could not fetch the portal link just now. Use "Re-register" above to get a fresh
+                one.
+              </Trans>
+            </p>
+          ) : null}
         </Step>
 
         <Step n={3} done={status.hasSecret} title={<Trans>Paste the signing secret</Trans>}>

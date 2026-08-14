@@ -159,7 +159,19 @@ export const DocumentSigningPageView = ({
             should be the same border every other panel on the page uses.
           */}
           <div className="border-border bg-card col-span-12 overflow-hidden rounded-[var(--r-lg)] border p-2 lg:col-span-7 xl:col-span-8">
-            <PDFViewer key={documentData.id} documentData={documentData} document={document} />
+            {/*
+              Markup for the signer. The token is the credential here — it is
+              what tells the server which document this is and which recipient
+              is drawing, so their own highlights and notes come back editable
+              and everyone else's do not.
+            */}
+            <PDFViewer
+              key={documentData.id}
+              documentData={documentData}
+              document={document}
+              enableAnnotations
+              annotationToken={recipient.token}
+            />
           </div>
 
           <div className="col-span-12 lg:col-span-5 xl:col-span-4">

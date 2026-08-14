@@ -1,4 +1,6 @@
 import { ocrFieldNames } from '../utils/ocr-fields';
+import type { OcrCanonicalField } from './ocr-fields';
+import { readOcrField } from './ocr-fields';
 
 /**
  * The invoice fields the Signature Inbox reads out of OCR output.
@@ -33,6 +35,26 @@ export const ocrFieldString = (item: { extractedData?: unknown }, keys: string[]
   return '';
 };
 
+/**
+ * Exact-key lookup first, then the canonical normalised reader.
+ *
+ * The exact lookup stays the primary path, for the reasons above. The fallback is
+ * confined to the three fields the due-date calculation depends on, because there
+ * are two alias registries in this codebase and only one of them could see a due
+ * date the extractor had spelled `payment_due_date`, `pay_by`, or plain `dueDate`.
+ * `universal/ocr-fields.ts` read those perfectly well while this file returned
+ * blank, and blank here does not surface as a missing date — it falls through to
+ * the vendor's standing terms and surfaces as a date that is simply *wrong*.
+ *
+ * Both the grid and the spreadsheet export read `invoiceFields`, so widening it
+ * moves them together and they cannot disagree.
+ */
+const canonicalOr = (
+  item: { extractedData?: unknown },
+  keys: string[],
+  canonical: OcrCanonicalField,
+): string => ocrFieldString(item, keys) || readOcrField(item.extractedData, canonical) || '';
+
 /** All invoice fields the grid surfaces — sourced ONLY from BMS ML metadata. */
 export const invoiceFields = (item: { extractedData?: unknown }) => ({
   invoiceNumber: ocrFieldString(item, ['invoice_number', 'invoiceNumber', 'invoice_no']),
@@ -46,8 +68,15 @@ export const invoiceFields = (item: { extractedData?: unknown }) => ({
   total: ocrFieldString(item, [...ocrFieldNames('total_amount'), 'invoice_amount', 'grand_total']),
   tax: ocrFieldString(item, [...ocrFieldNames('tax_amount'), 'vat']),
   net: ocrFieldString(item, ['subtotal', 'net_amount', 'net']),
-  invoiceDate: ocrFieldString(item, ['invoice_date', 'date', 'issue_date']),
-  dueDate: ocrFieldString(item, [...ocrFieldNames('due_date'), 'payment_due']),
+  invoiceDate: canonicalOr(item, ['invoice_date', 'date', 'issue_date'], 'invoiceDate'),
+  dueDate: canonicalOr(item, [...ocrFieldNames('due_date'), 'payment_due'], 'dueDate'),
+  /**
+   * The credit terms printed on the invoice — "Net 30", "Payment due within 30
+   * days." The due-date calculation ranks these above the vendor directory's
+   * standing terms code, and without them an invoice whose extractor echoed the
+   * invoice date into the due-date field has nothing to fall back on.
+   */
+  paymentTerms: canonicalOr(item, ['payment_terms', 'terms', 'payment_term'], 'paymentTerms'),
   customerName: ocrFieldString(item, ocrFieldNames('customer_name')),
 });
 

@@ -200,7 +200,18 @@ export default function DocumentPage() {
           gradient
         >
           <CardContent className="p-2">
-            <PDFViewer document={document} key={documentData.id} documentData={documentData} />
+            {/*
+              Markup is offered right up until the document is sealed. After
+              that there is nothing left to flatten it into, and the router
+              would refuse the write anyway — better not to show the pen.
+            */}
+            <PDFViewer
+              document={document}
+              key={documentData.id}
+              documentData={documentData}
+              enableAnnotations={document.status !== DocumentStatus.COMPLETED}
+              annotationDocumentId={document.id}
+            />
           </CardContent>
         </Card>
 

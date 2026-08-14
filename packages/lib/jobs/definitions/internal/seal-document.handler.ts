@@ -7,6 +7,7 @@ import { prisma } from '@documenso/prisma';
 import { signPdf } from '@documenso/signing';
 
 import { AppError, AppErrorCode } from '../../../errors/app-error';
+import { embedAnnotationsOnPdf } from '../../../server-only/annotations/embed-annotations-on-pdf';
 import { decryptSecondaryData } from '../../../server-only/crypto/decrypt';
 import { sendCompletedEmail } from '../../../server-only/document/send-completed-email';
 import PostHogServerClient from '../../../server-only/feature-flags/get-post-hog-server-client';
@@ -18,6 +19,7 @@ import { flattenForm } from '../../../server-only/pdf/flatten-form';
 import { insertFieldInPDF } from '../../../server-only/pdf/insert-field-in-pdf';
 import { legacy_insertFieldInPDF } from '../../../server-only/pdf/legacy-insert-field-in-pdf';
 import { normalizeSignatureAppearances } from '../../../server-only/pdf/normalize-signature-appearances';
+import { embedStampsOnPdf } from '../../../server-only/stamps/embed-stamp-on-pdf';
 import { triggerWebhook } from '../../../server-only/webhooks/trigger/trigger-webhook';
 import { DOCUMENT_AUDIT_LOG_TYPE } from '../../../types/document-audit-logs';
 import {
@@ -227,6 +229,23 @@ export const run = async ({
       }
     }
 
+    /**
+     * Stamps the sender placed, then markup anyone left on the document.
+     *
+     * This is the seal the job runner actually executes — `sealDocument` in
+     * server-only/document/seal-document.ts is a parallel copy of this same
+     * pipeline. Anything that has to reach the signed PDF has to be added to
+     * BOTH, which is exactly how stamps came to be drawn in one path and
+     * silently dropped in the other.
+     *
+     * Best-effort by design: a broken stamp or annotation logs and is skipped
+     * rather than failing a document someone has already signed.
+     */
+    if (!isRejected) {
+      await embedStampsOnPdf(pdfDoc, document.id);
+      await embedAnnotationsOnPdf(pdfDoc, document.id);
+    }
+
     // Re-flatten the form to handle our checkbox and radio fields that
     // create native arcoFields
     flattenForm(pdfDoc);
@@ -305,9 +324,7 @@ export const run = async ({
           certificatePageCount,
           // If a PDF lock password was held during signing, clear it now so the
           // system no longer holds it, and mark the PDF as locked.
-          ...(document.pdfPassword && !isRejected
-            ? { pdfPassword: null, pdfLocked: true }
-            : {}),
+          ...(document.pdfPassword && !isRejected ? { pdfPassword: null, pdfLocked: true } : {}),
         },
       });
 

@@ -1,4 +1,5 @@
 import { adminRouter } from './admin-router/router';
+import { annotationRouter } from './annotation-router/router';
 import { apiTokenRouter } from './api-token-router/router';
 import { approvalRouter } from './approval-router/router';
 import { aubreyRouter } from './aubrey-router/router';
@@ -44,6 +45,7 @@ export const appRouter = router({
   embeddingPresign: embeddingPresignRouter,
   push: pushRouter,
   stamp: stampRouter,
+  annotation: annotationRouter,
   workflow: workflowRouter,
   emailTemplate: emailTemplateRouter,
   businessRule: businessRuleRouter,
