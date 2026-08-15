@@ -140,6 +140,13 @@ const monthlyEquivalentSeatPriceFor = (pricing: SeatPricing, tier: string, inter
 const priceSuffix = (flatRate: boolean, interval: string) =>
   `${flatRate ? '' : '/seat'}/${interval === 'year' ? 'yr' : 'mo'}`;
 
+// Core "how many members" phrase for a flat-rate tier — genuinely unlimited
+// (Business/Enterprise, `maxSeats: undefined`) vs a real cap (Team). Flat
+// billing and a headcount cap are independent — don't assume flat means
+// uncapped. Callers wrap this in their own surrounding text/punctuation.
+const flatTierCapacityPhrase = (maxSeats: number | undefined) =>
+  maxSeats === undefined ? 'unlimited members' : `up to ${maxSeats} members`;
+
 // Static marketing copy (not per-render state), so this lives outside the
 // page component — shown wherever DMS is offered or already included, since
 // a bare `title=` tooltip can't render a bulleted feature list.
@@ -462,20 +469,23 @@ function OrgBillingPage() {
   // single Stripe subscription can't mix monthly/yearly items), even though
   // an org can now hold more than one tier at once.
   //
-  // "Total Seats"/"Available" are only meaningful for purchased-quantity
-  // tiers (Team) — a flat-rate tier's `quantity` is the "unlimited" sentinel,
-  // not a real seat count, so it's excluded from both rather than summed in
-  // and ballooning the displayed number. "Assigned" stays a true sum across
-  // every tier — that's a real headcount regardless of how a tier bills.
-  const nonFlatSeatPlans = seatPlans?.filter(
-    (p) => !TIER_CONFIG[p.tier as keyof typeof TIER_CONFIG]?.flatRate,
+  // "Total Seats"/"Available" are only meaningful for tiers with a real seat
+  // *cap* — that's about headcount, not billing model, so it's keyed off
+  // `maxSeats` rather than `flatRate`: Team is flat-rate now but still has a
+  // real 20-seat ceiling worth summarizing, while a flat-and-uncapped tier
+  // (Business/Enterprise) has nothing to sum here — its `quantity` is the
+  // "unlimited" sentinel, not a real seat count, so it's excluded rather
+  // than summed in and ballooning the displayed number. "Assigned" stays a
+  // true sum across every tier — that's a real headcount regardless of cap.
+  const cappedSeatPlans = seatPlans?.filter(
+    (p) => TIER_CONFIG[p.tier as keyof typeof TIER_CONFIG]?.maxSeats !== undefined,
   ) ?? [];
-  const totalSeats = nonFlatSeatPlans.reduce((sum, p) => sum + p.quantity, 0);
+  const totalSeats = cappedSeatPlans.reduce((sum, p) => sum + p.quantity, 0);
   const availableSeats = Math.max(
-    totalSeats - nonFlatSeatPlans.reduce((sum, p) => sum + p.assigned, 0),
+    totalSeats - cappedSeatPlans.reduce((sum, p) => sum + p.assigned, 0),
     0,
   );
-  const hasNonFlatTier = nonFlatSeatPlans.length > 0;
+  const hasCappedTier = cappedSeatPlans.length > 0;
   const assignedSeats = seatPlans?.reduce((sum, p) => sum + p.assigned, 0) ?? 0;
   const orgInterval = seatPlans?.[0]?.billingInterval ?? 'month';
   const billedTotal =
@@ -527,7 +537,10 @@ function OrgBillingPage() {
               orgInterval,
             )}
             {TIER_CONFIG[membership.seatTier as keyof typeof TIER_CONFIG]?.flatRate && (
-              <span className="text-muted-foreground"> (org-wide, unlimited members)</span>
+              <span className="text-muted-foreground">
+                {' '}
+                (org-wide, {flatTierCapacityPhrase(TIER_CONFIG[membership.seatTier as keyof typeof TIER_CONFIG]?.maxSeats)})
+              </span>
             )}
             {membership.dmsAddon && (
               <>
@@ -547,7 +560,7 @@ function OrgBillingPage() {
           purchased-quantity tier (Team); omitted entirely when the org only
           holds flat-rate tiers, since there's no cap to report. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {hasNonFlatTier && (
+        {hasCappedTier && (
           <div className="rounded-[var(--r)] border border-border bg-card p-3">
             <span className="text-[10px] font-semibold uppercase text-muted-foreground">Total Seats</span>
             <p className="mt-1 text-2xl font-semibold">{totalSeats}</p>
@@ -557,7 +570,7 @@ function OrgBillingPage() {
           <span className="text-[10px] font-semibold uppercase text-muted-foreground">Assigned</span>
           <p className="mt-1 text-2xl font-semibold">{assignedSeats}</p>
         </div>
-        {hasNonFlatTier && (
+        {hasCappedTier && (
           <div className="rounded-[var(--r)] border border-border bg-card p-3">
             <span className="text-[10px] font-semibold uppercase text-muted-foreground">Available</span>
             <p className="mt-1 text-2xl font-semibold text-green-600">{availableSeats}</p>
@@ -628,7 +641,7 @@ function OrgBillingPage() {
                           ? 'unlimited'
                           : `${docsForTier(tier)} signature requests`}
                         {config.flatRate
-                          ? ', unlimited members'
+                          ? `, ${flatTierCapacityPhrase(config.maxSeats)}`
                           : existingPlan
                             ? `, ${existingPlan.quantity} seats active`
                             : `, min ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}`}
@@ -687,11 +700,16 @@ function OrgBillingPage() {
                   />
                 </div>
               )}
-              {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate && (
-                <div className="text-[12px] text-muted-foreground">
-                  <Trans>Unlimited members included</Trans>
-                </div>
-              )}
+              {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate && (() => {
+                const phrase = flatTierCapacityPhrase(
+                  TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.maxSeats,
+                );
+                return (
+                  <div className="text-[12px] text-muted-foreground">
+                    {phrase.charAt(0).toUpperCase() + phrase.slice(1)} included
+                  </div>
+                );
+              })()}
               {/* Three states: bundled free (Business/Enterprise), a paid
                   add-on (no current tier — kept for a hypothetical future
                   one), or unavailable entirely (Team — the deliberate fence
@@ -811,7 +829,14 @@ function OrgBillingPage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      {config?.flatRate ? (
+                      {config?.maxSeats === undefined ? (
+                        // Genuinely uncapped (Business/Enterprise) — `quantity`
+                        // is the "unlimited" sentinel here, not a real number,
+                        // so there's nothing meaningful to show progress
+                        // against. A capped tier (Team, flat or not) always
+                        // has a real `quantity` = its cap — see
+                        // `resolveFlatTierQuantity` — so the same progress
+                        // display already works for both.
                         <span className="text-[13px] font-medium">
                           {plan.assigned} member{plan.assigned === 1 ? '' : 's'}
                         </span>

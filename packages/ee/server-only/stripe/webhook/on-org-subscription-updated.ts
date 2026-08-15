@@ -4,6 +4,7 @@ import { match } from 'ts-pattern';
 import {
   ORG_SEAT_TIERS,
   ORG_UNLIMITED_SENTINEL,
+  resolveFlatTierQuantity,
   resolveOrgTierDocuments,
 } from '@documenso/lib/constants/org-tiers';
 import { stripe } from '@documenso/lib/server-only/stripe';
@@ -121,11 +122,13 @@ export const onOrgSubscriptionUpdated = async ({
       // count) — set that way in `purchaseSeats`.
       docBlockQuantity: docBlockItem?.quantity ?? 0,
       // A `flatRate` tier's live Stripe quantity is always 1 (see
-      // `purchaseSeats`) — that's a billing detail, not a seat count, so it
-      // resolves to the same "unlimited" sentinel used elsewhere rather than
-      // literally storing `1` (which would make every `assigned`/`quantity`
-      // comparison downstream read as "capped at 1 seat").
-      quantity: tierLimits.flatRate ? ORG_UNLIMITED_SENTINEL : (seatItem.quantity ?? 0),
+      // `purchaseSeats`) — that's a billing detail, not a seat count, so
+      // this resolves to the tier's real cap if it has one (Team) or the
+      // "unlimited" sentinel otherwise (Business/Enterprise), never the
+      // literal `1` (which would make every `assigned`/`quantity` comparison
+      // downstream read as "capped at 1 seat"). This is the write path for
+      // every real, confirmed purchase — the one that actually matters.
+      quantity: tierLimits.flatRate ? resolveFlatTierQuantity(tier) : (seatItem.quantity ?? 0),
       billingInterval: seatItem.price.recurring?.interval === 'year' ? 'year' : 'month',
       stripePriceId: seatItem.price.id,
     };

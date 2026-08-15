@@ -48,7 +48,6 @@ import {
   UploadCloudIcon,
   UserCogIcon,
   UserIcon,
-  Users2Icon,
   UsersIcon,
   WebhookIcon,
   WorkflowIcon,
@@ -383,7 +382,6 @@ export const SETTINGS_CONSOLE: ConsoleDef = {
           label: <Trans>Members & Roles</Trans>,
           roles: ORG_ADMIN_ONLY,
         },
-        { to: '/settings/teams', icon: Users2Icon, label: <Trans>Teams</Trans> },
         {
           to: '/org/billing',
           icon: CreditCardIcon,

@@ -25,6 +25,7 @@ import { getI18nInstance } from '@documenso/lib/client-only/providers/i18n-serve
 import {
   ORG_SEAT_TIERS,
   ORG_UNLIMITED_SENTINEL,
+  resolveFlatTierQuantity,
   resolveOrgTierDocuments,
 } from '@documenso/lib/constants/org-tiers';
 import type { OrgBillingInterval } from '@documenso/lib/constants/org-tiers';
@@ -1174,11 +1175,19 @@ export const orgRouter = router({
       }
 
       // Some tiers (Team) have a hard seat ceiling — a guardrail, not a
-      // billing meter — covering both the first-ever purchase and any
-      // later top-up against the same running total.
+      // billing meter. Only meaningful for a purchased-quantity tier
+      // (comparing purchased-so-far + this purchase against the cap); a
+      // `flatRate` tier has no "purchase N seats" step to check against —
+      // its cap is enforced instead at assignment time, in
+      // `assignSeatToMember`'s `assigned >= quantity` check, once `quantity`
+      // itself holds the real cap (see the `flatRate` branch below).
       const projectedQuantity = (existingSeatPlan?.quantity ?? 0) + input.quantity;
 
-      if (tierLimits.maxSeats !== undefined && projectedQuantity > tierLimits.maxSeats) {
+      if (
+        !tierLimits.flatRate &&
+        tierLimits.maxSeats !== undefined &&
+        projectedQuantity > tierLimits.maxSeats
+      ) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: `${tierLimits.name} is limited to ${tierLimits.maxSeats} seats.`,
@@ -1226,12 +1235,12 @@ export const orgRouter = router({
         const docBlockQuantity =
           (existingSeatPlan?.docBlockQuantity ?? 0) + (input.tier === 'BUSINESS' ? (input.docBlocks ?? 0) : 0);
 
-        // `flatRate` tiers always resolve to the "unlimited" sentinel here —
-        // same convention already used for unlimited `documentsPerMonth`
-        // etc. — so every downstream `plan.quantity - plan.assigned` read
-        // keeps working without a second "is this tier flat" branch.
+        // A `flatRate` tier's tracked `quantity` is its real cap if it has
+        // one (Team) or the "unlimited" sentinel otherwise (Business/
+        // Enterprise) — see `resolveFlatTierQuantity`. Not the same as
+        // `seatQuantity`/what's billed to Stripe (always 1 for a flat tier).
         const trackedQuantity = tierLimits.flatRate
-          ? ORG_UNLIMITED_SENTINEL
+          ? resolveFlatTierQuantity(input.tier)
           : (existingSeatPlan?.quantity ?? 0) + input.quantity;
 
         const seatPlan = existingSeatPlan
@@ -1617,13 +1626,12 @@ export const orgRouter = router({
         // Stripe subscriptions can't hold zero items — if this tier is the
         // only thing on it, cancel the whole subscription instead of trying
         // to remove its last item.
-        const canceledSubscription = await stripe.subscriptions.cancel(liveSubscription.id, {
+        await stripe.subscriptions.cancel(liveSubscription.id, {
           invoice_now: true,
           prorate: true,
         });
 
         await onOrgSubscriptionDeleted({ organizationId: membership.organizationId });
-        await onSubscriptionDeleted({ subscription: canceledSubscription });
       } else {
         const updatedSubscription = await stripe.subscriptions.update(liveSubscription.id, {
           items: tierItemIds.map((id) => ({ id, deleted: true })),
@@ -2144,11 +2152,15 @@ export const orgRouter = router({
         tier: p.tier,
         quantity: p.quantity,
         assigned: p.assigned,
-        // `null` means unlimited (a `flatRate` tier) rather than a real
-        // number left — `quantity` there is the "unlimited" sentinel, not a
-        // seat count, so subtracting from it would show a meaningless huge
-        // number instead of "no cap."
-        available: ORG_SEAT_TIERS[p.tier].flatRate ? null : Math.max(p.quantity - p.assigned, 0),
+        // `null` means genuinely unlimited (flat *and* uncapped — Business/
+        // Enterprise) rather than a real number left. A flat tier with a
+        // real cap (Team) still has a meaningful `available` — its
+        // `quantity` holds the cap itself (see `resolveFlatTierQuantity`),
+        // not the "unlimited" sentinel, so the subtraction is correct as-is.
+        available:
+          ORG_SEAT_TIERS[p.tier].flatRate && ORG_SEAT_TIERS[p.tier].maxSeats === undefined
+            ? null
+            : Math.max(p.quantity - p.assigned, 0),
         dmsEnabled: p.dmsEnabled,
       })),
       domains,

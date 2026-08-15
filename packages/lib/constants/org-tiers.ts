@@ -31,13 +31,20 @@ export type OrgTierLimits = {
   dmsAddonAvailable: boolean;
   /**
    * `true` means this tier is billed as one flat monthly/yearly price per
-   * org, regardless of headcount — no purchased seat quantity, no cap.
-   * Mechanically: every Stripe subscription item for this tier (seat and
-   * Repositories add-on alike) always uses `quantity: 1`; a Stripe Price's
-   * `unit_amount` doesn't itself know "per seat" vs "flat," that's entirely
-   * about what quantity gets passed when the item is created. `false` means
-   * the older purchased-quantity-with-cap model (Team only) — buy N seats
-   * upfront, `minSeats`/`maxSeats` enforce a real range.
+   * org, regardless of headcount — no purchased seat quantity. Mechanically:
+   * every Stripe subscription item for this tier (seat and Repositories
+   * add-on alike) always uses `quantity: 1`; a Stripe Price's `unit_amount`
+   * doesn't itself know "per seat" vs "flat," that's entirely about what
+   * quantity gets passed when the item is created.
+   *
+   * `flatRate` is a billing-model question, independent of `maxSeats` (a
+   * headcount question) — don't assume `flatRate` implies uncapped. Business/
+   * Enterprise are flat *and* uncapped (`maxSeats: undefined`). Team is flat
+   * *and* capped: no per-seat charge, but still a real 20-seat ceiling,
+   * enforced at assignment time (`assignSeatToMember`'s `assigned >= quantity`
+   * check) rather than at a purchase-quantity step that no longer exists for
+   * it. `false` (no current tier) would mean the older purchased-quantity
+   * model — buy N seats upfront, billed per seat.
    */
   flatRate: boolean;
 };
@@ -74,7 +81,9 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     directTemplates: 8,
     dmsEnabled: false,
     dmsAddonAvailable: false,
-    flatRate: false,
+    // Flat $59/mo — never per-seat. Still capped at `maxSeats` above; see the
+    // `flatRate` field doc for why those are independent axes for this tier.
+    flatRate: true,
   },
   BUSINESS: {
     name: 'Business',
@@ -118,6 +127,21 @@ export const resolveOrgTierDocuments = (
   deployment: 'shared' | 'dedicated' = DEPLOYMENT_TYPE(),
 ): number | null =>
   tier === 'ENTERPRISE' && deployment === 'shared' ? 500 : ORG_SEAT_TIERS[tier].documents;
+
+/**
+ * The `OrgSeatPlan.quantity` a `flatRate` tier's plan should carry — NOT
+ * what's billed to Stripe (always 1 for a flat tier, see `flatRate`'s doc).
+ * This is what `assignSeatToMember`'s `assigned >= quantity` check enforces
+ * against: the tier's real cap (`maxSeats`) if it has one (Team), the
+ * "unlimited" sentinel otherwise (Business/Enterprise). Shared by the two
+ * places that write a flat tier's `quantity` (`purchaseSeats`'s
+ * local-tracking branch and `onOrgSubscriptionUpdated`'s webhook-confirmed
+ * write) so they can't drift apart. Only meaningful for a `flatRate` tier —
+ * a purchased-quantity tier's `quantity` comes from purchase/Stripe history,
+ * not a static formula.
+ */
+export const resolveFlatTierQuantity = (tier: OrgSeatTier): number =>
+  ORG_SEAT_TIERS[tier].maxSeats ?? ORG_UNLIMITED_SENTINEL;
 
 /** Business-only add-on: an extra 100 documents/mo, stacked as many times as purchased. Purely a limit — its price is Stripe-authoritative, same as everything else priced. */
 export const ORG_DOC_BLOCK_SIZE = 100;

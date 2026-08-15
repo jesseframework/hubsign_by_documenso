@@ -1,6 +1,7 @@
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { AnimatePresence } from 'framer-motion';
+import { redirect } from 'react-router';
 
 import { trpc } from '@documenso/trpc/react';
 import { AnimateGenericFadeInOut } from '@documenso/ui/components/animate/animate-generic-fade-in-out';
@@ -10,6 +11,13 @@ import { SettingsHeader } from '~/components/general/settings-header';
 import { TeamEmailUsage } from '~/components/general/teams/team-email-usage';
 import { TeamInvitations } from '~/components/general/teams/team-invitations';
 import { UserSettingsTeamsPageDataTable } from '~/components/tables/user-settings-teams-page-table';
+
+// Legacy pre-Organization team management — superseded by /org/members.
+// Kept as a route (not deleted) so any old links/bookmarks land somewhere
+// functional rather than a dead page.
+export function loader() {
+  throw redirect('/org/members');
+}
 
 export default function TeamsSettingsPage() {
   const { _ } = useLingui();
