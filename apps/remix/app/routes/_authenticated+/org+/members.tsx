@@ -364,7 +364,9 @@ const DomainCandidates = () => {
     onError: (error) => toast({ title: error.message, variant: 'destructive' }),
   });
 
-  const seatOptions = (data?.seatPlans ?? []).filter((p) => p.available > 0);
+  // `available === null` means unlimited (a flat-rate tier) — always a
+  // valid option, not "0 left."
+  const seatOptions = (data?.seatPlans ?? []).filter((p) => p.available === null || p.available > 0);
 
   // Nothing configured, or nothing to adopt — stay out of the way entirely.
   if (isLoading || !data || (data.candidates.length === 0 && data.ignoredPublicDomains.length === 0)) {
@@ -447,7 +449,7 @@ const DomainCandidates = () => {
                   <option value="">No seat</option>
                   {seatOptions.map((plan) => (
                     <option key={plan.tier} value={plan.tier}>
-                      {plan.tier} ({plan.available} left)
+                      {plan.tier} ({plan.available === null ? 'unlimited' : `${plan.available} left`})
                     </option>
                   ))}
                 </select>

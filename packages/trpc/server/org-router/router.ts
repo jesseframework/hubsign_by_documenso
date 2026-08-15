@@ -1164,7 +1164,9 @@ export const orgRouter = router({
       // The tier minimum only applies to establishing *that tier*, whether
       // it's the org's first tier ever or a second one added alongside an
       // existing one — once a tier already meets it, buying 1-2 more is fine.
-      if (!hasExistingTierPlan && input.quantity < config.minSeats) {
+      // Doesn't apply to a `flatRate` tier at all — there's no purchased
+      // quantity to hold to a minimum.
+      if (!tierLimits.flatRate && !hasExistingTierPlan && input.quantity < config.minSeats) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: `${input.tier} plan requires a minimum of ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}.`,
@@ -1182,6 +1184,13 @@ export const orgRouter = router({
           message: `${tierLimits.name} is limited to ${tierLimits.maxSeats} seats.`,
         });
       }
+
+      // A `flatRate` tier is billed as one flat price per org, no matter how
+      // many members end up assigned — every Stripe item for it (seat and
+      // Repositories add-on alike) always uses quantity 1, never the
+      // client-requested `input.quantity`. Never trust client input for
+      // something that determines a billed amount.
+      const seatQuantity = tierLimits.flatRate ? 1 : input.quantity;
 
       // The purchasing admin automatically consumes a seat if they don't
       // already have one — check whether that would strand an active
@@ -1217,15 +1226,23 @@ export const orgRouter = router({
         const docBlockQuantity =
           (existingSeatPlan?.docBlockQuantity ?? 0) + (input.tier === 'BUSINESS' ? (input.docBlocks ?? 0) : 0);
 
+        // `flatRate` tiers always resolve to the "unlimited" sentinel here —
+        // same convention already used for unlimited `documentsPerMonth`
+        // etc. — so every downstream `plan.quantity - plan.assigned` read
+        // keeps working without a second "is this tier flat" branch.
+        const trackedQuantity = tierLimits.flatRate
+          ? ORG_UNLIMITED_SENTINEL
+          : (existingSeatPlan?.quantity ?? 0) + input.quantity;
+
         const seatPlan = existingSeatPlan
           ? await prisma.orgSeatPlan.update({
               where: { id: existingSeatPlan.id },
-              data: { quantity: existingSeatPlan.quantity + input.quantity, dmsEnabled, docBlockQuantity },
+              data: { quantity: trackedQuantity, dmsEnabled, docBlockQuantity },
             })
           : await prisma.orgSeatPlan.create({
               data: {
                 tier: input.tier,
-                quantity: input.quantity,
+                quantity: trackedQuantity,
                 organizationId: membership.organizationId,
                 documentsPerMonth: config.documentsPerMonth,
                 recipientsPerMonth: config.recipientsPerMonth,
@@ -1258,7 +1275,10 @@ export const orgRouter = router({
       if (isTopUp) {
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
         const subscriptionId = org.stripeSubscriptionId as string;
-        const newQuantity = (existingSeatPlan?.quantity ?? 0) + input.quantity;
+        // Same `seatQuantity` (always 1 for a `flatRate` tier) drives both
+        // the seat item and, below, the Repositories add-on item — a flat
+        // tier's Stripe footprint never scales with headcount.
+        const newQuantity = tierLimits.flatRate ? seatQuantity : (existingSeatPlan?.quantity ?? 0) + input.quantity;
 
         const liveSubscription = await stripe.subscriptions.retrieve(subscriptionId, {
           expand: ['items.data.price.product'],
@@ -1441,7 +1461,7 @@ export const orgRouter = router({
       }
 
       const lineItems: Array<{ price: string; quantity: number }> = [
-        { price: seatPrice.id, quantity: input.quantity },
+        { price: seatPrice.id, quantity: seatQuantity },
       ];
 
       // DMS add-on — available on every tier now (no longer bundled into
@@ -1456,7 +1476,7 @@ export const orgRouter = router({
           });
         }
 
-        lineItems.push({ price: dmsPrice.id, quantity: input.quantity });
+        lineItems.push({ price: dmsPrice.id, quantity: seatQuantity });
       }
 
       // Doc volume blocks — Business-only, quantity = number of +100 blocks.
@@ -2118,7 +2138,11 @@ export const orgRouter = router({
         tier: p.tier,
         quantity: p.quantity,
         assigned: p.assigned,
-        available: Math.max(p.quantity - p.assigned, 0),
+        // `null` means unlimited (a `flatRate` tier) rather than a real
+        // number left — `quantity` there is the "unlimited" sentinel, not a
+        // seat count, so subtracting from it would show a meaningless huge
+        // number instead of "no cap."
+        available: ORG_SEAT_TIERS[p.tier].flatRate ? null : Math.max(p.quantity - p.assigned, 0),
         dmsEnabled: p.dmsEnabled,
       })),
       domains,

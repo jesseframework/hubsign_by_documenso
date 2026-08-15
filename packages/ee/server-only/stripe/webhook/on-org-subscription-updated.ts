@@ -120,7 +120,12 @@ export const onOrgSubscriptionUpdated = async ({
       // Item quantity directly *is* the block count (independent of seat
       // count) — set that way in `purchaseSeats`.
       docBlockQuantity: docBlockItem?.quantity ?? 0,
-      quantity: seatItem.quantity ?? 0,
+      // A `flatRate` tier's live Stripe quantity is always 1 (see
+      // `purchaseSeats`) — that's a billing detail, not a seat count, so it
+      // resolves to the same "unlimited" sentinel used elsewhere rather than
+      // literally storing `1` (which would make every `assigned`/`quantity`
+      // comparison downstream read as "capped at 1 seat").
+      quantity: tierLimits.flatRate ? ORG_UNLIMITED_SENTINEL : (seatItem.quantity ?? 0),
       billingInterval: seatItem.price.recurring?.interval === 'year' ? 'year' : 'month',
       stripePriceId: seatItem.price.id,
     };

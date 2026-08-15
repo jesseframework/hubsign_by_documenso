@@ -28,6 +28,17 @@ export type OrgTierLimits = {
    * oversight.
    */
   dmsAddonAvailable: boolean;
+  /**
+   * `true` means this tier is billed as one flat monthly/yearly price per
+   * org, regardless of headcount — no purchased seat quantity, no cap.
+   * Mechanically: every Stripe subscription item for this tier (seat and
+   * Repositories add-on alike) always uses `quantity: 1`; a Stripe Price's
+   * `unit_amount` doesn't itself know "per seat" vs "flat," that's entirely
+   * about what quantity gets passed when the item is created. `false` means
+   * the older purchased-quantity-with-cap model (Team only) — buy N seats
+   * upfront, `minSeats`/`maxSeats` enforce a real range.
+   */
+  flatRate: boolean;
 };
 
 /**
@@ -62,15 +73,21 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     directTemplates: 8,
     dmsEnabled: false,
     dmsAddonAvailable: false,
+    flatRate: false,
   },
   BUSINESS: {
     name: 'Business',
+    // `minSeats` is vestigial for a `flatRate` tier — there's no purchased
+    // quantity left to enforce a minimum on. Kept on the type (rather than
+    // made optional) so every tier has a uniform shape; `purchaseSeats` and
+    // the purchase-quantity UI both skip it when `flatRate` is true.
     minSeats: 2,
     documents: 150,
     recipients: 500,
     directTemplates: 20,
     dmsEnabled: false,
     dmsAddonAvailable: true,
+    flatRate: true,
   },
   ENTERPRISE: {
     name: 'Enterprise',
@@ -80,6 +97,7 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     directTemplates: null,
     dmsEnabled: false,
     dmsAddonAvailable: true,
+    flatRate: true,
   },
 };
 

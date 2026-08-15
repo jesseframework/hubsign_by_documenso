@@ -76,6 +76,7 @@ const TIER_CONFIG = Object.fromEntries(
       minSeats: config.minSeats,
       maxSeats: config.maxSeats,
       dmsAddonAvailable: config.dmsAddonAvailable,
+      flatRate: config.flatRate,
     },
   ]),
 ) as Record<
@@ -86,6 +87,7 @@ const TIER_CONFIG = Object.fromEntries(
     minSeats: number;
     maxSeats: number | undefined;
     dmsAddonAvailable: boolean;
+    flatRate: boolean;
   }
 >;
 
@@ -119,6 +121,11 @@ const dmsPriceFor = (pricing: SeatPricing, tier: string, interval: string) => {
 
 const docBlockPriceFor = (pricing: SeatPricing, interval: string) =>
   ((interval === 'year' ? pricing?.docBlock.year : pricing?.docBlock.month) ?? 0) / 100;
+
+// A flat-rate tier's price isn't "per seat" — nothing multiplies it by
+// headcount, so the label shouldn't imply it does.
+const priceSuffix = (flatRate: boolean, interval: string) =>
+  `${flatRate ? '' : '/seat'}/${interval === 'year' ? 'yr' : 'mo'}`;
 
 // Static marketing copy (not per-render state), so this lives outside the
 // page component — shown wherever DMS is offered or already included, since
@@ -353,7 +360,12 @@ function OrgBillingPage() {
     if (!membership) return;
 
     const minSeats = isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1;
-    const finalQty = Math.max(buyQty, minSeats);
+    // A flat-rate tier has no quantity to speak of — the server pins it to 1
+    // regardless, but send it explicitly rather than whatever stale `buyQty`
+    // value is left over from a previous tier selection.
+    const finalQty = TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate
+      ? 1
+      : Math.max(buyQty, minSeats);
     const docBlocks = buyTier === 'BUSINESS' ? buyDocBlocks : 0;
 
     if (!membership.seatTier) {
@@ -436,7 +448,21 @@ function OrgBillingPage() {
   // Calculate totals — every tier still shares one `billingInterval` (a
   // single Stripe subscription can't mix monthly/yearly items), even though
   // an org can now hold more than one tier at once.
-  const totalSeats = seatPlans?.reduce((sum, p) => sum + p.quantity, 0) ?? 0;
+  //
+  // "Total Seats"/"Available" are only meaningful for purchased-quantity
+  // tiers (Team) — a flat-rate tier's `quantity` is the "unlimited" sentinel,
+  // not a real seat count, so it's excluded from both rather than summed in
+  // and ballooning the displayed number. "Assigned" stays a true sum across
+  // every tier — that's a real headcount regardless of how a tier bills.
+  const nonFlatSeatPlans = seatPlans?.filter(
+    (p) => !TIER_CONFIG[p.tier as keyof typeof TIER_CONFIG]?.flatRate,
+  ) ?? [];
+  const totalSeats = nonFlatSeatPlans.reduce((sum, p) => sum + p.quantity, 0);
+  const availableSeats = Math.max(
+    totalSeats - nonFlatSeatPlans.reduce((sum, p) => sum + p.assigned, 0),
+    0,
+  );
+  const hasNonFlatTier = nonFlatSeatPlans.length > 0;
   const assignedSeats = seatPlans?.reduce((sum, p) => sum + p.assigned, 0) ?? 0;
   const orgInterval = seatPlans?.[0]?.billingInterval ?? 'month';
   const billedTotal =
@@ -444,7 +470,8 @@ function OrgBillingPage() {
       const seatPrice = seatPriceFor(pricing, p.tier, p.billingInterval);
       const dmsPrice = p.dmsEnabled ? dmsPriceFor(pricing, p.tier, p.billingInterval) : 0;
       const docBlockCost = p.docBlockQuantity * docBlockPriceFor(pricing, p.billingInterval);
-      return sum + (seatPrice + dmsPrice) * p.quantity + docBlockCost;
+      const seatCount = TIER_CONFIG[p.tier as keyof typeof TIER_CONFIG]?.flatRate ? 1 : p.quantity;
+      return sum + (seatPrice + dmsPrice) * seatCount + docBlockCost;
     }, 0) ?? 0;
 
   // Computed from the two independent live Stripe prices rather than a
@@ -482,7 +509,13 @@ function OrgBillingPage() {
             — $
             {seatPriceFor(pricing, membership.seatTier, orgInterval) +
               (membership.dmsAddon ? dmsPriceFor(pricing, membership.seatTier, orgInterval) : 0)}
-            /{orgInterval === 'year' ? 'yr' : 'mo'}
+            {priceSuffix(
+              TIER_CONFIG[membership.seatTier as keyof typeof TIER_CONFIG]?.flatRate ?? false,
+              orgInterval,
+            )}
+            {TIER_CONFIG[membership.seatTier as keyof typeof TIER_CONFIG]?.flatRate && (
+              <span className="text-muted-foreground"> (org-wide, unlimited members)</span>
+            )}
             {membership.dmsAddon && (
               <>
                 {' '}
@@ -497,20 +530,26 @@ function OrgBillingPage() {
         )}
       </div>
 
-      {/* Summary */}
+      {/* Summary — "Total Seats"/"Available" only mean anything for a
+          purchased-quantity tier (Team); omitted entirely when the org only
+          holds flat-rate tiers, since there's no cap to report. */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <div className="rounded-[var(--r)] border border-border bg-card p-3">
-          <span className="text-[10px] font-semibold uppercase text-muted-foreground">Total Seats</span>
-          <p className="mt-1 text-2xl font-semibold">{totalSeats}</p>
-        </div>
+        {hasNonFlatTier && (
+          <div className="rounded-[var(--r)] border border-border bg-card p-3">
+            <span className="text-[10px] font-semibold uppercase text-muted-foreground">Total Seats</span>
+            <p className="mt-1 text-2xl font-semibold">{totalSeats}</p>
+          </div>
+        )}
         <div className="rounded-[var(--r)] border border-border bg-card p-3">
           <span className="text-[10px] font-semibold uppercase text-muted-foreground">Assigned</span>
-          <p className="mt-1 text-2xl font-semibold">{assignedSeats} / {totalSeats}</p>
+          <p className="mt-1 text-2xl font-semibold">{assignedSeats}</p>
         </div>
-        <div className="rounded-[var(--r)] border border-border bg-card p-3">
-          <span className="text-[10px] font-semibold uppercase text-muted-foreground">Available</span>
-          <p className="mt-1 text-2xl font-semibold text-green-600">{totalSeats - assignedSeats}</p>
-        </div>
+        {hasNonFlatTier && (
+          <div className="rounded-[var(--r)] border border-border bg-card p-3">
+            <span className="text-[10px] font-semibold uppercase text-muted-foreground">Available</span>
+            <p className="mt-1 text-2xl font-semibold text-green-600">{availableSeats}</p>
+          </div>
+        )}
         <div className="rounded-[var(--r)] border border-border bg-card p-3">
           <span className="text-[10px] font-semibold uppercase text-muted-foreground">
             {orgInterval === 'year' ? 'Yearly' : 'Monthly'}
@@ -570,14 +609,17 @@ function OrgBillingPage() {
                     const existingPlan = seatPlans?.find((p) => p.tier === tier);
                     return (
                       <option key={tier} value={tier}>
-                        {config.name} — ${seatPriceFor(pricing, tier, 'month')}/seat/mo (
+                        {config.name} — ${seatPriceFor(pricing, tier, 'month')}
+                        {priceSuffix(config.flatRate, 'month')} (
                         {docsForTier(tier) === '∞'
                           ? 'unlimited'
                           : `${docsForTier(tier)} signature requests`}
-                        {existingPlan
-                          ? `, ${existingPlan.quantity} seats active`
-                          : `, min ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}`}
-                        {config.maxSeats !== undefined && `, max ${config.maxSeats} seats`}
+                        {config.flatRate
+                          ? ', unlimited members'
+                          : existingPlan
+                            ? `, ${existingPlan.quantity} seats active`
+                            : `, min ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}`}
+                        {!config.flatRate && config.maxSeats !== undefined && `, max ${config.maxSeats} seats`}
                         )
                       </option>
                     );
@@ -615,21 +657,28 @@ function OrgBillingPage() {
                   </div>
                 )}
               </div>
-              <div>
-                <label className="text-[12px] font-medium text-muted-foreground">
-                  {isTopUpForSelectedTier
-                    ? 'Additional seats'
-                    : `Quantity (min ${TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1})`}
-                </label>
-                <Input
-                  className="mt-1 h-8 w-20 text-[13px]"
-                  type="number"
-                  min={isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1}
-                  max={TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.maxSeats ?? 100}
-                  value={buyQty}
-                  onChange={(e) => setBuyQty(Number(e.target.value))}
-                />
-              </div>
+              {!TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate && (
+                <div>
+                  <label className="text-[12px] font-medium text-muted-foreground">
+                    {isTopUpForSelectedTier
+                      ? 'Additional seats'
+                      : `Quantity (min ${TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1})`}
+                  </label>
+                  <Input
+                    className="mt-1 h-8 w-20 text-[13px]"
+                    type="number"
+                    min={isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1}
+                    max={TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.maxSeats ?? 100}
+                    value={buyQty}
+                    onChange={(e) => setBuyQty(Number(e.target.value))}
+                  />
+                </div>
+              )}
+              {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate && (
+                <div className="text-[12px] text-muted-foreground">
+                  <Trans>Unlimited members included</Trans>
+                </div>
+              )}
               {/* Repositories (DMS) is a paid add-on, but not every tier can
                   buy it — Team deliberately can't, that's the fence that
                   pushes growing teams to Business rather than an oversight. */}
@@ -651,8 +700,8 @@ function OrgBillingPage() {
                       className="rounded"
                     />
                     <span className="font-medium text-muted-foreground">
-                      + Repositories Add-On (${dmsPriceFor(pricing, buyTier, buyInterval)}/seat/
-                      {buyInterval === 'year' ? 'yr' : 'mo'})
+                      + Repositories Add-On (${dmsPriceFor(pricing, buyTier, buyInterval)}
+                      {priceSuffix(TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate ?? false, buyInterval)})
                     </span>
                   </label>
                   <div className="-ml-2">
@@ -682,7 +731,8 @@ function OrgBillingPage() {
               )}
               <div className="text-[13px] font-medium text-muted-foreground">
                 = $
-                {buyQty * (seatPriceFor(pricing, buyTier, buyInterval) + (buyDms ? dmsPriceFor(pricing, buyTier, buyInterval) : 0)) +
+                {(TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate ? 1 : buyQty) *
+                  (seatPriceFor(pricing, buyTier, buyInterval) + (buyDms ? dmsPriceFor(pricing, buyTier, buyInterval) : 0)) +
                   (buyTier === 'BUSINESS' ? buyDocBlocks * docBlockPriceFor(pricing, buyInterval) : 0)}
                 /{buyInterval === 'year' ? 'year' : 'month'}
               </div>
@@ -691,9 +741,10 @@ function OrgBillingPage() {
                 onClick={() => void handlePurchaseClick()}
                 loading={purchaseSeats.isPending}
                 disabled={
-                  buyQty < (isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1) ||
-                  (existingPlanForSelectedTier?.quantity ?? 0) + buyQty >
-                    (TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.maxSeats ?? Infinity)
+                  !TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate &&
+                  (buyQty < (isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1) ||
+                    (existingPlanForSelectedTier?.quantity ?? 0) + buyQty >
+                      (TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.maxSeats ?? Infinity))
                 }
               >
                 Purchase
@@ -726,8 +777,8 @@ function OrgBillingPage() {
                       {config?.name || plan.tier}
                     </div>
                     <span className="inline-flex items-center gap-1 text-[12px] text-muted-foreground">
-                      ${allInSeatPrice}/seat/
-                      {plan.billingInterval === 'year' ? 'yr' : 'mo'} · {effectiveDocs} signature requests/mo
+                      ${allInSeatPrice}
+                      {priceSuffix(config?.flatRate ?? false, plan.billingInterval)} · {effectiveDocs} signature requests/mo
                       {plan.docBlockQuantity > 0 && ` (+${plan.docBlockQuantity} block${plan.docBlockQuantity > 1 ? 's' : ''})`}
                       {plan.dmsEnabled && (
                         <>
@@ -740,13 +791,21 @@ function OrgBillingPage() {
                   </div>
                   <div className="flex items-center gap-4">
                     <div className="text-right">
-                      <span className="text-[13px] font-medium">{plan.assigned} / {plan.quantity} assigned</span>
-                      <p className="text-[11px] text-muted-foreground">
-                        {plan.quantity - plan.assigned} available
-                      </p>
+                      {config?.flatRate ? (
+                        <span className="text-[13px] font-medium">
+                          {plan.assigned} member{plan.assigned === 1 ? '' : 's'}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-[13px] font-medium">{plan.assigned} / {plan.quantity} assigned</span>
+                          <p className="text-[11px] text-muted-foreground">
+                            {plan.quantity - plan.assigned} available
+                          </p>
+                        </>
+                      )}
                     </div>
                     <span className="text-[13px] font-semibold">
-                      ${allInSeatPrice * plan.quantity + docBlockCost}
+                      ${(config?.flatRate ? allInSeatPrice : allInSeatPrice * plan.quantity) + docBlockCost}
                       /{plan.billingInterval === 'year' ? 'yr' : 'mo'}
                     </span>
                     {isAdmin && (
@@ -979,8 +1038,12 @@ function OrgBillingPage() {
                 return assignedCount > 0 ? (
                   <Trans>
                     {assignedCount} member{assignedCount > 1 ? 's are' : ' is'} currently on this
-                    tier — including you, if you're one of them — and will lose access
-                    immediately, along with the plan itself. Unused time is credited to the
+                    tier — including you, if you're one of them. They'll drop to the Free plan's
+                    limits immediately{
+                      TIER_CONFIG[pendingCancelTier as keyof typeof TIER_CONFIG]?.dmsAddonAvailable
+                        ? ' and lose Repositories access if it was enabled'
+                        : ''
+                    }, along with the plan itself. Unused time is credited to the
                     account balance, not refunded to the card. This can't be undone; buying the
                     tier again later starts a new plan.
                   </Trans>
@@ -1023,8 +1086,9 @@ function OrgBillingPage() {
             </AlertDialogTitle>
             <AlertDialogDescription>
               <Trans>
-                These members lose access immediately. If you've selected yourself and another
-                admin exists, your own removal will fail while the rest still go through.
+                These members drop to the Free plan's limits immediately — the tier itself isn't
+                cancelled, just their seat on it. If you've selected yourself and another admin
+                exists, your own removal will fail while the rest still go through.
               </Trans>
             </AlertDialogDescription>
           </AlertDialogHeader>
