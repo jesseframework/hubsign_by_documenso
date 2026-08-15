@@ -1657,6 +1657,367 @@ export const orgRouter = router({
     }),
 
   /**
+   * Switches an existing tier's plan to a different tier and/or billing
+   * interval in place — unlike `cancelSeatPlan` followed by a fresh
+   * `purchaseSeats` call, this preserves currently-assigned members (moved
+   * to the new tier) instead of unassigning everyone first. Stripe prorates
+   * and settles the difference immediately (`always_invoice`), matching
+   * `purchaseSeats`'s top-up branch — no queued next-cycle proration.
+   */
+  changePlan: authenticatedProcedure
+    .input(
+      z.object({
+        currentTier: z.enum(['BUSINESS', 'ENTERPRISE', 'TEAM']),
+        targetTier: z.enum(['BUSINESS', 'ENTERPRISE', 'TEAM']),
+        interval: z.enum(['month', 'year']),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const membership = await prisma.organizationMember.findFirst({
+        where: { userId: ctx.user.id, role: 'ORG_ADMIN' },
+        include: { organization: true },
+      });
+
+      if (!membership) {
+        throw new TRPCError({ code: 'FORBIDDEN' });
+      }
+
+      const org = membership.organization;
+
+      const currentSeatPlan = await prisma.orgSeatPlan.findFirst({
+        where: { organizationId: membership.organizationId, tier: input.currentTier },
+      });
+
+      if (!currentSeatPlan) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: `No ${input.currentTier} plan to change.` });
+      }
+
+      const tierIsChanging = input.targetTier !== input.currentTier;
+
+      if (!tierIsChanging && input.interval === currentSeatPlan.billingInterval) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Nothing to change — pick a different tier or billing interval.',
+        });
+      }
+
+      const targetLimits = ORG_SEAT_TIERS[input.targetTier];
+
+      if (tierIsChanging) {
+        // An org can hold more than one tier at once (mixed licensing) —
+        // switching *into* a tier it already separately holds would mean
+        // merging two plans' `assigned`/`quantity`/`dmsEnabled` state, which
+        // is ambiguous. Blocked rather than guessed at.
+        const targetSeatPlan = await prisma.orgSeatPlan.findFirst({
+          where: { organizationId: membership.organizationId, tier: input.targetTier },
+        });
+
+        if (targetSeatPlan) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `Your organization already has a separate ${targetLimits.name} plan. Cancel it first, or manage its seats independently, before switching into it.`,
+          });
+        }
+
+        // Some tiers (Team) have a hard seat ceiling — never silently
+        // unassign members to fit a downgrade.
+        if (targetLimits.maxSeats !== undefined && currentSeatPlan.assigned > targetLimits.maxSeats) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `${targetLimits.name} is limited to ${targetLimits.maxSeats} seats, but ${currentSeatPlan.assigned} members are currently assigned. Unassign down to ${targetLimits.maxSeats} before switching.`,
+          });
+        }
+      }
+
+      // A license-key grant isn't reflected in Stripe at all — there's no
+      // subscription item to reprice and no proration to settle.
+      if (currentSeatPlan.source !== 'stripe') {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'This plan was granted by a license key and can’t be changed here.',
+        });
+      }
+
+      // Renames the plan's tier (and moves its assigned members) in place —
+      // preserves `assigned`/`id` instead of a delete+recreate, which is what
+      // would happen if `onOrgSubscriptionUpdated` alone had to infer this
+      // (it only ever sees "a tier appeared/disappeared" on the live
+      // subscription, never "a tier was renamed" — see below for why this
+      // must run BEFORE that sync). Skipped entirely for a pure interval
+      // change, where the tier identity never moves.
+      const renameTierInPlace = async () =>
+        prisma.$transaction([
+          prisma.orgSeatPlan.update({
+            where: { id: currentSeatPlan.id },
+            data: { tier: input.targetTier },
+          }),
+          prisma.organizationMember.updateMany({
+            where: { organizationId: membership.organizationId, seatTier: input.currentTier },
+            data: { seatTier: input.targetTier },
+          }),
+        ]);
+
+      if (!IS_BILLING_ENABLED() || !org.stripeSubscriptionId) {
+        if (tierIsChanging) {
+          await renameTierInPlace();
+        }
+
+        await prisma.orgSeatPlan.update({
+          where: { id: currentSeatPlan.id },
+          data: {
+            documentsPerMonth: resolveOrgTierDocuments(input.targetTier) ?? ORG_UNLIMITED_SENTINEL,
+            recipientsPerMonth: targetLimits.recipients ?? ORG_UNLIMITED_SENTINEL,
+            directTemplates: targetLimits.directTemplates ?? ORG_UNLIMITED_SENTINEL,
+            dmsEnabled: targetLimits.dmsEnabled,
+            docBlockQuantity: input.targetTier === 'BUSINESS' ? currentSeatPlan.docBlockQuantity : 0,
+            quantity: resolveFlatTierQuantity(input.targetTier),
+            billingInterval: input.interval,
+          },
+        });
+
+        return { success: true };
+      }
+
+      const liveSubscription = await stripe.subscriptions.retrieve(org.stripeSubscriptionId, {
+        expand: ['items.data.price.product'],
+      });
+
+      // Same self-healing lookup as `purchaseSeats`'s `findTierItem`,
+      // generalized to take a tier — an interval change touches every tier
+      // on the subscription, not just the one being switched.
+      const findTierItem = (
+        tier: 'BUSINESS' | 'ENTERPRISE' | 'TEAM',
+        type: 'org_seat' | 'org_dms' | 'org_doc_block',
+        cachedPriceId?: string | null,
+      ) =>
+        liveSubscription.items.data.find((item) => cachedPriceId && item.price.id === cachedPriceId) ??
+        liveSubscription.items.data.find((item) => {
+          const { product } = item.price;
+          return (
+            typeof product !== 'string' &&
+            !product.deleted &&
+            product.metadata?.type === type &&
+            product.metadata?.tier === tier
+          );
+        });
+
+      const items: Array<{ id?: string; price?: string; quantity?: number; deleted?: boolean }> = [];
+
+      const seatItem = findTierItem(input.currentTier, 'org_seat', currentSeatPlan.stripePriceId);
+
+      if (!seatItem) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Couldn't find ${input.currentTier}'s seat item on the live subscription.`,
+        });
+      }
+
+      const targetSeatPrice = await getOrgSeatPrice({
+        type: 'org_seat',
+        tier: input.targetTier,
+        interval: input.interval,
+        deployment: input.targetTier === 'ENTERPRISE' ? DEPLOYMENT_TYPE() : undefined,
+      });
+
+      if (!targetSeatPrice) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `No Stripe price configured for ${targetLimits.name} seats (${input.interval}).`,
+        });
+      }
+
+      items.push({
+        id: seatItem.id,
+        price: targetSeatPrice.id,
+        // Every live tier is `flatRate` — the Stripe quantity is always 1
+        // regardless of tier. Carries over the raw quantity otherwise, for a
+        // hypothetical future non-flat tier.
+        quantity: targetLimits.flatRate ? 1 : currentSeatPlan.quantity,
+      });
+
+      const existingDmsItem = findTierItem(input.currentTier, 'org_dms', null);
+
+      if (targetLimits.dmsEnabled) {
+        // Bundled free — never a separate billable item.
+        if (existingDmsItem) {
+          items.push({ id: existingDmsItem.id, deleted: true });
+        }
+      } else if (targetLimits.dmsAddonAvailable) {
+        // No live tier currently sells DMS as a paid add-on, but handled for
+        // a hypothetical future one: carry the addon over if it was enabled,
+        // repriced to the target tier/interval.
+        if (existingDmsItem && currentSeatPlan.dmsEnabled) {
+          const targetDmsPrice = await getOrgSeatPrice({
+            type: 'org_dms',
+            tier: input.targetTier,
+            interval: input.interval,
+          });
+
+          if (!targetDmsPrice) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `No Stripe price configured for the Repositories add-on (${input.interval}).`,
+            });
+          }
+
+          items.push({ id: existingDmsItem.id, price: targetDmsPrice.id, quantity: existingDmsItem.quantity });
+        } else if (existingDmsItem) {
+          items.push({ id: existingDmsItem.id, deleted: true });
+        }
+      } else if (existingDmsItem) {
+        // Target tier doesn't get Repositories at all (Team) — drop it.
+        items.push({ id: existingDmsItem.id, deleted: true });
+      }
+
+      // Document volume blocks are Business-only — dropped on the way out,
+      // repriced if staying on Business through an interval change, never
+      // carried in from another tier.
+      const existingDocBlockItem = findTierItem(input.currentTier, 'org_doc_block', null);
+
+      if (existingDocBlockItem) {
+        if (input.targetTier !== 'BUSINESS') {
+          items.push({ id: existingDocBlockItem.id, deleted: true });
+        } else if (input.interval !== currentSeatPlan.billingInterval) {
+          const targetDocBlockPrice = await getOrgSeatPrice({
+            type: 'org_doc_block',
+            tier: 'BUSINESS',
+            interval: input.interval,
+          });
+
+          if (!targetDocBlockPrice) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `No Stripe price configured for the document volume block add-on (${input.interval}).`,
+            });
+          }
+
+          items.push({
+            id: existingDocBlockItem.id,
+            price: targetDocBlockPrice.id,
+            quantity: existingDocBlockItem.quantity,
+          });
+        }
+      }
+
+      // A single Stripe subscription can't mix monthly/yearly items — an
+      // interval change has to reprice every OTHER tier's items too, not
+      // just the one being switched here.
+      if (input.interval !== currentSeatPlan.billingInterval) {
+        const otherPlans = await prisma.orgSeatPlan.findMany({
+          where: {
+            organizationId: membership.organizationId,
+            tier: { not: input.currentTier },
+            source: 'stripe',
+          },
+        });
+
+        for (const otherPlan of otherPlans) {
+          const otherLimits = ORG_SEAT_TIERS[otherPlan.tier];
+          const otherSeatItem = findTierItem(otherPlan.tier, 'org_seat', otherPlan.stripePriceId);
+
+          if (!otherSeatItem) {
+            continue;
+          }
+
+          const otherSeatPrice = await getOrgSeatPrice({
+            type: 'org_seat',
+            tier: otherPlan.tier,
+            interval: input.interval,
+            deployment: otherPlan.tier === 'ENTERPRISE' ? DEPLOYMENT_TYPE() : undefined,
+          });
+
+          if (!otherSeatPrice) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: `No Stripe price configured for ${otherLimits.name} seats (${input.interval}).`,
+            });
+          }
+
+          items.push({ id: otherSeatItem.id, price: otherSeatPrice.id, quantity: otherSeatItem.quantity });
+
+          const otherDmsItem = findTierItem(otherPlan.tier, 'org_dms', null);
+
+          if (otherDmsItem && otherLimits.dmsAddonAvailable) {
+            const otherDmsPrice = await getOrgSeatPrice({
+              type: 'org_dms',
+              tier: otherPlan.tier,
+              interval: input.interval,
+            });
+
+            if (otherDmsPrice) {
+              items.push({ id: otherDmsItem.id, price: otherDmsPrice.id, quantity: otherDmsItem.quantity });
+            }
+          }
+
+          const otherDocBlockItem = findTierItem(otherPlan.tier, 'org_doc_block', null);
+
+          if (otherDocBlockItem && otherPlan.tier === 'BUSINESS') {
+            const otherDocBlockPrice = await getOrgSeatPrice({
+              type: 'org_doc_block',
+              tier: 'BUSINESS',
+              interval: input.interval,
+            });
+
+            if (otherDocBlockPrice) {
+              items.push({
+                id: otherDocBlockItem.id,
+                price: otherDocBlockPrice.id,
+                quantity: otherDocBlockItem.quantity,
+              });
+            }
+          }
+        }
+      }
+
+      const baseUrl = NEXT_PUBLIC_WEBAPP_URL() || 'http://localhost:3000';
+
+      const updatedSubscription = await stripe.subscriptions.update(org.stripeSubscriptionId, {
+        items,
+        // Charges/credits the prorated difference to the card on file right
+        // away, matching `purchaseSeats`'s top-up branch — not a queued
+        // next-invoice proration.
+        proration_behavior: 'always_invoice',
+        expand: ['items.data.price.product'],
+        metadata: {
+          ...liveSubscription.metadata,
+          tier: input.targetTier,
+        },
+      });
+
+      if (tierIsChanging) {
+        await renameTierInPlace();
+      }
+
+      // The single place `OrgSeatPlan`/`dmsAddon` sync ever happens from
+      // confirmed Stripe state — reused rather than duplicated here. Must
+      // run AFTER the rename above: renaming first means this sees an
+      // existing row under the new tier (update, `assigned` preserved) —
+      // renaming after would instead look like the old tier disappearing
+      // and the new one appearing fresh (delete+create, `assigned` reset to
+      // 0, every previously-assigned member orphaned).
+      await onOrgSubscriptionUpdated({
+        organizationId: membership.organizationId,
+        subscription: updatedSubscription,
+      });
+
+      const { planName, priceFormatted } = resolveOrgPlanNameAndPrice(updatedSubscription);
+
+      await jobs.triggerJob({
+        name: 'send.subscription.purchase-confirmation.email',
+        payload: {
+          email: ctx.user.email,
+          name: ctx.user.name || undefined,
+          planName,
+          priceFormatted,
+          periodEnd: getSubscriptionPeriodEndISO(updatedSubscription),
+          billingUrl: `${baseUrl}/org/billing`,
+        },
+      });
+
+      return { success: true };
+    }),
+
+  /**
    * Checks whether assigning a seat to this member would strand an active
    * personal subscription (org seat limits supersede personal ones — see
    * `getServerLimits` — so the personal plan becomes wasted spend). Called by

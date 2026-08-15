@@ -347,6 +347,27 @@ function OrgBillingPage() {
   // reversible toggle.
   const [pendingCancelTier, setPendingCancelTier] = useState<string | null>(null);
 
+  const changePlan = trpc.org.changePlan.useMutation({
+    onSuccess: () => {
+      void utils.org.getSeatPlans.invalidate();
+      void utils.org.getMyOrganization.invalidate();
+      setPendingChangePlan(null);
+      toast({ title: _(msg`Plan changed`) });
+    },
+    onError: (err) => {
+      toast({ title: _(msg`Error`), description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // Switching an existing tier's plan in place (upgrade/downgrade and/or
+  // billing interval) — a separate action from purchasing a brand-new tier.
+  // `changeTargetTier`/`changeInterval` are seeded when the dialog opens and
+  // edited within it; `pendingChangePlan.tier` identifies which row's plan
+  // is being changed (an org can hold more than one tier at once).
+  const [pendingChangePlan, setPendingChangePlan] = useState<{ tier: string } | null>(null);
+  const [changeTargetTier, setChangeTargetTier] = useState<string>('');
+  const [changeInterval, setChangeInterval] = useState<OrgBillingInterval>('month');
+
   const unassignSeats = trpc.org.unassignSeats.useMutation({
     onSuccess: ({ removed, errors }) => {
       void utils.org.getMyOrganization.invalidate();
@@ -853,6 +874,23 @@ function OrgBillingPage() {
                       ${(config?.flatRate ? allInSeatPrice : allInSeatPrice * plan.quantity) + docBlockCost}
                       /{plan.billingInterval === 'year' ? 'yr' : 'mo'}
                     </span>
+                    {isAdmin && plan.source === 'stripe' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setPendingChangePlan({ tier: plan.tier });
+                          // Defaults to the plan's own current tier/interval —
+                          // a no-op until the admin picks a different tier
+                          // and/or interval, which also covers a pure
+                          // interval-only switch (tier unchanged).
+                          setChangeTargetTier(plan.tier);
+                          setChangeInterval((plan.billingInterval as OrgBillingInterval) ?? 'month');
+                        }}
+                      >
+                        <Trans>Change plan</Trans>
+                      </Button>
+                    )}
                     {isAdmin && (
                       <Button
                         size="sm"
@@ -1125,6 +1163,128 @@ function OrgBillingPage() {
               }}
             >
               <Trans>Cancel plan</Trans>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={pendingChangePlan !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingChangePlan(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              <Trans>
+                Change {pendingChangePlan ? TIER_CONFIG[pendingChangePlan.tier as keyof typeof TIER_CONFIG]?.name : ''} plan
+              </Trans>
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <label className="text-[12px] font-medium text-muted-foreground">
+                      <Trans>New tier</Trans>
+                    </label>
+                    <select
+                      className="mt-1 block h-8 rounded-md border border-border bg-background px-2 text-[13px] text-foreground"
+                      value={changeTargetTier}
+                      onChange={(e) => setChangeTargetTier(e.target.value)}
+                    >
+                      {Object.entries(TIER_CONFIG)
+                        .filter(([tier]) => {
+                          // The plan's own current tier stays selectable — it's
+                          // how a pure interval-only switch (tier unchanged) is
+                          // expressed. Any *other* tier the org already
+                          // separately holds is excluded — switching into it is
+                          // blocked server-side (ambiguous merge of two plans).
+                          if (tier === pendingChangePlan?.tier) return true;
+                          return !seatPlans?.some((p) => p.tier === tier);
+                        })
+                        .map(([tier, config]) => (
+                          <option key={tier} value={tier}>
+                            {config.name}
+                            {tier === pendingChangePlan?.tier ? ' (current)' : ''} — $
+                            {monthlyEquivalentSeatPriceFor(pricing, tier, changeInterval)}
+                            {priceSuffix(config.flatRate, 'month')}
+                            {config.flatRate ? `, ${flatTierCapacityPhrase(config.maxSeats)}` : ''}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[12px] font-medium text-muted-foreground">
+                      <Trans>Billing</Trans>
+                    </label>
+                    <div className="mt-1 flex h-8 overflow-hidden rounded-md border border-border text-[13px]">
+                      <button
+                        type="button"
+                        className={`px-2.5 ${
+                          changeInterval === 'month' ? 'bg-primary text-primary-foreground' : 'bg-background'
+                        }`}
+                        onClick={() => setChangeInterval('month')}
+                      >
+                        Monthly
+                      </button>
+                      <button
+                        type="button"
+                        className={`border-l border-border px-2.5 ${
+                          changeInterval === 'year' ? 'bg-primary text-primary-foreground' : 'bg-background'
+                        }`}
+                        onClick={() => setChangeInterval('year')}
+                      >
+                        Yearly
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[13px]">
+                  <Trans>
+                    New price: ${seatPriceFor(pricing, changeTargetTier, changeInterval)}
+                    {priceSuffix(
+                      TIER_CONFIG[changeTargetTier as keyof typeof TIER_CONFIG]?.flatRate ?? false,
+                      changeInterval,
+                    )}
+                  </Trans>
+                </p>
+
+                <p className="text-[13px] text-muted-foreground">
+                  <Trans>
+                    Switching plans charges or credits the prorated difference to your card on
+                    file immediately — not on your next invoice. Members currently assigned to
+                    this plan move to the new tier automatically. This can't be undone; you'd
+                    need to switch back separately.
+                  </Trans>
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setPendingChangePlan(null)}>
+              <Trans>Keep current plan</Trans>
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={
+                !changeTargetTier ||
+                (changeTargetTier === pendingChangePlan?.tier &&
+                  changeInterval ===
+                    (seatPlans?.find((p) => p.tier === pendingChangePlan?.tier)?.billingInterval ?? 'month')) ||
+                changePlan.isPending
+              }
+              onClick={() => {
+                if (pendingChangePlan && changeTargetTier) {
+                  void changePlan.mutateAsync({
+                    currentTier: pendingChangePlan.tier as 'BUSINESS' | 'ENTERPRISE' | 'TEAM',
+                    targetTier: changeTargetTier as 'BUSINESS' | 'ENTERPRISE' | 'TEAM',
+                    interval: changeInterval,
+                  });
+                }
+              }}
+            >
+              <Trans>Confirm change</Trans>
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
