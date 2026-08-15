@@ -1132,18 +1132,18 @@ export const orgRouter = router({
         documentsPerMonth: resolveOrgTierDocuments(input.tier) ?? ORG_UNLIMITED_SENTINEL,
         recipientsPerMonth: tierLimits.recipients ?? ORG_UNLIMITED_SENTINEL,
         directTemplates: tierLimits.directTemplates ?? ORG_UNLIMITED_SENTINEL,
-        dmsEnabled: tierLimits.dmsEnabled,
         minSeats: tierLimits.minSeats,
       };
 
-      const dmsEnabled = input.dmsEnabled ?? config.dmsEnabled;
-
-      if (!tierLimits.dmsAddonAvailable && dmsEnabled) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: `Repositories is not available on the ${tierLimits.name} tier.`,
-        });
-      }
+      // On, unconditionally, if the tier bundles Repositories for free
+      // (Business/Enterprise); otherwise on only if the tier sells it as a
+      // paid add-on *and* the client asked for it (no current tier does —
+      // Team never gets it, Business/Enterprise bundle rather than sell it —
+      // kept generic for a hypothetical future paid-add-on tier). An
+      // illegitimate `true` (e.g. Team, or a client trying to force it on a
+      // tier that doesn't sell it) is structurally impossible here, so no
+      // separate validation throw is needed.
+      const dmsEnabled = tierLimits.dmsEnabled || (tierLimits.dmsAddonAvailable && (input.dmsEnabled ?? false));
 
       // Interval is chosen once, at the org's first-ever seat purchase, and
       // locked thereafter across *every* tier — a single Stripe subscription
@@ -1340,7 +1340,11 @@ export const orgRouter = router({
         // didn't touch the checkbox (it defaults unchecked on every purchase).
         const dmsNowEnabled = dmsEnabled || Boolean(existingDmsItem);
 
-        if (dmsNowEnabled) {
+        // Bundled-free DMS (Business/Enterprise) must never generate a
+        // separate billable Stripe item — its cost is already inside the
+        // flat seat price. `dmsAddonAvailable` is the fence: only a tier
+        // that actually *sells* DMS separately gets an `org_dms` item.
+        if (tierLimits.dmsAddonAvailable && dmsNowEnabled) {
           if (existingDmsItem) {
             items.push({ id: existingDmsItem.id, quantity: newQuantity });
           } else {
@@ -1464,9 +1468,11 @@ export const orgRouter = router({
         { price: seatPrice.id, quantity: seatQuantity },
       ];
 
-      // DMS add-on — available on every tier now (no longer bundled into
-      // Enterprise), so no tier exclusion here.
-      if (dmsEnabled) {
+      // DMS add-on — only a tier that actually sells it separately
+      // (`dmsAddonAvailable`) gets its own line item. Business/Enterprise
+      // bundle it free into the flat seat price above; no current tier
+      // reaches this branch, kept for a hypothetical future paid-add-on tier.
+      if (tierLimits.dmsAddonAvailable && dmsEnabled) {
         const dmsPrice = await getOrgSeatPrice({ type: 'org_dms', tier: input.tier, interval });
 
         if (!dmsPrice) {

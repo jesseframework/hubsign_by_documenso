@@ -12,20 +12,21 @@ export type OrgTierLimits = {
   recipients: number | null;
   directTemplates: number | null;
   /**
-   * Whether DMS ("Repositories") is bundled into this tier for free. Always
-   * `false` now — DMS is a paid add-on for every tier that offers it (see
-   * `dmsAddonAvailable` below for which do, and `ORG_DOC_BLOCK_SIZE` below
-   * for the other org-level add-on). Kept as an explicit field rather than
-   * deleted so `getOrgSeatLimits`'s bundling check stays uniform across
-   * tiers rather than special-casing "no tier ever bundles it."
+   * Whether DMS ("Repositories") is bundled into this tier for free, at no
+   * separate charge — `true` for Business/Enterprise (matches the pricing
+   * doc's "Included" — a prior, since-superseded engineering decision sold
+   * it as a $15/seat add-on instead; that's no longer current). `false` for
+   * Team, which doesn't get it at all.
    */
   dmsEnabled: boolean;
   /**
-   * Whether DMS ("Repositories") can be purchased as a paid add-on at all on
-   * this tier. Distinct from `dmsEnabled` (which is about free bundling,
-   * always `false`) — this is the actual purchasability fence. `false` on
-   * Team by design: it's the deliberate upgrade path to Business, not an
-   * oversight.
+   * Whether DMS ("Repositories") can be purchased as a *separate paid*
+   * add-on on this tier — distinct from `dmsEnabled` (free bundling). No
+   * current tier has this `true`: Team doesn't get DMS at all, and
+   * Business/Enterprise now bundle it free rather than sell it. Kept as a
+   * real fence (not deleted) so the Stripe `org_dms` line-item machinery
+   * degrades safely to "never fires" rather than needing to be rebuilt if a
+   * future tier ever wants to sell DMS as a paid add-on again.
    */
   dmsAddonAvailable: boolean;
   /**
@@ -85,8 +86,8 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     documents: 150,
     recipients: 500,
     directTemplates: 20,
-    dmsEnabled: false,
-    dmsAddonAvailable: true,
+    dmsEnabled: true,
+    dmsAddonAvailable: false,
     flatRate: true,
   },
   ENTERPRISE: {
@@ -95,8 +96,8 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     documents: null,
     recipients: null,
     directTemplates: null,
-    dmsEnabled: false,
-    dmsAddonAvailable: true,
+    dmsEnabled: true,
+    dmsAddonAvailable: false,
     flatRate: true,
   },
 };

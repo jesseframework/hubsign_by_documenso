@@ -75,6 +75,7 @@ const TIER_CONFIG = Object.fromEntries(
       color: TIER_COLORS[tier as keyof typeof ORG_SEAT_TIERS],
       minSeats: config.minSeats,
       maxSeats: config.maxSeats,
+      dmsEnabled: config.dmsEnabled,
       dmsAddonAvailable: config.dmsAddonAvailable,
       flatRate: config.flatRate,
     },
@@ -86,6 +87,7 @@ const TIER_CONFIG = Object.fromEntries(
     color: string;
     minSeats: number;
     maxSeats: number | undefined;
+    dmsEnabled: boolean;
     dmsAddonAvailable: boolean;
     flatRate: boolean;
   }
@@ -679,10 +681,16 @@ function OrgBillingPage() {
                   <Trans>Unlimited members included</Trans>
                 </div>
               )}
-              {/* Repositories (DMS) is a paid add-on, but not every tier can
-                  buy it — Team deliberately can't, that's the fence that
-                  pushes growing teams to Business rather than an oversight. */}
-              {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.dmsAddonAvailable ? (
+              {/* Three states: bundled free (Business/Enterprise), a paid
+                  add-on (no current tier — kept for a hypothetical future
+                  one), or unavailable entirely (Team — the deliberate fence
+                  that pushes growing teams to Business, not an oversight). */}
+              {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.dmsEnabled ? (
+                <span className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground">
+                  <Trans>Repositories included</Trans>
+                  <DmsFeaturesHoverCard />
+                </span>
+              ) : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.dmsAddonAvailable ? (
                 <>
                   <label
                     className="flex items-center gap-1.5 text-[12px]"
@@ -783,7 +791,8 @@ function OrgBillingPage() {
                       {plan.dmsEnabled && (
                         <>
                           {' '}
-                          · Repositories add-on <DmsFeaturesHoverCard />
+                          · Repositories {config?.dmsAddonAvailable ? 'add-on' : 'included'}{' '}
+                          <DmsFeaturesHoverCard />
                         </>
                       )}
                       {plan.billingInterval === 'year' && ' · Yearly'}
@@ -1035,17 +1044,20 @@ function OrgBillingPage() {
                 const assignedCount =
                   seatPlans?.find((p) => p.tier === pendingCancelTier)?.assigned ?? 0;
 
+                const cancelledTierConfig = TIER_CONFIG[pendingCancelTier as keyof typeof TIER_CONFIG];
+                const dmsClause = cancelledTierConfig?.dmsEnabled
+                  ? ' and lose Repositories access'
+                  : cancelledTierConfig?.dmsAddonAvailable
+                    ? ' and lose Repositories access if it was enabled'
+                    : '';
+
                 return assignedCount > 0 ? (
                   <Trans>
                     {assignedCount} member{assignedCount > 1 ? 's are' : ' is'} currently on this
                     tier — including you, if you're one of them. They'll drop to the Free plan's
-                    limits immediately{
-                      TIER_CONFIG[pendingCancelTier as keyof typeof TIER_CONFIG]?.dmsAddonAvailable
-                        ? ' and lose Repositories access if it was enabled'
-                        : ''
-                    }, along with the plan itself. Unused time is credited to the
-                    account balance, not refunded to the card. This can't be undone; buying the
-                    tier again later starts a new plan.
+                    limits immediately{dmsClause}, along with the plan itself. Unused time is
+                    credited to the account balance, not refunded to the card. This can't be
+                    undone; buying the tier again later starts a new plan.
                   </Trans>
                 ) : (
                   <Trans>
