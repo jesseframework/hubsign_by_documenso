@@ -124,6 +124,17 @@ const dmsPriceFor = (pricing: SeatPricing, tier: string, interval: string) => {
 const docBlockPriceFor = (pricing: SeatPricing, interval: string) =>
   ((interval === 'year' ? pricing?.docBlock.year : pricing?.docBlock.month) ?? 0) / 100;
 
+// The per-month rate implied by whichever interval is actually selected —
+// for yearly, that's the discounted annual total divided by 12, not the
+// separate (higher) monthly Price. Showing the undiscounted monthly figure
+// next to a "Yearly · Save X%" toggle the user just picked reads as if the
+// discount never applied. Rounded to whole dollars, matching how the
+// pricing doc itself presents monthly-equivalent annual rates.
+const monthlyEquivalentSeatPriceFor = (pricing: SeatPricing, tier: string, interval: string) =>
+  interval === 'year'
+    ? Math.round(seatPriceFor(pricing, tier, 'year') / 12)
+    : seatPriceFor(pricing, tier, 'month');
+
 // A flat-rate tier's price isn't "per seat" — nothing multiplies it by
 // headcount, so the label shouldn't imply it does.
 const priceSuffix = (flatRate: boolean, interval: string) =>
@@ -611,7 +622,7 @@ function OrgBillingPage() {
                     const existingPlan = seatPlans?.find((p) => p.tier === tier);
                     return (
                       <option key={tier} value={tier}>
-                        {config.name} — ${seatPriceFor(pricing, tier, 'month')}
+                        {config.name} — ${monthlyEquivalentSeatPriceFor(pricing, tier, buyInterval)}
                         {priceSuffix(config.flatRate, 'month')} (
                         {docsForTier(tier) === '∞'
                           ? 'unlimited'
@@ -942,28 +953,34 @@ function OrgBillingPage() {
                   </select>
                 )}
 
-                {isAdmin && (
-                  <Button
-                    size="sm"
-                    variant={member.seatTier ? 'outline' : 'default'}
-                    disabled={isSelfBlocked}
-                    title={
-                      isSelfBlocked
-                        ? "You can't change your own seat assignment — ask another admin to do it."
-                        : undefined
-                    }
-                    onClick={() => {
-                      if (member.seatTier) {
-                        void unassignSeat.mutateAsync({ memberId: member.id });
-                      } else {
-                        const tier = giveSeatTier[member.id] ?? availableTiers[0]?.tier ?? 'BUSINESS';
-                        void handleGiveSeat(member.id, tier);
+                {isAdmin && (() => {
+                  const noSeatsAvailable = !member.seatTier && availableTiers.length === 0;
+
+                  return (
+                    <Button
+                      size="sm"
+                      variant={member.seatTier ? 'outline' : 'default'}
+                      disabled={isSelfBlocked || noSeatsAvailable}
+                      title={
+                        isSelfBlocked
+                          ? "You can't change your own seat assignment — ask another admin to do it."
+                          : noSeatsAvailable
+                            ? 'Purchase a plan to assign seats.'
+                            : undefined
                       }
-                    }}
-                  >
-                    {member.seatTier ? <Trans>Remove seat</Trans> : <Trans>Give seat</Trans>}
-                  </Button>
-                )}
+                      onClick={() => {
+                        if (member.seatTier) {
+                          void unassignSeat.mutateAsync({ memberId: member.id });
+                        } else if (availableTiers.length > 0) {
+                          const tier = giveSeatTier[member.id] ?? availableTiers[0].tier;
+                          void handleGiveSeat(member.id, tier);
+                        }
+                      }}
+                    >
+                      {member.seatTier ? <Trans>Remove seat</Trans> : <Trans>Give seat</Trans>}
+                    </Button>
+                  );
+                })()}
               </div>
             </div>
             );
