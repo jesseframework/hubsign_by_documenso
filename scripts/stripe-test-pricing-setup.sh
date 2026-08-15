@@ -8,6 +8,10 @@
 #     `OrgTierLimits.flatRate` in packages/lib/constants/org-tiers.ts). Repositories/DMS
 #     is bundled into these two for free now, not sold separately — no `org_dms` Price
 #     needed for either.
+#   - Document volume overage blocks for Team/Business/Enterprise
+#     ({type: 'org_doc_block', tier: ...}) — see `resolveDocBlocksAvailable`/
+#     `resolveDocBlockSize` in org-tiers.ts. Enterprise's is only ever looked up
+#     on a shared deployment (Dedicated is already unlimited).
 #   - Individual personal plan (metadata.plan = 'regular'), replacing Basic/Pro
 #
 # Review-before-run only — nothing here executes automatically, and nothing
@@ -125,6 +129,86 @@ stripe_ prices create \
   -d "recurring[interval]=year" \
   > /dev/null
 echo "  yearly price created: \$2,988.00/yr (flat)"
+
+echo
+echo "== Document volume blocks — Team/Business/Enterprise overage, 17% off annually =="
+echo "   (Enterprise's block Product carries no deployment tag — Dedicated is already"
+echo "   unlimited and never looks this up at all, see resolveDocBlocksAvailable().)"
+
+TEAM_DOC_BLOCK_PRODUCT_ID=$(stripe_ products create \
+  --name "Team Document Volume Block" \
+  -d "description=Team tier document volume block — +50 signature requests/mo, capped at 2 (150/mo total)." \
+  -d "metadata[type]=org_doc_block" \
+  -d "metadata[tier]=TEAM" \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+
+echo "Product: $TEAM_DOC_BLOCK_PRODUCT_ID"
+
+stripe_ prices create \
+  -d "product=$TEAM_DOC_BLOCK_PRODUCT_ID" \
+  -d "unit_amount=2500" \
+  -d "currency=usd" \
+  -d "recurring[interval]=month" \
+  > /dev/null
+echo "  monthly price created: \$25.00/mo"
+
+stripe_ prices create \
+  -d "product=$TEAM_DOC_BLOCK_PRODUCT_ID" \
+  -d "unit_amount=24900" \
+  -d "currency=usd" \
+  -d "recurring[interval]=year" \
+  > /dev/null
+echo "  yearly price created: \$249.00/yr (17% off \$25/mo)"
+
+BUSINESS_DOC_BLOCK_PRODUCT_ID=$(stripe_ products create \
+  --name "Business Document Volume Block" \
+  -d "description=Business tier document volume block — +100 signature requests/mo, capped at 3 (450/mo total)." \
+  -d "metadata[type]=org_doc_block" \
+  -d "metadata[tier]=BUSINESS" \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+
+echo "Product: $BUSINESS_DOC_BLOCK_PRODUCT_ID"
+
+stripe_ prices create \
+  -d "product=$BUSINESS_DOC_BLOCK_PRODUCT_ID" \
+  -d "unit_amount=4500" \
+  -d "currency=usd" \
+  -d "recurring[interval]=month" \
+  > /dev/null
+echo "  monthly price created: \$45.00/mo"
+
+stripe_ prices create \
+  -d "product=$BUSINESS_DOC_BLOCK_PRODUCT_ID" \
+  -d "unit_amount=44800" \
+  -d "currency=usd" \
+  -d "recurring[interval]=year" \
+  > /dev/null
+echo "  yearly price created: \$448.00/yr (17% off \$45/mo)"
+
+ENTERPRISE_DOC_BLOCK_PRODUCT_ID=$(stripe_ products create \
+  --name "Enterprise Document Volume Block" \
+  -d "description=Enterprise (shared) tier document volume block — +250 signature requests/mo, capped at 4 (1,500/mo total). Never purchasable on a dedicated deployment (already unlimited)." \
+  -d "metadata[type]=org_doc_block" \
+  -d "metadata[tier]=ENTERPRISE" \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+
+echo "Product: $ENTERPRISE_DOC_BLOCK_PRODUCT_ID"
+
+stripe_ prices create \
+  -d "product=$ENTERPRISE_DOC_BLOCK_PRODUCT_ID" \
+  -d "unit_amount=3500" \
+  -d "currency=usd" \
+  -d "recurring[interval]=month" \
+  > /dev/null
+echo "  monthly price created: \$35.00/mo"
+
+stripe_ prices create \
+  -d "product=$ENTERPRISE_DOC_BLOCK_PRODUCT_ID" \
+  -d "unit_amount=34900" \
+  -d "currency=usd" \
+  -d "recurring[interval]=year" \
+  > /dev/null
+echo "  yearly price created: \$349.00/yr (17% off \$35/mo)"
 
 echo
 echo "== Individual (personal) — \$15/mo, \$144/yr (20% off), replaces Basic/Pro =="

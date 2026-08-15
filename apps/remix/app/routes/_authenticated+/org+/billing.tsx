@@ -16,8 +16,9 @@ import { useSearchParams } from 'react-router';
 import {
   ORG_DMS_ADDON_DESCRIPTION,
   ORG_DMS_ADDON_FEATURES,
-  ORG_DOC_BLOCK_SIZE,
   ORG_SEAT_TIERS,
+  resolveDocBlockSize,
+  resolveDocBlocksAvailable,
   resolveOrgTierDocuments,
 } from '@documenso/lib/constants/org-tiers';
 import type { OrgBillingInterval } from '@documenso/lib/constants/org-tiers';
@@ -78,6 +79,7 @@ const TIER_CONFIG = Object.fromEntries(
       dmsEnabled: config.dmsEnabled,
       dmsAddonAvailable: config.dmsAddonAvailable,
       flatRate: config.flatRate,
+      maxDocBlocks: config.maxDocBlocks,
     },
   ]),
 ) as Record<
@@ -90,6 +92,7 @@ const TIER_CONFIG = Object.fromEntries(
     dmsEnabled: boolean;
     dmsAddonAvailable: boolean;
     flatRate: boolean;
+    maxDocBlocks: number | undefined;
   }
 >;
 
@@ -103,7 +106,7 @@ type SeatPricing =
   | {
       seat: Record<'TEAM' | 'BUSINESS' | 'ENTERPRISE', { month: number | null; year: number | null }>;
       dms: Record<'TEAM' | 'BUSINESS' | 'ENTERPRISE', { month: number | null; year: number | null }>;
-      docBlock: { month: number | null; year: number | null };
+      docBlock: Record<'TEAM' | 'BUSINESS' | 'ENTERPRISE', { month: number | null; year: number | null }>;
       deployment: 'shared' | 'dedicated';
     }
   | undefined;
@@ -121,8 +124,10 @@ const dmsPriceFor = (pricing: SeatPricing, tier: string, interval: string) => {
   return ((interval === 'year' ? amounts?.year : amounts?.month) ?? 0) / 100;
 };
 
-const docBlockPriceFor = (pricing: SeatPricing, interval: string) =>
-  ((interval === 'year' ? pricing?.docBlock.year : pricing?.docBlock.month) ?? 0) / 100;
+const docBlockPriceFor = (pricing: SeatPricing, tier: string, interval: string) => {
+  const amounts = pricing?.docBlock[tier as keyof NonNullable<SeatPricing>['docBlock']];
+  return ((interval === 'year' ? amounts?.year : amounts?.month) ?? 0) / 100;
+};
 
 // The per-month rate implied by whichever interval is actually selected —
 // for yearly, that's the discounted annual total divided by 12, not the
@@ -407,7 +412,7 @@ function OrgBillingPage() {
     const finalQty = TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate
       ? 1
       : Math.max(buyQty, minSeats);
-    const docBlocks = buyTier === 'BUSINESS' ? buyDocBlocks : 0;
+    const docBlocks = resolveDocBlocksAvailable(buyTier as keyof typeof ORG_SEAT_TIERS) ? buyDocBlocks : 0;
 
     if (!membership.seatTier) {
       const conflict = await utils.org.getMemberBillingConflict.fetch({ memberId: membership.id });
@@ -513,7 +518,7 @@ function OrgBillingPage() {
     seatPlans?.reduce((sum, p) => {
       const seatPrice = seatPriceFor(pricing, p.tier, p.billingInterval);
       const dmsPrice = p.dmsEnabled ? dmsPriceFor(pricing, p.tier, p.billingInterval) : 0;
-      const docBlockCost = p.docBlockQuantity * docBlockPriceFor(pricing, p.billingInterval);
+      const docBlockCost = p.docBlockQuantity * docBlockPriceFor(pricing, p.tier, p.billingInterval);
       const seatCount = TIER_CONFIG[p.tier as keyof typeof TIER_CONFIG]?.flatRate ? 1 : p.quantity;
       return sum + (seatPrice + dmsPrice) * seatCount + docBlockCost;
     }, 0) ?? 0;
@@ -771,17 +776,17 @@ function OrgBillingPage() {
                   Repositories available on Business and up.
                 </span>
               )}
-              {buyTier === 'BUSINESS' && (
+              {resolveDocBlocksAvailable(buyTier as keyof typeof ORG_SEAT_TIERS) && (
                 <div>
                   <label className="text-[12px] font-medium text-muted-foreground">
-                    + Doc blocks (+{ORG_DOC_BLOCK_SIZE}/mo each, $
-                    {docBlockPriceFor(pricing, buyInterval)}/{buyInterval === 'year' ? 'yr' : 'mo'})
+                    + Doc blocks (+{resolveDocBlockSize(buyTier as keyof typeof ORG_SEAT_TIERS)}/mo each, $
+                    {docBlockPriceFor(pricing, buyTier, buyInterval)}/{buyInterval === 'year' ? 'yr' : 'mo'})
                   </label>
                   <Input
                     className="mt-1 h-8 w-20 text-[13px]"
                     type="number"
                     min={0}
-                    max={100}
+                    max={TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.maxDocBlocks ?? 100}
                     value={buyDocBlocks}
                     onChange={(e) => setBuyDocBlocks(Math.max(0, Number(e.target.value)))}
                   />
@@ -791,7 +796,9 @@ function OrgBillingPage() {
                 = $
                 {(TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate ? 1 : buyQty) *
                   (seatPriceFor(pricing, buyTier, buyInterval) + (buyDms ? dmsPriceFor(pricing, buyTier, buyInterval) : 0)) +
-                  (buyTier === 'BUSINESS' ? buyDocBlocks * docBlockPriceFor(pricing, buyInterval) : 0)}
+                  (resolveDocBlocksAvailable(buyTier as keyof typeof ORG_SEAT_TIERS)
+                    ? buyDocBlocks * docBlockPriceFor(pricing, buyTier, buyInterval)
+                    : 0)}
                 /{buyInterval === 'year' ? 'year' : 'month'}
               </div>
               <Button
@@ -799,10 +806,13 @@ function OrgBillingPage() {
                 onClick={() => void handlePurchaseClick()}
                 loading={purchaseSeats.isPending}
                 disabled={
-                  !TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate &&
-                  (buyQty < (isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1) ||
-                    (existingPlanForSelectedTier?.quantity ?? 0) + buyQty >
-                      (TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.maxSeats ?? Infinity))
+                  (!TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate &&
+                    (buyQty < (isTopUpForSelectedTier ? 1 : TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.minSeats ?? 1) ||
+                      (existingPlanForSelectedTier?.quantity ?? 0) + buyQty >
+                        (TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.maxSeats ?? Infinity))) ||
+                  (resolveDocBlocksAvailable(buyTier as keyof typeof ORG_SEAT_TIERS) &&
+                    (existingPlanForSelectedTier?.docBlockQuantity ?? 0) + buyDocBlocks >
+                      (TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.maxDocBlocks ?? Infinity))
                 }
               >
                 Purchase
@@ -822,11 +832,11 @@ function OrgBillingPage() {
               // never contradicts the all-in total or the "Your Plan" card.
               const dmsPrice = plan.dmsEnabled ? dmsPriceFor(pricing, plan.tier, plan.billingInterval) : 0;
               const allInSeatPrice = seatPriceFor(pricing, plan.tier, plan.billingInterval) + dmsPrice;
-              const docBlockCost = plan.docBlockQuantity * docBlockPriceFor(pricing, plan.billingInterval);
+              const docBlockCost = plan.docBlockQuantity * docBlockPriceFor(pricing, plan.tier, plan.billingInterval);
               const planDocs = docsForTier(plan.tier);
               const effectiveDocs =
                 typeof planDocs === 'number'
-                  ? planDocs + plan.docBlockQuantity * ORG_DOC_BLOCK_SIZE
+                  ? planDocs + plan.docBlockQuantity * resolveDocBlockSize(plan.tier as keyof typeof ORG_SEAT_TIERS)
                   : planDocs;
               return (
                 <div key={plan.id} className="flex items-center justify-between px-4 py-3">

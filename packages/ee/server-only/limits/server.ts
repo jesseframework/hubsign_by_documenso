@@ -3,8 +3,8 @@ import { DateTime } from 'luxon';
 
 import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
 import {
-  ORG_DOC_BLOCK_SIZE,
   ORG_SEAT_TIERS,
+  resolveDocBlockSize,
   resolveOrgTierDocuments,
 } from '@documenso/lib/constants/org-tiers';
 import { prisma } from '@documenso/prisma';
@@ -87,9 +87,11 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
     seatLimits.dmsEnabled = true;
   }
 
-  // Purchased document volume blocks (Business-only) stack on top of the
-  // tier's base quota — already `Infinity` for unlimited tiers, so this is a
-  // no-op there.
+  // Purchased document volume blocks stack on top of the tier's base quota —
+  // already `Infinity` for unlimited tiers (Enterprise Dedicated), so this is
+  // a no-op there. This `Number.isFinite` guard is `resolveDocBlocksAvailable`'s
+  // condition in disguise (same underlying `resolveOrgTierDocuments` call),
+  // so it already correctly includes Enterprise Shared with no extra check.
   if (tierConfig && Number.isFinite(seatLimits.documents)) {
     const seatPlan = await prisma.orgSeatPlan.findFirst({
       where: { organizationId: membership.organizationId, tier: membership.seatTier },
@@ -97,7 +99,7 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
     });
 
     if (seatPlan?.docBlockQuantity) {
-      seatLimits.documents += seatPlan.docBlockQuantity * ORG_DOC_BLOCK_SIZE;
+      seatLimits.documents += seatPlan.docBlockQuantity * resolveDocBlockSize(membership.seatTier);
     }
   }
 

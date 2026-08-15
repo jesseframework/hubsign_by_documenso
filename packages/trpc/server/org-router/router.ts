@@ -25,6 +25,7 @@ import { getI18nInstance } from '@documenso/lib/client-only/providers/i18n-serve
 import {
   ORG_SEAT_TIERS,
   ORG_UNLIMITED_SENTINEL,
+  resolveDocBlocksAvailable,
   resolveFlatTierQuantity,
   resolveOrgTierDocuments,
 } from '@documenso/lib/constants/org-tiers';
@@ -1081,10 +1082,24 @@ export const orgRouter = router({
           year: amountFor({ type: 'org_dms', tier: 'ENTERPRISE', interval: 'year' }),
         },
       },
-      // Business-only.
+      // Team/Business always; Enterprise only on a shared deployment (see
+      // `resolveDocBlocksAvailable`) — the lookup itself doesn't need a
+      // `deployment` param, though, since there's exactly one non-deployment-
+      // tagged `org_doc_block` Price per tier (unlike seats, which have two
+      // separate Enterprise Prices).
       docBlock: {
-        month: amountFor({ type: 'org_doc_block', tier: 'BUSINESS', interval: 'month' }),
-        year: amountFor({ type: 'org_doc_block', tier: 'BUSINESS', interval: 'year' }),
+        TEAM: {
+          month: amountFor({ type: 'org_doc_block', tier: 'TEAM', interval: 'month' }),
+          year: amountFor({ type: 'org_doc_block', tier: 'TEAM', interval: 'year' }),
+        },
+        BUSINESS: {
+          month: amountFor({ type: 'org_doc_block', tier: 'BUSINESS', interval: 'month' }),
+          year: amountFor({ type: 'org_doc_block', tier: 'BUSINESS', interval: 'year' }),
+        },
+        ENTERPRISE: {
+          month: amountFor({ type: 'org_doc_block', tier: 'ENTERPRISE', interval: 'month' }),
+          year: amountFor({ type: 'org_doc_block', tier: 'ENTERPRISE', interval: 'year' }),
+        },
       },
       deployment,
     };
@@ -1194,6 +1209,26 @@ export const orgRouter = router({
         });
       }
 
+      // Document volume blocks: computed once here and reused by every
+      // branch below instead of each recomputing `docBlocks` differently.
+      // `docBlocksAvailable` is derived (see `resolveDocBlocksAvailable`),
+      // not stored — a request for blocks on a tier that doesn't sell them
+      // (e.g. Enterprise on a dedicated deployment) silently resolves to 0,
+      // same "structurally impossible input, no throw" precedent as
+      // `dmsEnabled` below. `maxDocBlocks` is a real, enforced ceiling for
+      // every tier that does sell them (unlike Business's old unbounded
+      // stacking, corrected here to match the pricing doc).
+      const docBlocksAvailable = resolveDocBlocksAvailable(input.tier);
+      const requestedDocBlocks = docBlocksAvailable ? (input.docBlocks ?? 0) : 0;
+      const projectedBlockQuantity = (existingSeatPlan?.docBlockQuantity ?? 0) + requestedDocBlocks;
+
+      if (tierLimits.maxDocBlocks !== undefined && projectedBlockQuantity > tierLimits.maxDocBlocks) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `${tierLimits.name} is limited to ${tierLimits.maxDocBlocks} document volume block${tierLimits.maxDocBlocks === 1 ? '' : 's'}.`,
+        });
+      }
+
       // A `flatRate` tier is billed as one flat price per org, no matter how
       // many members end up assigned — every Stripe item for it (seat and
       // Repositories add-on alike) always uses quantity 1, never the
@@ -1232,8 +1267,7 @@ export const orgRouter = router({
       if (!IS_BILLING_ENABLED()) {
         // Billing not enabled — just track it locally, synchronously (no
         // Stripe involved either way, so there's nothing to wait on).
-        const docBlockQuantity =
-          (existingSeatPlan?.docBlockQuantity ?? 0) + (input.tier === 'BUSINESS' ? (input.docBlocks ?? 0) : 0);
+        const docBlockQuantity = projectedBlockQuantity;
 
         // A `flatRate` tier's tracked `quantity` is its real cap if it has
         // one (Team) or the "unlimited" sentinel otherwise (Business/
@@ -1374,14 +1408,14 @@ export const orgRouter = router({
           }
         }
 
-        // Doc volume blocks: Business-only, quantity = number of +100 blocks
-        // (independent of seat count, unlike seats/DMS above).
-        const newDocBlockQuantity = (existingSeatPlan?.docBlockQuantity ?? 0) + (input.docBlocks ?? 0);
+        // Doc volume blocks: quantity = number of blocks (independent of seat
+        // count, unlike seats/DMS above) — the ceiling itself was already
+        // enforced above, this just reflects it onto the Stripe item.
         const existingDocBlockItem = findTierItem('org_doc_block', null);
 
-        if (input.tier === 'BUSINESS' && newDocBlockQuantity > 0) {
+        if (docBlocksAvailable && projectedBlockQuantity > 0) {
           if (existingDocBlockItem) {
-            items.push({ id: existingDocBlockItem.id, quantity: newDocBlockQuantity });
+            items.push({ id: existingDocBlockItem.id, quantity: projectedBlockQuantity });
           } else {
             const docBlockPrice = await getOrgSeatPrice({ type: 'org_doc_block', tier: input.tier, interval });
 
@@ -1392,7 +1426,7 @@ export const orgRouter = router({
               });
             }
 
-            items.push({ price: docBlockPrice.id, quantity: newDocBlockQuantity });
+            items.push({ price: docBlockPrice.id, quantity: projectedBlockQuantity });
           }
         }
 
@@ -1494,8 +1528,8 @@ export const orgRouter = router({
         lineItems.push({ price: dmsPrice.id, quantity: seatQuantity });
       }
 
-      // Doc volume blocks — Business-only, quantity = number of +100 blocks.
-      if (input.tier === 'BUSINESS' && (input.docBlocks ?? 0) > 0) {
+      // Doc volume blocks — quantity = number of blocks.
+      if (docBlocksAvailable && requestedDocBlocks > 0) {
         const docBlockPrice = await getOrgSeatPrice({ type: 'org_doc_block', tier: input.tier, interval });
 
         if (!docBlockPrice) {
@@ -1505,8 +1539,7 @@ export const orgRouter = router({
           });
         }
 
-        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        lineItems.push({ price: docBlockPrice.id, quantity: input.docBlocks as number });
+        lineItems.push({ price: docBlockPrice.id, quantity: requestedDocBlocks });
       }
 
       const sessionParams = {
@@ -1702,6 +1735,12 @@ export const orgRouter = router({
       }
 
       const targetLimits = ORG_SEAT_TIERS[input.targetTier];
+      // Derived, not stored — see `resolveDocBlocksAvailable`. Needed both
+      // for the downgrade cap-check below (only when the tier itself is
+      // changing) and later, unconditionally, when building the Stripe
+      // item list (a target that never supported blocks still needs its
+      // existing block item dropped, even on a pure interval switch).
+      const targetDocBlocksAvailable = resolveDocBlocksAvailable(input.targetTier);
 
       if (tierIsChanging) {
         // An org can hold more than one tier at once (mixed licensing) —
@@ -1725,6 +1764,20 @@ export const orgRouter = router({
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: `${targetLimits.name} is limited to ${targetLimits.maxSeats} seats, but ${currentSeatPlan.assigned} members are currently assigned. Unassign down to ${targetLimits.maxSeats} before switching.`,
+          });
+        }
+
+        // Same idea for purchased document volume blocks — never silently
+        // drop or truncate them to fit a switch. A target that doesn't sell
+        // blocks at all (e.g. Enterprise under a dedicated deployment) is
+        // treated as an effective cap of 0, same `undefined` = "no cap"
+        // convention as `maxSeats` above.
+        const targetMaxDocBlocks = targetDocBlocksAvailable ? targetLimits.maxDocBlocks : 0;
+
+        if (targetMaxDocBlocks !== undefined && currentSeatPlan.docBlockQuantity > targetMaxDocBlocks) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `${targetLimits.name} allows at most ${targetMaxDocBlocks} document volume block${targetMaxDocBlocks === 1 ? '' : 's'}, but this plan currently has ${currentSeatPlan.docBlockQuantity}. Cancel this plan first if you want to switch to ${targetLimits.name} with fewer blocks.`,
           });
         }
       }
@@ -1769,7 +1822,7 @@ export const orgRouter = router({
             recipientsPerMonth: targetLimits.recipients ?? ORG_UNLIMITED_SENTINEL,
             directTemplates: targetLimits.directTemplates ?? ORG_UNLIMITED_SENTINEL,
             dmsEnabled: targetLimits.dmsEnabled,
-            docBlockQuantity: input.targetTier === 'BUSINESS' ? currentSeatPlan.docBlockQuantity : 0,
+            docBlockQuantity: targetDocBlocksAvailable ? currentSeatPlan.docBlockQuantity : 0,
             quantity: resolveFlatTierQuantity(input.targetTier),
             billingInterval: input.interval,
           },
@@ -1869,18 +1922,20 @@ export const orgRouter = router({
         items.push({ id: existingDmsItem.id, deleted: true });
       }
 
-      // Document volume blocks are Business-only — dropped on the way out,
-      // repriced if staying on Business through an interval change, never
-      // carried in from another tier.
+      // Document volume blocks: dropped if the target doesn't sell them at
+      // all; otherwise always repriced to the target tier/interval — not
+      // gated on whether the interval itself changed, since a same-interval
+      // tier switch (e.g. Team → Business, both now sell blocks) still needs
+      // the item's Price swapped to the target's own Product.
       const existingDocBlockItem = findTierItem(input.currentTier, 'org_doc_block', null);
 
       if (existingDocBlockItem) {
-        if (input.targetTier !== 'BUSINESS') {
+        if (!targetDocBlocksAvailable) {
           items.push({ id: existingDocBlockItem.id, deleted: true });
-        } else if (input.interval !== currentSeatPlan.billingInterval) {
+        } else {
           const targetDocBlockPrice = await getOrgSeatPrice({
             type: 'org_doc_block',
-            tier: 'BUSINESS',
+            tier: input.targetTier,
             interval: input.interval,
           });
 
@@ -1951,10 +2006,10 @@ export const orgRouter = router({
 
           const otherDocBlockItem = findTierItem(otherPlan.tier, 'org_doc_block', null);
 
-          if (otherDocBlockItem && otherPlan.tier === 'BUSINESS') {
+          if (otherDocBlockItem && resolveDocBlocksAvailable(otherPlan.tier)) {
             const otherDocBlockPrice = await getOrgSeatPrice({
               type: 'org_doc_block',
-              tier: 'BUSINESS',
+              tier: otherPlan.tier,
               interval: input.interval,
             });
 

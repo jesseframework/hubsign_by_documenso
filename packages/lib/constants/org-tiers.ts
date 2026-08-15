@@ -47,6 +47,22 @@ export type OrgTierLimits = {
    * model — buy N seats upfront, billed per seat.
    */
   flatRate: boolean;
+  /**
+   * Signature requests added per purchased document-volume-overage block —
+   * meaningless when this tier has no finite `documents` quota to overage
+   * past (Enterprise Dedicated). Read via `resolveDocBlockSize`, not this
+   * field directly, outside this file.
+   */
+  docBlockSize: number;
+  /**
+   * Purchasable block ceiling — `undefined` means uncapped, matching
+   * `maxSeats`'s exact convention. No current tier is actually uncapped
+   * (kept `?` rather than required so the type stays honest if that ever
+   * changes) — Team caps at 2, Business at 3, Enterprise (shared) at 4.
+   * Whether a tier sells blocks *at all* isn't stored here — see
+   * `resolveDocBlocksAvailable`.
+   */
+  maxDocBlocks?: number;
 };
 
 /**
@@ -84,6 +100,9 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     // Flat $59/mo — never per-seat. Still capped at `maxSeats` above; see the
     // `flatRate` field doc for why those are independent axes for this tier.
     flatRate: true,
+    // $25/mo per block — see `resolveDocBlocksAvailable`.
+    docBlockSize: 50,
+    maxDocBlocks: 2,
   },
   BUSINESS: {
     name: 'Business',
@@ -98,6 +117,11 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     dmsEnabled: true,
     dmsAddonAvailable: false,
     flatRate: true,
+    // $45/mo per block. `maxDocBlocks: 3` is a real ceiling as of this
+    // change — Business previously stacked blocks unboundedly, which
+    // contradicted the pricing doc; corrected here, not a pre-existing rule.
+    docBlockSize: 100,
+    maxDocBlocks: 3,
   },
   ENTERPRISE: {
     name: 'Enterprise',
@@ -108,6 +132,11 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     dmsEnabled: true,
     dmsAddonAvailable: false,
     flatRate: true,
+    // $35/mo per block — only ever purchasable on a shared deployment
+    // (Dedicated already has unlimited `documents`, so there's nothing to
+    // overage past). See `resolveDocBlocksAvailable`.
+    docBlockSize: 250,
+    maxDocBlocks: 4,
   },
 };
 
@@ -129,6 +158,19 @@ export const resolveOrgTierDocuments = (
   tier === 'ENTERPRISE' && deployment === 'shared' ? 500 : ORG_SEAT_TIERS[tier].documents;
 
 /**
+ * Whether a tier sells document-volume-overage blocks at all — derived from
+ * `resolveOrgTierDocuments` rather than a separate stored flag, so it can
+ * never drift out of sync with the finite/infinite quota it depends on.
+ * Overage only means something when there's a finite base to overage past:
+ * Team and Business always qualify; Enterprise only on a shared deployment
+ * (`documents: 500`), never dedicated (`documents: null` → unlimited already).
+ */
+export const resolveDocBlocksAvailable = (
+  tier: OrgSeatTier,
+  deployment: 'shared' | 'dedicated' = DEPLOYMENT_TYPE(),
+): boolean => resolveOrgTierDocuments(tier, deployment) !== null;
+
+/**
  * The `OrgSeatPlan.quantity` a `flatRate` tier's plan should carry — NOT
  * what's billed to Stripe (always 1 for a flat tier, see `flatRate`'s doc).
  * This is what `assignSeatToMember`'s `assigned >= quantity` check enforces
@@ -143,8 +185,12 @@ export const resolveOrgTierDocuments = (
 export const resolveFlatTierQuantity = (tier: OrgSeatTier): number =>
   ORG_SEAT_TIERS[tier].maxSeats ?? ORG_UNLIMITED_SENTINEL;
 
-/** Business-only add-on: an extra 100 documents/mo, stacked as many times as purchased. Purely a limit — its price is Stripe-authoritative, same as everything else priced. */
-export const ORG_DOC_BLOCK_SIZE = 100;
+/**
+ * The document-volume-block size for a tier — analogous to
+ * `resolveFlatTierQuantity`/`resolveOrgTierDocuments`. Purely a limit — its
+ * price is Stripe-authoritative, same as everything else priced.
+ */
+export const resolveDocBlockSize = (tier: OrgSeatTier): number => ORG_SEAT_TIERS[tier].docBlockSize;
 
 /**
  * Marketing copy for the DMS add-on, shown alongside its (Stripe-authoritative)

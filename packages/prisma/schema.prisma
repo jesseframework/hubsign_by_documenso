@@ -1839,7 +1839,8 @@ model OrgSeatPlan {
   recipientsPerMonth Int     @default(50)
   directTemplates    Int     @default(5)
   dmsEnabled         Boolean @default(false)
-  // How many +100-doc volume blocks purchased (Business tier only).
+  // How many document-volume-overage blocks purchased — block size varies
+  // per tier, see `resolveDocBlockSize`.
   docBlockQuantity   Int     @default(0)
 
   // How many seats purchased at this tier
