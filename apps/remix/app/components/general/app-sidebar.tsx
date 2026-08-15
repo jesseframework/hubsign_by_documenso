@@ -23,7 +23,7 @@ import { useInboxEvents } from '~/hooks/use-inbox-events';
 import { useNavContext } from '~/hooks/use-nav-context';
 
 import { BrandingLogo } from './branding-logo';
-import type { NavItem } from './nav-config';
+import type { NavIcon, NavItem } from './nav-config';
 import {
   ACCOUNT_CONSOLE,
   ACCOUNT_ITEM,
@@ -33,6 +33,7 @@ import {
   SETTINGS_ITEM,
   TOOLS_ITEM,
   TOOLS_NAV,
+  filterGroups,
   filterItems,
   getPrimaryNav,
   isConsoleActive,
@@ -51,6 +52,35 @@ export type AppSidebarProps = {
 };
 
 type NavStyle = (active: boolean) => React.CSSProperties | undefined;
+
+type TopAccordionId = 'tools' | 'account' | 'settings';
+
+type CollapsibleRowProps = {
+  rowKey: string;
+  icon?: NavIcon;
+  label: React.ReactNode;
+  /** Omit for a group header that only toggles — it has no obvious first child to jump to. */
+  to?: string;
+  active: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  ariaLabel?: string;
+  children: React.ReactNode;
+};
+
+/**
+ * One open at a time among a set of named siblings, auto-following the active
+ * route until the user makes an explicit choice — same `null`-means-auto idiom
+ * the sidebar already used for its single Tools toggle, generalized so several
+ * collapsibles (Tools/Account/Settings, and Settings' own groups) can share one
+ * accordion instead of being able to sit open simultaneously.
+ */
+function useAccordion<T extends string>(autoId: T | null) {
+  const [explicit, setExplicit] = useState<T | null | undefined>(undefined);
+  const openId = explicit === undefined ? autoId : explicit;
+  const toggle = (id: T) => setExplicit(openId === id ? null : id);
+  return { openId, toggle };
+}
 
 /**
  * The daily-work navigation. Everything configuration-shaped lives behind the
@@ -91,6 +121,7 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
     ACCOUNT_CONSOLE.groups.flatMap((group) => group.items),
     ctx,
   );
+  const settingsGroups = filterGroups(SETTINGS_CONSOLE.groups, ctx);
 
   // Org branding colors
   const orgBrand = orgMembership?.organization;
@@ -132,6 +163,103 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
     </Link>
   );
 
+  const renderLeafLink = (item: NavItem, active: boolean) => (
+    <Link
+      key={item.to}
+      to={item.to}
+      aria-current={active ? 'page' : undefined}
+      className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors ${
+        !sidebarTextColor
+          ? active
+            ? 'bg-primary/10 font-medium text-primary'
+            : 'text-[hsl(var(--sidebar-text))] hover:bg-[hsl(var(--sidebar-hover))] hover:text-[hsl(var(--sidebar-text-active))]'
+          : ''
+      }`}
+      style={navStyle(active)}
+      onClick={onClose}
+    >
+      <item.icon className="h-3.5 w-3.5 flex-shrink-0 opacity-80" />
+      {item.label}
+    </Link>
+  );
+
+  /**
+   * A collapsible parent row: Tools/Account/Settings (which navigate on the
+   * label and toggle via a separate chevron button, `to` given) and Settings'
+   * own group headers (Organization/Documents/Automation/Developer, which only
+   * toggle — a group has no obvious first child to jump to, `to` omitted).
+   */
+  const renderCollapsibleRow = ({
+    rowKey,
+    icon: Icon,
+    label,
+    to,
+    active,
+    expanded,
+    onToggle,
+    ariaLabel,
+    children,
+  }: CollapsibleRowProps) => (
+    <div key={rowKey}>
+      <div className="flex items-center">
+        {to ? (
+          <>
+            <Link
+              to={to}
+              className={`sidebar-nav-item flex-1 ${!sidebarTextColor && active ? 'active' : ''}`}
+              style={navStyle(active)}
+              onClick={onClose}
+            >
+              {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+              {label}
+            </Link>
+            <button
+              type="button"
+              className="mr-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md"
+              style={{ color: mutedColor }}
+              onClick={onToggle}
+              aria-label={ariaLabel}
+              aria-expanded={expanded}
+            >
+              {expanded ? (
+                <ChevronDownIcon className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRightIcon className="h-3.5 w-3.5" />
+              )}
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            className={`sidebar-nav-item w-full flex-1 border-0 bg-transparent ${!sidebarTextColor && active ? 'active' : ''}`}
+            style={navStyle(active)}
+            onClick={onToggle}
+            aria-expanded={expanded}
+          >
+            {Icon && <Icon className="h-4 w-4 flex-shrink-0" />}
+            <span className="flex-1 text-left">{label}</span>
+            {expanded ? (
+              <ChevronDownIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
+            ) : (
+              <ChevronRightIcon className="h-3.5 w-3.5 flex-shrink-0 opacity-60" />
+            )}
+          </button>
+        )}
+      </div>
+
+      {expanded && (
+        <div
+          className="mb-1 ml-[18px] mt-0.5 space-y-px border-l pl-2.5"
+          style={{
+            borderColor: sidebarTextColor ? `${sidebarTextColor}25` : 'hsl(var(--sidebar-border))',
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+
   const billingUrl = orgMembership?.organization ? '/org/billing' : '/settings/billing';
 
   const currentTeam = teams.find((t) => t.url === teamUrl);
@@ -149,13 +277,25 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
         .slice(0, 2)
     : user.email[0].toUpperCase();
 
-  const [toolsOpen, setToolsOpen] = useState<boolean | null>(null);
   const toolsActive = toolsNav.some((item) => isPathActive(item, pathname));
-  const showTools = toolsOpen === null ? toolsActive : toolsOpen;
+  const accountActive = isConsoleActive(ACCOUNT_CONSOLE, pathname);
+  const settingsActive = isConsoleActive(SETTINGS_CONSOLE, pathname);
+
+  const autoTopId: TopAccordionId | null = toolsActive
+    ? 'tools'
+    : accountActive
+      ? 'account'
+      : settingsActive
+        ? 'settings'
+        : null;
+  const topAccordion = useAccordion<TopAccordionId>(autoTopId);
+
+  const autoGroupId =
+    settingsGroups.find((group) => group.items.some((item) => isPathActive(item, pathname)))
+      ?.id ?? null;
+  const groupAccordion = useAccordion<string>(autoGroupId);
 
   const homeHref = primaryNav[0]?.to ?? '/documents';
-
-  const accountActive = isConsoleActive(ACCOUNT_CONSOLE, pathname);
 
   return (
     <>
@@ -236,80 +376,81 @@ export const AppSidebar = ({ user, teams, isOpen, onClose }: AppSidebarProps) =>
           {toolsNav.length === 1 &&
             renderNavRow(toolsNav[0], isPathActive(toolsNav[0], pathname))}
 
-          {toolsNav.length > 1 && (
-            <div>
-              <div className="flex items-center">
-                <Link
-                  to={toolsNav[0].to}
-                  className={`sidebar-nav-item flex-1 ${!sidebarTextColor && toolsActive ? 'active' : ''}`}
-                  style={navStyle(toolsActive)}
-                  onClick={onClose}
-                >
-                  <TOOLS_ITEM.icon className="h-4 w-4 flex-shrink-0" />
-                  {TOOLS_ITEM.label}
-                </Link>
-                <button
-                  type="button"
-                  className="mr-1 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md"
-                  style={{ color: mutedColor }}
-                  onClick={() => setToolsOpen(!showTools)}
-                  aria-label="Toggle tools"
-                  aria-expanded={showTools}
-                >
-                  {showTools ? (
-                    <ChevronDownIcon className="h-3.5 w-3.5" />
-                  ) : (
-                    <ChevronRightIcon className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              </div>
-
-              {showTools && (
-                <div
-                  className="mb-1 ml-[18px] mt-0.5 space-y-px border-l pl-2.5"
-                  style={{
-                    borderColor: sidebarTextColor
-                      ? `${sidebarTextColor}25`
-                      : 'hsl(var(--sidebar-border))',
-                  }}
-                >
-                  {toolsNav.map((item) => {
-                    const active = isPathActive(item, pathname);
-
-                    return (
-                      <Link
-                        key={item.to}
-                        to={item.to}
-                        aria-current={active ? 'page' : undefined}
-                        className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors ${
-                          !sidebarTextColor
-                            ? active
-                              ? 'bg-primary/10 font-medium text-primary'
-                              : 'text-[hsl(var(--sidebar-text))] hover:bg-[hsl(var(--sidebar-hover))] hover:text-[hsl(var(--sidebar-text-active))]'
-                            : ''
-                        }`}
-                        style={navStyle(active)}
-                        onClick={onClose}
-                      >
-                        <item.icon className="h-3.5 w-3.5 flex-shrink-0 opacity-80" />
-                        {item.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+          {toolsNav.length > 1 &&
+            renderCollapsibleRow({
+              rowKey: 'tools',
+              icon: TOOLS_ITEM.icon,
+              label: TOOLS_ITEM.label,
+              to: toolsNav[0].to,
+              active: toolsActive,
+              expanded: topAccordion.openId === 'tools',
+              onToggle: () => topAccordion.toggle('tools'),
+              ariaLabel: 'Toggle tools',
+              children: toolsNav.map((item) => renderLeafLink(item, isPathActive(item, pathname))),
+            })}
 
           {/* Consoles. Below the divider because they are doors you open
-              deliberately, not places you pass through during the day. */}
+              deliberately, not places you pass through during the day. Folded
+              into the sidebar itself, in the same idiom as Tools above, rather
+              than opening a second rail beside the page content: one accordion
+              (Tools/Account/Settings, and Settings' own groups nested one level
+              further) keeps the tree reachable without letting it grow tall. */}
           <div
             className="my-2 h-px"
             style={{ background: sidebarTextColor ? `${sidebarTextColor}15` : 'hsl(var(--sidebar-border))' }}
           />
 
-          {renderNavRow(ACCOUNT_ITEM, accountActive)}
-          {renderNavRow(SETTINGS_ITEM, isConsoleActive(SETTINGS_CONSOLE, pathname))}
+          {accountNav.length === 0 && renderNavRow(ACCOUNT_ITEM, accountActive)}
+          {accountNav.length === 1 &&
+            renderNavRow(accountNav[0], isPathActive(accountNav[0], pathname))}
+          {accountNav.length > 1 &&
+            renderCollapsibleRow({
+              rowKey: 'account',
+              icon: ACCOUNT_ITEM.icon,
+              label: ACCOUNT_ITEM.label,
+              to: ACCOUNT_ITEM.to,
+              active: accountActive,
+              expanded: topAccordion.openId === 'account',
+              onToggle: () => topAccordion.toggle('account'),
+              ariaLabel: 'Toggle account',
+              children: accountNav.map((item) => renderLeafLink(item, isPathActive(item, pathname))),
+            })}
+
+          {settingsGroups.length === 0 && renderNavRow(SETTINGS_ITEM, settingsActive)}
+          {settingsGroups.length > 0 &&
+            renderCollapsibleRow({
+              rowKey: 'settings',
+              icon: SETTINGS_ITEM.icon,
+              label: SETTINGS_ITEM.label,
+              to: SETTINGS_ITEM.to,
+              active: settingsActive,
+              expanded: topAccordion.openId === 'settings',
+              onToggle: () => topAccordion.toggle('settings'),
+              ariaLabel: 'Toggle settings',
+              children:
+                settingsGroups.length === 1
+                  ? settingsGroups[0].items.map((item) =>
+                      renderLeafLink(item, isPathActive(item, pathname)),
+                    )
+                  : settingsGroups.map((group) => {
+                      const groupActive = group.items.some((item) =>
+                        isPathActive(item, pathname),
+                      );
+
+                      return renderCollapsibleRow({
+                        rowKey: group.id,
+                        icon: group.icon,
+                        label: group.label,
+                        active: groupActive,
+                        expanded: groupAccordion.openId === group.id,
+                        onToggle: () => groupAccordion.toggle(group.id),
+                        children: group.items.map((item) =>
+                          renderLeafLink(item, isPathActive(item, pathname)),
+                        ),
+                      });
+                    }),
+            })}
+
           {isAdmin && renderNavRow(ADMIN_ITEM, isConsoleActive(ADMIN_CONSOLE, pathname))}
         </div>
 

@@ -68,6 +68,11 @@ import {
  *                               on one screen, never sibling sidebar rows.
  *   3. Consoles (side rails)  — configuration and administration. Destinations
  *                               you enter deliberately, not nav you scan past.
+ *                               Settings and Account fold their groups directly
+ *                               into the primary sidebar instead of a side rail
+ *                               (see `app-sidebar.tsx`); Admin is the one console
+ *                               still rendered as its own rail, since it isn't
+ *                               part of that sidebar tree.
  *
  * Every path appears in exactly ONE registry below. That invariant is what
  * makes the nav memorable: a user who learns where something lives is never
@@ -136,10 +141,12 @@ export type NavGroup = {
   id: string;
   label: React.ReactNode;
   /**
-   * Shown when the group is drawn as a collapsible category in the console rail,
-   * which is how a console with more than one group renders (see `ConsoleShell`).
-   * Optional because a single-group console draws its items flat, with no parent
-   * row for an icon to sit on.
+   * Shown when the group is drawn as a collapsible category — in the primary
+   * sidebar for Settings (see `app-sidebar.tsx`), or in the console rail for a
+   * multi-group console rendered by `ConsoleShell` (currently none; Admin, the
+   * only console still using the rail, has a single group). Optional because a
+   * single-group console/list draws its items flat, with no parent row for an
+   * icon to sit on.
    */
   icon?: NavIcon;
   items: NavItem[];
@@ -206,7 +213,7 @@ export const PRIMARY_NAV: NavItem[] = [
   { to: '/tasks', icon: CheckSquareIcon, label: <Trans>Tasks</Trans>, surface: 'tasks' },
 ];
 
-/** The one genuine sidebar submenu: utilities you run, rather than places you go. */
+/** Utilities you run, rather than places you go — the sidebar's first submenu. */
 export const TOOLS_NAV: NavItem[] = [
   { to: '/doc-merge', icon: CombineIcon, label: <Trans>Merge</Trans> },
   {
