@@ -125,6 +125,10 @@ async function redeemOrgGrant(key: string, userId: number, organizationId: numbe
       dmsEnabled: dms,
       quantity: seats,
       billingInterval: 'month',
+      // Irrelevant in practice — always 'month' above, and getOrgSeatLimits
+      // only ever reads periodStart for an annual plan — set anyway so the
+      // row is self-describing.
+      periodStart: new Date(),
       source: 'license_key',
       expiresAt,
     };

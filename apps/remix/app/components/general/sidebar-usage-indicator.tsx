@@ -1,7 +1,9 @@
+import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import { Link } from 'react-router';
 
 import { useLimits } from '@documenso/ee/server-only/limits/provider/client';
+import { PERIOD_LABEL_MAP } from '@documenso/ee/server-only/limits/period-label';
 import { isApproachingLimit } from '@documenso/ee/server-only/limits/thresholds';
 import { cn } from '@documenso/ui/lib/utils';
 
@@ -82,6 +84,8 @@ export const SidebarUsageIndicator = ({
   sidebarTextColor,
 }: SidebarUsageIndicatorProps) => {
   const { quota, remaining } = useLimits();
+  const { _ } = useLingui();
+  const periodLabel = _(PERIOD_LABEL_MAP[quota.period]);
 
   const showDocuments = Number.isFinite(quota.documents);
   const showDirectTemplates = Number.isFinite(quota.directTemplates);
@@ -107,7 +111,7 @@ export const SidebarUsageIndicator = ({
     >
       {showDocuments && (
         <UsageRow
-          label={<Trans>Signature requests this month</Trans>}
+          label={<Trans>Signature requests this {periodLabel}</Trans>}
           used={documentsUsed}
           quota={quota.documents}
           sidebarTextColor={sidebarTextColor}

@@ -7,6 +7,7 @@ import { AlertTriangle, Globe2Icon, InfoIcon, Link2Icon, Loader, LockIcon } from
 import { Link } from 'react-router';
 
 import { useLimits } from '@documenso/ee/server-only/limits/provider/client';
+import { PERIOD_LABEL_MAP } from '@documenso/ee/server-only/limits/period-label';
 import { isApproachingLimit } from '@documenso/ee/server-only/limits/thresholds';
 import { useUpdateSearchParams } from '@documenso/lib/client-only/hooks/use-update-search-params';
 import { formatTemplatesPath } from '@documenso/lib/utils/teams';
@@ -225,7 +226,8 @@ export const TemplatesTable = ({
           </AlertTitle>
           <AlertDescription className="mt-2">
             <Trans>
-              You have {remaining.documents} of {quota.documents} signature requests remaining this month.{' '}
+              You have {remaining.documents} of {quota.documents} signature requests remaining this{' '}
+              {_(PERIOD_LABEL_MAP[quota.period])}.{' '}
               <Link className="underline underline-offset-4" to="/settings/billing">
                 Upgrade your account
               </Link>{' '}

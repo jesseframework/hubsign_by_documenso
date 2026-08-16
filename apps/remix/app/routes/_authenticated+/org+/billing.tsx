@@ -779,7 +779,10 @@ function OrgBillingPage() {
               {resolveDocBlocksAvailable(buyTier as keyof typeof ORG_SEAT_TIERS) && (
                 <div>
                   <label className="text-[12px] font-medium text-muted-foreground">
-                    + Doc blocks (+{resolveDocBlockSize(buyTier as keyof typeof ORG_SEAT_TIERS)}/mo each, $
+                    + Doc blocks (+
+                    {resolveDocBlockSize(buyTier as keyof typeof ORG_SEAT_TIERS) *
+                      (buyInterval === 'year' ? 12 : 1)}
+                    /{buyInterval === 'year' ? 'yr' : 'mo'} each, $
                     {docBlockPriceFor(pricing, buyTier, buyInterval)}/{buyInterval === 'year' ? 'yr' : 'mo'})
                   </label>
                   <Input
@@ -834,9 +837,15 @@ function OrgBillingPage() {
               const allInSeatPrice = seatPriceFor(pricing, plan.tier, plan.billingInterval) + dmsPrice;
               const docBlockCost = plan.docBlockQuantity * docBlockPriceFor(pricing, plan.tier, plan.billingInterval);
               const planDocs = docsForTier(plan.tier);
+              // Annual plans pool the full year's allowance rather than a
+              // monthly cap (see `getOrgSeatLimits`) — both the base quota
+              // and any purchased blocks scale ×12 to match.
+              const isAnnual = plan.billingInterval === 'year';
               const effectiveDocs =
                 typeof planDocs === 'number'
-                  ? planDocs + plan.docBlockQuantity * resolveDocBlockSize(plan.tier as keyof typeof ORG_SEAT_TIERS)
+                  ? (planDocs +
+                      plan.docBlockQuantity * resolveDocBlockSize(plan.tier as keyof typeof ORG_SEAT_TIERS)) *
+                    (isAnnual ? 12 : 1)
                   : planDocs;
               return (
                 <div key={plan.id} className="flex items-center justify-between px-4 py-3">
@@ -846,7 +855,7 @@ function OrgBillingPage() {
                     </div>
                     <span className="inline-flex items-center gap-1 text-[12px] text-muted-foreground">
                       ${allInSeatPrice}
-                      {priceSuffix(config?.flatRate ?? false, plan.billingInterval)} · {effectiveDocs} signature requests/mo
+                      {priceSuffix(config?.flatRate ?? false, plan.billingInterval)} · {effectiveDocs} signature requests/{isAnnual ? 'yr' : 'mo'}
                       {plan.docBlockQuantity > 0 && ` (+${plan.docBlockQuantity} block${plan.docBlockQuantity > 1 ? 's' : ''})`}
                       {plan.dmsEnabled && (
                         <>

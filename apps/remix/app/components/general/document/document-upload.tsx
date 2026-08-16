@@ -8,6 +8,7 @@ import { useNavigate, useParams } from 'react-router';
 import { match } from 'ts-pattern';
 
 import { useLimits } from '@documenso/ee/server-only/limits/provider/client';
+import { PERIOD_LABEL_MAP } from '@documenso/ee/server-only/limits/period-label';
 import { isApproachingLimit } from '@documenso/ee/server-only/limits/thresholds';
 import { useAnalytics } from '@documenso/lib/client-only/hooks/use-analytics';
 import { useSession } from '@documenso/lib/client-only/providers/session';
@@ -138,7 +139,8 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
         .with('INVALID_DOCUMENT_FILE', () => msg`You cannot upload encrypted PDFs`)
         .with(
           AppErrorCode.LIMIT_EXCEEDED,
-          () => msg`You have reached your signature request limit for this month. Please upgrade your plan.`,
+          () =>
+            msg`You have reached your signature request limit for this ${_(PERIOD_LABEL_MAP[quota.period])}. Please upgrade your plan.`,
         )
         .otherwise(() => msg`An error occurred while uploading your document.`);
 
@@ -188,7 +190,8 @@ export const DocumentUploadDropzone = ({ className }: DocumentUploadDropzoneProp
                   )}
                 >
                   <Trans>
-                    {remaining.documents} of {quota.documents} signature requests remaining this month.
+                    {remaining.documents} of {quota.documents} signature requests remaining this{' '}
+                    {_(PERIOD_LABEL_MAP[quota.period])}.
                   </Trans>
                 </p>
               </TooltipContent>

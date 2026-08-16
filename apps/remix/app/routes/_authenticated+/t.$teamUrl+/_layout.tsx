@@ -38,12 +38,14 @@ export default function Layout({ params }: Route.ComponentProps) {
           recipients: 0,
           directTemplates: 0,
           dmsEnabled: false,
+          period: 'month' as const,
         },
         remaining: {
           documents: 0,
           recipients: 0,
           directTemplates: 0,
           dmsEnabled: false,
+          period: 'month' as const,
         },
       };
     }

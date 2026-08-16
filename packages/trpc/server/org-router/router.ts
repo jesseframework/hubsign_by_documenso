@@ -1293,6 +1293,7 @@ export const orgRouter = router({
                 dmsEnabled,
                 docBlockQuantity,
                 billingInterval: interval,
+                periodStart: new Date(),
               },
             });
 
@@ -1825,6 +1826,13 @@ export const orgRouter = router({
             docBlockQuantity: targetDocBlocksAvailable ? currentSeatPlan.docBlockQuantity : 0,
             quantity: resolveFlatTierQuantity(input.targetTier),
             billingInterval: input.interval,
+            // Annual plans pool their quota over the year rather than the
+            // calendar month (see getOrgSeatLimits) — a switch into (or
+            // within) annual billing always starts that pool fresh, matching
+            // the pricing doc's "mid-term upgrade starts fresh" rule. No
+            // Stripe/webhook involved on this no-billing path, so no
+            // resync-clobber risk to guard against here.
+            ...(input.interval === 'year' ? { periodStart: new Date() } : {}),
           },
         });
 
@@ -1956,7 +1964,11 @@ export const orgRouter = router({
 
       // A single Stripe subscription can't mix monthly/yearly items — an
       // interval change has to reprice every OTHER tier's items too, not
-      // just the one being switched here.
+      // just the one being switched here. Tracked in the outer scope (not
+      // just inside this `if`) since it's also needed below to build
+      // `forcePeriodStartReset` for the `onOrgSubscriptionUpdated` call.
+      const repricedOtherTiers: Array<'BUSINESS' | 'ENTERPRISE' | 'TEAM'> = [];
+
       if (input.interval !== currentSeatPlan.billingInterval) {
         const otherPlans = await prisma.orgSeatPlan.findMany({
           where: {
@@ -1973,6 +1985,13 @@ export const orgRouter = router({
           if (!otherSeatItem) {
             continue;
           }
+
+          // This tier's items are genuinely getting repriced onto this same
+          // interval switch below — its own `billingInterval` will flip too
+          // on the sync that follows, so if that's *into* annual it needs
+          // the same fresh-pool-start treatment `input.targetTier` gets,
+          // even though `changePlan` was never explicitly called for it.
+          repricedOtherTiers.push(otherPlan.tier);
 
           const otherSeatPrice = await getOrgSeatPrice({
             type: 'org_seat',
@@ -2050,9 +2069,23 @@ export const orgRouter = router({
       // renaming after would instead look like the old tier disappearing
       // and the new one appearing fresh (delete+create, `assigned` reset to
       // 0, every previously-assigned member orphaned).
+      //
+      // `forcePeriodStartReset`: only meaningful when this switch enters
+      // annual billing — a monthly plan never reads `periodStart` at all.
+      // Covers both the tier actually being switched (`input.targetTier`)
+      // and any other tier on this subscription that just got repriced onto
+      // the same interval change (`repricedOtherTiers`) — both need their
+      // pooled quota window to start fresh now, not silently inherit
+      // whatever Stripe's unchanged `current_period_start` still says.
+      const tiersEnteringAnnual = new Set<'BUSINESS' | 'ENTERPRISE' | 'TEAM'>([
+        input.targetTier,
+        ...repricedOtherTiers,
+      ]);
+
       await onOrgSubscriptionUpdated({
         organizationId: membership.organizationId,
         subscription: updatedSubscription,
+        forcePeriodStartReset: input.interval === 'year' ? tiersEnteringAnnual : undefined,
       });
 
       const { planName, priceFormatted } = resolveOrgPlanNameAndPrice(updatedSubscription);

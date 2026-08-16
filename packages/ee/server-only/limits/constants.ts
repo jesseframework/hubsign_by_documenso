@@ -5,6 +5,7 @@ export const FREE_PLAN_LIMITS: TLimitsSchema = {
   recipients: 10,
   directTemplates: 3,
   dmsEnabled: false,
+  period: 'month',
 };
 
 export const TEAM_PLAN_LIMITS: TLimitsSchema = {
@@ -12,6 +13,7 @@ export const TEAM_PLAN_LIMITS: TLimitsSchema = {
   recipients: Infinity,
   directTemplates: Infinity,
   dmsEnabled: false,
+  period: 'month',
 };
 
 export const SELFHOSTED_PLAN_LIMITS: TLimitsSchema = {
@@ -19,6 +21,7 @@ export const SELFHOSTED_PLAN_LIMITS: TLimitsSchema = {
   recipients: Infinity,
   directTemplates: Infinity,
   dmsEnabled: true,
+  period: 'month',
 };
 
 // DMS add-on — when a user has an active DMS subscription
@@ -38,4 +41,5 @@ export const INDIVIDUAL_LICENSE_LIMITS: TLimitsSchema = {
   recipients: Infinity,
   directTemplates: Infinity,
   dmsEnabled: false,
+  period: 'month',
 };

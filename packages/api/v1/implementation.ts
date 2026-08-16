@@ -264,7 +264,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
         return {
           status: 400,
           body: {
-            message: 'You have reached the maximum number of documents allowed for this month',
+            message: `You have reached the maximum number of documents allowed for this ${remaining.period}`,
           },
         };
       }
@@ -473,7 +473,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
       return {
         status: 400,
         body: {
-          message: 'You have reached the maximum number of documents allowed for this month',
+          message: `You have reached the maximum number of documents allowed for this ${remaining.period}`,
         },
       };
     }
@@ -571,7 +571,7 @@ export const ApiContractV1Implementation = tsr.router(ApiContractV1, {
       return {
         status: 400,
         body: {
-          message: 'You have reached the maximum number of documents allowed for this month',
+          message: `You have reached the maximum number of documents allowed for this ${remaining.period}`,
         },
       };
     }

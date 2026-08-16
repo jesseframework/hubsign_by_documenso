@@ -73,14 +73,36 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
   // to `Infinity` for in-memory quota arithmetic.
   const tierConfig = ORG_SEAT_TIERS[membership.seatTier];
 
+  // Needed unconditionally whenever a tier applies (not just for the
+  // doc-block addition, as before) — `billingInterval`/`periodStart` decide
+  // whether this org pools its quota annually.
+  const seatPlan = tierConfig
+    ? await prisma.orgSeatPlan.findFirst({
+        where: { organizationId: membership.organizationId, tier: membership.seatTier },
+        select: { docBlockQuantity: true, billingInterval: true, periodStart: true, createdAt: true },
+      })
+    : null;
+
+  const period: 'month' | 'year' = seatPlan?.billingInterval === 'year' ? 'year' : 'month';
+
   const seatLimits: TLimitsSchema = tierConfig
     ? {
         documents: resolveOrgTierDocuments(membership.seatTier) ?? Infinity,
         recipients: tierConfig.recipients ?? Infinity,
         directTemplates: tierConfig.directTemplates ?? Infinity,
         dmsEnabled: tierConfig.dmsEnabled,
+        period,
       }
     : structuredClone(FREE_PLAN_LIMITS);
+
+  // Annual plans get the full year's allowance as one pool, not the same
+  // monthly cap a monthly plan gets (HubSign-Pricing-Plan.md §2 rule 4) —
+  // every tier's stated yearly figure is exactly its monthly figure × 12
+  // (Business 150×12=1,800, Team 50×12=600, Enterprise Shared 500×12=6,000 —
+  // verified against the doc), so no new per-tier config is needed here.
+  if (period === 'year' && tierConfig && Number.isFinite(seatLimits.documents)) {
+    seatLimits.documents *= 12;
+  }
 
   // DMS addon overrides dmsEnabled
   if (membership.dmsAddon) {
@@ -92,25 +114,27 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
   // a no-op there. This `Number.isFinite` guard is `resolveDocBlocksAvailable`'s
   // condition in disguise (same underlying `resolveOrgTierDocuments` call),
   // so it already correctly includes Enterprise Shared with no extra check.
-  if (tierConfig && Number.isFinite(seatLimits.documents)) {
-    const seatPlan = await prisma.orgSeatPlan.findFirst({
-      where: { organizationId: membership.organizationId, tier: membership.seatTier },
-      select: { docBlockQuantity: true },
-    });
-
-    if (seatPlan?.docBlockQuantity) {
-      seatLimits.documents += seatPlan.docBlockQuantity * resolveDocBlockSize(membership.seatTier);
-    }
+  // Blocks pool annually too, same ×12 as the base quota, for consistency.
+  if (tierConfig && Number.isFinite(seatLimits.documents) && seatPlan?.docBlockQuantity) {
+    const blockSize = resolveDocBlockSize(membership.seatTier) * (period === 'year' ? 12 : 1);
+    seatLimits.documents += seatPlan.docBlockQuantity * blockSize;
   }
 
-  // Count usage this month — signature requests are counted at send, not
-  // creation (a saved draft costs nothing), and `sentAt` is set once so a
-  // resend/reminder never re-counts the same document. See `sendDocument`.
+  // Count usage this month (or this pooled year, for an annual plan) —
+  // signature requests are counted at send, not creation (a saved draft
+  // costs nothing), and `sentAt` is set once so a resend/reminder never
+  // re-counts the same document. See `sendDocument`.
+  const startOfCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const usageWindowStart =
+    period === 'year'
+      ? (seatPlan?.periodStart ?? seatPlan?.createdAt ?? startOfCalendarMonth)
+      : startOfCalendarMonth;
+
   const [documents, directTemplates] = await Promise.all([
     prisma.document.count({
       where: {
         userId: user.id,
-        sentAt: { gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) },
+        sentAt: { gte: usageWindowStart },
         source: { not: 'TEMPLATE_DIRECT_LINK' },
       },
     }),
@@ -317,12 +341,14 @@ const handleTeamLimits = async ({ email, teamId }: HandleTeamLimitsOptions) => {
         recipients: 0,
         directTemplates: 0,
         dmsEnabled: false,
+        period: 'month' as const,
       },
       remaining: {
         documents: 0,
         recipients: 0,
         directTemplates: 0,
         dmsEnabled: false,
+        period: 'month' as const,
       },
     };
   }

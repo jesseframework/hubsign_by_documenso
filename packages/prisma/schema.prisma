@@ -1852,6 +1852,18 @@ model OrgSeatPlan {
   // (a single Stripe subscription can't mix billing intervals).
   billingInterval String @default("month")
 
+  // Start of this plan's current pooled cycle — read only when
+  // billingInterval === 'year'. Set on row creation; kept in sync with
+  // Stripe's live current_period_start on every routine webhook resync (so a
+  // real annual renewal advances it automatically, no separate "detect
+  // renewal" logic needed); force-reset to now() specifically by a
+  // changePlan tier/interval switch (the pricing doc's "starts fresh" rule).
+  // Nullable rather than defaulted (mirrors SignatureInboxItem.receivedAt) —
+  // a pre-migration row's true historical cycle start isn't recoverable, so
+  // getOrgSeatLimits falls back to createdAt until this row's next Stripe
+  // sync fills in a real value.
+  periodStart DateTime?
+
   // Stripe
   stripePriceId String?
 

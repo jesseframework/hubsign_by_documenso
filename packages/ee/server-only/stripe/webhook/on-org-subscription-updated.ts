@@ -14,6 +14,16 @@ import { prisma } from '@documenso/prisma';
 export type OnOrgSubscriptionUpdatedOptions = {
   organizationId: number;
   subscription: Stripe.Subscription;
+  /**
+   * Tier(s) that just got switched into (or switched into annual billing) by
+   * the `changePlan` call that triggered THIS sync — force `periodStart` to
+   * `now()` for these rather than syncing Stripe's live `current_period_start`
+   * (which a tier/interval item-price-swap alone never moves — Stripe doesn't
+   * consider that a new billing cycle). Every other caller (a routine top-up,
+   * or the webhook replaying the same update) omits this and always gets
+   * Stripe's live value.
+   */
+  forcePeriodStartReset?: ReadonlySet<OrgSeatTier>;
 };
 
 const isOrgSeatTier = (value: unknown): value is OrgSeatTier =>
@@ -22,6 +32,7 @@ const isOrgSeatTier = (value: unknown): value is OrgSeatTier =>
 export const onOrgSubscriptionUpdated = async ({
   organizationId,
   subscription: passedInSubscription,
+  forcePeriodStartReset,
 }: OnOrgSubscriptionUpdatedOptions) => {
   // Re-fetch with product data expanded regardless of what the caller passed
   // in — an org's subscription can now hold items for more than one tier at
@@ -113,6 +124,39 @@ export const onOrgSubscriptionUpdated = async ({
     const tierLimits = ORG_SEAT_TIERS[tier];
     const dmsEnabled = tierLimits.dmsEnabled || Boolean(dmsItem);
 
+    // Mirrors the `periodEnd` fallback above (newer Stripe API versions move
+    // `current_period_start` onto items too), but scoped to *this tier's own*
+    // seat item rather than `subscription.items.data[0]` — an org's
+    // subscription can hold more than one tier's items, potentially added at
+    // different times.
+    // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+    const seatItemPeriodStart = (seatItem as unknown as { current_period_start?: number })
+      ?.current_period_start;
+    const periodStartSeconds = seatItemPeriodStart ?? subscription.current_period_start;
+    const stripePeriodStart = periodStartSeconds ? new Date(periodStartSeconds * 1000) : undefined;
+
+    // Hoisted above `seatPlanData` (unlike the rest of this loop's lookups)
+    // because `periodStart` below needs it to decide create vs. resync vs.
+    // forced-reset, and its result has to land inside `seatPlanData` itself.
+    const existingSeatPlan = await prisma.orgSeatPlan.findFirst({
+      where: { organizationId, tier },
+    });
+
+    // Three cases: (a) brand new row — take Stripe's live value; (b) routine
+    // resync of an existing row — take Stripe's live value too, which is
+    // idempotent for a routine top-up (Stripe's `current_period_start` hasn't
+    // moved) and self-heals for free on a genuine annual renewal (Stripe's
+    // value *has* moved); (c) this specific tier was just switched into by a
+    // `changePlan` call in the same request — force `now()` instead, since a
+    // tier/interval item-price-swap alone never moves Stripe's own billing
+    // cycle, so syncing its value here would silently undo the "starts
+    // fresh" reset `changePlan` is trying to apply.
+    const periodStart: Date | undefined = !existingSeatPlan
+      ? (stripePeriodStart ?? new Date())
+      : forcePeriodStartReset?.has(tier)
+        ? new Date()
+        : (stripePeriodStart ?? existingSeatPlan.periodStart ?? undefined);
+
     const seatPlanData = {
       documentsPerMonth: resolveOrgTierDocuments(tier) ?? ORG_UNLIMITED_SENTINEL,
       recipientsPerMonth: tierLimits.recipients ?? ORG_UNLIMITED_SENTINEL,
@@ -131,11 +175,8 @@ export const onOrgSubscriptionUpdated = async ({
       quantity: tierLimits.flatRate ? resolveFlatTierQuantity(tier) : (seatItem.quantity ?? 0),
       billingInterval: seatItem.price.recurring?.interval === 'year' ? 'year' : 'month',
       stripePriceId: seatItem.price.id,
+      periodStart,
     };
-
-    const existingSeatPlan = await prisma.orgSeatPlan.findFirst({
-      where: { organizationId, tier },
-    });
 
     const seatPlan = existingSeatPlan
       ? await prisma.orgSeatPlan.update({
