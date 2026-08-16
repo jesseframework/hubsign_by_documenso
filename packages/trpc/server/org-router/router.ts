@@ -1225,7 +1225,7 @@ export const orgRouter = router({
       if (tierLimits.maxDocBlocks !== undefined && projectedBlockQuantity > tierLimits.maxDocBlocks) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `${tierLimits.name} is limited to ${tierLimits.maxDocBlocks} document volume block${tierLimits.maxDocBlocks === 1 ? '' : 's'}.`,
+          message: `${tierLimits.name} is limited to ${tierLimits.maxDocBlocks} signature request block${tierLimits.maxDocBlocks === 1 ? '' : 's'}.`,
         });
       }
 
@@ -1423,7 +1423,7 @@ export const orgRouter = router({
             if (!docBlockPrice) {
               throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
-                message: `No Stripe price configured for the document volume block add-on (${interval}).`,
+                message: `No Stripe price configured for the signature request block add-on (${interval}).`,
               });
             }
 
@@ -1536,7 +1536,7 @@ export const orgRouter = router({
         if (!docBlockPrice) {
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: `No Stripe price configured for the document volume block add-on (${interval}).`,
+            message: `No Stripe price configured for the signature request block add-on (${interval}).`,
           });
         }
 
@@ -1778,7 +1778,7 @@ export const orgRouter = router({
         if (targetMaxDocBlocks !== undefined && currentSeatPlan.docBlockQuantity > targetMaxDocBlocks) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: `${targetLimits.name} allows at most ${targetMaxDocBlocks} document volume block${targetMaxDocBlocks === 1 ? '' : 's'}, but this plan currently has ${currentSeatPlan.docBlockQuantity}. Cancel this plan first if you want to switch to ${targetLimits.name} with fewer blocks.`,
+            message: `${targetLimits.name} allows at most ${targetMaxDocBlocks} signature request block${targetMaxDocBlocks === 1 ? '' : 's'}, but this plan currently has ${currentSeatPlan.docBlockQuantity}. Cancel this plan first if you want to switch to ${targetLimits.name} with fewer blocks.`,
           });
         }
       }
@@ -1950,7 +1950,7 @@ export const orgRouter = router({
           if (!targetDocBlockPrice) {
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
-              message: `No Stripe price configured for the document volume block add-on (${input.interval}).`,
+              message: `No Stripe price configured for the signature request block add-on (${input.interval}).`,
             });
           }
 

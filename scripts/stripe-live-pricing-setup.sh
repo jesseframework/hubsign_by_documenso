@@ -1,48 +1,51 @@
 #!/usr/bin/env bash
 #
-# Creates the Stripe TEST MODE Products/Prices the new pricing ladder code
-# expects to find by metadata:
-#   - Team org seats  ({type: 'org_seat', tier: 'TEAM'}) — per-seat, purchased quantity
+# LIVE-MODE counterpart of stripe-test-pricing-setup.sh — creates the exact
+# same 7 Products / 14 Prices against a real Stripe account, for real
+# customer checkout. Keep both scripts in sync if the pricing ladder ever
+# changes; this one intentionally duplicates rather than parameterizes
+# test-vs-live, so a diff between them is always visible in review rather
+# than hidden behind a flag.
+#
+#   - Team org seats  ({type: 'org_seat', tier: 'TEAM'}) — flat rate
 #   - Business/Enterprise org seats ({type: 'org_seat', tier: 'BUSINESS'|'ENTERPRISE'}) —
 #     flat rate: one Price, always bought at quantity 1 regardless of headcount (see
 #     `OrgTierLimits.flatRate` in packages/lib/constants/org-tiers.ts). Repositories/DMS
 #     is bundled into these two for free now, not sold separately — no `org_dms` Price
 #     needed for either.
-#   - Document volume overage blocks for Team/Business/Enterprise
+#   - Signature request overage blocks for Team/Business/Enterprise
 #     ({type: 'org_doc_block', tier: ...}) — see `resolveDocBlocksAvailable`/
-#     `resolveDocBlockSize` in org-tiers.ts. Enterprise's is only ever looked up
-#     on a shared deployment (Dedicated is already unlimited).
-#   - Individual personal plan (metadata.plan = 'regular'), replacing Basic/Pro
+#     `resolveDocBlockSize` in org-tiers.ts.
+#   - Individual personal plan (metadata.plan = 'regular')
 #
-# Review-before-run only — nothing here executes automatically, and nothing
-# here touches production. Run it yourself against a TEST secret key:
+# Only the Enterprise SHARED seat variant is created here (matches the app's
+# actual deployment) — Enterprise Dedicated has no priced figure anywhere in
+# the pricing doc or codebase and is out of scope for this run.
 #
-#   STRIPE_API_KEY=sk_test_... ./scripts/stripe-test-pricing-setup.sh
+# Review-before-run only — nothing here executes automatically. Run it
+# yourself against a LIVE key:
 #
-# Requires the Stripe CLI (`brew install stripe/stripe-cli/stripe`, or see
-# https://stripe.com/docs/stripe-cli). Every dollar figure below matches the
-# pricing doc (HubSign-Pricing-Plan.md) and the app's `org-tiers.ts` /
-# `matchOrgPrice` lookups in `packages/lib/server-only/stripe/get-org-seat-price.ts`.
+#   STRIPE_API_KEY=rk_live_... ./scripts/stripe-live-pricing-setup.sh
+#   STRIPE_API_KEY=sk_live_... ./scripts/stripe-live-pricing-setup.sh
 #
-# This script only CREATES. It never archives/deletes existing Prices —
-# retiring Basic/Pro (if present in this Stripe account) is a separate,
-# deliberate step, listed at the bottom as a reminder, not automated here.
+# This script only CREATES — it never archives/deletes/deactivates existing
+# Prices, live or otherwise.
 
 set -euo pipefail
 
 if [ -z "${STRIPE_API_KEY:-}" ]; then
-  echo "Set STRIPE_API_KEY to a Stripe TEST secret key (sk_test_...) before running this script." >&2
+  echo "Set STRIPE_API_KEY to a Stripe LIVE key (sk_live_... or rk_live_...) before running this script." >&2
   exit 1
 fi
 
-if [[ "$STRIPE_API_KEY" != sk_test_* ]]; then
-  echo "STRIPE_API_KEY doesn't look like a test-mode key (expected sk_test_...). Refusing to run against what looks like a live key." >&2
+if [[ "$STRIPE_API_KEY" != sk_live_* && "$STRIPE_API_KEY" != rk_live_* ]]; then
+  echo "STRIPE_API_KEY doesn't look like a live-mode key (expected sk_live_... or rk_live_...). Refusing to run against what looks like a test key — use stripe-test-pricing-setup.sh for that." >&2
   exit 1
 fi
 
 stripe_() { stripe --api-key "$STRIPE_API_KEY" "$@"; }
 
-echo "== Team org seats — \$59/mo, \$566/yr (20% off, matches Individual/Team's acquisition-tier discount) =="
+echo "== Team org seats — \$59/mo, \$566/yr (20% off) =="
 
 TEAM_SEAT_PRODUCT_ID=$(stripe_ products create \
   --name "Team Org Seat" \
@@ -99,10 +102,8 @@ echo "  yearly price created: \$1,983.00/yr (flat)"
 
 echo
 echo "== Enterprise org seats — \$300/mo flat, \$2,988/yr (17% off), unlimited members, Repositories included =="
-echo "   (This is the Enterprise SHARED price — the only one a shared/multi-tenant deployment"
-echo "   like this local checkout will ever look up. See DEPLOYMENT_TYPE()/GetOrgSeatPriceOptions"
-echo "   in get-org-seat-price.ts — a dedicated deployment resolves a different Price entirely,"
-echo "   not created by this script.)"
+echo "   (SHARED variant only — the only one the app's deployment ever looks up."
+echo "   Enterprise Dedicated has no priced figure and is not created here.)"
 
 ENTERPRISE_SEAT_PRODUCT_ID=$(stripe_ products create \
   --name "Enterprise Org Seat (Shared)" \
@@ -132,8 +133,6 @@ echo "  yearly price created: \$2,988.00/yr (flat)"
 
 echo
 echo "== Signature request blocks — Team/Business/Enterprise overage, 17% off annually =="
-echo "   (Enterprise's block Product carries no deployment tag — Dedicated is already"
-echo "   unlimited and never looks this up at all, see resolveDocBlocksAvailable().)"
 
 TEAM_DOC_BLOCK_PRODUCT_ID=$(stripe_ products create \
   --name "Team Signature Request Block" \
@@ -211,7 +210,7 @@ stripe_ prices create \
 echo "  yearly price created: \$349.00/yr (17% off \$35/mo)"
 
 echo
-echo "== Individual (personal) — \$15/mo, \$144/yr (20% off), replaces Basic/Pro =="
+echo "== Individual (personal) — \$15/mo, \$144/yr (20% off) =="
 
 INDIVIDUAL_PRODUCT_ID=$(stripe_ products create \
   --name "Individual" \
@@ -239,25 +238,26 @@ echo "  yearly price created: \$144.00/yr"
 
 cat <<'EOF'
 
-Done. Before running the plan's verification steps against these:
+Done. Before pointing production traffic at these:
 
-1. If this test-mode account still has Basic/Pro test Prices active under
-   `metadata.plan = 'regular'`, the app's personal billing page shows ALL of
-   them side by side — archive the old ones first:
+1. If this live account already has old Basic/Pro (or any other stale)
+   Prices active under `metadata.plan = 'regular'` or the old per-seat org
+   metadata shapes, the app will show/consider ALL of them — archive the
+   old ones first:
      stripe --api-key "$STRIPE_API_KEY" prices update <price_id> -d active=false
    (list candidates with: stripe --api-key "$STRIPE_API_KEY" prices list --limit 20)
 
-2. This script creates the Enterprise seat Price tagged `deployment=shared` —
-   the only one a shared/multi-tenant instance (like app.hubsign.io, and any
-   local dev checkout with `NEXT_PUBLIC_DEPLOYMENT_TYPE=shared`) ever looks
-   up. If that env var is unset locally, `DEPLOYMENT_TYPE()` defaults to
+2. This script created the Enterprise seat Price tagged `deployment=shared`
+   only. Confirm the production deployment's `NEXT_PUBLIC_DEPLOYMENT_TYPE`
+   is set to `shared` — otherwise `DEPLOYMENT_TYPE()` defaults to
    `dedicated` and Enterprise pricing/purchase calls will fail to find a
-   match against this Price — set it to `shared` in `.env.local` first.
+   match against this Price.
 
-3. Repositories/DMS is bundled free into Business/Enterprise now, not sold
-   separately — no `org_dms` Price is created for either, by design.
+3. Repositories/DMS is bundled free into Business/Enterprise — no `org_dms`
+   Price is created for either, by design.
 
-4. None of this touches production. Re-run this same script's logic against
-   a LIVE key only as a separate, deliberate step once the code above has
-   been verified end to end — see the plan's Verification section.
+4. The production `NEXT_PRIVATE_STRIPE_API_KEY`/publishable key/webhook
+   secret must all be the LIVE equivalents for any of this to be reachable
+   — this script only creates the Products/Prices, it doesn't wire up the
+   running app's own credentials.
 EOF

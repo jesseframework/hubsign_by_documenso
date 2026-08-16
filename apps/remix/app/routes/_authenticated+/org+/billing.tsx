@@ -778,8 +778,8 @@ function OrgBillingPage() {
               )}
               {resolveDocBlocksAvailable(buyTier as keyof typeof ORG_SEAT_TIERS) && (
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground">
-                    + Doc blocks (+
+                  <label className="whitespace-nowrap text-[12px] font-medium text-muted-foreground">
+                    + Request blocks (+
                     {resolveDocBlockSize(buyTier as keyof typeof ORG_SEAT_TIERS) *
                       (buyInterval === 'year' ? 12 : 1)}
                     /{buyInterval === 'year' ? 'yr' : 'mo'} each, $
