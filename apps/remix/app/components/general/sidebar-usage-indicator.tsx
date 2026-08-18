@@ -89,20 +89,26 @@ export const SidebarUsageIndicator = ({
 
   const showDocuments = Number.isFinite(quota.documents);
   const showDirectTemplates = Number.isFinite(quota.directTemplates);
+  const showOcrPages = Number.isFinite(quota.ocrPages);
 
-  if (!showDocuments && !showDirectTemplates) {
+  if (!showDocuments && !showDirectTemplates && !showOcrPages) {
     return null;
   }
 
   const documentsUsed = Math.max(quota.documents - remaining.documents, 0);
   const directTemplatesUsed = Math.max(quota.directTemplates - remaining.directTemplates, 0);
+  const ocrPagesUsed = Math.max(quota.ocrPages - remaining.ocrPages, 0);
 
   const isAnyLimitClose =
     (showDocuments &&
       (remaining.documents <= 0 || isApproachingLimit(quota.documents, remaining.documents))) ||
     (showDirectTemplates &&
       (remaining.directTemplates <= 0 ||
-        isApproachingLimit(quota.directTemplates, remaining.directTemplates)));
+        isApproachingLimit(quota.directTemplates, remaining.directTemplates))) ||
+    // Soft-stop, not a hard block (see the OCR runners) — still worth the
+    // same "you're close/at the limit" nudge as documents/directTemplates.
+    (showOcrPages &&
+      (remaining.ocrPages <= 0 || isApproachingLimit(quota.ocrPages, remaining.ocrPages)));
 
   return (
     <div
@@ -123,6 +129,15 @@ export const SidebarUsageIndicator = ({
           label={<Trans>Direct templates</Trans>}
           used={directTemplatesUsed}
           quota={quota.directTemplates}
+          sidebarTextColor={sidebarTextColor}
+        />
+      )}
+
+      {showOcrPages && (
+        <UsageRow
+          label={<Trans>Smart OCR pages this {periodLabel}</Trans>}
+          used={ocrPagesUsed}
+          quota={quota.ocrPages}
           sidebarTextColor={sidebarTextColor}
         />
       )}

@@ -14,6 +14,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   CircleDashedIcon,
+  ClockIcon,
   CoinsIcon,
   CopyIcon,
   DollarSignIcon,
@@ -222,6 +223,11 @@ const ocrBadge = (status: string): string => {
   switch (status) {
     case 'OCR_PROCESSING':
       return 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300';
+    // Over the org's Smart OCR page quota — paused, not broken. Orange
+    // rather than OCR_FAILED's red: nothing needs fixing here, it just
+    // needs quota (or time) to free up.
+    case 'OCR_QUEUED':
+      return 'bg-orange-50 text-orange-700 dark:bg-orange-950 dark:text-orange-300';
     case 'OCR_FAILED':
       return 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300';
     case 'READY':
@@ -360,6 +366,7 @@ const STATUS_FILTERS = [
   { key: 'duplicate', label: 'Duplicates', icon: CopyIcon },
   { key: 'SENT_FOR_SIGNATURE', label: 'Sent to sign', icon: SendIcon },
   { key: 'OCR_FAILED', label: 'OCR failed', icon: XCircleIcon },
+  { key: 'OCR_QUEUED', label: 'OCR paused (quota)', icon: ClockIcon },
   { key: 'COMPLETED', label: 'Completed', icon: CheckCheckIcon },
   { key: 'REJECTED', label: 'Rejected', icon: XCircleIcon },
   { key: 'ARCHIVED', label: 'Archived', icon: ArchiveIcon },

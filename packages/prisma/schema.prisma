@@ -115,6 +115,7 @@ model User {
   sentReminders            RecipientReminder[]    @relation("UserSentReminders")
   inboxFieldEdits          InboxFieldEdit[]       @relation("UserInboxFieldEdits")
   attachmentOcrRuns        DocumentSupportingFile[] @relation("UserRanAttachmentOcr")
+  triggeredOcrUsage        OrgOcrUsage[]
   decidedRuleOverrides     BusinessRuleOverride[]   @relation("UserDecidedRuleOverrides")
   assignedRuleOverrides    BusinessRuleOverride[]   @relation("UserAssignedRuleOverrides")
 
@@ -506,13 +507,16 @@ model DocumentSupportingFile {
   // OCR of the attachment itself — used to read a purchase order a signer
   // attached alongside the invoice.
   //
-  // Never automatic. These bytes are uploaded by whoever holds a signing token,
-  // with no account behind them, so sending them to an external extraction
-  // service is an egress decision a member of the organization makes
-  // deliberately rather than something the upload triggers.
+  // Runs automatically right after upload (see readAttachmentQuietly /
+  // runAttachmentOcr) — the signer holds a signing token, not an account,
+  // so there is no one to ask; a member of the organization can also
+  // trigger it by hand from the review screen.
   ocrRanAt      DateTime?
   ocrRanById    Int?
   ocrError      String?
+  /// Set instead of ocrRanAt when the org was over its Smart OCR page quota
+  /// — the read was queued, not attempted. See OrgOcrUsage/drain-ocr-queue.ts.
+  ocrQueuedAt   DateTime?
   /// What the extractor called it, e.g. "purchase_order". Verbatim.
   ocrDocumentType String?
   extractedData Json?
@@ -1282,6 +1286,11 @@ model DmsDocument {
   fileSize             Int
   ocrText              String?
   ocrProcessed         Boolean            @default(false)
+  /// Set instead of processing when the org was over its Smart OCR page
+  /// quota — the read was queued, not attempted. See OrgOcrUsage/
+  /// drain-ocr-queue.ts. Unrelated to `status` below, which is the filing
+  /// lifecycle, not OCR.
+  ocrQueuedAt          DateTime?
   status               DmsDocumentStatus  @default(ACTIVE)
   format               DmsDocumentFormat  @default(DIGITAL)
   confidentiality      DmsConfidentiality @default(INTERNAL)
@@ -1816,6 +1825,7 @@ model Organization {
   aiConversations        DmsAiConversation[]
   aiUsage                DmsAiUsage[]
   seatPlans              OrgSeatPlan[]
+  ocrUsage               OrgOcrUsage[]
   stamps                 Stamp[]
   workflows              Workflow[]              @relation("OrgWorkflows")
   documents              Document[]              @relation("OrgDocuments")
@@ -2523,6 +2533,12 @@ model ApprovalReminderHistory {
 enum InboxItemStatus {
   RECEIVED
   OCR_PROCESSING
+  /// Over the org's Smart OCR page quota when this item was ready to
+  /// process — the BMS ML call was skipped, not attempted. Distinct from
+  /// OCR_FAILED (which means the call was attempted and errored). Drains
+  /// automatically once the org's quota has room again — see
+  /// packages/lib/server-only/bms-ml/drain-ocr-queue.ts.
+  OCR_QUEUED
   OCR_COMPLETED
   OCR_FAILED
   READY
@@ -2586,6 +2602,59 @@ model SignatureInboxItem {
   @@index([createdAt])
   @@index([externalMessageId])
   @@index([duplicateOfId])
+}
+
+enum OcrUsageSource {
+  INBOX
+  ATTACHMENT
+  DMS
+}
+
+enum OcrUsageStatus {
+  /// BMS ML was actually called and this counts against the org's Smart OCR
+  /// page quota for the period it fell in.
+  PROCESSED
+  /// The org was over quota when this was ready to process — BMS ML was
+  /// never called, no page was spent. Drained automatically once quota
+  /// frees up; see drain-ocr-queue.ts.
+  QUEUED
+}
+
+/// Both the Smart OCR usage ledger and the pending-work queue for org OCR —
+/// a QUEUED row *is* a queued item, no separate queue table. One row per
+/// OCR attempt across all three trigger paths (Signature Inbox, signing-flow
+/// attachments, DMS), so usage can be summed from one place regardless of
+/// which pipeline generated it. See packages/ee/server-only/limits/ocr-quota.ts.
+model OrgOcrUsage {
+  id             String         @id @default(cuid())
+  organizationId Int
+  source         OcrUsageSource
+  status         OcrUsageStatus
+  pageCount      Int
+
+  /// Polymorphic-by-source pointer (SignatureInboxItem.id |
+  /// DocumentSupportingFile.id | DmsDocument.id) — no formal FK since the
+  /// three parent tables are unrelated to each other.
+  sourceId String
+
+  /// Who asked for the read. Null when an automatic trigger fired it
+  /// (inbound email ingest, a signer's own attachment upload) — there is no
+  /// user to record for either.
+  triggeredById Int?
+
+  /// Set when this transitions to PROCESSED — null while QUEUED.
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  triggeredBy  User?        @relation(fields: [triggeredById], references: [id], onDelete: SetNull)
+
+  /// Usage-window sum, mirrors the OrgSeatPlan.periodStart pooling pattern.
+  @@index([organizationId, createdAt])
+  /// Drain job: find an org's still-queued rows.
+  @@index([organizationId, status])
+  /// A source row's own OCR/usage history.
+  @@index([sourceId])
 }
 
 /// A saved column layout for the export builder, scoped to one organization and

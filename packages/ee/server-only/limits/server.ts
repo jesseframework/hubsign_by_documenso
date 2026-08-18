@@ -18,6 +18,7 @@ import {
   TEAM_PLAN_LIMITS,
 } from './constants';
 import { ERROR_CODES } from './errors';
+import { getOrgOcrQuota } from './ocr-quota';
 import type { TLimitsResponseSchema, TLimitsSchema } from './schema';
 import { ZLimitsSchema } from './schema';
 
@@ -53,9 +54,13 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
         where: { organizationId: membership.organizationId, source: 'stripe' },
       });
       if (!paidPlan) {
+        // OCR quota is org-wide (see getOrgOcrQuota) — even though this
+        // member has no usable seat, the org itself may hold other plans
+        // generating real Smart OCR usage.
+        const ocrQuota = await getOrgOcrQuota({ organizationId: membership.organizationId });
         return {
-          quota: { ...FREE_PLAN_LIMITS, dmsEnabled: false },
-          remaining: { ...FREE_PLAN_LIMITS, dmsEnabled: false },
+          quota: { ...FREE_PLAN_LIMITS, dmsEnabled: false, ocrPages: ocrQuota.quota },
+          remaining: { ...FREE_PLAN_LIMITS, dmsEnabled: false, ocrPages: ocrQuota.remaining },
         };
       }
     }
@@ -63,9 +68,10 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
 
   // If no seat assigned, user is in org but has no plan → treat as free
   if (!membership.seatTier) {
+    const ocrQuota = await getOrgOcrQuota({ organizationId: membership.organizationId });
     return {
-      quota: { ...FREE_PLAN_LIMITS, dmsEnabled: false },
-      remaining: { ...FREE_PLAN_LIMITS, dmsEnabled: false },
+      quota: { ...FREE_PLAN_LIMITS, dmsEnabled: false, ocrPages: ocrQuota.quota },
+      remaining: { ...FREE_PLAN_LIMITS, dmsEnabled: false, ocrPages: ocrQuota.remaining },
     };
   }
 
@@ -92,6 +98,9 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
         directTemplates: tierConfig.directTemplates ?? Infinity,
         dmsEnabled: tierConfig.dmsEnabled,
         period,
+        // Overwritten below with the org-wide value from getOrgOcrQuota —
+        // this placeholder just satisfies TLimitsSchema's shape.
+        ocrPages: 0,
       }
     : structuredClone(FREE_PLAN_LIMITS);
 
@@ -146,9 +155,17 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
     }),
   ]);
 
+  // Smart OCR quota is org-wide (see getOrgOcrQuota's own doc comment) —
+  // deliberately not scoped to this member's own usage the way
+  // documents/directTemplates are, since two of the three OCR triggers have
+  // no acting user at all to scope by.
+  const ocrQuota = await getOrgOcrQuota({ organizationId: membership.organizationId });
+  seatLimits.ocrPages = ocrQuota.quota;
+
   const remaining = structuredClone(seatLimits);
   remaining.documents = Math.max(remaining.documents - documents, 0);
   remaining.directTemplates = Math.max(remaining.directTemplates - directTemplates, 0);
+  remaining.ocrPages = ocrQuota.remaining;
 
   return {
     quota: seatLimits,
@@ -342,6 +359,7 @@ const handleTeamLimits = async ({ email, teamId }: HandleTeamLimitsOptions) => {
         directTemplates: 0,
         dmsEnabled: false,
         period: 'month' as const,
+        ocrPages: 0,
       },
       remaining: {
         documents: 0,
@@ -349,6 +367,7 @@ const handleTeamLimits = async ({ email, teamId }: HandleTeamLimitsOptions) => {
         directTemplates: 0,
         dmsEnabled: false,
         period: 'month' as const,
+        ocrPages: 0,
       },
     };
   }

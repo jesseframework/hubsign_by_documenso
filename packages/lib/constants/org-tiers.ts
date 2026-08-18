@@ -63,6 +63,17 @@ export type OrgTierLimits = {
    * `resolveDocBlocksAvailable`.
    */
   maxDocBlocks?: number;
+  /**
+   * Smart OCR (BMS ML) pages included per month — soft-stop, not a hard
+   * block (see `getOrgOcrQuota`/the OCR runners): once exhausted, OCR
+   * pauses and queues rather than anything else breaking. `null` is
+   * Enterprise's canonical *dedicated*-deployment value (unlimited); on a
+   * shared deployment it's overridden — see `resolveOrgTierOcrPages`,
+   * exactly mirroring `documents`/`resolveOrgTierDocuments`. There's no
+   * purchasable page-block add-on yet — no confirmed per-page price exists
+   * (see the pricing doc's own "Open questions").
+   */
+  ocrPages: number | null;
 };
 
 /**
@@ -103,6 +114,7 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     // $25/mo per block — see `resolveDocBlocksAvailable`.
     docBlockSize: 50,
     maxDocBlocks: 2,
+    ocrPages: 400,
   },
   BUSINESS: {
     name: 'Business',
@@ -122,6 +134,7 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     // contradicted the pricing doc; corrected here, not a pre-existing rule.
     docBlockSize: 100,
     maxDocBlocks: 3,
+    ocrPages: 1500,
   },
   ENTERPRISE: {
     name: 'Enterprise',
@@ -137,6 +150,9 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     // overage past). See `resolveDocBlocksAvailable`.
     docBlockSize: 250,
     maxDocBlocks: 4,
+    // null = dedicated-deployment canonical value (unlimited) — see
+    // `resolveOrgTierOcrPages` for the shared-deployment override (5,000).
+    ocrPages: null,
   },
 };
 
@@ -156,6 +172,18 @@ export const resolveOrgTierDocuments = (
   deployment: 'shared' | 'dedicated' = DEPLOYMENT_TYPE(),
 ): number | null =>
   tier === 'ENTERPRISE' && deployment === 'shared' ? 500 : ORG_SEAT_TIERS[tier].documents;
+
+/**
+ * Smart OCR (BMS ML) page allowance, deployment-aware exactly like
+ * `resolveOrgTierDocuments` — Enterprise Shared metrers OCR (bounds compute
+ * exposure on shared infrastructure) while Enterprise Dedicated stays
+ * genuinely unlimited (isolated infrastructure, cost is priced into the tier).
+ */
+export const resolveOrgTierOcrPages = (
+  tier: OrgSeatTier,
+  deployment: 'shared' | 'dedicated' = DEPLOYMENT_TYPE(),
+): number | null =>
+  tier === 'ENTERPRISE' && deployment === 'shared' ? 5000 : ORG_SEAT_TIERS[tier].ocrPages;
 
 /**
  * Whether a tier sells document-volume-overage blocks at all — derived from

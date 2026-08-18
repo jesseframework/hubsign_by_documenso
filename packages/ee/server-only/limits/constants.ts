@@ -6,6 +6,10 @@ export const FREE_PLAN_LIMITS: TLimitsSchema = {
   directTemplates: 3,
   dmsEnabled: false,
   period: 'month',
+  // Real figure, not a placeholder — an org member with no assigned seat
+  // falls through to this constant in `getOrgSeatLimits`, and that's a
+  // real org-scoped case that can generate Smart OCR usage.
+  ocrPages: 30,
 };
 
 export const TEAM_PLAN_LIMITS: TLimitsSchema = {
@@ -14,6 +18,7 @@ export const TEAM_PLAN_LIMITS: TLimitsSchema = {
   directTemplates: Infinity,
   dmsEnabled: false,
   period: 'month',
+  ocrPages: Infinity,
 };
 
 export const SELFHOSTED_PLAN_LIMITS: TLimitsSchema = {
@@ -22,6 +27,7 @@ export const SELFHOSTED_PLAN_LIMITS: TLimitsSchema = {
   directTemplates: Infinity,
   dmsEnabled: true,
   period: 'month',
+  ocrPages: Infinity,
 };
 
 // DMS add-on — when a user has an active DMS subscription
@@ -42,4 +48,5 @@ export const INDIVIDUAL_LICENSE_LIMITS: TLimitsSchema = {
   directTemplates: Infinity,
   dmsEnabled: false,
   period: 'month',
+  ocrPages: Infinity,
 };

@@ -9,6 +9,8 @@
 
 import { Prisma } from '@prisma/client';
 
+import { assertOcrQuotaOrQueue, recordOcrPagesProcessed } from '@documenso/ee/server-only/limits/ocr-quota';
+import { getPdfPageCount } from '@documenso/lib/server-only/pdf/get-pdf-page-count';
 import { prisma } from '@documenso/prisma';
 
 import { buildOcrCanonicalFields } from '../../universal/ocr-fields';
@@ -73,10 +75,17 @@ const fireOcrCompleted = async (inboxItemId: string): Promise<void> => {
 export const runInboxOcr = async ({
   inboxItemId,
   templateId: overrideTemplateId,
+  existingUsageId,
 }: {
   inboxItemId: string;
   /** Explicit template chosen by a user re-running OCR; beats vendor routing. */
   templateId?: number;
+  /**
+   * Set by the drain-queue job when re-attempting a previously QUEUED item —
+   * skips the quota check (the drain job already confirmed room) and
+   * updates that row in place instead of creating a new one.
+   */
+  existingUsageId?: string;
 }): Promise<void> => {
   const item = await prisma.signatureInboxItem.findUnique({
     where: { id: inboxItemId },
@@ -121,6 +130,35 @@ export const runInboxOcr = async ({
     const baseName = item.document.title?.trim() || 'document';
     const fileName = /\.pdf$/i.test(baseName) ? baseName : `${baseName}.pdf`;
 
+    // Compute page count and check quota BEFORE calling BMS ML — cheap,
+    // local work first, the expensive network call only if there's room.
+    // Skipped when the drain job already confirmed room for this exact item.
+    const pageCount = await getPdfPageCount(buffer, fileName);
+    const decision = existingUsageId
+      ? ({ allowed: true } as const)
+      : await assertOcrQuotaOrQueue({
+          organizationId: item.organizationId,
+          pageCount,
+          source: 'INBOX',
+          sourceId: item.id,
+        });
+
+    if (!decision.allowed) {
+      // Soft-stop: over quota, not an error. The item stays usable — it
+      // just hasn't been enriched yet, and will drain automatically once
+      // the org's Smart OCR quota has room again.
+      await prisma.signatureInboxItem.update({
+        where: { id: item.id },
+        data: { status: 'OCR_QUEUED' },
+      });
+      // Push the state to any open inbox view so the spinner stops — but
+      // deliberately skip fireOcrCompleted: it drives duplicate-detection
+      // and INBOX_OCR_COMPLETED workflow dispatch, both keyed on finished
+      // extractedData, which doesn't exist yet for a queued item.
+      publishInboxEvent(item.organizationId, { type: 'ocr', inboxItemId: item.id, status: 'OCR_QUEUED' });
+      return;
+    }
+
     // Route to a vendor's extraction template via the sender address. Without
     // one the service extracts generically and confidence sits far lower.
     const template = await resolveOcrTemplate({
@@ -133,6 +171,14 @@ export const runInboxOcr = async ({
     const result = await bmsMlUploadDocument(buffer, fileName, {
       orgConfig,
       templateId: template.templateId ?? undefined,
+    });
+
+    await recordOcrPagesProcessed({
+      organizationId: item.organizationId,
+      pageCount,
+      source: 'INBOX',
+      sourceId: item.id,
+      existingUsageId,
     });
 
     const extracted: Record<string, unknown> = {};

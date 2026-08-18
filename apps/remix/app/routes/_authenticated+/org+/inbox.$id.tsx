@@ -271,6 +271,20 @@ export default function InboxItemPage() {
             <p className="text-[12px] text-muted-foreground">
               {item.status === 'OCR_PROCESSING' ? (
                 <Trans>OCR is running…</Trans>
+              ) : item.status === 'OCR_QUEUED' ? (
+                <>
+                  <Trans>
+                    Smart OCR paused — no pages left in this organization's plan this period.
+                  </Trans>{' '}
+                  <Trans>
+                    You can still send for signature. This will process automatically once quota
+                    frees up, or{' '}
+                    <Link className="underline underline-offset-4" to="/org/billing">
+                      upgrade your plan
+                    </Link>
+                    .
+                  </Trans>
+                </>
               ) : item.status === 'OCR_FAILED' ? (
                 <Trans>OCR failed — you can re-run it or proceed manually.</Trans>
               ) : (

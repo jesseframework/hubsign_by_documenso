@@ -2,8 +2,8 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import { dmsAiChat, getAiConversations, getAiConversationMessages, getDmsAiQueryLimit } from '@documenso/lib/server-only/dms-ai/agent';
-import { bmsMlGetStatus, bmsMlGetTemplates, bmsMlUploadDocument, isBmsMlConfigured } from '@documenso/lib/server-only/bms-ml/client';
-import { getFileServerSide } from '@documenso/lib/universal/upload/get-file.server';
+import { bmsMlGetStatus, bmsMlGetTemplates, isBmsMlConfigured } from '@documenso/lib/server-only/bms-ml/client';
+import { runDmsOcr } from '@documenso/lib/server-only/dms/run-dms-ocr';
 import { prisma } from '@documenso/prisma';
 
 import { dmsEntitledProcedure, router } from '../trpc';
@@ -359,13 +359,14 @@ export const dmsRouter = router({
 
       // Auto-OCR if requested or org has auto-process enabled
       const shouldOcr = autoOcr || membership?.organization?.ocrAutoProcess;
-      if (shouldOcr && isBmsMlConfigured({
+      const organizationId = membership?.organizationId;
+
+      if (shouldOcr && organizationId && isBmsMlConfigured({
         apiUrl: membership?.organization?.ocrApiUrl,
         apiKey: membership?.organization?.ocrApiKey,
         apiUsername: membership?.organization?.ocrApiUsername,
         apiPassword: membership?.organization?.ocrApiPassword,
       })) {
-        // Run OCR in background — don't block the upload response
         const orgConfig = {
           apiUrl: membership?.organization?.ocrApiUrl,
           apiKey: membership?.organization?.ocrApiKey,
@@ -375,38 +376,41 @@ export const dmsRouter = router({
           defaultEngine: membership?.organization?.ocrDefaultEngine,
         };
 
-        // Non-blocking OCR
+        // Non-blocking OCR — don't block the upload response. No user to
+        // attribute: this is an automatic trigger, not someone clicking a
+        // button.
         void (async () => {
           try {
-            const documentData = await prisma.documentData.findUnique({ where: { id: data.fileUrl } });
-            if (!documentData || documentData.type !== 'BYTES_64') return;
-
-            const fileBuffer = Buffer.from(documentData.data, 'base64');
-            const result = await bmsMlUploadDocument(fileBuffer, data.fileName, {
-              templateId: ocrTemplateId,
+            const ocr = await runDmsOcr({
+              documentId: document.id,
+              organizationId,
               orgConfig,
+              templateId: ocrTemplateId,
+              triggeredById: null,
             });
 
+            if (ocr.status !== 'processed') return;
+
             const extractedFields: Record<string, unknown> = {};
-            for (const field of result.invoice.field_extractions) {
+            for (const field of ocr.result.invoice.field_extractions) {
               extractedFields[field.field_name] = field.extracted_value;
             }
 
             await prisma.dmsDocument.update({
               where: { id: document.id },
               data: {
-                ocrText: result.invoice.raw_ocr_text,
+                ocrText: ocr.result.invoice.raw_ocr_text,
                 ocrProcessed: true,
                 metadata: {
                   ...extractedFields,
                   _ocr: {
-                    engine: result.invoice.ocr_engine,
-                    ocrConfidence: result.invoice.ocr_confidence,
-                    mlConfidence: result.invoice.ml_confidence,
-                    documentType: result.invoice.document_type,
-                    completeness: result.processing_details.completeness,
-                    fieldExtractions: result.invoice.field_extractions,
-                    bmsMlInvoiceId: result.invoice.id,
+                    engine: ocr.result.invoice.ocr_engine,
+                    ocrConfidence: ocr.result.invoice.ocr_confidence,
+                    mlConfidence: ocr.result.invoice.ml_confidence,
+                    documentType: ocr.result.invoice.document_type,
+                    completeness: ocr.result.processing_details.completeness,
+                    fieldExtractions: ocr.result.invoice.field_extractions,
+                    bmsMlInvoiceId: ocr.result.invoice.id,
                   },
                 },
               },
@@ -1045,96 +1049,109 @@ export const dmsRouter = router({
         defaultEngine: orgMembership.organization.ocrDefaultEngine,
       } : null;
 
-      if (!isBmsMlConfigured(orgOcrConfig)) {
+      if (!orgOcrConfig || !isBmsMlConfigured(orgOcrConfig)) {
         return { status: 'not_configured', message: 'BMS ML API not configured. Set it up in Organization Settings or env vars.' };
       }
 
-      try {
-        // Get the file from storage
-        const documentData = await prisma.documentData.findUnique({
-          where: { id: doc.fileUrl },
-        });
+      const organizationId = orgMembership?.organizationId;
 
-        if (!documentData) {
-          return { status: 'error', message: 'Document data not found' };
-        }
+      if (!organizationId) {
+        return { status: 'error', message: 'Organization not found' };
+      }
 
-        // Read the file into a buffer. getFileServerSide handles every storage
-        // backend — inline BYTES/BYTES_64 and S3_PATH (presigned GET + fetch) —
-        // so S3-stored documents OCR the same as inline ones (mirrors the
-        // Signature-Inbox OCR path in run-inbox-ocr.ts).
-        const bytes = await getFileServerSide({ type: documentData.type, data: documentData.data });
-        const fileBuffer = Buffer.from(bytes);
+      const ocr = await runDmsOcr({
+        documentId: input.id,
+        organizationId,
+        orgConfig: orgOcrConfig,
+        templateId: input.templateId,
+        ocrEngine: input.ocrEngine,
+        triggeredById: ctx.user.id,
+      });
 
-        // Call BMS ML API
-        const result = await bmsMlUploadDocument(fileBuffer, doc.fileName, {
-          templateId: input.templateId,
-          ocrEngine: input.ocrEngine,
-          orgConfig: orgOcrConfig,
-        });
-
-        // Store OCR results
-        const extractedFields: Record<string, unknown> = {};
-        for (const field of result.invoice.field_extractions) {
-          extractedFields[field.field_name] = field.extracted_value;
-        }
-
-        await prisma.dmsDocument.update({
-          where: { id: input.id },
-          data: {
-            ocrText: result.invoice.raw_ocr_text,
-            ocrProcessed: true,
-            metadata: {
-              ...((doc.metadata as Record<string, unknown>) || {}),
-              ...extractedFields,
-              _ocr: {
-                engine: result.invoice.ocr_engine,
-                ocrConfidence: result.invoice.ocr_confidence,
-                mlConfidence: result.invoice.ml_confidence,
-                documentType: result.invoice.document_type,
-                documentTypeConfidence: result.invoice.document_type_confidence,
-                extractionMethod: result.invoice.extraction_method,
-                aiEnhanced: result.invoice.ai_enhanced,
-                processingTimeMs: result.invoice.processing_time_ms,
-                needsReview: result.invoice.needs_human_review,
-                completeness: result.processing_details.completeness,
-                fieldExtractions: result.invoice.field_extractions,
-                bmsMlInvoiceId: result.invoice.id,
-              },
-            },
-          },
-        });
-
+      if (ocr.status === 'queued') {
         await prisma.dmsAuditLog.create({
           data: {
-            action: 'OCR_COMPLETED',
+            action: 'OCR_REQUESTED',
             documentId: input.id,
             userId: ctx.user.id,
-            details: `OCR completed via ${result.invoice.ocr_engine}. ${result.invoice.field_extractions.length} fields extracted. Confidence: ${Math.round(result.invoice.ocr_confidence * 100)}%`,
+            details: 'OCR paused — over the organization\'s Smart OCR page quota for this period. Will process automatically once quota frees up.',
           },
         });
 
-        return {
-          status: result.invoice.status,
-          fieldsExtracted: result.invoice.field_extractions.length,
-          ocrConfidence: result.invoice.ocr_confidence,
-          documentType: result.invoice.document_type,
-          completeness: result.processing_details.completeness,
-        };
-      } catch (err) {
-        console.error('[BMS ML OCR Error]', err);
+        return { status: 'queued', message: 'Smart OCR page quota reached for this period — queued, will process automatically.' };
+      }
+
+      if (ocr.status === 'error') {
+        console.error('[BMS ML OCR Error]', ocr.error);
 
         await prisma.dmsAuditLog.create({
           data: {
             action: 'OCR_FAILED',
             documentId: input.id,
             userId: ctx.user.id,
-            details: `OCR failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+            details: `OCR failed: ${ocr.error}`,
           },
         });
 
-        return { status: 'error', message: err instanceof Error ? err.message : 'OCR processing failed' };
+        return { status: 'error', message: ocr.error };
       }
+
+      if (ocr.status === 'not_configured') {
+        // Unreachable in practice — already checked above — but keeps the
+        // discriminated union exhaustive rather than asserting past it.
+        return { status: 'not_configured', message: 'BMS ML API not configured.' };
+      }
+
+      const result = ocr.result;
+
+      // Store OCR results
+      const extractedFields: Record<string, unknown> = {};
+      for (const field of result.invoice.field_extractions) {
+        extractedFields[field.field_name] = field.extracted_value;
+      }
+
+      await prisma.dmsDocument.update({
+        where: { id: input.id },
+        data: {
+          ocrText: result.invoice.raw_ocr_text,
+          ocrProcessed: true,
+          metadata: {
+            ...((doc.metadata as Record<string, unknown>) || {}),
+            ...extractedFields,
+            _ocr: {
+              engine: result.invoice.ocr_engine,
+              ocrConfidence: result.invoice.ocr_confidence,
+              mlConfidence: result.invoice.ml_confidence,
+              documentType: result.invoice.document_type,
+              documentTypeConfidence: result.invoice.document_type_confidence,
+              extractionMethod: result.invoice.extraction_method,
+              aiEnhanced: result.invoice.ai_enhanced,
+              processingTimeMs: result.invoice.processing_time_ms,
+              needsReview: result.invoice.needs_human_review,
+              completeness: result.processing_details.completeness,
+              fieldExtractions: result.invoice.field_extractions,
+              bmsMlInvoiceId: result.invoice.id,
+            },
+          },
+        },
+      });
+
+      await prisma.dmsAuditLog.create({
+        data: {
+          action: 'OCR_COMPLETED',
+          documentId: input.id,
+          userId: ctx.user.id,
+          details: `OCR completed via ${result.invoice.ocr_engine}. ${result.invoice.field_extractions.length} fields extracted. Confidence: ${Math.round(result.invoice.ocr_confidence * 100)}%`,
+        },
+      });
+
+      return {
+        status: result.invoice.status,
+        fieldsExtracted: result.invoice.field_extractions.length,
+        ocrConfidence: result.invoice.ocr_confidence,
+        documentType: result.invoice.document_type,
+        completeness: result.processing_details.completeness,
+      };
     }),
 
   updateOcrText: dmsEntitledProcedure

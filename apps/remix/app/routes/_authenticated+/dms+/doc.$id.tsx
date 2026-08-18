@@ -661,7 +661,16 @@ export default function DmsDocumentDetailPage() {
               })()}
 
               {/* OCR status */}
-              {!doc.ocrProcessed && (
+              {!doc.ocrProcessed && doc.ocrQueuedAt && (
+                <div className="flex items-center gap-2 rounded border border-orange-200 bg-orange-50 p-2 dark:border-orange-800 dark:bg-orange-950">
+                  <ClockIcon className="h-3.5 w-3.5 text-orange-600" />
+                  <span className="text-[11px] text-orange-700 dark:text-orange-300">
+                    Smart OCR paused — no pages left in this organization's plan this period. Will
+                    process automatically once quota frees up.
+                  </span>
+                </div>
+              )}
+              {!doc.ocrProcessed && !doc.ocrQueuedAt && (
                 <div className="flex items-center gap-2 rounded border border-amber-200 bg-amber-50 p-2 dark:border-amber-800 dark:bg-amber-950">
                   <ClockIcon className="h-3.5 w-3.5 text-amber-600" />
                   <span className="text-[11px] text-amber-700 dark:text-amber-300">OCR pending — text will be extracted when the AI service processes this document</span>

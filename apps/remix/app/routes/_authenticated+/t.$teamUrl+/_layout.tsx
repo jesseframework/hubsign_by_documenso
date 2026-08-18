@@ -39,6 +39,7 @@ export default function Layout({ params }: Route.ComponentProps) {
           directTemplates: 0,
           dmsEnabled: false,
           period: 'month' as const,
+          ocrPages: 0,
         },
         remaining: {
           documents: 0,
@@ -46,6 +47,7 @@ export default function Layout({ params }: Route.ComponentProps) {
           directTemplates: 0,
           dmsEnabled: false,
           period: 'month' as const,
+          ocrPages: 0,
         },
       };
     }

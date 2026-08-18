@@ -1,5 +1,7 @@
 import { Prisma } from '@prisma/client';
 
+import { assertOcrQuotaOrQueue, recordOcrPagesProcessed } from '@documenso/ee/server-only/limits/ocr-quota';
+import { getPdfPageCount } from '@documenso/lib/server-only/pdf/get-pdf-page-count';
 import { prisma } from '@documenso/prisma';
 
 import { readOcrField } from '../../universal/ocr-fields';
@@ -35,6 +37,13 @@ const READABLE = /\.(pdf|png|jpe?g|tiff?)$/i;
 
 export type AttachmentOcrResult = {
   ok: boolean;
+  /**
+   * True when the org was over its Smart OCR page quota — the BMS ML call
+   * was skipped, not attempted. Distinct from a genuine failure (`ok:
+   * false, queued: false`): a queued attachment isn't broken, it's paused,
+   * and will drain automatically once quota frees up.
+   */
+  queued: boolean;
   fileName: string;
   documentType: string | null;
   /** Number of fields extracted. Zero is a real answer, not a failure. */
@@ -116,6 +125,7 @@ export const runAttachmentOcr = async ({
   organizationId,
   userId,
   templateId,
+  existingUsageId,
 }: {
   supportingFileId: string;
   organizationId: number;
@@ -125,6 +135,11 @@ export const runAttachmentOcr = async ({
    */
   userId?: number | null;
   templateId?: number;
+  /**
+   * Set by the drain-queue job when re-attempting a previously QUEUED
+   * attachment — skips the quota check and updates that row in place.
+   */
+  existingUsageId?: string;
 }): Promise<AttachmentOcrResult> => {
   const file = await prisma.documentSupportingFile.findFirst({
     // Scoped through the document's organization — an id alone must not reach
@@ -144,6 +159,7 @@ export const runAttachmentOcr = async ({
   }
 
   const base: Omit<AttachmentOcrResult, 'ok' | 'error'> = {
+    queued: false,
     fileName: file.fileName,
     documentType: null,
     fieldCount: 0,
@@ -187,13 +203,47 @@ export const runAttachmentOcr = async ({
 
   try {
     const bytes = await getFileServerSide({ type: file.type, data: file.data });
+    const buffer = Buffer.from(bytes);
 
-    const result = await bmsMlUploadDocument(Buffer.from(bytes), file.fileName, {
+    // Compute page count and check quota BEFORE calling BMS ML — cheap,
+    // local work first, the expensive network call only if there's room.
+    // Skipped when the drain job already confirmed room for this exact file.
+    const pageCount = await getPdfPageCount(buffer, file.fileName);
+    const decision = existingUsageId
+      ? ({ allowed: true } as const)
+      : await assertOcrQuotaOrQueue({
+          organizationId,
+          pageCount,
+          source: 'ATTACHMENT',
+          sourceId: file.id,
+        });
+
+    if (!decision.allowed) {
+      // Soft-stop: over quota, not an error — the upload already succeeded
+      // and stays usable, just unenriched until quota frees up.
+      await prisma.documentSupportingFile.update({
+        where: { id: file.id },
+        data: { ocrQueuedAt: new Date() },
+      });
+
+      return { ...base, ok: false, queued: true, error: null };
+    }
+
+    const result = await bmsMlUploadDocument(buffer, file.fileName, {
       orgConfig,
       // No sender-based routing here: an attachment has no sender of its own.
       // A caller that knows this is a purchase order can force the right
       // template explicitly.
       templateId,
+    });
+
+    await recordOcrPagesProcessed({
+      organizationId,
+      pageCount,
+      source: 'ATTACHMENT',
+      sourceId: file.id,
+      triggeredById: userId,
+      existingUsageId,
     });
 
     const extracted: Record<string, unknown> = {};
