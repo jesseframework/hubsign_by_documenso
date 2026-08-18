@@ -101,13 +101,14 @@ stripe_ prices create \
 echo "  yearly price created: \$1,983.00/yr (flat)"
 
 echo
-echo "== Enterprise org seats — \$300/mo flat, \$2,988/yr (17% off), unlimited members, Repositories included =="
+echo "== Enterprise org seats — \$500/mo flat, \$4,980/yr (17% off), unlimited members, Repositories included =="
 echo "   (SHARED variant only — the only one the app's deployment ever looks up."
-echo "   Enterprise Dedicated has no priced figure and is not created here.)"
+echo "   Enterprise Dedicated now has a priced figure in the pricing doc (\$750/mo + setup)"
+echo "   but is sold via a sales conversation, not self-serve checkout — still not created here.)"
 
 ENTERPRISE_SEAT_PRODUCT_ID=$(stripe_ products create \
   --name "Enterprise Org Seat (Shared)" \
-  -d "description=Enterprise tier, shared deployment — unlimited members (min 2), 500 signature requests/mo, Repositories included free." \
+  -d "description=Enterprise tier, shared deployment — unlimited members (min 2), 1,000 signature requests/mo, Repositories included free." \
   -d "metadata[type]=org_seat" \
   -d "metadata[tier]=ENTERPRISE" \
   -d "metadata[deployment]=shared" \
@@ -117,19 +118,19 @@ echo "Product: $ENTERPRISE_SEAT_PRODUCT_ID"
 
 stripe_ prices create \
   -d "product=$ENTERPRISE_SEAT_PRODUCT_ID" \
-  -d "unit_amount=30000" \
+  -d "unit_amount=50000" \
   -d "currency=usd" \
   -d "recurring[interval]=month" \
   > /dev/null
-echo "  monthly price created: \$300.00/mo (flat — always bought at quantity 1)"
+echo "  monthly price created: \$500.00/mo (flat — always bought at quantity 1)"
 
 stripe_ prices create \
   -d "product=$ENTERPRISE_SEAT_PRODUCT_ID" \
-  -d "unit_amount=298800" \
+  -d "unit_amount=498000" \
   -d "currency=usd" \
   -d "recurring[interval]=year" \
   > /dev/null
-echo "  yearly price created: \$2,988.00/yr (flat)"
+echo "  yearly price created: \$4,980.00/yr (flat)"
 
 echo
 echo "== Signature request blocks — Team/Business/Enterprise overage, 17% off annually =="
@@ -161,7 +162,7 @@ echo "  yearly price created: \$249.00/yr (17% off \$25/mo)"
 
 BUSINESS_DOC_BLOCK_PRODUCT_ID=$(stripe_ products create \
   --name "Business Signature Request Block" \
-  -d "description=Business tier signature request block — +100 signature requests/mo, capped at 3 (450/mo total)." \
+  -d "description=Business tier signature request block — +100 signature requests/mo, capped at 6 (750/mo total)." \
   -d "metadata[type]=org_doc_block" \
   -d "metadata[tier]=BUSINESS" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
@@ -186,7 +187,7 @@ echo "  yearly price created: \$448.00/yr (17% off \$45/mo)"
 
 ENTERPRISE_DOC_BLOCK_PRODUCT_ID=$(stripe_ products create \
   --name "Enterprise Signature Request Block" \
-  -d "description=Enterprise (shared) tier signature request block — +250 signature requests/mo, capped at 4 (1,500/mo total). Never purchasable on a dedicated deployment (already unlimited)." \
+  -d "description=Enterprise (shared) tier signature request block — +250 signature requests/mo, capped at 4 (2,000/mo total). Never purchasable on a dedicated deployment (already unlimited)." \
   -d "metadata[type]=org_doc_block" \
   -d "metadata[tier]=ENTERPRISE" \
   | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")

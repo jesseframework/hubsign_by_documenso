@@ -129,11 +129,12 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     dmsEnabled: true,
     dmsAddonAvailable: false,
     flatRate: true,
-    // $45/mo per block. `maxDocBlocks: 3` is a real ceiling as of this
-    // change — Business previously stacked blocks unboundedly, which
-    // contradicted the pricing doc; corrected here, not a pre-existing rule.
+    // $45/mo per block, capped at 6 (750/mo total) — raised from 3 so
+    // Business runs to its own ceiling before Enterprise Shared's repriced
+    // $500/mo (was a 3-block/$300 ladder; see the pricing doc's "Why
+    // Enterprise Shared moved from $300 to $500").
     docBlockSize: 100,
-    maxDocBlocks: 3,
+    maxDocBlocks: 6,
     ocrPages: 1500,
   },
   ENTERPRISE: {
@@ -151,39 +152,49 @@ export const ORG_SEAT_TIERS: Record<OrgSeatTier, OrgTierLimits> = {
     docBlockSize: 250,
     maxDocBlocks: 4,
     // null = dedicated-deployment canonical value (unlimited) — see
-    // `resolveOrgTierOcrPages` for the shared-deployment override (5,000).
+    // `resolveOrgTierOcrPages` for the shared-deployment override (10,000).
     ocrPages: null,
   },
 };
 
 /**
  * Enterprise's document allowance is deployment-aware: the shared
- * multi-tenant instance (app.hubsign.io) meters it at 500/mo, matching what's
- * actually sold there; a dedicated single-tenant deployment (a separate
- * instance of this same codebase, per customer) stays unlimited —
+ * multi-tenant instance (app.hubsign.io) meters it at 1,000/mo (raised from
+ * 500 alongside the $300→$500 reprice — see the pricing doc's "Why
+ * Enterprise Shared moved from $300 to $500"), matching what's actually sold
+ * there; a dedicated single-tenant deployment (a separate instance of this
+ * same codebase, per customer) stays unlimited —
  * `ORG_SEAT_TIERS.ENTERPRISE.documents` above (`null`) is that dedicated/
  * canonical value. Must agree with the deployment-conditional Enterprise seat
  * *price* lookup (`GetOrgSeatPriceOptions.deployment`) — a shared instance
- * charging the 500/mo price while silently still granting unlimited documents
- * would be a real mismatch between what's sold and what's enforced.
+ * charging the $500/mo price while silently still granting the old 500/mo
+ * document allowance would be a real mismatch between what's sold and what's
+ * enforced.
  */
 export const resolveOrgTierDocuments = (
   tier: OrgSeatTier,
   deployment: 'shared' | 'dedicated' = DEPLOYMENT_TYPE(),
 ): number | null =>
-  tier === 'ENTERPRISE' && deployment === 'shared' ? 500 : ORG_SEAT_TIERS[tier].documents;
+  tier === 'ENTERPRISE' && deployment === 'shared' ? 1000 : ORG_SEAT_TIERS[tier].documents;
 
 /**
  * Smart OCR (BMS ML) page allowance, deployment-aware exactly like
- * `resolveOrgTierDocuments` — Enterprise Shared metrers OCR (bounds compute
- * exposure on shared infrastructure) while Enterprise Dedicated stays
- * genuinely unlimited (isolated infrastructure, cost is priced into the tier).
+ * `resolveOrgTierDocuments` — Enterprise Shared meters OCR at 10,000/mo
+ * (bounds compute exposure on shared infrastructure — "no practical limit"
+ * in customer-facing conversation, but a real number internally) while
+ * Enterprise Dedicated stays genuinely unlimited (isolated infrastructure,
+ * cost is priced into the tier). Cap *behavior* at 10,000 is still uniform
+ * soft-stop-and-queue with every other tier, per the product decision this
+ * was built to — see `getOrgOcrQuota`/the OCR runners; the pricing doc's own
+ * prose argues 10,000 should instead be alert-only/never pause ("a threshold
+ * nobody should reach"), which would be a real behavioral change from what's
+ * implemented, not just a number update — flagged, not silently applied.
  */
 export const resolveOrgTierOcrPages = (
   tier: OrgSeatTier,
   deployment: 'shared' | 'dedicated' = DEPLOYMENT_TYPE(),
 ): number | null =>
-  tier === 'ENTERPRISE' && deployment === 'shared' ? 5000 : ORG_SEAT_TIERS[tier].ocrPages;
+  tier === 'ENTERPRISE' && deployment === 'shared' ? 10000 : ORG_SEAT_TIERS[tier].ocrPages;
 
 /**
  * Whether a tier sells document-volume-overage blocks at all — derived from
