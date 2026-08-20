@@ -1127,14 +1127,27 @@ export const orgRouter = router({
 
       const org = membership.organization;
 
-      // An org can hold more than one tier at once now (mixed licensing,
-      // like Business + Enterprise M365 seats in one tenant) — so the
-      // question isn't "does the org have a plan" but two separate ones:
-      // does *this* tier already exist (top-up vs. establishing it), and
+      // One tier per org — switching between tiers goes through `changePlan`
+      // (prorated in place, see that mutation below), never by holding two
+      // tiers at once. Only a genuinely *different* tier is blocked here;
+      // topping up the org's existing tier (a doc-block purchase) or a
+      // brand-new org's first-ever purchase are unaffected.
+      const otherTierPlan = await prisma.orgSeatPlan.findFirst({
+        where: { organizationId: membership.organizationId, tier: { not: input.tier } },
+      });
+
+      if (otherTierPlan) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Your organization is already on the ${otherTierPlan.tier} plan. Use Change Plan to switch tiers.`,
+        });
+      }
+
+      // Does *this* tier already exist (top-up vs. establishing it), and
       // does the org have *any* subscription yet (modify it vs. first-ever
-      // Checkout). A brand-new tier added to an org that already has a
-      // subscription for a different tier still modifies that existing
-      // subscription (as a new item) rather than starting a second one.
+      // Checkout) — the guard above already ruled out a different tier
+      // existing, so this is purely "is this a repeat purchase of the same
+      // tier."
       const existingSeatPlan = await prisma.orgSeatPlan.findFirst({
         where: { organizationId: membership.organizationId, tier: input.tier },
       });

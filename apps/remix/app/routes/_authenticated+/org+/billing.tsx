@@ -214,10 +214,10 @@ function OrgBillingPage() {
   // row picks independently.
   const [giveSeatTier, setGiveSeatTier] = useState<Record<string, string>>({});
 
-  // An org can hold more than one tier at once now (mixed licensing, like
-  // Business + Enterprise seats in one org — see `purchaseSeats`), so
-  // "is this a top-up" depends on which tier is *currently selected* in the
-  // form, not whether the org has a plan at all.
+  // One tier per org — `purchaseSeats` rejects a genuinely different tier
+  // (switching goes through Change Plan instead, see `changePlan`), so once
+  // the org has any seat plan, `buyTier` is forced to match it (below) and
+  // `existingPlanForSelectedTier` always resolves to that same single plan.
   const hasAnySeatPlan = Boolean(seatPlans && seatPlans.length > 0);
   const existingPlanForSelectedTier = seatPlans?.find((p) => p.tier === buyTier);
   const isTopUpForSelectedTier = Boolean(existingPlanForSelectedTier);
@@ -229,8 +229,7 @@ function OrgBillingPage() {
   const dmsLockedOn = Boolean(existingPlanForSelectedTier?.dmsEnabled);
 
   // Billing interval is locked org-wide the moment *any* tier has been
-  // purchased — a single Stripe subscription can't mix monthly/yearly items
-  // across tiers, even if the tiers themselves can coexist.
+  // purchased — a single Stripe subscription can't mix monthly/yearly items.
   useEffect(() => {
     if (seatPlans && seatPlans.length > 0) {
       // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
@@ -238,17 +237,30 @@ function OrgBillingPage() {
     }
   }, [seatPlans]);
 
+  // One tier per org — once the org holds a tier, that's the only one
+  // `purchaseSeats` will accept (switching tiers goes through Change Plan
+  // instead, see `changePlan`). Force the picker to match rather than
+  // leaving `buyTier` pointed at whatever was last selected (or arrived via
+  // the `?plan=` CTA below), which a purchase attempt would just reject.
+  useEffect(() => {
+    if (seatPlans && seatPlans.length > 0) {
+      setBuyTier(seatPlans[0].tier);
+    }
+  }, [seatPlans]);
+
   // Arrived from a marketing-site plan CTA, forwarded here (via org
   // creation) with `?plan=<tier>` — preselect and open the purchase form
-  // rather than auto-charging, since seat quantity still needs user input.
-  // Waits for `seatPlans` to load so it doesn't reopen the form for a tier
-  // the org already holds.
+  // rather than auto-charging, since a genuinely fresh choice still needs
+  // confirming. Only meaningful for an org with **no** tier yet — once one
+  // exists, the effect above forces `buyTier` to it regardless, and
+  // switching tiers goes through Change Plan, not a fresh purchase, so the
+  // CTA param is ignored (still cleared from the URL) rather than trying to
+  // reopen the form for a tier the org can no longer buy.
   useEffect(() => {
     const plan = searchParams.get('plan')?.toUpperCase();
     if (!seatPlans || !plan || !(plan in TIER_CONFIG)) return;
 
-    const alreadyHasTier = seatPlans.some((p) => p.tier === plan);
-    if (!alreadyHasTier) {
+    if (seatPlans.length === 0) {
       setBuyTier(plan);
       setShowBuy(true);
     }
@@ -260,8 +272,11 @@ function OrgBillingPage() {
   // Keep quantity/DMS defaults in sync with whichever tier is currently
   // selected: topping up an existing tier resets to a single additional
   // seat mirroring its current DMS status; picking a tier with no plan yet
-  // resets to that tier's minimum. DMS is never auto-selected — it's a paid
-  // add-on on every tier now, not bundled into Enterprise.
+  // resets to that tier's minimum. DMS is never auto-selected via this
+  // checkbox — Business/Enterprise bundle it in automatically with no
+  // checkbox to select at all (see the Plan Tier form below); this only
+  // ever fires for a hypothetical future tier that sells it as a real,
+  // client-toggleable add-on.
   useEffect(() => {
     if (existingPlanForSelectedTier) {
       setBuyDms(existingPlanForSelectedTier.dmsEnabled);
@@ -364,11 +379,13 @@ function OrgBillingPage() {
     },
   });
 
-  // Switching an existing tier's plan in place (upgrade/downgrade and/or
-  // billing interval) — a separate action from purchasing a brand-new tier.
+  // Switching the org's one tier to a different tier and/or billing
+  // interval — the only way to move tiers now that an org can't hold two at
+  // once (see `purchaseSeats`'s one-tier-per-org guard). Kept keyed by
+  // `pendingChangePlan.tier` rather than assuming "the org's only plan" so
+  // the same dialog still works cleanly if that ever changes again.
   // `changeTargetTier`/`changeInterval` are seeded when the dialog opens and
-  // edited within it; `pendingChangePlan.tier` identifies which row's plan
-  // is being changed (an org can hold more than one tier at once).
+  // edited within it.
   const [pendingChangePlan, setPendingChangePlan] = useState<{ tier: string } | null>(null);
   const [changeTargetTier, setChangeTargetTier] = useState<string>('');
   const [changeInterval, setChangeInterval] = useState<OrgBillingInterval>('month');
@@ -483,17 +500,20 @@ function OrgBillingPage() {
     (m) => m.id !== membership.id && (m.role === 'ORG_ADMIN' || m.role === 'DMS_ADMIN'),
   );
 
-  // Tiers with at least one open seat — when there's more than one, "Give
-  // seat" needs to ask which tier rather than assuming the org's only one.
+  // Tiers with at least one open seat — an org can only ever hold one tier
+  // now (see `purchaseSeats`'s one-tier-per-org guard), so this resolves to
+  // at most a single entry in practice. Kept as a filtered list rather than
+  // a single lookup so "Give seat" still degrades safely (asks which tier,
+  // instead of guessing) if that ever changes again.
   const availableTiers = seatPlans?.filter((p) => p.assigned < p.quantity) ?? [];
 
   // Bulk-removal candidates — only members currently holding a seat have
   // anything to remove.
   const seatHoldingMembers = org.members.filter((m) => m.seatTier);
 
-  // Calculate totals — every tier still shares one `billingInterval` (a
-  // single Stripe subscription can't mix monthly/yearly items), even though
-  // an org can now hold more than one tier at once.
+  // Calculate totals — `seatPlans` holds at most one entry now (one tier
+  // per org), but this still sums over it rather than indexing `[0]`
+  // directly so nothing here has to change if that ever stops being true.
   //
   // "Total Seats"/"Available" are only meaningful for tiers with a real seat
   // *cap* — that's about headcount, not billing model, so it's keyed off
@@ -649,17 +669,24 @@ function OrgBillingPage() {
             <div className="flex flex-wrap items-end gap-3">
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground">Plan Tier</label>
-                {/* An org can hold more than one tier at once (mixed licensing) —
-                    always selectable, whether picking a tier to top up or a new
-                    one to add alongside whatever the org already has. */}
-                <select
-                  className="mt-1 block h-8 rounded-md border border-border bg-background px-2 text-[13px]"
-                  value={buyTier}
-                  onChange={(e) => setBuyTier(e.target.value as keyof typeof TIER_CONFIG)}
-                >
-                  {Object.entries(TIER_CONFIG).map(([tier, config]) => {
-                    const existingPlan = seatPlans?.find((p) => p.tier === tier);
-                    return (
+                {hasAnySeatPlan ? (
+                  // One tier per org — once a tier is purchased, this is
+                  // fixed. Switching tiers happens through the per-row
+                  // "Change plan" action (prorated in place), not by picking
+                  // a different one here — see `purchaseSeats`'s
+                  // one-tier-per-org guard and `changePlan`.
+                  <div className="mt-1 flex h-8 items-center rounded-md border border-border bg-muted px-2 text-[13px]">
+                    {TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.name} — $
+                    {monthlyEquivalentSeatPriceFor(pricing, buyTier, buyInterval)}
+                    {priceSuffix(TIER_CONFIG[buyTier as keyof typeof TIER_CONFIG]?.flatRate ?? false, 'month')}
+                  </div>
+                ) : (
+                  <select
+                    className="mt-1 block h-8 rounded-md border border-border bg-background px-2 text-[13px]"
+                    value={buyTier}
+                    onChange={(e) => setBuyTier(e.target.value as keyof typeof TIER_CONFIG)}
+                  >
+                    {Object.entries(TIER_CONFIG).map(([tier, config]) => (
                       <option key={tier} value={tier}>
                         {config.name} — ${monthlyEquivalentSeatPriceFor(pricing, tier, buyInterval)}
                         {priceSuffix(config.flatRate, 'month')} (
@@ -668,15 +695,13 @@ function OrgBillingPage() {
                           : `${docsForTier(tier)} signature requests`}
                         {config.flatRate
                           ? `, ${flatTierCapacityPhrase(config.maxSeats)}`
-                          : existingPlan
-                            ? `, ${existingPlan.quantity} seats active`
-                            : `, min ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}`}
+                          : `, min ${config.minSeats} seat${config.minSeats > 1 ? 's' : ''}`}
                         {!config.flatRate && config.maxSeats !== undefined && `, max ${config.maxSeats} seats`}
                         )
                       </option>
-                    );
-                  })}
-                </select>
+                    ))}
+                  </select>
+                )}
               </div>
               <div>
                 <label className="text-[12px] font-medium text-muted-foreground">Billing</label>
