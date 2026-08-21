@@ -555,11 +555,38 @@ function OrgBillingPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-semibold"><Trans>Organization Billing</Trans></h2>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
-          <Trans>Purchase seats and assign plans to members.</Trans>
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-lg font-semibold"><Trans>Organization Billing</Trans></h2>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">
+            <Trans>Purchase seats and assign plans to members.</Trans>
+          </p>
+        </div>
+
+        {isAdmin && hasAnySeatPlan && (
+          <Button
+            size="sm"
+            loading={manageBilling.isPending}
+            onClick={async () => {
+              const result = await manageBilling.mutateAsync();
+
+              if (result.url) {
+                window.open(result.url, '_blank');
+              } else {
+                toast({
+                  title: _(msg`Something went wrong`),
+                  description: _(
+                    msg`We are unable to proceed to the billing portal at this time. Please try again, or contact support.`,
+                  ),
+                  variant: 'destructive',
+                  duration: 10000,
+                });
+              }
+            }}
+          >
+            <Trans>Manage billing</Trans>
+          </Button>
+        )}
       </div>
 
       {isAdmin && <RedeemLicenseKeyCard organizationId={org.id} />}
