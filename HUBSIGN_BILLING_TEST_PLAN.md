@@ -161,17 +161,18 @@ a couple of manual steps to simulate "3 days before renewal"):
 
 ## Phase 3 — Approaching-limit warnings (80% threshold)
 
-**Updated 2026-08-19:** the free plan's real document quota is **3/month**, not 5 (and hasn't
-been 5 for a while) — 3 whole documents never lands cleanly on an 80% ratio either (2/3 ≈ 67%,
-3/3 = 100%), so the "4/5 = 80%" walkthrough below no longer works against Free as written. Use
-**Individual** instead for both the document and direct-template sub-tests — its
+**Updated 2026-08-19, corrected 2026-08-20:** the free plan's real document quota is **3/month**,
+not 5 (and hasn't been 5 for a while) — 3 whole documents never lands cleanly on an 80% ratio
+either (2/3 ≈ 67%, 3/3 = 100%), so the "4/5 = 80%" walkthrough below no longer works against Free
+as written. Use **Starter** instead for both the document and direct-template sub-tests — its
 `documents`/`directTemplates` test-mode metadata are already set to 5 each (see the "G8" gap and
 its fix in the "Known gaps"/"Additional one-time setup" sections further down, before Phase 12),
-so both sub-tests below work as written against a Free-tier account. Basic/Pro (referenced below
-and in the original Phase 4) no longer exist — replaced by the single Individual plan; subscribe
-to that instead wherever this phase says "Basic."
+so both sub-tests below work as written against a Free-tier account. (The 2026-08-19 note here
+originally claimed Plus/Pro — then still named Basic/Pro — "no longer exist." That was wrong, see
+Phase 4's 2026-08-20 correction: all three personal-tier plans are real. Plus/Pro just aren't
+needed for this specific 80%-threshold check, since Starter's metadata is already sized right.)
 
-**Documents** (Individual's `documents=5` — 4/5 = 80%, lands exactly on the threshold):
+**Documents** (Starter's `documents=5` — 4/5 = 80%, lands exactly on the threshold):
 1. [ ] Upload 3 documents this month. Hover the upload button / open the drop-zone — should
        still show plain "2 of 5 documents remaining" (not yet amber).
 2. [ ] Upload a 4th document. Now confirm:
@@ -184,31 +185,35 @@ to that instead wherever this phase says "Basic."
        from step 2 is gone (replaced by the red block).
 
 **Direct templates**: same problem on Free (quota of 3 never lands on 80%) — use the same
-Individual test account, with its `directTemplates` metadata sized to 5:
-1. [ ] Subscribe to **Individual** with `directTemplates=5` set on the test-mode product metadata.
+Starter test account, with its `directTemplates` metadata sized to 5:
+1. [ ] Subscribe to **Starter** with `directTemplates=5` set on the test-mode product metadata.
 2. [ ] Create 4 direct template links. Open the "Enable direct link signing" dialog on a 5th
        template — confirm the blue "Approaching your direct template limit (4/5)" alert appears.
 3. [ ] Create a 5th direct template link — confirm the existing hard-block alert replaces it.
 
 ---
 
-## Phase 4 — Individual plan restructure
+## Phase 4 — Individual (personal) plan restructure
 
 **Corrected 2026-08-20 — the 2026-08-19 update above was wrong.** Basic ($35/mo) and Pro ($50/mo)
 were **not** retired in favor of a single Individual plan — confirmed by screenshot during actual
 QA: all three (Individual $15/mo, Basic $35/mo, Pro $50/mo) are intentionally still sold side by
 side on `/settings/billing`, aimed at an individual user who wants more than the base tier without
-needing an org. Only their **names/copy** are flagged for future polish (more playful,
-individual-focused naming; clearer per-card benefit copy) — that's a product/copy decision, not
-something to fix here. Two real bugs found alongside this were fixed in code (not just this doc):
-the three cards were wrapping to a second row below ~1536px viewport width (a `2xl:grid-cols-3`
-breakpoint that was far too high — now `lg:grid-cols-3`), and downgrading to Individual was
-incorrectly showing "Free Plan" instead of "Individual" (a Price-vs-Product Stripe-metadata
+needing an org. Two real bugs found alongside this were fixed in code (not just this doc): the
+three cards were wrapping to a second row below ~1536px viewport width (a `2xl:grid-cols-3`
+breakpoint that was far too high — now `lg:grid-cols-3`), and downgrading to the $15/mo tier was
+incorrectly showing "Free Plan" instead of its real name (a Price-vs-Product Stripe-metadata
 mismatch in `getPricesByPlan` — see the metadata note in step 3 below).
 
+**Renamed 2026-08-20** — the "future polish" naming this doc previously flagged as out of scope
+happened: **Individual → Starter, Basic → Plus, Pro stays Pro.** This is a Stripe product-name
+change (`price.product.name`, read live everywhere these cards render), not a code change — no
+files were touched. Bullet copy on each card is unchanged, by explicit decision, for this pass.
+
 1. [ ] Go to `/settings/billing` on an account with no active subscription, at **normal browser
-       zoom (100%)** — confirm all **three** cards (Individual, Basic, Pro) fit in one row without
-       needing to zoom out. This is the regression check for the grid-layout fix above.
+       zoom (100%)** — confirm all **three** cards (**Starter**, **Plus**, **Pro** — not the old
+       Individual/Basic names) fit in one row without needing to zoom out. This is the regression
+       check for the grid-layout fix above, and the visible confirmation of the rename.
 2. [ ] Confirm each card's feature list matches whatever is currently set on that plan's Stripe
        product metadata (`documents`/`recipients`/`directTemplates`/`ocrPages`) — this is
        Product-level metadata, not Price-level (see G8/G13-style notes: a price that only carries
@@ -218,16 +223,16 @@ mismatch in `getPricesByPlan` — see the metadata note in step 3 below).
 3. [ ] Toggle the interval tabs (Monthly/Yearly) — confirm each card's yearly rate matches
        whatever's actually configured on the Stripe test Price (Stripe-price-authoritative, not
        hardcoded — don't assume `HubSign-Pricing-Plan.md`'s numbers are what's live in test mode).
-4. [ ] Subscribe to **Individual** with the test card — confirm the embedded checkout flow works
-       and you land back on the billing page showing you're subscribed to "Individual", with a
-       **"Current plan" badge** on the Individual card specifically (not silently falling back to
+4. [ ] Subscribe to **Starter** with the test card — confirm the embedded checkout flow works
+       and you land back on the billing page showing you're subscribed to "Starter", with a
+       **"Current plan" badge** on the Starter card specifically (not silently falling back to
        "Free Plan" — this is the direct regression check for the fixed bug).
-5. [ ] From an already-subscribed state (e.g. on Basic), open the plan switcher and **downgrade
-       to Individual** — confirm the page correctly shows "You are currently subscribed to
-       Individual" (not "Free Plan") and the Individual card carries the "Current plan" badge,
+5. [ ] From an already-subscribed state (e.g. on Plus), open the plan switcher and **downgrade
+       to Starter** — confirm the page correctly shows "You are currently subscribed to
+       Starter" (not "Free Plan") and the Starter card carries the "Current plan" badge,
        matching what the Stripe customer portal shows. This is the scenario that was broken.
-6. [ ] Confirm you can switch between all three tiers (Basic ↔ Pro ↔ Individual), not just
-       Basic ↔ Pro.
+6. [ ] Confirm you can switch between all three tiers (Plus ↔ Pro ↔ Starter), not just
+       Plus ↔ Pro.
 
 ---
 
@@ -253,8 +258,8 @@ flat-rate consolidation:
   mutations) — this postdates the original version of this phase entirely; see 5g.
 - DMS is bundled free into Business/Enterprise (`dmsEnabled: true`, no charge, no checkbox) —
   see 5e. Team never gets it. (Also see **G12** further down: this bundling is supposed to be
-  org-only — Individual/personal plans should still sell DMS as a real paid add-on, which is a
-  distinct, not-yet-re-verified code path from the org-level bundling described here.)
+  org-only — Starter/Plus/Pro (personal plans) should still sell DMS as a real paid add-on, which
+  is a distinct, not-yet-re-verified code path from the org-level bundling described here.)
 
 **5a. Tier picker only shows before any seats exist**
 1. [ ] On a **fresh org with zero seat plans**, click **Purchase Seats** — confirm the **Plan
@@ -274,7 +279,7 @@ flat-rate consolidation:
 
 **5c. Admin auto-assigned seat #1 on purchase**
 1. [ ] As the purchasing **ORG_ADMIN**, before purchasing seats, subscribe yourself to the
-       **Individual** plan via `/settings/billing` first — you want an active personal plan going
+       **Starter** plan via `/settings/billing` first — you want an active personal plan going
        into this step. *(Skip this step and the dialog in 5c.2 won't appear — you'll just get
        assigned seat #1 directly, which is also correct behavior, just less to check.)*
 2. [ ] Purchase a Business plan. Confirm an **AlertDialog** appears: "Cancel personal plan?"
@@ -295,7 +300,7 @@ flat-rate consolidation:
 2. [ ] Click **Give seat** for a member with **no** active personal plan — confirm it assigns
        immediately, no dialog, and the button changes to **"Remove seat"**.
 3. [ ] Click **Give seat** for a member who **does** have an active personal plan (subscribe a
-       test account to Individual first) — confirm the same cancel-with-credit `AlertDialog` from
+       test account to Starter first) — confirm the same cancel-with-credit `AlertDialog` from
        5c appears, this time naming that member's plan. Confirm, and verify their personal
        subscription is cancelled with a credit the same way.
 4. [ ] Click **Remove seat** for an assigned member — confirm it frees the seat immediately
@@ -551,8 +556,9 @@ a **Change Plan** (5g) moving a tier between Team and Business/Enterprise.
 
 ## Phase 11 — Admin subscriptions page removed
 
-Individual plan pricing is now covered by the updated **Phase 4** above (Basic/Pro no longer
-exist — see Phase 4's 2026-08-19 note) — this phase is just the admin page removal.
+Personal plan pricing (Starter/Plus/Pro, renamed from Individual/Basic/Pro — see Phase 4's
+2026-08-20 note) is now covered by the updated **Phase 4** above — this phase is just the admin
+page removal.
 
 1. [ ] As an admin, open the sidebar — confirm there is **no** "Subscriptions" link under the
        Admin section (Stats/Users/Documents/Leaderboard/Site Settings should still all be there).
@@ -576,11 +582,11 @@ here so nobody reports them as new bugs mid-run — they're the reason certain p
 | G5 | The org-level billing status has **no UI banner at all** (unlike the legacy Team model, which has `TeamLayoutBillingBanner`). `Organization.billingStatus` is checked in exactly two places: the stamps feature gate and license-key redemption. | `team-layout-billing-banner.tsx` (exists), no org equivalent | Phase 20's past-due/cancelled tests will show *no visible warning* — that's the current behavior to confirm, and the direct answer to "does the user get a banner": **no, not for orgs.** |
 | G6 | Cancelling an org's Stripe subscription (`onOrgSubscriptionDeleted`) clears `billingStatus`/`stripeSubscriptionId`/`seatCount` but does **not** clear members' `seatTier` or delete the `OrgSeatPlan` row. `getOrgSeatLimits` never reads `billingStatus` — only `seatTier`. | `on-org-subscription-deleted.ts`, `limits/server.ts` | A cancelled-via-Stripe org may keep full paid-tier quota indefinitely. Phase 20 tests this explicitly — expect it to fail the "access is revoked" assumption. |
 | G7 | `getServerLimits` short-circuits to fully unlimited (`SELFHOSTED_PLAN_LIMITS`) for **everyone** whenever `NEXT_PUBLIC_FEATURE_BILLING_ENABLED` is off — no restriction, no warning, at all. The moment it flips on, anyone with no assigned seat drops straight to Free limits (3 docs/mo) with **no grace period and no banner**. | `limits/server.ts:181-190`, `dms+/_layout.tsx` | This is the direct answer to the dedicated-instance-billing question — see Phase 22. |
-| G8 | The Individual ($15/mo) Stripe test/live product is created by `scripts/stripe-*-pricing-setup.sh` with only `metadata[plan]=regular` — no `documents`/`recipients`/`directTemplates`/`ocrPages` keys. `ZLimitsSchema` defaults missing fields to `0`. | `stripe-test-pricing-setup.sh:218-222`, `limits/schema.ts` | If nobody has set this metadata by hand in the Stripe dashboard, purchasing Individual grants **zero** quota — Phase 13 checks this first, before assuming the 15/mo number works. |
+| G8 | The **Starter** ($15/mo, named Individual until the 2026-08-20 rename) Stripe test/live product is created by `scripts/stripe-*-pricing-setup.sh` with only `metadata[plan]=regular` — no `documents`/`recipients`/`directTemplates`/`ocrPages` keys. `ZLimitsSchema` defaults missing fields to `0`. | `stripe-test-pricing-setup.sh:218-222`, `limits/schema.ts` | If nobody has set this metadata by hand in the Stripe dashboard, purchasing Starter grants **zero** quota — Phase 13 checks this first, before assuming the 15/mo number works. |
 | G9 | `sendDocument` (the actual "Send" action, sets `sentAt`) never re-checks quota — only document/template *creation* does. Usage is counted by `sentAt`, so a document created under quota can be sent later even if the org's quota was consumed elsewhere in between. | `document-router/router.ts` (`createDocument` checks; `sendDocument` doesn't) | Phase 12 includes one test for this specific ordering. |
 | G10 | The OCR queue-drain cron (`/api/cron/ocr-queue-drain`) is not wired into any scheduler in `render.yaml` — it only runs if something calls it. | `apps/remix/app/routes/api+/cron.ocr-queue-drain.ts` | Phase 16's drain test triggers it manually via `curl` with `NEXT_PRIVATE_CRON_SECRET` — don't wait for it to fire on its own. |
 | G11 | "Team" is an overloaded name in code: `ORG_SEAT_TIERS.TEAM` (the new $59/mo org tier under test here) vs. `TEAM_PLAN_LIMITS` (a legacy, unrelated, all-`Infinity` per-team subscription limit). | `limits/constants.ts` vs `org-tiers.ts` | Make sure every "Team" test case below is against an **org** on the `TEAM` seat tier, not a legacy Documenso Team. |
-| G12 | **Product requirement, flagged 2026-08-19, not yet verified either way:** DMS ("Repositories") bundling should apply **only to org plans** (Business/Enterprise — free, no separate charge). For every *other* plan (Individual, and any personal/no-org context) DMS must remain a **paid add-on**, not bundled and not simply unavailable. The personal add-on's infrastructure still exists in code (`subscription-addons.tsx`, `toggleSubscriptionAddon`, `STRIPE_PLAN_TYPE.DMS` in `settings+/billing.tsx`), but it hasn't been re-verified since the org side moved to bundled-free — confirm it still actually works end to end (price shows, Add/Remove toggles, `dmsEnabled` flips) rather than assuming Phase 6's original pass still holds. | `apps/remix/app/components/general/subscription-addons.tsx`, `packages/lib/server-only/user/toggle-subscription-addon.ts`, `apps/remix/app/routes/_authenticated+/settings+/billing.tsx` | Phase 6 already exercises this — treat its steps 1–2 as the primary verification of this gap, not just a regression check. If it's broken, this is a real fix, not just a stale-doc issue like G1–G11. |
+| G12 | **Product requirement, flagged 2026-08-19, not yet verified either way:** DMS ("Repositories") bundling should apply **only to org plans** (Business/Enterprise — free, no separate charge). For every *other* plan (Starter/Plus/Pro, and any personal/no-org context) DMS must remain a **paid add-on**, not bundled and not simply unavailable. The personal add-on's infrastructure still exists in code (`subscription-addons.tsx`, `toggleSubscriptionAddon`, `STRIPE_PLAN_TYPE.DMS` in `settings+/billing.tsx`), but it hasn't been re-verified since the org side moved to bundled-free — confirm it still actually works end to end (price shows, Add/Remove toggles, `dmsEnabled` flips) rather than assuming Phase 6's original pass still holds. | `apps/remix/app/components/general/subscription-addons.tsx`, `packages/lib/server-only/user/toggle-subscription-addon.ts`, `apps/remix/app/routes/_authenticated+/settings+/billing.tsx` | Phase 6 already exercises this — treat its steps 1–2 as the primary verification of this gap, not just a regression check. If it's broken, this is a real fix, not just a stale-doc issue like G1–G11. |
 
 ## Additional one-time setup for Phases 12–22
 
@@ -590,24 +596,31 @@ here so nobody reports them as new bugs mid-run — they're the reason certain p
    `.env.local`'s `NEXT_PRIVATE_CRON_SECRET` has been set for Phase 16's manual drain trigger.
    `NEXT_PUBLIC_FEATURE_BILLING_ENABLED=true` and `NEXT_PUBLIC_DEPLOYMENT_TYPE=shared` were
    already set. **Never merge this branch** — it exists only to run Phases 12–22 against.
-2. **G8 already fixed.** Confirmed real, not a false alarm — the Individual product
-   (`prod_V4s3XbkqCdtAQn`) had only `metadata.plan=regular`, no quota keys, meaning a real
-   Individual purchase granted `documents: 0` (`ZLimitsSchema`'s missing-field default) instead
-   of any usable quota. Fixed via the Stripe CLI: added `documents=5`, `recipients=10`,
-   `directTemplates=5`, `ocrPages=15`, `period=month` (test-sized; the real ones are 15/mo per
-   the pricing doc) to that product's existing metadata, `plan=regular` untouched.
-   `documents`/`directTemplates` were both deliberately set to **5** rather than two different
-   small numbers — Phase 3's approaching-limit-warning walkthrough needs a round 5 to land exactly
-   on the 4/5 = 80% threshold, and Phase 13 doesn't care about the specific value, just that it's
-   small and non-zero, so there was no reason to fight that. Nothing further needed before Phase
-   3 or 13 — this was a genuine production-test-mode gap, not just a testing convenience, so flag
-   it to the team for a real-numbers fix outside this branch too.
-   **Also noticed while in there**: a stale **Basic** product (`prod_UoaYzbvK97rPFW`, `documents:
-   50` etc.) is still active from the pre-Individual pricing model that Phase 11 above was
-   supposed to retire — `handleUserLimits` picks "the subscription with the highest quota" across
-   *all* active subscriptions, so if a test account ever ends up with both Basic and Individual
-   active, Basic's stale 50-doc quota silently wins over Individual's real one. Not touched here
-   (archiving Prices is a bigger, separate action) — worth a deliberate cleanup pass.
+2. **G8 already fixed.** Confirmed real, not a false alarm — the **Starter** product
+   (`prod_V4s3XbkqCdtAQn`, named Individual until the 2026-08-20 rename) had only
+   `metadata.plan=regular`, no quota keys, meaning a real Starter purchase granted `documents: 0`
+   (`ZLimitsSchema`'s missing-field default) instead of any usable quota. Fixed via the Stripe
+   CLI: added `documents=5`, `recipients=10`, `directTemplates=5`, `ocrPages=15`, `period=month`
+   (test-sized; the real ones are 15/mo per the pricing doc) to that product's existing metadata,
+   `plan=regular` untouched. `documents`/`directTemplates` were both deliberately set to **5**
+   rather than two different small numbers — Phase 3's approaching-limit-warning walkthrough
+   needs a round 5 to land exactly on the 4/5 = 80% threshold, and Phase 13 doesn't care about
+   the specific value, just that it's small and non-zero, so there was no reason to fight that.
+   Nothing further needed before Phase 3 or 13 — this was a genuine production-test-mode gap, not
+   just a testing convenience, so flag it to the team for a real-numbers fix outside this branch
+   too.
+   **Correction, 2026-08-20:** the note originally here called `prod_UoaYzbvK97rPFW` (**Plus**,
+   named Basic until the rename) a "stale leftover from the pre-Individual pricing model" that
+   Phase 11 was "supposed to retire" — that was wrong, built on the same incorrect premise Phase
+   4's 2026-08-19 update had (that Basic/Pro no longer exist). Plus is a real, currently-sold
+   tier with real production quota metadata (`documents: 50` etc.), not stale data to archive.
+   The one true thing in the original note stands on its own, though, and is still worth
+   testing deliberately: `handleUserLimits` picks "the subscription with the highest quota"
+   across *all* of a user's active subscriptions — so a test account that somehow ends up with
+   both Starter and Plus active simultaneously will silently show Plus's higher quota, not
+   Starter's. Not a bug (a user genuinely subscribed to two personal tiers at once is an edge
+   case, not the normal path), but worth a deliberate test case in Phase 4 or 13 if that
+   scenario matters to you.
 3. Phases 18 and 22 require flipping `NEXT_PUBLIC_DEPLOYMENT_TYPE` / `NEXT_PUBLIC_FEATURE_BILLING_ENABLED`
    in `.env.local` and restarting the dev server — `env()` reads `process.env` at request time but
    the value is captured at process start, so a restart is required for either to take effect.
@@ -640,16 +653,16 @@ gets from `FREE_PLAN_LIMITS`.
 
 ---
 
-## Phase 13 — Individual ($15/mo) tier limits
+## Phase 13 — Starter ($15/mo, renamed from Individual) tier limits
 
 1. [ ] Complete the Stripe metadata prerequisite in setup step 2 above first — this phase is
        meaningless without it (confirms/refutes G8).
-2. [ ] Subscribe a test account to Individual with the test card.
+2. [ ] Subscribe a test account to Starter with the test card.
 3. [ ] Confirm the sidebar usage indicator now shows the metadata-configured quota (5 in the test
        setup above), not still 3 (Free) and not 0 (the G8 failure mode).
-4. [ ] Repeat the document/recipient/template cap checks from Phase 12 against Individual's
+4. [ ] Repeat the document/recipient/template cap checks from Phase 12 against Starter's
        numbers.
-5. [ ] Confirm Individual's OCR allowance reflects the `ocrPages` metadata value, not Free's 30.
+5. [ ] Confirm Starter's OCR allowance reflects the `ocrPages` metadata value, not Free's 30.
 
 ---
 
@@ -734,7 +747,7 @@ hold as described, not re-deriving them.
 | API key creation | Individual: API only; Free/Team: no; Business+: yes | Universal, zero gating | [ ] Confirm a Free account can create an API token. |
 | Embedding (create doc/template via API) | Same column as API | Universal, zero gating | [ ] Confirm a Free account's API token can create an embedding document. |
 | Embedding (presign token / signing iframe) | Same column as API | Gated by legacy Community/Enterprise Stripe plan, unrelated to org tier | [ ] Confirm this is gated by the *legacy* plan check, not by org seat tier — attempt with an org on Enterprise seat tier but no legacy Stripe Enterprise price attached, confirm it's still blocked (`EmbedPaywall` stub). |
-| DMS (Repositories) | Business+/Enterprise only | **Correctly gated** — the one feature that matches the doc | [ ] Confirm Free/Individual/Team all show the upgrade-prompt card at `/dms`, and confirm the `dmsEntitledMiddleware` tRPC guard (not just the UI) rejects a direct API call — replay a `dms.*` tRPC request via dev tools from a non-entitled account, confirm `FORBIDDEN`. |
+| DMS (Repositories) | Business+/Enterprise only | **Correctly gated** — the one feature that matches the doc | [ ] Confirm Free, any personal plan (Starter/Plus/Pro), and Team all show the upgrade-prompt card at `/dms`, and confirm the `dmsEntitledMiddleware` tRPC guard (not just the UI) rejects a direct API call — replay a `dms.*` tRPC request via dev tools from a non-entitled account, confirm `FORBIDDEN`. |
 | Webhooks, Public API v1, Zapier, Teams integration, custom branding, SLA tracking, custom reporting | Not explicitly fenced in pricing doc | Universal | [ ] Spot-check 2–3 of these on Free to confirm still accessible (lower priority than the rows above — these were never claimed as fenced). |
 
 ---
@@ -881,6 +894,7 @@ billing logic — it's purely an external deploy tool).
 - **After Phases 12–22 specifically**: discard the `qa/plan-limits-testing` branch entirely —
   never merge the `QA-TEST-VALUE`-tagged edits in `org-tiers.ts`. Revert `.env.local`'s
   `NEXT_PUBLIC_DEPLOYMENT_TYPE`/`NEXT_PUBLIC_FEATURE_BILLING_ENABLED` to their pre-Phase-18/22
-  values if you changed them mid-run. If you added test metadata to the Stripe Individual
-  product for G8 and it wasn't there originally, decide with the team whether to leave it (it's
-  currently a real gap in production test mode, not just a testing convenience) or revert it.
+  values if you changed them mid-run. If you added test metadata to the Stripe Starter (formerly
+  Individual) product for G8 and it wasn't there originally, decide with the team whether to
+  leave it (it's currently a real gap in production test mode, not just a testing convenience)
+  or revert it.
