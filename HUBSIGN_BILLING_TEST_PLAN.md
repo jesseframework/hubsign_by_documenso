@@ -194,27 +194,40 @@ Individual test account, with its `directTemplates` metadata sized to 5:
 
 ## Phase 4 — Individual plan restructure
 
-**Updated 2026-08-19 — superseded, not just re-priced:** Basic ($35/mo) and Pro ($50/mo) don't
-exist anymore at all. They were replaced by a single **Individual** plan ($15/mo, per
-`HubSign-Pricing-Plan.md`) — there's nothing to switch *between* on the individual side today, so
-step 6 below no longer applies to anything. Rewritten for the current one-plan lineup; see Phase
-13 (further down) for Individual's actual document/recipient/OCR quota testing — this phase now
-only covers the plan-card/checkout mechanics, not the numbers.
+**Corrected 2026-08-20 — the 2026-08-19 update above was wrong.** Basic ($35/mo) and Pro ($50/mo)
+were **not** retired in favor of a single Individual plan — confirmed by screenshot during actual
+QA: all three (Individual $15/mo, Basic $35/mo, Pro $50/mo) are intentionally still sold side by
+side on `/settings/billing`, aimed at an individual user who wants more than the base tier without
+needing an org. Only their **names/copy** are flagged for future polish (more playful,
+individual-focused naming; clearer per-card benefit copy) — that's a product/copy decision, not
+something to fix here. Two real bugs found alongside this were fixed in code (not just this doc):
+the three cards were wrapping to a second row below ~1536px viewport width (a `2xl:grid-cols-3`
+breakpoint that was far too high — now `lg:grid-cols-3`), and downgrading to Individual was
+incorrectly showing "Free Plan" instead of "Individual" (a Price-vs-Product Stripe-metadata
+mismatch in `getPricesByPlan` — see the metadata note in step 3 below).
 
-1. [ ] Go to `/settings/billing` on an account with no active subscription.
-2. [ ] Confirm exactly **one** plan card shows: **Individual** ($15/mo) — no Basic, Pro, or
-       "Dedicated Instance" card.
-3. [ ] Confirm the card's feature list matches whatever is currently set on the Individual
-       Stripe product's metadata (`documents`/`recipients`/`directTemplates`/`ocrPages` —
-       see the G8 note further down: this metadata was missing entirely as of 2026-08-19 and had
-       to be added by hand for testing to mean anything).
-4. [ ] Toggle the interval tabs (Monthly/Yearly) — confirm the yearly rate matches whatever
-       discount is currently configured on the Stripe test Price (per `HubSign-Pricing-Plan.md`
-       §4, Individual should be 20% off annually — $12/mo, $144/yr — but this is Stripe-price-
-       authoritative, not hardcoded, so confirm against what's actually live in test mode rather
-       than assuming the doc's number is what's configured).
-5. [ ] Subscribe to **Individual** with the test card — confirm the embedded checkout flow works
-       and you land back on the billing page showing you're subscribed to "Individual".
+1. [ ] Go to `/settings/billing` on an account with no active subscription, at **normal browser
+       zoom (100%)** — confirm all **three** cards (Individual, Basic, Pro) fit in one row without
+       needing to zoom out. This is the regression check for the grid-layout fix above.
+2. [ ] Confirm each card's feature list matches whatever is currently set on that plan's Stripe
+       product metadata (`documents`/`recipients`/`directTemplates`/`ocrPages`) — this is
+       Product-level metadata, not Price-level (see G8/G13-style notes: a price that only carries
+       this tag at one level and gets checked against the other silently breaks plan detection —
+       exactly what happened with the "shows Free after downgrade" bug, now fixed in
+       `get-prices-by-plan.ts`).
+3. [ ] Toggle the interval tabs (Monthly/Yearly) — confirm each card's yearly rate matches
+       whatever's actually configured on the Stripe test Price (Stripe-price-authoritative, not
+       hardcoded — don't assume `HubSign-Pricing-Plan.md`'s numbers are what's live in test mode).
+4. [ ] Subscribe to **Individual** with the test card — confirm the embedded checkout flow works
+       and you land back on the billing page showing you're subscribed to "Individual", with a
+       **"Current plan" badge** on the Individual card specifically (not silently falling back to
+       "Free Plan" — this is the direct regression check for the fixed bug).
+5. [ ] From an already-subscribed state (e.g. on Basic), open the plan switcher and **downgrade
+       to Individual** — confirm the page correctly shows "You are currently subscribed to
+       Individual" (not "Free Plan") and the Individual card carries the "Current plan" badge,
+       matching what the Stripe customer portal shows. This is the scenario that was broken.
+6. [ ] Confirm you can switch between all three tiers (Basic ↔ Pro ↔ Individual), not just
+       Basic ↔ Pro.
 
 ---
 
