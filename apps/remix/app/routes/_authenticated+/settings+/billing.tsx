@@ -41,15 +41,39 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // Org seat limits supersede personal subscription limits entirely (see
   // `getServerLimits`), regardless of context or whether a seat is even
-  // assigned yet — so personal billing is genuinely irrelevant for any org
-  // member, not just once they're seated. Skip the Stripe/price fetching
-  // below and point them at Organization > Billing instead.
+  // assigned yet — so the full plan-switcher/add-ons UI below is genuinely
+  // irrelevant for any org member, not just once they're seated. Skip that
+  // Stripe/price fetching and point them at Organization > Billing instead.
+  //
+  // Still check for a still-*active* personal subscription, though — joining
+  // or creating an org doesn't cancel one (only actually being assigned a
+  // seat does, via `assignSeatToMember`'s conflict dialog) — this page used
+  // to hide that fact unconditionally, leaving an org member with no way to
+  // see a personal plan that was still silently billing them.
   const orgMembership = await prisma.organizationMember.findFirst({
     where: { userId: user.id },
   });
 
   if (orgMembership) {
-    return superLoaderJson({ isOrgManaged: true as const });
+    const [orgManagedSubscriptions, orgManagedPrimaryPlanPrices] = await Promise.all([
+      getSubscriptionsByUserId({ userId: user.id }),
+      getPrimaryAccountPlanPrices(),
+    ]);
+
+    const orgManagedPrimaryPlanPriceIds = orgManagedPrimaryPlanPrices.map(({ id }) => id);
+
+    const activePersonalSubscription = orgManagedSubscriptions.find(
+      ({ status, priceId }) =>
+        status === SubscriptionStatus.ACTIVE && orgManagedPrimaryPlanPriceIds.includes(priceId),
+    );
+
+    const activePersonalPlanName = activePersonalSubscription
+      ? await getProductByPriceId({ priceId: activePersonalSubscription.priceId })
+          .then((product) => product?.name ?? null)
+          .catch(() => null)
+      : null;
+
+    return superLoaderJson({ isOrgManaged: true as const, activePersonalPlanName });
   }
 
   if (!user.customerId) {
@@ -174,6 +198,23 @@ export default function TeamsSettingBillingPage() {
             </Link>
           </Trans>
         </p>
+
+        {data.activePersonalPlanName && (
+          <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border p-3">
+            <p className="text-sm">
+              <Trans>
+                You still have an active{' '}
+                <span className="font-semibold">{data.activePersonalPlanName}</span> personal
+                plan, separate from your organization's billing — it isn't cancelled
+                automatically until you're assigned an organization seat.
+              </Trans>
+            </p>
+
+            <BillingPortalButton buttonProps={{ size: 'sm', variant: 'outline' }}>
+              <Trans>Manage</Trans>
+            </BillingPortalButton>
+          </div>
+        )}
       </div>
     );
   }
@@ -284,6 +325,7 @@ export default function TeamsSettingBillingPage() {
                 prices={addonPrices}
                 activePriceIds={activeAddonPriceIds}
                 currentInterval={subscriptionInterval}
+                currentPrice={currentPrice}
               />
             </>
           )}
