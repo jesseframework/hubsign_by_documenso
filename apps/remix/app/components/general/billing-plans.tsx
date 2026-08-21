@@ -121,7 +121,7 @@ export const BillingPlans = ({ prices, autoSubscribe }: BillingPlansProps) => {
         </TabsList>
       </Tabs>
 
-      <div className="mt-8 grid gap-8 lg:grid-cols-2 2xl:grid-cols-3">
+      <div className="mt-8 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
         <AnimatePresence mode="wait">
           {prices[interval].map((price) => (
             <MotionCard
