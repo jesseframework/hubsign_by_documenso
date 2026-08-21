@@ -1,7 +1,7 @@
 import type { TLimitsSchema } from './schema';
 
 export const FREE_PLAN_LIMITS: TLimitsSchema = {
-  documents: 3,
+  documents: 5,
   recipients: 10,
   directTemplates: 3,
   dmsEnabled: false,

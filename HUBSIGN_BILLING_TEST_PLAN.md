@@ -161,18 +161,17 @@ a couple of manual steps to simulate "3 days before renewal"):
 
 ## Phase 3 — Approaching-limit warnings (80% threshold)
 
-**Updated 2026-08-19, corrected 2026-08-20:** the free plan's real document quota is **3/month**,
-not 5 (and hasn't been 5 for a while) — 3 whole documents never lands cleanly on an 80% ratio
-either (2/3 ≈ 67%, 3/3 = 100%), so the "4/5 = 80%" walkthrough below no longer works against Free
-as written. Use **Starter** instead for both the document and direct-template sub-tests — its
-`documents`/`directTemplates` test-mode metadata are already set to 5 each (see the "G8" gap and
-its fix in the "Known gaps"/"Additional one-time setup" sections further down, before Phase 12),
-so both sub-tests below work as written against a Free-tier account. (The 2026-08-19 note here
-originally claimed Plus/Pro — then still named Basic/Pro — "no longer exist." That was wrong, see
-Phase 4's 2026-08-20 correction: all three personal-tier plans are real. Plus/Pro just aren't
-needed for this specific 80%-threshold check, since Starter's metadata is already sized right.)
+**Updated 2026-08-19, corrected/re-updated 2026-08-20:** the free plan's document quota went
+3 → **5** on 2026-08-20 (a real production-value change, made alongside setting Starter's real
+quota to **20/mo** — see G8's update below; the `5` you'll see quoted around this doc elsewhere
+for Starter was only ever a QA test placeholder, since replaced). Free's new 5 lands cleanly on
+an 80% ratio (4/5) again, so the **document** sub-test below now works directly against a
+fresh Free account — no Starter subscription needed for it anymore. Direct templates are
+unaffected (Free's real value is still 3, which still never lands on 80%), so that sub-test
+still needs Starter, whose `directTemplates` test metadata remains sized to 5 for exactly this
+reason.
 
-**Documents** (Starter's `documents=5` — 4/5 = 80%, lands exactly on the threshold):
+**Documents** (Free's real `documents=5` — 4/5 = 80%, lands exactly on the threshold):
 1. [ ] Upload 3 documents this month. Hover the upload button / open the drop-zone — should
        still show plain "2 of 5 documents remaining" (not yet amber).
 2. [ ] Upload a 4th document. Now confirm:
@@ -184,9 +183,9 @@ needed for this specific 80%-threshold check, since Starter's metadata is alread
        Exceeded!" alert, disabled dropzone) still takes over correctly, and the amber warning
        from step 2 is gone (replaced by the red block).
 
-**Direct templates**: same problem on Free (quota of 3 never lands on 80%) — use the same
-Starter test account, with its `directTemplates` metadata sized to 5:
-1. [ ] Subscribe to **Starter** with `directTemplates=5` set on the test-mode product metadata.
+**Direct templates**: Free's quota of 3 never lands on 80% (2/3 ≈ 67%, 3/3 = 100%) — use a
+Starter test account instead, with its `directTemplates` metadata sized to 5:
+1. [ ] Subscribe to **Starter** (its `directTemplates=5` test metadata is already set — see G8).
 2. [ ] Create 4 direct template links. Open the "Enable direct link signing" dialog on a 5th
        template — confirm the blue "Approaching your direct template limit (4/5)" alert appears.
 3. [ ] Create a 5th direct template link — confirm the existing hard-block alert replaces it.
@@ -581,8 +580,8 @@ here so nobody reports them as new bugs mid-run — they're the reason certain p
 | G4 | Custom domain and custom SMTP have **no functional implementation** at all — `domain` is a stored-but-unused field, SMTP is one global sender for the whole deployment. | `HubSign-Feature-Catalog.md` §2 | Nothing to test in-app for these — Dedicated's "custom domain, SSO, SMTP" claim is infra-level ops work, not app behavior. Note in Phase 18 and move on. |
 | G5 | The org-level billing status has **no UI banner at all** (unlike the legacy Team model, which has `TeamLayoutBillingBanner`). `Organization.billingStatus` is checked in exactly two places: the stamps feature gate and license-key redemption. | `team-layout-billing-banner.tsx` (exists), no org equivalent | Phase 20's past-due/cancelled tests will show *no visible warning* — that's the current behavior to confirm, and the direct answer to "does the user get a banner": **no, not for orgs.** |
 | G6 | Cancelling an org's Stripe subscription (`onOrgSubscriptionDeleted`) clears `billingStatus`/`stripeSubscriptionId`/`seatCount` but does **not** clear members' `seatTier` or delete the `OrgSeatPlan` row. `getOrgSeatLimits` never reads `billingStatus` — only `seatTier`. | `on-org-subscription-deleted.ts`, `limits/server.ts` | A cancelled-via-Stripe org may keep full paid-tier quota indefinitely. Phase 20 tests this explicitly — expect it to fail the "access is revoked" assumption. |
-| G7 | `getServerLimits` short-circuits to fully unlimited (`SELFHOSTED_PLAN_LIMITS`) for **everyone** whenever `NEXT_PUBLIC_FEATURE_BILLING_ENABLED` is off — no restriction, no warning, at all. The moment it flips on, anyone with no assigned seat drops straight to Free limits (3 docs/mo) with **no grace period and no banner**. | `limits/server.ts:181-190`, `dms+/_layout.tsx` | This is the direct answer to the dedicated-instance-billing question — see Phase 22. |
-| G8 | The **Starter** ($15/mo, named Individual until the 2026-08-20 rename) Stripe test/live product is created by `scripts/stripe-*-pricing-setup.sh` with only `metadata[plan]=regular` — no `documents`/`recipients`/`directTemplates`/`ocrPages` keys. `ZLimitsSchema` defaults missing fields to `0`. | `stripe-test-pricing-setup.sh:218-222`, `limits/schema.ts` | If nobody has set this metadata by hand in the Stripe dashboard, purchasing Starter grants **zero** quota — Phase 13 checks this first, before assuming the 15/mo number works. |
+| G7 | `getServerLimits` short-circuits to fully unlimited (`SELFHOSTED_PLAN_LIMITS`) for **everyone** whenever `NEXT_PUBLIC_FEATURE_BILLING_ENABLED` is off — no restriction, no warning, at all. The moment it flips on, anyone with no assigned seat drops straight to Free limits (5 docs/mo, raised from 3 on 2026-08-20) with **no grace period and no banner**. | `limits/server.ts:181-190`, `dms+/_layout.tsx` | This is the direct answer to the dedicated-instance-billing question — see Phase 22. |
+| G8 | The **Starter** ($15/mo, named Individual until the 2026-08-20 rename) Stripe test/live product is created by `scripts/stripe-*-pricing-setup.sh` with only `metadata[plan]=regular` — no `documents`/`recipients`/`directTemplates`/`ocrPages` keys. `ZLimitsSchema` defaults missing fields to `0`. | `stripe-test-pricing-setup.sh:218-222`, `limits/schema.ts` | If nobody has set this metadata by hand in the Stripe dashboard, purchasing Starter grants **zero** quota — Phase 13 checks this first. `documents` now has a confirmed real value (**20/mo**, set 2026-08-20); `recipients`/`directTemplates`/`ocrPages` are still QA test placeholders, not real numbers yet. |
 | G9 | `sendDocument` (the actual "Send" action, sets `sentAt`) never re-checks quota — only document/template *creation* does. Usage is counted by `sentAt`, so a document created under quota can be sent later even if the org's quota was consumed elsewhere in between. | `document-router/router.ts` (`createDocument` checks; `sendDocument` doesn't) | Phase 12 includes one test for this specific ordering. |
 | G10 | The OCR queue-drain cron (`/api/cron/ocr-queue-drain`) is not wired into any scheduler in `render.yaml` — it only runs if something calls it. | `apps/remix/app/routes/api+/cron.ocr-queue-drain.ts` | Phase 16's drain test triggers it manually via `curl` with `NEXT_PRIVATE_CRON_SECRET` — don't wait for it to fire on its own. |
 | G11 | "Team" is an overloaded name in code: `ORG_SEAT_TIERS.TEAM` (the new $59/mo org tier under test here) vs. `TEAM_PLAN_LIMITS` (a legacy, unrelated, all-`Infinity` per-team subscription limit). | `limits/constants.ts` vs `org-tiers.ts` | Make sure every "Team" test case below is against an **org** on the `TEAM` seat tier, not a legacy Documenso Team. |
@@ -621,6 +620,14 @@ here so nobody reports them as new bugs mid-run — they're the reason certain p
    Starter's. Not a bug (a user genuinely subscribed to two personal tiers at once is an edge
    case, not the normal path), but worth a deliberate test case in Phase 4 or 13 if that
    scenario matters to you.
+   **Second correction, 2026-08-20 (same day):** Starter's `documents` value above has since
+   moved from the test-sized `5` to a **real** `20/mo` — a genuine product decision, made
+   alongside raising Free's real quota from 3 to **5/mo** at the same time
+   (`FREE_PLAN_LIMITS.documents` in `packages/ee/server-only/limits/constants.ts`, a real code
+   change, not `QA-TEST-VALUE`-tagged). The "why 5, to land 4/5=80%" reasoning above no longer
+   applies to Starter — Free's own new 5 now serves that exact role instead (see Phase 3's
+   2026-08-20 update). `recipients`, `directTemplates`, and `ocrPages` on Starter are still the
+   original test placeholders from this fix, not real numbers.
 3. Phases 18 and 22 require flipping `NEXT_PUBLIC_DEPLOYMENT_TYPE` / `NEXT_PUBLIC_FEATURE_BILLING_ENABLED`
    in `.env.local` and restarting the dev server — `env()` reads `process.env` at request time but
    the value is captured at process start, so a restart is required for either to take effect.
@@ -632,12 +639,17 @@ here so nobody reports them as new bugs mid-run — they're the reason certain p
 Free is not org-based — it's what an account with no org membership and no active subscription
 gets from `FREE_PLAN_LIMITS`.
 
+**Updated 2026-08-20**: Free's real document quota is now **5/mo**, raised from 3 (a deliberate
+product decision, made alongside setting Starter's real quota to 20/mo — see G8's update
+further down). `packages/ee/server-only/limits/constants.ts`'s `FREE_PLAN_LIMITS.documents` was
+changed directly (not a `QA-TEST-VALUE` — this is real).
+
 1. [ ] On a fresh account with no org and no subscription, confirm the sidebar usage indicator
-       shows **3 documents/mo**, **30 Smart OCR pages/mo** (Free's real values — not shrunk, see
+       shows **5 documents/mo**, **30 Smart OCR pages/mo** (Free's real values — not shrunk, see
        setup step 1).
-2. [ ] Create and send 3 documents this month. Confirm the 4th attempt is blocked with the
+2. [ ] Create and send 5 documents this month. Confirm the 6th attempt is blocked with the
        existing "Document Limit Exceeded" UI (same hard-block already verified in Phase 3 above —
-       just confirm the number is still 3, not something else).
+       just confirm the number is now 5, not the old 3 or anything else).
 3. [ ] Confirm recipient cap is 10/document (add signers up to 10, confirm the 11th is blocked
        client-side; per Phase 1 above, also replay the tRPC call with 11+ via dev tools to confirm
        the server-side block too).
@@ -655,14 +667,20 @@ gets from `FREE_PLAN_LIMITS`.
 
 ## Phase 13 — Starter ($15/mo, renamed from Individual) tier limits
 
+**Updated 2026-08-20**: Starter's real `documents` metadata is now **20/mo** (product decision,
+set directly on the live Stripe product — not a QA test value). `recipients` (10),
+`directTemplates` (5), and `ocrPages` (15) are still the earlier QA test-sized placeholders from
+G8's fix, not real numbers yet — only `documents` has a confirmed real value so far.
+
 1. [ ] Complete the Stripe metadata prerequisite in setup step 2 above first — this phase is
        meaningless without it (confirms/refutes G8).
 2. [ ] Subscribe a test account to Starter with the test card.
-3. [ ] Confirm the sidebar usage indicator now shows the metadata-configured quota (5 in the test
-       setup above), not still 3 (Free) and not 0 (the G8 failure mode).
-4. [ ] Repeat the document/recipient/template cap checks from Phase 12 against Starter's
-       numbers.
-5. [ ] Confirm Starter's OCR allowance reflects the `ocrPages` metadata value, not Free's 30.
+3. [ ] Confirm the sidebar usage indicator now shows **20 documents/mo** (not still 5 — Free's
+       new value — and not 0, the original G8 failure mode).
+4. [ ] Repeat the recipient/template cap checks from Phase 12 against Starter's numbers (10
+       recipients, 5 direct templates — still test-sized, see the note above).
+5. [ ] Confirm Starter's OCR allowance reflects the `ocrPages` metadata value (15, still
+       test-sized), not Free's 30.
 
 ---
 
@@ -856,8 +874,8 @@ billing logic — it's purely an external deploy tool).
 1. [ ] Flip `NEXT_PUBLIC_FEATURE_BILLING_ENABLED=true`. Restart (this is the equivalent of ops
        updating the env var on a real Komodo stack and redeploying/restarting the container).
 2. [ ] **Without** granting any org/user a seat tier or subscription, confirm the same
-       previously-unlimited user now immediately shows **Free tier limits** (3 docs/mo) — no
-       grace period, no transition window.
+       previously-unlimited user now immediately shows **Free tier limits** (5 docs/mo, raised
+       from 3 on 2026-08-20) — no grace period, no transition window.
 3. [ ] Confirm there is **no proactive notification of any kind** — no banner, no email, no toast
        — telling the user their access just changed. The only way to discover it is hitting the
        new, much lower cap on the next document/template creation attempt, or checking the sidebar
