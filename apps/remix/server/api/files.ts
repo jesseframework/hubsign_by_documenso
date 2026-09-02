@@ -14,8 +14,16 @@ import {
   sanitizeSupportingFileName,
   validateSupportingFile,
 } from '@documenso/lib/server-only/document/supporting-file-types';
-import { getFileServerSide } from '@documenso/lib/universal/upload/get-file.server';
+import { runAttachmentOcr } from '@documenso/lib/server-only/inbox/run-attachment-ocr';
+import { decryptPdf } from '@documenso/lib/server-only/pdf/decrypt-pdf';
 import { getApiTokenByToken } from '@documenso/lib/server-only/public-api/get-api-token-by-token';
+import { readOcrField } from '@documenso/lib/universal/ocr-fields';
+import {
+  PDF_PASSWORD_REQUIRED_CODE,
+  PdfPasswordRequiredError,
+} from '@documenso/lib/universal/pdf-errors';
+import { stripFieldLabel } from '@documenso/lib/universal/reference-number';
+import { getFileServerSide } from '@documenso/lib/universal/upload/get-file.server';
 import { putFileServerSide } from '@documenso/lib/universal/upload/put-file.server';
 import {
   getPresignGetUrl,
@@ -23,12 +31,7 @@ import {
 } from '@documenso/lib/universal/upload/server-actions';
 import { prisma } from '@documenso/prisma';
 
-import { runAttachmentOcr } from '@documenso/lib/server-only/inbox/run-attachment-ocr';
-import { readOcrField } from '@documenso/lib/universal/ocr-fields';
-import { stripFieldLabel } from '@documenso/lib/universal/reference-number';
-
 import type { HonoEnv } from '../router';
-
 import { buildSignedResponse } from './files.helpers';
 import {
   type TGetPresignedGetUrlResponse,
@@ -108,6 +111,49 @@ const readAttachmentQuietly = async ({
 };
 
 export const filesRoute = new Hono<HonoEnv>()
+  /**
+   * Strips the encryption from a PDF that opens without a password and returns
+   * the unlocked bytes.
+   *
+   * The browser can render these files (pdf.js decrypts them) but can't merge
+   * or stamp them, because pdf-lib has no decryption support. MuPDF only runs
+   * server side, so the client posts the file here whenever `PDFDocument.load`
+   * rejects it as encrypted.
+   */
+  .post('/decrypt-pdf', sValidator('form', ZUploadPdfRequestSchema), async (c) => {
+    const session = await getOptionalSession(c.req.raw);
+
+    if (!session.isAuthenticated) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const { file } = c.req.valid('form');
+
+    if (!file) {
+      return c.json({ error: 'No file provided' }, 400);
+    }
+
+    if (file.size > APP_DOCUMENT_UPLOAD_SIZE_LIMIT * 1024 * 1024) {
+      return c.json({ error: 'File too large' }, 400);
+    }
+
+    try {
+      const decrypted = await decryptPdf(new Uint8Array(await file.arrayBuffer()));
+
+      return c.body(decrypted.buffer as ArrayBuffer, 200, {
+        'Content-Type': 'application/pdf',
+        'Content-Length': String(decrypted.byteLength),
+      });
+    } catch (error) {
+      if (error instanceof PdfPasswordRequiredError) {
+        return c.json({ error: error.message, code: PDF_PASSWORD_REQUIRED_CODE }, 400);
+      }
+
+      console.error('PDF decrypt failed:', error);
+
+      return c.json({ error: 'Could not read this PDF' }, 400);
+    }
+  })
   /**
    * Uploads a document file to the appropriate storage location and creates
    * a document data record.

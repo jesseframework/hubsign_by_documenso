@@ -16,6 +16,9 @@
  * Pure, so the parsing rules can be reasoned about without a database.
  */
 
+import type { DateOrder } from './ocr-date';
+import { detectDateOrder, parseOcrDateValue } from './ocr-date';
+
 /**
  * Applied to a new vendor record, and to any record whose code will not parse.
  *
@@ -194,6 +197,7 @@ export const resolveDueDate = ({
   invoiceTerms,
   arrivedAt,
   termsCode,
+  dateOrder = null,
   now = new Date(),
 }: {
   ocrDueDate?: string | Date | null;
@@ -202,6 +206,12 @@ export const resolveDueDate = ({
   invoiceTerms?: string | null;
   arrivedAt?: Date | null;
   termsCode?: string | null;
+  /**
+   * How to read an all-numeric date whose order the value itself cannot settle.
+   * Only `03/04/2026`-shaped values ever consult it; everything else proves its
+   * own order. Null means such a value is discarded rather than guessed at.
+   */
+  dateOrder?: DateOrder | null;
   now?: Date;
 }): ResolvedDueDate => {
   const pastDue = (dueAt: Date, basis: DueDateBasis): ResolvedDueDate => ({
@@ -212,8 +222,14 @@ export const resolveDueDate = ({
     daysPastDue: Math.floor((startOfUtcDay(now) - startOfUtcDay(dueAt)) / DAY_MS),
   });
 
-  const stated = toDate(ocrDueDate);
-  const issued = toDate(invoiceDate);
+  // Let the invoice settle its own ambiguity before anything external does. A
+  // page whose invoice date reads `18/05/2026` was printed day-first, so its
+  // `03/04/2026` due date is 3 April — one field on a document is the best
+  // available evidence for how the next one on the same document is written.
+  const order = dateOrder ?? detectDateOrder(invoiceDate) ?? detectDateOrder(ocrDueDate);
+
+  const stated = parseOcrDateValue(ocrDueDate, order);
+  const issued = parseOcrDateValue(invoiceDate, order);
   const echoed = stated !== null && issued !== null && startOfUtcDay(stated) === startOfUtcDay(issued);
 
   if (stated && !echoed) {
@@ -251,54 +267,4 @@ const startOfUtcDay = (value: Date): number => {
   const date = new Date(value);
   date.setUTCHours(0, 0, 0, 0);
   return date.getTime();
-};
-
-/**
- * Parse a date that came out of OCR.
- *
- * Two forms are accepted, and the line between them is whether the month is
- * stated in letters:
- *
- *   - ISO `YYYY-MM-DD` (with or without a time), which is what most extraction
- *     templates emit.
- *   - Anything containing a month NAME — "June 29, 2026", "07 Jun 2026" — parsed
- *     by the platform. Real invoices in this deployment carry both.
- *
- * All-numeric slash and dot forms are deliberately refused. `03/04/2026` is 3
- * April or 4 March depending on which country printed the invoice, and choosing
- * one would make every invoice from the other silently a month wrong in the
- * direction that matters — a month early looks paid on time, a month late starts
- * a dunning letter. Falling through to the vendor's terms is the honest answer.
- */
-const toDate = (value: string | Date | null | undefined): Date | null => {
-  if (!value) {
-    return null;
-  }
-
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value;
-  }
-
-  const text = value.trim();
-  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(text);
-
-  if (iso) {
-    const parsed = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00.000Z`);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  // A month name makes the order unambiguous however the rest is arranged.
-  if (/[a-z]{3}/i.test(text)) {
-    const parsed = new Date(text);
-
-    if (!Number.isNaN(parsed.getTime())) {
-      // Normalised to a UTC midnight so a date read as local time cannot shift a
-      // day either side of the boundary and change the count.
-      return new Date(
-        Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate(), 0, 0, 0, 0),
-      );
-    }
-  }
-
-  return null;
 };

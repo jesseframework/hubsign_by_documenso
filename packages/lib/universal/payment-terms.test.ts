@@ -159,6 +159,46 @@ describe('resolveDueDate', () => {
     expect(iso(result.dueAt)).toBe('2026-08-31');
   });
 
+  it('uses a numeric due date instead of falling through to the terms code', () => {
+    // The regression that mattered most: this invoice states its due date, and
+    // the calculation used to discard it for being written with slashes and
+    // report the terms-derived 2026-04-29 instead — a date printed nowhere.
+    const result = resolveDueDate({
+      ocrDueDate: '15/05/2026',
+      invoiceDate: '30/03/2026',
+      termsCode: '30d',
+      now,
+    });
+
+    expect(result.basis).toBe('invoice');
+    expect(iso(result.dueAt)).toBe('2026-05-15');
+    expect(result.daysPastDue).toBe(91);
+  });
+
+  it('lets the invoice date settle an ambiguous due date on the same page', () => {
+    // 18/05 can only be day-first, so 03/06 on the same document is 3 June.
+    const result = resolveDueDate({
+      ocrDueDate: '03/06/2026',
+      invoiceDate: '18/05/2026',
+      now,
+    });
+
+    expect(result.basis).toBe('invoice');
+    expect(iso(result.dueAt)).toBe('2026-06-03');
+  });
+
+  it('falls through to terms when nothing on the page settles the order', () => {
+    const result = resolveDueDate({
+      ocrDueDate: '03/06/2026',
+      invoiceDate: '03/04/2026',
+      termsCode: '30d',
+      dateOrder: null,
+      now,
+    });
+
+    expect(result.basis).toBe('none');
+  });
+
   it('reports nothing rather than guessing when there is nothing to go on', () => {
     const result = resolveDueDate({ invoiceDate: '2026-07-18', now });
 

@@ -81,8 +81,9 @@ ACTIONS (the "config" of an ACTION step; allowed action values: ${WORKFLOW_ACTIO
 - LOOKUP_METADATA:      { "action":"LOOKUP_METADATA", "category":"vendor", "key":"{{payload.extractedData.vendor_name}}", "saveAs":"vendor" }
   (Looks up an org metadata record and stores the match in a run variable. Two modes:
    • EXACT: pass "key" (a template) to match a record's name, e.g. the vendor name.
-   • KEYWORD: OMIT "key" to match records by their keywords against the invoice's OCR fields — best for "trigger a sign request by keyword", e.g. { "action":"LOOKUP_METADATA", "category":"signee", "saveAs":"signer" } finds the signee whose keyword appears anywhere in the OCR data. Optionally pass "keywordText" to scan specific text.
-   After it runs, later steps read {{vars.<saveAs>.found}}, {{vars.<saveAs>.email}}, {{vars.<saveAs>.contactName}}, {{vars.<saveAs>.role}}, {{vars.<saveAs>.matchedKeyword}}. Typical flow: LOOKUP_METADATA(signee, keyword) → CONDITION on {{vars.signer.found}} → SEND_FOR_SIGNATURE to {{vars.signer.email}}. Chain steps with "next".)
+   • KEYWORD: OMIT "key" to match records by their keywords against the invoice's OCR fields — best for "trigger a sign request by keyword", e.g. { "action":"LOOKUP_METADATA", "category":"signee", "saveAs":"signer" } finds the signee whose keyword appears anywhere in the OCR data. Optionally pass "keywordText" to scan specific text. Keywords match whole words only.
+     Add "searchDocumentText": true to also scan the document's FULL OCR text rather than only the ~15 extracted fields — use it when the keyword the user describes is not one of the extracted fields (a project code, a site name, a phrase like "net 30"). Inbox events only.
+   After it runs, later steps read {{vars.<saveAs>.found}}, {{vars.<saveAs>.email}}, {{vars.<saveAs>.contactName}}, {{vars.<saveAs>.role}}, {{vars.<saveAs>.matchedKeyword}}, and — when several records matched — {{vars.<saveAs>.ambiguous}} / {{vars.<saveAs>.matchCount}}. Typical flow: LOOKUP_METADATA(signee, keyword) → CONDITION on {{vars.signer.found}} → SEND_FOR_SIGNATURE to {{vars.signer.email}}. Chain steps with "next".)
 
 JSONLOGIC (for conditions/branches/assignments) — examples:
   { "==": [ { "var": "PATH" }, "value" ] }              equals

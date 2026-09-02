@@ -1,4 +1,6 @@
 import { ocrFieldNames } from '../utils/ocr-fields';
+import type { DateOrder } from './ocr-date';
+import { parseOcrDateValue } from './ocr-date';
 import type { OcrCanonicalField } from './ocr-fields';
 import { readOcrField } from './ocr-fields';
 
@@ -127,32 +129,15 @@ export const parseAmount = (raw: string): number | null => {
  * Parse an OCR date value into a real Date, for spreadsheet cells that should
  * sort and filter as dates rather than as text.
  *
- * Returns null when the value is not a date the runtime recognises; the caller
- * writes the original string instead, because a date the extractor produced in
- * some unexpected format is still information worth exporting.
+ * Delegates to the shared parser rather than carrying its own, which it used to.
+ * The two disagreed: this one handed anything non-ISO to `new Date()`, so
+ * `03/04/2026` exported as 4 March — the runtime's convention, not the invoice's
+ * — while the overdue calculation discarded the same value. One number was a
+ * guess and the other was absent, and nothing on either screen said so.
+ *
+ * Returns null when the value is not a date that can be read without guessing;
+ * the caller writes the original string instead, because a date the extractor
+ * produced in some unexpected format is still information worth exporting.
  */
-export const parseOcrDate = (raw: string): Date | null => {
-  if (!raw) return null;
-
-  // Anchor the common ISO-ish prefix at midnight UTC rather than letting the
-  // runtime apply the server's timezone, which would shift 2026-06-12 to the
-  // 11th for anyone west of Greenwich.
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) {
-    const parsed = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00.000Z`);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return null;
-
-  // "06/01/2026" and "June 1, 2026" parse to midnight in the *server's*
-  // timezone, which is a different calendar day in UTC for anyone east of
-  // Greenwich — a June 1 invoice would export as May 31. Rebuild date-only
-  // values at UTC midnight so the day survives the trip into the spreadsheet.
-  if (parsed.getHours() === 0 && parsed.getMinutes() === 0 && parsed.getSeconds() === 0) {
-    return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
-  }
-
-  return parsed;
-};
+export const parseOcrDate = (raw: string, order: DateOrder | null = null): Date | null =>
+  parseOcrDateValue(raw, order);

@@ -8,6 +8,8 @@ import {
   parseAmount,
   parseOcrDate,
 } from '../../../universal/inbox-invoice-fields';
+import type { DateOrder } from '../../../universal/ocr-date';
+import { detectDateOrder } from '../../../universal/ocr-date';
 import {
   DEFAULT_VENDOR_MATCH_THRESHOLD,
   matchVendorName,
@@ -66,6 +68,21 @@ const fetchItems = async (where: Prisma.SignatureInboxItemWhereInput) =>
   });
 
 const text = (value: string) => (value === '' ? null : value);
+
+/**
+ * How to read an all-numeric date on THIS invoice, inferred from the invoice's
+ * own fields.
+ *
+ * Both date cells consult it, and the overdue calculation infers it the same way
+ * from the same two fields, so a `03/04/2026` that the dashboard reads as 3 April
+ * cannot land in the spreadsheet as 4 March. The two used to disagree on exactly
+ * this value, which is a difference nobody catches until they reconcile the sheet
+ * against the screen.
+ */
+const ocrDateOrder = (item: { extractedData?: unknown }): DateOrder | null => {
+  const fields = invoiceFields(item);
+  return detectDateOrder(fields.invoiceDate) ?? detectDateOrder(fields.dueDate);
+};
 
 /** Newest-first list of every OCR key present in this org's extracted data. */
 const discoverOcrKeys = async (organizationId: number): Promise<string[]> => {
@@ -311,7 +328,7 @@ const staticColumns = (): ExportColumnDef<InboxExportRow>[] => [
     isDefault: true,
     read: (r) => {
       const raw = invoiceFields(r.item).invoiceDate;
-      return parseOcrDate(raw) ?? text(raw);
+      return parseOcrDate(raw, ocrDateOrder(r.item)) ?? text(raw);
     },
   },
   {
@@ -322,7 +339,7 @@ const staticColumns = (): ExportColumnDef<InboxExportRow>[] => [
     isDefault: true,
     read: (r) => {
       const raw = invoiceFields(r.item).dueDate;
-      return parseOcrDate(raw) ?? text(raw);
+      return parseOcrDate(raw, ocrDateOrder(r.item)) ?? text(raw);
     },
   },
 
