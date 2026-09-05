@@ -11,6 +11,7 @@ import { useAnalytics } from '@documenso/lib/client-only/hooks/use-analytics';
 import { useOptionalSession } from '@documenso/lib/client-only/providers/session';
 import { AppError } from '@documenso/lib/errors/app-error';
 import type { DocumentAndSender } from '@documenso/lib/server-only/document/get-document-by-token';
+import type { VendorSpendMeter } from '@documenso/lib/server-only/document/vendor-spend-meter';
 import type { TRecipientActionAuth } from '@documenso/lib/types/document-auth';
 import { isFieldUnsignedAndRequired } from '@documenso/lib/utils/advanced-fields-helpers';
 import { sortFieldsByPosition, validateFieldsInserted } from '@documenso/lib/utils/fields';
@@ -33,6 +34,7 @@ import { DocumentSigningCompleteDialog } from './document-signing-complete-dialo
 import { useRequiredDocumentSigningContext } from './document-signing-provider';
 import type { SupportingFile } from './supporting-file-upload';
 import { SupportingFileUpload } from './supporting-file-upload';
+import { VendorSpendMeterPanel } from './vendor-spend-meter-panel';
 
 export type DocumentSigningFormProps = {
   document: DocumentAndSender;
@@ -42,6 +44,8 @@ export type DocumentSigningFormProps = {
   isRecipientsTurn: boolean;
   allRecipients?: RecipientWithFields[];
   setSelectedSignerId?: (id: number | null) => void;
+  /** Org-member-only vendor spend context; null means show nothing. */
+  spendMeter?: VendorSpendMeter | null;
 };
 
 export const DocumentSigningForm = ({
@@ -52,6 +56,7 @@ export const DocumentSigningForm = ({
   isRecipientsTurn,
   allRecipients = [],
   setSelectedSignerId,
+  spendMeter = null,
 }: DocumentSigningFormProps) => {
   const { sessionData } = useOptionalSession();
   const user = sessionData?.user;
@@ -194,7 +199,7 @@ export const DocumentSigningForm = ({
   return (
     <div
       className={cn(
-        'dark:bg-background border-border bg-widget sticky flex h-full flex-col rounded-xl border px-4 py-6',
+        'border-border bg-card sticky flex h-full flex-col rounded-[var(--r-lg)] border p-5',
         {
           'top-20 max-h-[min(68rem,calc(100vh-6rem))]': user,
           'top-4 max-h-[min(68rem,calc(100vh-2rem))]': !user,
@@ -209,28 +214,28 @@ export const DocumentSigningForm = ({
 
       <div className="custom-scrollbar -mx-2 flex flex-1 flex-col overflow-y-auto overflow-x-hidden px-2">
         <div className="flex flex-1 flex-col">
-          <h3 className="text-foreground text-2xl font-semibold">
+          <h2 className="text-foreground text-[15px] font-semibold tracking-tight">
             {recipient.role === RecipientRole.VIEWER && <Trans>View Document</Trans>}
             {recipient.role === RecipientRole.SIGNER && <Trans>Sign Document</Trans>}
             {recipient.role === RecipientRole.APPROVER && <Trans>Approve Document</Trans>}
             {recipient.role === RecipientRole.ASSISTANT && <Trans>Assist Document</Trans>}
-          </h3>
+          </h2>
 
           {recipient.role === RecipientRole.VIEWER ? (
             <>
-              <p className="text-muted-foreground mt-2 text-sm">
+              <p className="text-muted-foreground mt-1 text-[13px]">
                 <Trans>Please mark as viewed to complete</Trans>
               </p>
 
-              <hr className="border-border mb-8 mt-4" />
+              <hr className="border-border my-4" />
 
               <div className="-mx-2 flex flex-1 flex-col gap-4 overflow-y-auto px-2">
                 <div className="flex flex-1 flex-col gap-y-4" />
                 <div className="flex flex-col gap-4 md:flex-row">
                   <Button
                     type="button"
-                    className="dark:bg-muted dark:hover:bg-muted/80 w-full bg-black/5 hover:bg-black/10"
-                    variant="secondary"
+                    className="border-border w-full"
+                    variant="outline"
                     size="lg"
                     disabled={typeof window !== 'undefined' && window.history.length <= 1}
                     onClick={async () => navigate(-1)}
@@ -272,7 +277,7 @@ export const DocumentSigningForm = ({
           ) : recipient.role === RecipientRole.ASSISTANT ? (
             <>
               <form onSubmit={assistantForm.handleSubmit(onAssistantFormSubmit)}>
-                <p className="text-muted-foreground mt-2 text-sm">
+                <p className="text-muted-foreground mt-1 text-[13px] leading-relaxed">
                   <Trans>
                     Complete the fields for the following signers. Once reviewed, they will inform
                     you if any modifications are needed.
@@ -281,7 +286,7 @@ export const DocumentSigningForm = ({
 
                 <hr className="border-border my-4" />
 
-                <fieldset className="dark:bg-background border-border rounded-2xl border bg-white p-3">
+                <fieldset className="border-border bg-muted/40 rounded-[var(--r)] border p-3">
                   <Controller
                     name="selectedSignerId"
                     control={assistantForm.control}
@@ -300,7 +305,7 @@ export const DocumentSigningForm = ({
                           .map((r) => (
                             <div
                               key={`${assistantSignersId}-${r.id}`}
-                              className="bg-widget border-border relative flex flex-col gap-4 rounded-lg border p-4"
+                              className="bg-card border-border relative flex flex-col gap-4 rounded-[var(--r-sm)] border p-3"
                             >
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
@@ -312,7 +317,7 @@ export const DocumentSigningForm = ({
 
                                   <div className="grid grow gap-1">
                                     <Label
-                                      className="inline-flex items-start"
+                                      className="inline-flex items-start text-[13px]"
                                       htmlFor={`${assistantSignersId}-${r.id}`}
                                     >
                                       {r.name}
@@ -368,7 +373,7 @@ export const DocumentSigningForm = ({
           ) : (
             <>
               <div>
-                <p className="text-muted-foreground mt-2 text-sm">
+                <p className="text-muted-foreground mt-1 text-[13px]">
                   {recipient.role === RecipientRole.APPROVER && !hasSignatureField ? (
                     <Trans>Please review the document before approving.</Trans>
                   ) : (
@@ -376,7 +381,18 @@ export const DocumentSigningForm = ({
                   )}
                 </p>
 
-                <hr className="border-border mb-8 mt-4" />
+                {/*
+                  Before the form, not after it: this is context for the decision
+                  to sign, and below the signature pad it would be read — if at
+                  all — only after that decision was made.
+                */}
+                {spendMeter && (
+                  <div className="mt-4">
+                    <VendorSpendMeterPanel meter={spendMeter} />
+                  </div>
+                )}
+
+                <hr className="border-border my-4" />
 
                 <fieldset
                   disabled={isSubmitting}
@@ -384,14 +400,14 @@ export const DocumentSigningForm = ({
                 >
                   <div className="flex flex-1 flex-col gap-y-4">
                     <div>
-                      <Label htmlFor="full-name">
+                      <Label htmlFor="full-name" className="text-[13px]">
                         <Trans>Full Name</Trans>
                       </Label>
 
                       <Input
                         type="text"
                         id="full-name"
-                        className="bg-background mt-2"
+                        className="border-border bg-background mt-1.5 h-9 text-[13px]"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value.trimStart())}
                       />
@@ -411,12 +427,12 @@ export const DocumentSigningForm = ({
 
                     {hasSignatureField && (
                       <div>
-                        <Label htmlFor="Signature">
+                        <Label htmlFor="Signature" className="text-[13px]">
                           <Trans>Signature</Trans>
                         </Label>
 
                         <SignaturePadDialog
-                          className="mt-2"
+                          className="border-border mt-1.5 rounded-[var(--r)]"
                           disabled={isSubmitting}
                           value={signature ?? ''}
                           onChange={(v) => setSignature(v ?? '')}
@@ -432,8 +448,8 @@ export const DocumentSigningForm = ({
                 <div className="mt-6 flex flex-col gap-4 md:flex-row">
                   <Button
                     type="button"
-                    className="dark:bg-muted dark:hover:bg-muted/80 w-full bg-black/5 hover:bg-black/10"
-                    variant="secondary"
+                    className="border-border w-full"
+                    variant="outline"
                     size="lg"
                     disabled={typeof window !== 'undefined' && window.history.length <= 1}
                     onClick={async () => navigate(-1)}

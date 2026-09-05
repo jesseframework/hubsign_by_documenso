@@ -47,6 +47,7 @@ import {
   TrophyIcon,
   UploadCloudIcon,
   UserCogIcon,
+  SparklesIcon,
   UserIcon,
   Users2Icon,
   UsersIcon,
@@ -204,6 +205,9 @@ export const PRIMARY_NAV: NavItem[] = [
   },
   { to: '/templates', icon: FileTextIcon, label: <Trans>Templates</Trans>, teamScoped: true },
   { to: '/tasks', icon: CheckSquareIcon, label: <Trans>Tasks</Trans>, surface: 'tasks' },
+  // Aubrey AI — decoupled from the DMS add-on, available to every member. Also
+  // reachable anywhere via the global floating button.
+  { to: '/aubrey', icon: BotIcon, label: <Trans>Aubrey AI</Trans> },
 ];
 
 /** The one genuine sidebar submenu: utilities you run, rather than places you go. */
@@ -221,7 +225,6 @@ export const TOOLS_NAV: NavItem[] = [
     label: <Trans>Exports</Trans>,
     requiresOrg: true,
   },
-  { to: '/dms/ai', icon: BotIcon, label: <Trans>AI Agent</Trans>, requiresDms: true },
 ];
 
 export const TOOLS_ITEM: NavItem = {
@@ -381,6 +384,16 @@ export const SETTINGS_CONSOLE: ConsoleDef = {
           to: '/org/billing',
           icon: CreditCardIcon,
           label: <Trans>Billing & Plan</Trans>,
+          roles: ORG_ADMIN_ONLY,
+        },
+        // Its own entry rather than a card on Billing. Seats are a recurring
+        // subscription and credits are a consumable pool bought in packs; they
+        // are read at different times by the same admin, and the pool has a
+        // history worth its own screen.
+        {
+          to: '/org/ai-credits',
+          icon: SparklesIcon,
+          label: <Trans>AI Credits</Trans>,
           roles: ORG_ADMIN_ONLY,
         },
         {

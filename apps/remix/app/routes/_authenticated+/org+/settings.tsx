@@ -10,8 +10,9 @@ import { Button } from '@documenso/ui/primitives/button';
 import { Input } from '@documenso/ui/primitives/input';
 import { useToast } from '@documenso/ui/primitives/use-toast';
 
-import { appMetaTags } from '~/utils/meta';
 import { OrgAdminGuard } from '~/components/general/org-admin-guard';
+import { RealtimeMailCard } from '~/components/general/realtime-mail-card';
+import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
   return appMetaTags('Organization Settings');
@@ -48,6 +49,18 @@ function OrgSettingsPage() {
   const utils = trpc.useUtils();
 
   const { data: membership, isLoading } = trpc.org.getMyOrganization.useQuery();
+
+  /**
+   * The vendor fields that can hold a spend limit.
+   *
+   * Only NUMBER, and only on the vendor category: the meter divides by this
+   * figure, and a TEXT field reading "net 30" would make every invoice
+   * infinitely over budget.
+   */
+  const { data: metadataFields } = trpc.metadata.listFields.useQuery();
+  const vendorNumberFields = (metadataFields ?? []).filter(
+    (field) => field.category === 'vendor' && field.type === 'NUMBER',
+  );
 
   const [createName, setCreateName] = useState('');
   const [createSlug, setCreateSlug] = useState('');
@@ -90,6 +103,12 @@ function OrgSettingsPage() {
   // until somebody pressed Save.
   const [slaSigningHours, setSlaSigningHours] = useState('');
   const [slaInitialized, setSlaInitialized] = useState(false);
+
+  // Spend meter — vendor spend against a limit, shown while signing.
+  const [spendMeterEnabled, setSpendMeterEnabled] = useState(false);
+  const [spendMeterField, setSpendMeterField] = useState('');
+  const [spendMeterDays, setSpendMeterDays] = useState('90');
+  const [spendMeterInitialized, setSpendMeterInitialized] = useState(false);
 
   const [includeCertificate, setIncludeCertificate] = useState(true);
   const [certificateInitialized, setCertificateInitialized] = useState(false);
@@ -142,43 +161,59 @@ function OrgSettingsPage() {
   });
 
   if (isLoading) {
-    return <div className="py-12 text-center text-muted-foreground">Loading...</div>;
+    return <div className="text-muted-foreground py-12 text-center">Loading...</div>;
   }
 
   // No organization yet — show create form
   if (!membership) {
     return (
       <div className="space-y-4">
-        <div className="rounded-[var(--r)] border border-border bg-card p-6">
+        <div className="border-border bg-card rounded-[var(--r)] border p-6">
           <div className="mx-auto max-w-md text-center">
-            <BuildingIcon className="mx-auto mb-4 h-12 w-12 text-primary/30" />
-            <h2 className="text-xl font-semibold"><Trans>Create an Organization</Trans></h2>
-            <p className="mt-2 text-[13px] text-muted-foreground">
-              <Trans>Organizations let you share the Document Manager across your team with role-based permissions.</Trans>
+            <BuildingIcon className="text-primary/30 mx-auto mb-4 h-12 w-12" />
+            <h2 className="text-xl font-semibold">
+              <Trans>Create an Organization</Trans>
+            </h2>
+            <p className="text-muted-foreground mt-2 text-[13px]">
+              <Trans>
+                Organizations let you share the Document Manager across your team with role-based
+                permissions.
+              </Trans>
             </p>
 
             <div className="mt-6 space-y-3 text-left">
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">Organization Name</label>
+                <label className="text-muted-foreground text-[12px] font-medium">
+                  Organization Name
+                </label>
                 <Input
                   className="mt-1"
                   placeholder="e.g. Acme Corporation"
                   value={createName}
                   onChange={(e) => {
                     setCreateName(e.target.value);
-                    setCreateSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''));
+                    setCreateSlug(
+                      e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '-')
+                        .replace(/^-|-$/g, ''),
+                    );
                   }}
                 />
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">URL Slug</label>
+                <label className="text-muted-foreground text-[12px] font-medium">URL Slug</label>
                 <Input
                   className="mt-1"
                   placeholder="acme-corp"
                   value={createSlug}
-                  onChange={(e) => setCreateSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                  onChange={(e) =>
+                    setCreateSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
+                  }
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">hubsign.io/org/{createSlug || '...'}</p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  hubsign.io/org/{createSlug || '...'}
+                </p>
               </div>
               <Button
                 className="w-full"
@@ -205,7 +240,11 @@ function OrgSettingsPage() {
     setBrandAccent(org.brandingAccentColor || '#f59e0b');
     setBrandSidebarBg(org.brandingSidebarBg || '#0d0d10');
     setBrandSidebarText(org.brandingSidebarTextColor || '#f4f2ff');
-    setBrandNavActive((org as Record<string, unknown>).brandingNavActiveColor as string || org.brandingPrimaryColor || '#7c5cfc');
+    setBrandNavActive(
+      ((org as Record<string, unknown>).brandingNavActiveColor as string) ||
+        org.brandingPrimaryColor ||
+        '#7c5cfc',
+    );
     setBrandLogoUrl(org.brandingLogo || '');
     setBrandButtonColor(org.brandingButtonColor || '#7c5cfc');
     setBrandButtonHover(org.brandingButtonHoverColor || '#6a4af0');
@@ -222,7 +261,9 @@ function OrgSettingsPage() {
     const orgRec = org as Record<string, unknown>;
     setReminderEnabled(Boolean(orgRec.signReminderEnabled));
     setReminderDays(typeof orgRec.signReminderDays === 'number' ? orgRec.signReminderDays : 3);
-    setReminderMaxCount(typeof orgRec.signReminderMaxCount === 'number' ? orgRec.signReminderMaxCount : 3);
+    setReminderMaxCount(
+      typeof orgRec.signReminderMaxCount === 'number' ? orgRec.signReminderMaxCount : 3,
+    );
     setRemindersInitialized(true);
   }
 
@@ -234,17 +275,35 @@ function OrgSettingsPage() {
     if (Array.isArray(days) && days.length) setSlaWorkingDays(days as number[]);
     setSlaWorkdayStart((orgRec.slaWorkdayStart as string) || '09:00');
     setSlaWorkdayEnd((orgRec.slaWorkdayEnd as string) || '17:00');
-    setSlaHolidaysText(Array.isArray(orgRec.slaHolidays) ? (orgRec.slaHolidays as string[]).join('\n') : '');
+    setSlaHolidaysText(
+      Array.isArray(orgRec.slaHolidays) ? (orgRec.slaHolidays as string[]).join('\n') : '',
+    );
     setSlaInternalHours(
-      typeof orgRec.slaDefaultInternalHours === 'number' ? String(orgRec.slaDefaultInternalHours) : '',
+      typeof orgRec.slaDefaultInternalHours === 'number'
+        ? String(orgRec.slaDefaultInternalHours)
+        : '',
     );
     setSlaEndToEndHours(
-      typeof orgRec.slaDefaultEndToEndHours === 'number' ? String(orgRec.slaDefaultEndToEndHours) : '',
+      typeof orgRec.slaDefaultEndToEndHours === 'number'
+        ? String(orgRec.slaDefaultEndToEndHours)
+        : '',
     );
     setSlaSigningHours(
-      typeof orgRec.slaDefaultSigningHours === 'number' ? String(orgRec.slaDefaultSigningHours) : '',
+      typeof orgRec.slaDefaultSigningHours === 'number'
+        ? String(orgRec.slaDefaultSigningHours)
+        : '',
     );
     setSlaInitialized(true);
+  }
+
+  if (!spendMeterInitialized && org) {
+    const orgRec = org as Record<string, unknown>;
+    setSpendMeterEnabled(Boolean(orgRec.spendMeterEnabled));
+    setSpendMeterField((orgRec.spendMeterField as string) || '');
+    setSpendMeterDays(
+      typeof orgRec.spendMeterDays === 'number' ? String(orgRec.spendMeterDays) : '90',
+    );
+    setSpendMeterInitialized(true);
   }
 
   if (!certificateInitialized && org) {
@@ -302,11 +361,13 @@ function OrgSettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-[var(--r)] border border-border bg-card p-5">
+      <div className="border-border bg-card rounded-[var(--r)] border p-5">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-[15px] font-semibold"><Trans>Organization Details</Trans></h2>
-            <p className="mt-1 text-[13px] text-muted-foreground">
+            <h2 className="text-[15px] font-semibold">
+              <Trans>Organization Details</Trans>
+            </h2>
+            <p className="text-muted-foreground mt-1 text-[13px]">
               <Trans>Manage your organization settings.</Trans>
             </p>
           </div>
@@ -331,7 +392,7 @@ function OrgSettingsPage() {
           <div className="mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">Name</label>
+                <label className="text-muted-foreground text-[12px] font-medium">Name</label>
                 <Input
                   className="mt-1 h-9 text-[13px]"
                   value={editName}
@@ -340,24 +401,28 @@ function OrgSettingsPage() {
                 />
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">Domain</label>
+                <label className="text-muted-foreground text-[12px] font-medium">Domain</label>
                 <Input
                   className="mt-1 h-9 text-[13px]"
                   value={editDomain}
                   onChange={(e) => setEditDomain(e.target.value)}
                   placeholder="e.g. acme.com"
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">Used for SSO and email domain matching</p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Used for SSO and email domain matching
+                </p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">Slug</label>
-                <p className="mt-0.5 font-mono text-[13px] text-muted-foreground">{org.slug}</p>
+                <label className="text-muted-foreground text-[12px] font-medium">Slug</label>
+                <p className="text-muted-foreground mt-0.5 font-mono text-[13px]">{org.slug}</p>
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">Your Role</label>
-                <p className="mt-0.5 text-[13px] font-medium text-primary">{membership.role.replace(/_/g, ' ')}</p>
+                <label className="text-muted-foreground text-[12px] font-medium">Your Role</label>
+                <p className="text-primary mt-0.5 text-[13px] font-medium">
+                  {membership.role.replace(/_/g, ' ')}
+                </p>
               </div>
             </div>
             <div className="flex justify-end gap-2">
@@ -367,10 +432,12 @@ function OrgSettingsPage() {
               <Button
                 size="sm"
                 onClick={() => {
-                  void updateOrg.mutateAsync({
-                    name: editName || undefined,
-                    domain: editDomain || null,
-                  }).then(() => setEditingDetails(false));
+                  void updateOrg
+                    .mutateAsync({
+                      name: editName || undefined,
+                      domain: editDomain || null,
+                    })
+                    .then(() => setEditingDetails(false));
                 }}
                 loading={updateOrg.isPending}
                 disabled={!editName.trim()}
@@ -382,23 +449,25 @@ function OrgSettingsPage() {
         ) : (
           <div className="mt-4 grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Name</label>
+              <label className="text-muted-foreground text-[12px] font-medium">Name</label>
               <p className="mt-0.5 text-[14px] font-medium">{org.name}</p>
             </div>
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Slug</label>
+              <label className="text-muted-foreground text-[12px] font-medium">Slug</label>
               <p className="mt-0.5 font-mono text-[13px]">{org.slug}</p>
             </div>
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Your Role</label>
-              <p className="mt-0.5 text-[13px] font-medium text-primary">{membership.role.replace(/_/g, ' ')}</p>
+              <label className="text-muted-foreground text-[12px] font-medium">Your Role</label>
+              <p className="text-primary mt-0.5 text-[13px] font-medium">
+                {membership.role.replace(/_/g, ' ')}
+              </p>
             </div>
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Domain</label>
+              <label className="text-muted-foreground text-[12px] font-medium">Domain</label>
               <p className="mt-0.5 text-[13px]">{org.domain || 'Not set'}</p>
             </div>
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">
+              <label className="text-muted-foreground text-[12px] font-medium">
                 Organization ID
               </label>
               <div className="mt-0.5 flex items-center gap-1.5">
@@ -406,7 +475,7 @@ function OrgSettingsPage() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 px-1.5 text-muted-foreground"
+                  className="text-muted-foreground h-6 px-1.5"
                   title={_(msg`Copy organization ID`)}
                   onClick={() => {
                     void navigator.clipboard?.writeText(String(org.id));
@@ -416,7 +485,7 @@ function OrgSettingsPage() {
                   <CopyIcon className="h-3 w-3" />
                 </Button>
               </div>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground mt-0.5 text-[11px]">
                 <Trans>Quote this when generating a license key or raising support.</Trans>
               </p>
             </div>
@@ -427,102 +496,132 @@ function OrgSettingsPage() {
       {/* Stats */}
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-[var(--r)] border border-border bg-card p-4">
-          <span className="text-[11px] font-semibold uppercase text-muted-foreground">Members</span>
+        <div className="border-border bg-card rounded-[var(--r)] border p-4">
+          <span className="text-muted-foreground text-[11px] font-semibold uppercase">Members</span>
           <p className="mt-1 text-2xl font-semibold">{org.members.length}</p>
         </div>
-        <div className="rounded-[var(--r)] border border-border bg-card p-4">
-          <span className="text-[11px] font-semibold uppercase text-muted-foreground">DMS Documents</span>
+        <div className="border-border bg-card rounded-[var(--r)] border p-4">
+          <span className="text-muted-foreground text-[11px] font-semibold uppercase">
+            DMS Documents
+          </span>
           <p className="mt-1 text-2xl font-semibold">{org._count.dmsDocuments}</p>
         </div>
-        <div className="rounded-[var(--r)] border border-border bg-card p-4">
-          <span className="text-[11px] font-semibold uppercase text-muted-foreground">Locations</span>
+        <div className="border-border bg-card rounded-[var(--r)] border p-4">
+          <span className="text-muted-foreground text-[11px] font-semibold uppercase">
+            Locations
+          </span>
           <p className="mt-1 text-2xl font-semibold">{org._count.dmsLocations}</p>
         </div>
       </div>
 
       {/* Branding */}
       {isAdmin && (
-        <div className="rounded-[var(--r)] border border-border bg-card p-5">
-          <h2 className="text-[15px] font-semibold"><Trans>Organization Branding</Trans></h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+        <div className="border-border bg-card rounded-[var(--r)] border p-5">
+          <h2 className="text-[15px] font-semibold">
+            <Trans>Organization Branding</Trans>
+          </h2>
+          <p className="text-muted-foreground mt-1 text-[13px]">
             <Trans>Customize your organization's appearance with your brand colors and logo.</Trans>
           </p>
 
           <div className="mt-4 grid grid-cols-2 gap-4">
             {/* Primary Color */}
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Primary Color</label>
+              <label className="text-muted-foreground text-[12px] font-medium">Primary Color</label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
                   value={brandPrimary}
-                  onChange={(e) => { setBrandPrimary(e.target.value);}}
-                  className="h-9 w-12 cursor-pointer rounded border border-border"
+                  onChange={(e) => {
+                    setBrandPrimary(e.target.value);
+                  }}
+                  className="border-border h-9 w-12 cursor-pointer rounded border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
                   value={brandPrimary}
-                  onChange={(e) => { setBrandPrimary(e.target.value);}}
+                  onChange={(e) => {
+                    setBrandPrimary(e.target.value);
+                  }}
                   placeholder="#7c5cfc"
                 />
               </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">Used for buttons, active states, and highlights</p>
+              <p className="text-muted-foreground mt-1 text-[11px]">
+                Used for buttons, active states, and highlights
+              </p>
             </div>
 
             {/* Accent Color */}
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Accent Color</label>
+              <label className="text-muted-foreground text-[12px] font-medium">Accent Color</label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
                   value={brandAccent}
-                  onChange={(e) => { setBrandAccent(e.target.value);}}
-                  className="h-9 w-12 cursor-pointer rounded border border-border"
+                  onChange={(e) => {
+                    setBrandAccent(e.target.value);
+                  }}
+                  className="border-border h-9 w-12 cursor-pointer rounded border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
                   value={brandAccent}
-                  onChange={(e) => { setBrandAccent(e.target.value);}}
+                  onChange={(e) => {
+                    setBrandAccent(e.target.value);
+                  }}
                   placeholder="#f59e0b"
                 />
               </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">Used for secondary highlights and accents</p>
+              <p className="text-muted-foreground mt-1 text-[11px]">
+                Used for secondary highlights and accents
+              </p>
             </div>
           </div>
 
           {/* Sidebar Colors */}
           <div className="mt-4 grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Sidebar Background</label>
+              <label className="text-muted-foreground text-[12px] font-medium">
+                Sidebar Background
+              </label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
                   value={brandSidebarBg}
-                  onChange={(e) => { setBrandSidebarBg(e.target.value);}}
-                  className="h-9 w-12 cursor-pointer rounded border border-border"
+                  onChange={(e) => {
+                    setBrandSidebarBg(e.target.value);
+                  }}
+                  className="border-border h-9 w-12 cursor-pointer rounded border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
                   value={brandSidebarBg}
-                  onChange={(e) => { setBrandSidebarBg(e.target.value);}}
+                  onChange={(e) => {
+                    setBrandSidebarBg(e.target.value);
+                  }}
                   placeholder="#0d0d10"
                 />
               </div>
             </div>
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Sidebar Text Color</label>
+              <label className="text-muted-foreground text-[12px] font-medium">
+                Sidebar Text Color
+              </label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
                   value={brandSidebarText}
-                  onChange={(e) => { setBrandSidebarText(e.target.value);}}
-                  className="h-9 w-12 cursor-pointer rounded border border-border"
+                  onChange={(e) => {
+                    setBrandSidebarText(e.target.value);
+                  }}
+                  className="border-border h-9 w-12 cursor-pointer rounded border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
                   value={brandSidebarText}
-                  onChange={(e) => { setBrandSidebarText(e.target.value);}}
+                  onChange={(e) => {
+                    setBrandSidebarText(e.target.value);
+                  }}
                   placeholder="#f4f2ff"
                 />
               </div>
@@ -532,13 +631,15 @@ function OrgSettingsPage() {
           {/* Nav Active Color */}
           <div className="mt-4 grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Nav Selected/Active Color</label>
+              <label className="text-muted-foreground text-[12px] font-medium">
+                Nav Selected/Active Color
+              </label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
                   value={brandNavActive}
                   onChange={(e) => setBrandNavActive(e.target.value)}
-                  className="h-9 w-12 cursor-pointer rounded border border-border"
+                  className="border-border h-9 w-12 cursor-pointer rounded border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
@@ -547,59 +648,77 @@ function OrgSettingsPage() {
                   placeholder="#7c5cfc"
                 />
               </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">Color for the active/selected menu item in the sidebar</p>
+              <p className="text-muted-foreground mt-1 text-[11px]">
+                Color for the active/selected menu item in the sidebar
+              </p>
             </div>
           </div>
 
           {/* Button Colors */}
           <div className="mt-4 grid grid-cols-3 gap-4">
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Button Color</label>
+              <label className="text-muted-foreground text-[12px] font-medium">Button Color</label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
                   value={brandButtonColor}
-                  onChange={(e) => { setBrandButtonColor(e.target.value);}}
-                  className="h-9 w-12 cursor-pointer rounded border border-border"
+                  onChange={(e) => {
+                    setBrandButtonColor(e.target.value);
+                  }}
+                  className="border-border h-9 w-12 cursor-pointer rounded border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
                   value={brandButtonColor}
-                  onChange={(e) => { setBrandButtonColor(e.target.value);}}
+                  onChange={(e) => {
+                    setBrandButtonColor(e.target.value);
+                  }}
                   placeholder="#7c5cfc"
                 />
               </div>
             </div>
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Button Hover Color</label>
+              <label className="text-muted-foreground text-[12px] font-medium">
+                Button Hover Color
+              </label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
                   value={brandButtonHover}
-                  onChange={(e) => { setBrandButtonHover(e.target.value);}}
-                  className="h-9 w-12 cursor-pointer rounded border border-border"
+                  onChange={(e) => {
+                    setBrandButtonHover(e.target.value);
+                  }}
+                  className="border-border h-9 w-12 cursor-pointer rounded border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
                   value={brandButtonHover}
-                  onChange={(e) => { setBrandButtonHover(e.target.value);}}
+                  onChange={(e) => {
+                    setBrandButtonHover(e.target.value);
+                  }}
                   placeholder="#6a4af0"
                 />
               </div>
             </div>
             <div>
-              <label className="text-[12px] font-medium text-muted-foreground">Button Text Color</label>
+              <label className="text-muted-foreground text-[12px] font-medium">
+                Button Text Color
+              </label>
               <div className="mt-1.5 flex items-center gap-2">
                 <input
                   type="color"
                   value={brandButtonText}
-                  onChange={(e) => { setBrandButtonText(e.target.value);}}
-                  className="h-9 w-12 cursor-pointer rounded border border-border"
+                  onChange={(e) => {
+                    setBrandButtonText(e.target.value);
+                  }}
+                  className="border-border h-9 w-12 cursor-pointer rounded border"
                 />
                 <Input
                   className="h-9 flex-1 font-mono text-[13px]"
                   value={brandButtonText}
-                  onChange={(e) => { setBrandButtonText(e.target.value);}}
+                  onChange={(e) => {
+                    setBrandButtonText(e.target.value);
+                  }}
                   placeholder="#ffffff"
                 />
               </div>
@@ -608,20 +727,26 @@ function OrgSettingsPage() {
 
           {/* Logo URL */}
           <div className="mt-4">
-            <label className="text-[12px] font-medium text-muted-foreground">Organization Logo URL</label>
+            <label className="text-muted-foreground text-[12px] font-medium">
+              Organization Logo URL
+            </label>
             <Input
               className="mt-1.5 h-9 text-[13px]"
               value={brandLogoUrl}
-              onChange={(e) => { setBrandLogoUrl(e.target.value);}}
+              onChange={(e) => {
+                setBrandLogoUrl(e.target.value);
+              }}
               placeholder="https://example.com/logo.png (or leave empty for default)"
             />
-            <p className="mt-1 text-[11px] text-muted-foreground">PNG or SVG recommended. Will replace the HubSign logo in the sidebar.</p>
+            <p className="text-muted-foreground mt-1 text-[11px]">
+              PNG or SVG recommended. Will replace the HubSign logo in the sidebar.
+            </p>
           </div>
 
           {/* Preview */}
           <div className="mt-4">
-            <label className="text-[12px] font-medium text-muted-foreground">Preview</label>
-            <div className="mt-1.5 flex gap-3 overflow-hidden rounded-md border border-border">
+            <label className="text-muted-foreground text-[12px] font-medium">Preview</label>
+            <div className="border-border mt-1.5 flex gap-3 overflow-hidden rounded-md border">
               {/* Sidebar preview */}
               <div
                 className="flex w-[180px] flex-shrink-0 flex-col p-3"
@@ -647,13 +772,17 @@ function OrgSettingsPage() {
                   >
                     Documents
                   </div>
-                  <div className="rounded px-2 py-1 text-[11px]" style={{ opacity: 0.6 }}>Templates</div>
-                  <div className="rounded px-2 py-1 text-[11px]" style={{ opacity: 0.6 }}>Doc Manager</div>
+                  <div className="rounded px-2 py-1 text-[11px]" style={{ opacity: 0.6 }}>
+                    Templates
+                  </div>
+                  <div className="rounded px-2 py-1 text-[11px]" style={{ opacity: 0.6 }}>
+                    Doc Manager
+                  </div>
                 </div>
               </div>
 
               {/* Content preview */}
-              <div className="flex-1 bg-background p-4">
+              <div className="bg-background flex-1 p-4">
                 <div className="flex items-center gap-3">
                   <div
                     className="flex h-8 w-8 items-center justify-center rounded-lg text-[12px] font-bold text-white"
@@ -695,17 +824,19 @@ function OrgSettingsPage() {
 
           <div className="mt-4 flex justify-end">
             <Button
-              onClick={() => void updateOrg.mutateAsync({
-                brandingPrimaryColor: brandPrimary || null,
-                brandingAccentColor: brandAccent || null,
-                brandingSidebarBg: brandSidebarBg || null,
-                brandingSidebarTextColor: brandSidebarText || null,
-                brandingNavActiveColor: brandNavActive || null,
-                brandingButtonColor: brandButtonColor || null,
-                brandingButtonHoverColor: brandButtonHover || null,
-                brandingButtonTextColor: brandButtonText || null,
-                brandingLogo: brandLogoUrl || null,
-              })}
+              onClick={() =>
+                void updateOrg.mutateAsync({
+                  brandingPrimaryColor: brandPrimary || null,
+                  brandingAccentColor: brandAccent || null,
+                  brandingSidebarBg: brandSidebarBg || null,
+                  brandingSidebarTextColor: brandSidebarText || null,
+                  brandingNavActiveColor: brandNavActive || null,
+                  brandingButtonColor: brandButtonColor || null,
+                  brandingButtonHoverColor: brandButtonHover || null,
+                  brandingButtonTextColor: brandButtonText || null,
+                  brandingLogo: brandLogoUrl || null,
+                })
+              }
               loading={updateOrg.isPending}
             >
               <Trans>Save Branding</Trans>
@@ -716,12 +847,14 @@ function OrgSettingsPage() {
 
       {/* Email Domain Restriction */}
       {isAdmin && (
-        <div className="rounded-[var(--r)] border border-border bg-card p-5">
-          <h2 className="text-[15px] font-semibold"><Trans>Email Domain Restriction</Trans></h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+        <div className="border-border bg-card rounded-[var(--r)] border p-5">
+          <h2 className="text-[15px] font-semibold">
+            <Trans>Email Domain Restriction</Trans>
+          </h2>
+          <p className="text-muted-foreground mt-1 text-[13px]">
             <Trans>
-              Only users whose email matches one of these domains can be invited or self-join
-              this organization. Leave empty to allow any email.
+              Only users whose email matches one of these domains can be invited or self-join this
+              organization. Leave empty to allow any email.
             </Trans>
           </p>
 
@@ -745,14 +878,14 @@ function OrgSettingsPage() {
 
           <div className="mt-3 flex flex-wrap gap-2">
             {allowedDomains.length === 0 ? (
-              <p className="text-[12px] italic text-muted-foreground">
+              <p className="text-muted-foreground text-[12px] italic">
                 <Trans>No restriction — any email domain can be invited.</Trans>
               </p>
             ) : (
               allowedDomains.map((d) => (
                 <span
                   key={d}
-                  className="group inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2.5 py-0.5 text-[12px] font-medium"
+                  className="border-border bg-muted group inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[12px] font-medium"
                 >
                   @{d}
                   <button
@@ -781,26 +914,24 @@ function OrgSettingsPage() {
 
       {/* Signed documents — audit certificate */}
       {isAdmin && (
-        <div className="rounded-[var(--r)] border border-border bg-card p-5">
+        <div className="border-border bg-card rounded-[var(--r)] border p-5">
           <h2 className="text-[15px] font-semibold">
             <Trans>Signed Documents</Trans>
           </h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            <Trans>
-              Controls the Final Audit Report page appended to completed documents.
-            </Trans>
+          <p className="text-muted-foreground mt-1 text-[13px]">
+            <Trans>Controls the Final Audit Report page appended to completed documents.</Trans>
           </p>
 
-          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+          <div className="border-border mt-4 flex items-start justify-between rounded-md border p-3">
             <div className="flex-1 pr-4">
               <label className="text-[13px] font-medium">
                 <Trans>Attach the audit certificate to signed documents</Trans>
               </label>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">
+              <p className="text-muted-foreground mt-0.5 text-[12px]">
                 <Trans>
-                  The certificate is the signing audit trail, so it is normally kept. Turn this
-                  off only if your documents are circulated externally and the extra page is
-                  unwanted — recipients can still download either version.
+                  The certificate is the signing audit trail, so it is normally kept. Turn this off
+                  only if your documents are circulated externally and the extra page is unwanted —
+                  recipients can still download either version.
                 </Trans>
               </p>
             </div>
@@ -811,7 +942,7 @@ function OrgSettingsPage() {
                 checked={includeCertificate}
                 onChange={(e) => setIncludeCertificate(e.target.checked)}
               />
-              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+              <div className="bg-muted after:border-border after:bg-background peer-checked:bg-primary peer-checked:after:border-primary peer h-6 w-11 rounded-full after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:transition-all peer-checked:after:translate-x-full" />
             </label>
           </div>
 
@@ -820,11 +951,11 @@ function OrgSettingsPage() {
             certificate is baked into the PDF when the document is sealed, so this
             setting cannot retroactively add or remove it.
           */}
-          <p className="mt-3 text-[12px] text-muted-foreground">
+          <p className="text-muted-foreground mt-3 text-[12px]">
             <Trans>
-              Applies to documents completed from now on. Documents already signed keep the
-              pages they were sealed with — use the Download menu on those to get a copy
-              without the certificate.
+              Applies to documents completed from now on. Documents already signed keep the pages
+              they were sealed with — use the Download menu on those to get a copy without the
+              certificate.
             </Trans>
           </p>
 
@@ -843,21 +974,23 @@ function OrgSettingsPage() {
 
       {/* Sign Reminders */}
       {isAdmin && (
-        <div className="rounded-[var(--r)] border border-border bg-card p-5">
-          <h2 className="text-[15px] font-semibold"><Trans>Sign Reminders</Trans></h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+        <div className="border-border bg-card rounded-[var(--r)] border p-5">
+          <h2 className="text-[15px] font-semibold">
+            <Trans>Sign Reminders</Trans>
+          </h2>
+          <p className="text-muted-foreground mt-1 text-[13px]">
             <Trans>
-              Automatically email recipients who haven't signed yet after the chosen number of
-              days. Reminders stop after the maximum count is reached.
+              Automatically email recipients who haven't signed yet after the chosen number of days.
+              Reminders stop after the maximum count is reached.
             </Trans>
           </p>
 
-          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+          <div className="border-border mt-4 flex items-start justify-between rounded-md border p-3">
             <div className="flex-1 pr-4">
               <label className="text-[13px] font-medium">
                 <Trans>Enable sign reminders</Trans>
               </label>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">
+              <p className="text-muted-foreground mt-0.5 text-[12px]">
                 <Trans>
                   Requires a scheduled cron to call <code>POST /api/cron/send-reminders</code>.
                 </Trans>
@@ -870,14 +1003,14 @@ function OrgSettingsPage() {
                 checked={reminderEnabled}
                 onChange={(e) => setReminderEnabled(e.target.checked)}
               />
-              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+              <div className="bg-muted after:border-border after:bg-background peer-checked:bg-primary peer-checked:after:border-primary peer h-6 w-11 rounded-full after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:transition-all peer-checked:after:translate-x-full" />
             </label>
           </div>
 
           {reminderEnabled && (
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>Reminder interval (days)</Trans>
                 </label>
                 <Input
@@ -886,14 +1019,16 @@ function OrgSettingsPage() {
                   max={60}
                   className="mt-1 h-8 text-[13px]"
                   value={reminderDays}
-                  onChange={(e) => setReminderDays(Math.max(1, Math.min(60, Number(e.target.value))))}
+                  onChange={(e) =>
+                    setReminderDays(Math.max(1, Math.min(60, Number(e.target.value))))
+                  }
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">
+                <p className="text-muted-foreground mt-1 text-[11px]">
                   Send a reminder if the recipient still hasn't signed after this many days.
                 </p>
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>Max reminders per recipient</Trans>
                 </label>
                 <Input
@@ -902,9 +1037,11 @@ function OrgSettingsPage() {
                   max={10}
                   className="mt-1 h-8 text-[13px]"
                   value={reminderMaxCount}
-                  onChange={(e) => setReminderMaxCount(Math.max(1, Math.min(10, Number(e.target.value))))}
+                  onChange={(e) =>
+                    setReminderMaxCount(Math.max(1, Math.min(10, Number(e.target.value))))
+                  }
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">
+                <p className="text-muted-foreground mt-1 text-[11px]">
                   Stops sending reminders after this many.
                 </p>
               </div>
@@ -913,11 +1050,13 @@ function OrgSettingsPage() {
 
           <div className="mt-4 flex justify-end">
             <Button
-              onClick={() => void updateOrg.mutateAsync({
-                signReminderEnabled: reminderEnabled,
-                signReminderDays: reminderDays,
-                signReminderMaxCount: reminderMaxCount,
-              })}
+              onClick={() =>
+                void updateOrg.mutateAsync({
+                  signReminderEnabled: reminderEnabled,
+                  signReminderDays: reminderDays,
+                  signReminderMaxCount: reminderMaxCount,
+                })
+              }
               loading={updateOrg.isPending}
             >
               <Trans>Save Reminder Settings</Trans>
@@ -928,9 +1067,11 @@ function OrgSettingsPage() {
 
       {/* SLA */}
       {isAdmin && (
-        <div className="rounded-[var(--r)] border border-border bg-card p-5">
-          <h2 className="text-[15px] font-semibold"><Trans>SLA Setup</Trans></h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+        <div className="border-border bg-card rounded-[var(--r)] border p-5">
+          <h2 className="text-[15px] font-semibold">
+            <Trans>SLA Setup</Trans>
+          </h2>
+          <p className="text-muted-foreground mt-1 text-[13px]">
             <Trans>
               Turnaround targets for Signature Inbox items, measured from the moment the email
               arrives. Targets are in <strong>business hours</strong> — an invoice arriving Friday
@@ -939,10 +1080,12 @@ function OrgSettingsPage() {
             </Trans>
           </p>
 
-          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+          <div className="border-border mt-4 flex items-start justify-between rounded-md border p-3">
             <div className="flex-1 pr-4">
-              <label className="text-[13px] font-medium"><Trans>Track SLA</Trans></label>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">
+              <label className="text-[13px] font-medium">
+                <Trans>Track SLA</Trans>
+              </label>
+              <p className="text-muted-foreground mt-0.5 text-[12px]">
                 <Trans>Shows SLA performance on the dashboard and flags overdue items.</Trans>
               </p>
             </div>
@@ -969,7 +1112,10 @@ function OrgSettingsPage() {
                   between the other two rather than an afterthought. */}
               <div className="mt-4 grid gap-4 sm:grid-cols-3">
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground" htmlFor="sla-internal">
+                  <label
+                    className="text-muted-foreground text-[12px] font-medium"
+                    htmlFor="sla-internal"
+                  >
                     <Trans>Default internal target (business hours)</Trans>
                   </label>
                   <Input
@@ -981,12 +1127,15 @@ function OrgSettingsPage() {
                     onChange={(e) => setSlaInternalHours(e.target.value)}
                     placeholder="8"
                   />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
+                  <p className="text-muted-foreground mt-1 text-[11px]">
                     <Trans>Received → sent for signature. What your team controls.</Trans>
                   </p>
                 </div>
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground" htmlFor="sla-signing">
+                  <label
+                    className="text-muted-foreground text-[12px] font-medium"
+                    htmlFor="sla-signing"
+                  >
                     <Trans>Default signing target (business hours)</Trans>
                   </label>
                   <Input
@@ -998,7 +1147,7 @@ function OrgSettingsPage() {
                     onChange={(e) => setSlaSigningHours(e.target.value)}
                     placeholder="48"
                   />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
+                  <p className="text-muted-foreground mt-1 text-[11px]">
                     <Trans>
                       Sent for signature → fully signed. Leave this empty and an invoice waiting on
                       a signature is measured by nothing.
@@ -1006,7 +1155,10 @@ function OrgSettingsPage() {
                   </p>
                 </div>
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground" htmlFor="sla-end-to-end">
+                  <label
+                    className="text-muted-foreground text-[12px] font-medium"
+                    htmlFor="sla-end-to-end"
+                  >
                     <Trans>Default end-to-end target (business hours)</Trans>
                   </label>
                   <Input
@@ -1018,19 +1170,19 @@ function OrgSettingsPage() {
                     onChange={(e) => setSlaEndToEndHours(e.target.value)}
                     placeholder="72"
                   />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
+                  <p className="text-muted-foreground mt-1 text-[11px]">
                     <Trans>Received → fully signed. Both stages together.</Trans>
                   </p>
                 </div>
               </div>
 
-              <p className="mt-5 text-[12px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+              <p className="text-muted-foreground mt-5 text-[12px] font-semibold uppercase tracking-[0.05em]">
                 <Trans>The clock</Trans>
               </p>
 
               <div className="mt-2 grid grid-cols-3 gap-4">
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground">
+                  <label className="text-muted-foreground text-[12px] font-medium">
                     <Trans>Timezone</Trans>
                   </label>
                   <Input
@@ -1039,10 +1191,10 @@ function OrgSettingsPage() {
                     onChange={(e) => setSlaTimezone(e.target.value)}
                     placeholder="America/Jamaica"
                   />
-                  <p className="mt-1 text-[11px] text-muted-foreground">IANA name</p>
+                  <p className="text-muted-foreground mt-1 text-[11px]">IANA name</p>
                 </div>
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground">
+                  <label className="text-muted-foreground text-[12px] font-medium">
                     <Trans>Day starts</Trans>
                   </label>
                   <Input
@@ -1053,7 +1205,7 @@ function OrgSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground">
+                  <label className="text-muted-foreground text-[12px] font-medium">
                     <Trans>Day ends</Trans>
                   </label>
                   <Input
@@ -1066,7 +1218,7 @@ function OrgSettingsPage() {
               </div>
 
               <div className="mt-4">
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>Working days</Trans>
                 </label>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -1098,16 +1250,16 @@ function OrgSettingsPage() {
               </div>
 
               <div className="mt-4">
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>Holidays</Trans>
                 </label>
                 <textarea
-                  className="mt-1 min-h-[72px] w-full rounded-md border border-input bg-background px-3 py-2 font-mono text-[12px]"
+                  className="border-input bg-background mt-1 min-h-[72px] w-full rounded-md border px-3 py-2 font-mono text-[12px]"
                   value={slaHolidaysText}
                   onChange={(e) => setSlaHolidaysText(e.target.value)}
                   placeholder={'2026-12-25\n2027-01-01'}
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">
+                <p className="text-muted-foreground mt-1 text-[11px]">
                   <Trans>One yyyy-MM-dd date per line. The clock pauses on these days.</Trans>
                 </p>
               </div>
@@ -1137,29 +1289,167 @@ function OrgSettingsPage() {
         </div>
       )}
 
-      {/* SSO / OIDC Configuration */}
+      {/* Spend meter */}
       {isAdmin && (
-        <div className="rounded-[var(--r)] border border-border bg-card p-5">
-          <h2 className="text-[15px] font-semibold"><Trans>Single Sign-On (SSO)</Trans></h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+        <div className="border-border bg-card rounded-[var(--r)] border p-5">
+          <h2 className="text-[15px] font-semibold">
+            <Trans>Spend Meter</Trans>
+          </h2>
+          <p className="text-muted-foreground mt-1 text-[13px]">
             <Trans>
-              Configure your own OpenID Connect provider — works with Office 365 / Azure AD,
-              Google Workspace, Okta, Auth0, or any OIDC-compliant identity provider. When
-              enabled, members sign in via{' '}
-              <code className="rounded bg-muted px-1">/signin?org={org.slug}</code>.
+              Shows what you have already spent with a vendor — and what this invoice adds — to
+              members signing that vendor's invoice. Only your own members see it: a signing link
+              works for anyone holding it, and the person signing a vendor's invoice may work for
+              that vendor.
             </Trans>
           </p>
 
-          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+          <div className="border-border mt-4 flex items-start justify-between rounded-md border p-3">
+            <div className="flex-1 pr-4">
+              <label className="text-[13px] font-medium">
+                <Trans>Show spend while signing</Trans>
+              </label>
+              <p className="text-muted-foreground mt-0.5 text-[12px]">
+                <Trans>
+                  Applies to invoices that arrived through the Signature Inbox and match a vendor in
+                  your directory.
+                </Trans>
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={spendMeterEnabled}
+              onClick={() => setSpendMeterEnabled(!spendMeterEnabled)}
+              className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
+                spendMeterEnabled ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                  spendMeterEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
+
+          {spendMeterEnabled && (
+            <>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    className="text-muted-foreground text-[12px] font-medium"
+                    htmlFor="spend-meter-field"
+                  >
+                    <Trans>Limit field</Trans>
+                  </label>
+                  <select
+                    id="spend-meter-field"
+                    className="border-input bg-background mt-1 h-9 w-full rounded-md border px-2 text-[13px]"
+                    value={spendMeterField}
+                    onChange={(e) => setSpendMeterField(e.target.value)}
+                  >
+                    <option value="">
+                      {vendorNumberFields.length === 0
+                        ? _(msg`No number fields defined`)
+                        : _(msg`Select a field…`)}
+                    </option>
+                    {vendorNumberFields.map((field) => (
+                      <option key={field.key} value={field.key}>
+                        {field.label}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-muted-foreground mt-1 text-[11px]">
+                    {/*
+                      Naming where the figure comes from, because the meter is
+                      silent when a vendor has none — and "why does this vendor
+                      show nothing" is otherwise unanswerable from this page.
+                    */}
+                    <Trans>
+                      A number field on your vendor records. Vendors with no figure show no meter.
+                    </Trans>
+                  </p>
+                </div>
+
+                <div>
+                  <label
+                    className="text-muted-foreground text-[12px] font-medium"
+                    htmlFor="spend-meter-days"
+                  >
+                    <Trans>Window (days)</Trans>
+                  </label>
+                  <Input
+                    id="spend-meter-days"
+                    className="mt-1 h-9 text-[13px]"
+                    type="number"
+                    min={1}
+                    max={731}
+                    value={spendMeterDays}
+                    onChange={(e) => setSpendMeterDays(e.target.value)}
+                    placeholder="90"
+                  />
+                  <p className="text-muted-foreground mt-1 text-[11px]">
+                    <Trans>
+                      The limit is a single figure with no period of its own, so this is what the
+                      percentage means. The meter says which window it used.
+                    </Trans>
+                  </p>
+                </div>
+              </div>
+
+              {vendorNumberFields.length === 0 && (
+                <p className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-[12px] text-amber-700 dark:text-amber-400">
+                  <Trans>
+                    Your vendor records have no number fields yet. Add one under Metadata — a field
+                    of type Number holding each vendor's limit — then choose it here.
+                  </Trans>
+                </p>
+              )}
+            </>
+          )}
+
+          <div className="mt-4 flex justify-end">
+            <Button
+              onClick={() =>
+                void updateOrg.mutateAsync({
+                  spendMeterEnabled,
+                  spendMeterField: spendMeterField || null,
+                  spendMeterDays: Number(spendMeterDays) || 90,
+                })
+              }
+              loading={updateOrg.isPending}
+            >
+              <Trans>Save Spend Meter</Trans>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* SSO / OIDC Configuration */}
+      {isAdmin && (
+        <div className="border-border bg-card rounded-[var(--r)] border p-5">
+          <h2 className="text-[15px] font-semibold">
+            <Trans>Single Sign-On (SSO)</Trans>
+          </h2>
+          <p className="text-muted-foreground mt-1 text-[13px]">
+            <Trans>
+              Configure your own OpenID Connect provider — works with Office 365 / Azure AD, Google
+              Workspace, Okta, Auth0, or any OIDC-compliant identity provider. When enabled, members
+              sign in via <code className="bg-muted rounded px-1">/signin?org={org.slug}</code>.
+            </Trans>
+          </p>
+
+          <div className="border-border mt-4 flex items-start justify-between rounded-md border p-3">
             <div className="flex-1 pr-4">
               <label className="text-[13px] font-medium">
                 <Trans>Enable SSO for this organization</Trans>
               </label>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">
+              <p className="text-muted-foreground mt-0.5 text-[12px]">
                 <Trans>
                   When on, the SSO button appears on{' '}
-                  <code className="rounded bg-muted px-1">/signin?org={org.slug}</code>. New
-                  members are auto-added to this org on first SSO sign-in.
+                  <code className="bg-muted rounded px-1">/signin?org={org.slug}</code>. New members
+                  are auto-added to this org on first SSO sign-in.
                 </Trans>
               </p>
             </div>
@@ -1170,14 +1460,14 @@ function OrgSettingsPage() {
                 checked={oidcEnabled}
                 onChange={(e) => setOidcEnabled(e.target.checked)}
               />
-              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+              <div className="bg-muted after:border-border after:bg-background peer-checked:bg-primary peer-checked:after:border-primary peer h-6 w-11 rounded-full after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:transition-all peer-checked:after:translate-x-full" />
             </label>
           </div>
 
           {oidcEnabled && (
             <div className="mt-4 grid grid-cols-1 gap-3">
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>Provider Label</Trans>
                 </label>
                 <Input
@@ -1188,7 +1478,7 @@ function OrgSettingsPage() {
                 />
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>Discovery / Well-Known URL</Trans>
                 </label>
                 <Input
@@ -1197,15 +1487,20 @@ function OrgSettingsPage() {
                   value={oidcWellKnownUrl}
                   onChange={(e) => setOidcWellKnownUrl(e.target.value)}
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  Office 365: <code>https://login.microsoftonline.com/{'{tenant-id}'}/v2.0/.well-known/openid-configuration</code>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Office 365:{' '}
+                  <code>
+                    https://login.microsoftonline.com/{'{tenant-id}'}
+                    /v2.0/.well-known/openid-configuration
+                  </code>
                   <br />
-                  Google Workspace: <code>https://accounts.google.com/.well-known/openid-configuration</code>
+                  Google Workspace:{' '}
+                  <code>https://accounts.google.com/.well-known/openid-configuration</code>
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground">
+                  <label className="text-muted-foreground text-[12px] font-medium">
                     <Trans>Client ID</Trans>
                   </label>
                   <Input
@@ -1216,7 +1511,7 @@ function OrgSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground">
+                  <label className="text-muted-foreground text-[12px] font-medium">
                     <Trans>Client Secret</Trans>
                   </label>
                   <Input
@@ -1229,11 +1524,13 @@ function OrgSettingsPage() {
                   />
                 </div>
               </div>
-              <p className="mt-1 text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground mt-1 text-[11px]">
                 <Trans>
                   Set the redirect URL on your provider to:{' '}
-                  <code className="rounded bg-muted px-1">
-                    {typeof window !== 'undefined' ? window.location.origin : 'https://app.hubsign.io'}
+                  <code className="bg-muted rounded px-1">
+                    {typeof window !== 'undefined'
+                      ? window.location.origin
+                      : 'https://app.hubsign.io'}
                     /api/auth/callback/oidc?org={org.slug}
                   </code>
                 </Trans>
@@ -1241,12 +1538,12 @@ function OrgSettingsPage() {
             </div>
           )}
 
-          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+          <div className="border-border mt-4 flex items-start justify-between rounded-md border p-3">
             <div className="flex-1 pr-4">
               <label className="text-[13px] font-medium">
                 <Trans>Disable self-signup for this organization's domains</Trans>
               </label>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">
+              <p className="text-muted-foreground mt-0.5 text-[12px]">
                 <Trans>
                   Users with an email matching one of this org's allowed domains can't sign up
                   themselves — they must be invited or use SSO. Set allowed domains above first.
@@ -1260,20 +1557,22 @@ function OrgSettingsPage() {
                 checked={disableSelfSignup}
                 onChange={(e) => setDisableSelfSignup(e.target.checked)}
               />
-              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+              <div className="bg-muted after:border-border after:bg-background peer-checked:bg-primary peer-checked:after:border-primary peer h-6 w-11 rounded-full after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:transition-all peer-checked:after:translate-x-full" />
             </label>
           </div>
 
           <div className="mt-4 flex justify-end">
             <Button
-              onClick={() => void updateOrg.mutateAsync({
-                oidcEnabled,
-                oidcClientId: oidcClientId || null,
-                oidcClientSecret: oidcClientSecret || null,
-                oidcWellKnownUrl: oidcWellKnownUrl || null,
-                oidcProviderLabel: oidcProviderLabel || null,
-                disableSelfSignup,
-              })}
+              onClick={() =>
+                void updateOrg.mutateAsync({
+                  oidcEnabled,
+                  oidcClientId: oidcClientId || null,
+                  oidcClientSecret: oidcClientSecret || null,
+                  oidcWellKnownUrl: oidcWellKnownUrl || null,
+                  oidcProviderLabel: oidcProviderLabel || null,
+                  disableSelfSignup,
+                })
+              }
               loading={updateOrg.isPending}
             >
               <Trans>Save SSO Settings</Trans>
@@ -1284,22 +1583,24 @@ function OrgSettingsPage() {
 
       {/* Email-to-Sign Inbox */}
       {isAdmin && (
-        <div className="rounded-[var(--r)] border border-border bg-card p-5">
-          <h2 className="text-[15px] font-semibold"><Trans>Email-to-Sign Inbox</Trans></h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
+        <div className="border-border bg-card rounded-[var(--r)] border p-5">
+          <h2 className="text-[15px] font-semibold">
+            <Trans>Email-to-Sign Inbox</Trans>
+          </h2>
+          <p className="text-muted-foreground mt-1 text-[13px]">
             <Trans>
-              HubSign polls your existing WorkHub mailbox (configured below) for incoming PDFs,
-              runs them through OCR, and adds them to the Signature Inbox to review and send for
+              HubSign polls your existing WorkHub mailbox (configured below) for incoming PDFs, runs
+              them through OCR, and adds them to the Signature Inbox to review and send for
               signature. No DNS or alias setup — it reads the mailbox you already use.
             </Trans>
           </p>
 
-          <div className="mt-4 flex items-start justify-between rounded-md border border-border p-3">
+          <div className="border-border mt-4 flex items-start justify-between rounded-md border p-3">
             <div className="flex-1 pr-4">
               <label className="text-[13px] font-medium">
                 <Trans>Enable email-to-sign for this org</Trans>
               </label>
-              <p className="mt-0.5 text-[12px] text-muted-foreground">
+              <p className="text-muted-foreground mt-0.5 text-[12px]">
                 <Trans>
                   When on, HubSign polls the WorkHub mailbox below for new PDFs to sign.
                 </Trans>
@@ -1312,60 +1613,62 @@ function OrgSettingsPage() {
                 checked={emailToSignEnabled}
                 onChange={(e) => setEmailToSignEnabled(e.target.checked)}
               />
-              <div className="peer h-6 w-11 rounded-full bg-muted after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:border-border after:bg-background after:transition-all peer-checked:bg-primary peer-checked:after:translate-x-full peer-checked:after:border-primary" />
+              <div className="bg-muted after:border-border after:bg-background peer-checked:bg-primary peer-checked:after:border-primary peer h-6 w-11 rounded-full after:absolute after:left-[2px] after:top-[2px] after:h-5 after:w-5 after:rounded-full after:border after:transition-all peer-checked:after:translate-x-full" />
             </label>
           </div>
 
           {/* WorkHub inbox (receive) connection — per org, same credential model as sending */}
           <div className="mt-4 space-y-3">
-            <p className="text-[12px] font-medium text-muted-foreground">
+            <p className="text-muted-foreground text-[12px] font-medium">
               <Trans>WorkHub inbox connection</Trans>
             </p>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>WorkHub API key (x-api-key)</Trans>
                 </label>
                 <input
                   type="password"
-                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  className="border-border bg-background focus:border-primary mt-1 block w-full rounded-md border px-2 py-1.5 text-[13px] outline-none"
                   value={workhubApiKey}
                   onChange={(e) => setWorkhubApiKey(e.target.value)}
                   placeholder="generate in WorkHub → Settings → API Keys (needs email.read)"
                   autoComplete="off"
                 />
-                <p className="mt-0.5 text-[11px] text-muted-foreground">
-                  <Trans>This is what reads the inbox. Generate it in WorkHub with email.read permission.</Trans>
+                <p className="text-muted-foreground mt-0.5 text-[11px]">
+                  <Trans>
+                    This is what reads the inbox. Generate it in WorkHub with email.read permission.
+                  </Trans>
                 </p>
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>Inbox email (receiving address)</Trans>
                 </label>
                 <input
-                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  className="border-border bg-background focus:border-primary mt-1 block w-full rounded-md border px-2 py-1.5 text-[13px] outline-none"
                   value={inboxEmail}
                   onChange={(e) => setInboxEmail(e.target.value)}
                   placeholder={`${org.slug}@inbox.your-domain.com`}
                 />
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>Mailbox ID (optional)</Trans>
                 </label>
                 <input
-                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  className="border-border bg-background focus:border-primary mt-1 block w-full rounded-md border px-2 py-1.5 text-[13px] outline-none"
                   value={workhubMailboxId}
                   onChange={(e) => setWorkhubMailboxId(e.target.value)}
                   placeholder="leave blank to use the credential's mailbox"
                 />
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>BulkSender username (optional fallback)</Trans>
                 </label>
                 <input
-                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  className="border-border bg-background focus:border-primary mt-1 block w-full rounded-md border px-2 py-1.5 text-[13px] outline-none"
                   value={workhubUsername}
                   onChange={(e) => setWorkhubUsername(e.target.value)}
                   placeholder="bsk_..."
@@ -1373,12 +1676,12 @@ function OrgSettingsPage() {
                 />
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>BulkSender password (optional fallback)</Trans>
                 </label>
                 <input
                   type="password"
-                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  className="border-border bg-background focus:border-primary mt-1 block w-full rounded-md border px-2 py-1.5 text-[13px] outline-none"
                   value={workhubPassword}
                   onChange={(e) => setWorkhubPassword(e.target.value)}
                   placeholder="bsk...."
@@ -1386,34 +1689,36 @@ function OrgSettingsPage() {
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-[12px] font-medium text-muted-foreground">
+                <label className="text-muted-foreground text-[12px] font-medium">
                   <Trans>WorkHub API base (optional)</Trans>
                 </label>
                 <input
-                  className="mt-1 block w-full rounded-md border border-border bg-background px-2 py-1.5 text-[13px] outline-none focus:border-primary"
+                  className="border-border bg-background focus:border-primary mt-1 block w-full rounded-md border px-2 py-1.5 text-[13px] outline-none"
                   value={workhubApiBase}
                   onChange={(e) => setWorkhubApiBase(e.target.value)}
                   placeholder="https://api.workhubplatform.io/v1 (or staging)"
                 />
               </div>
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-muted-foreground text-[11px]">
               <Trans>
                 HubSign polls this WorkHub mailbox with the API key above and shows incoming PDFs in
                 the Signature Inbox after OCR. The BulkSender fields are an optional fallback.
               </Trans>
             </p>
 
+            <RealtimeMailCard />
+
             {/*
               Loop prevention. Mail from HubSign's own address and from this org's
               own inbox address is always refused in code — these are the extra
               org-specific rules on top.
             */}
-            <div className="mt-4 border-t border-border pt-4">
+            <div className="border-border mt-4 border-t pt-4">
               <h3 className="text-[13px] font-semibold">
                 <Trans>Inbound filtering</Trans>
               </h3>
-              <p className="mt-0.5 text-[11px] text-muted-foreground">
+              <p className="text-muted-foreground mt-0.5 text-[11px]">
                 <Trans>
                   One rule per line, matched anywhere in the value and case-insensitively. Mail sent
                   by HubSign itself, or from this org's own inbox address, is always ignored — you
@@ -1423,11 +1728,11 @@ function OrgSettingsPage() {
 
               <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground">
+                  <label className="text-muted-foreground text-[12px] font-medium">
                     <Trans>Blocked senders</Trans>
                   </label>
                   <textarea
-                    className="mt-1 block h-24 w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] outline-none focus:border-primary"
+                    className="border-border bg-background focus:border-primary mt-1 block h-24 w-full resize-y rounded-md border px-2 py-1.5 font-mono text-[12px] outline-none"
                     value={inboxBlockedSenders}
                     onChange={(e) => setInboxBlockedSenders(e.target.value)}
                     placeholder={'no-reply@\nnotifications@'}
@@ -1435,11 +1740,11 @@ function OrgSettingsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[12px] font-medium text-muted-foreground">
+                  <label className="text-muted-foreground text-[12px] font-medium">
                     <Trans>Blocked subjects</Trans>
                   </label>
                   <textarea
-                    className="mt-1 block h-24 w-full resize-y rounded-md border border-border bg-background px-2 py-1.5 font-mono text-[12px] outline-none focus:border-primary"
+                    className="border-border bg-background focus:border-primary mt-1 block h-24 w-full resize-y rounded-md border px-2 py-1.5 font-mono text-[12px] outline-none"
                     value={inboxBlockedSubjects}
                     onChange={(e) => setInboxBlockedSubjects(e.target.value)}
                     placeholder={'Signing Complete\nOut of office'}
@@ -1475,68 +1780,99 @@ function OrgSettingsPage() {
 
       {/* OCR / BMS ML Settings */}
       {isAdmin && (
-        <div className="rounded-[var(--r)] border border-border bg-card p-5">
-          <h2 className="text-[15px] font-semibold"><Trans>OCR & Document Processing</Trans></h2>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            <Trans>Connect your BMS ML service for automatic OCR, field extraction, and document classification.</Trans>
+        <div className="border-border bg-card rounded-[var(--r)] border p-5">
+          <h2 className="text-[15px] font-semibold">
+            <Trans>OCR & Document Processing</Trans>
+          </h2>
+          <p className="text-muted-foreground mt-1 text-[13px]">
+            <Trans>
+              Connect your BMS ML service for automatic OCR, field extraction, and document
+              classification.
+            </Trans>
           </p>
 
           <div className="mt-4 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">BMS ML API URL</label>
+                <label className="text-muted-foreground text-[12px] font-medium">
+                  BMS ML API URL
+                </label>
                 <Input
                   className="mt-1.5 h-9 font-mono text-[13px]"
                   value={ocrApiUrl}
-                  onChange={(e) => { setOcrApiUrl(e.target.value); }}
+                  onChange={(e) => {
+                    setOcrApiUrl(e.target.value);
+                  }}
                   placeholder="http://bms-ml-server:8080/api/v1"
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">The base URL of your BMS ML service</p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  The base URL of your BMS ML service
+                </p>
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">API Key</label>
+                <label className="text-muted-foreground text-[12px] font-medium">API Key</label>
                 <Input
                   className="mt-1.5 h-9 font-mono text-[13px]"
                   type="password"
                   value={ocrApiKey}
-                  onChange={(e) => { setOcrApiKey(e.target.value); }}
+                  onChange={(e) => {
+                    setOcrApiKey(e.target.value);
+                  }}
                   placeholder="sk-your-api-key"
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">Authentication key for the BMS ML API</p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Authentication key for the BMS ML API
+                </p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">Username (JWT auth)</label>
+                <label className="text-muted-foreground text-[12px] font-medium">
+                  Username (JWT auth)
+                </label>
                 <Input
                   className="mt-1.5 h-9 text-[13px]"
                   value={ocrUsername}
-                  onChange={(e) => { setOcrUsername(e.target.value); }}
+                  onChange={(e) => {
+                    setOcrUsername(e.target.value);
+                  }}
                   placeholder="admin"
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">Leave empty if using API key</p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Leave empty if using API key
+                </p>
               </div>
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">Password (JWT auth)</label>
+                <label className="text-muted-foreground text-[12px] font-medium">
+                  Password (JWT auth)
+                </label>
                 <Input
                   className="mt-1.5 h-9 text-[13px]"
                   type="password"
                   value={ocrPassword}
-                  onChange={(e) => { setOcrPassword(e.target.value); }}
+                  onChange={(e) => {
+                    setOcrPassword(e.target.value);
+                  }}
                   placeholder="••••••"
                 />
-                <p className="mt-1 text-[11px] text-muted-foreground">Leave empty if using API key</p>
+                <p className="text-muted-foreground mt-1 text-[11px]">
+                  Leave empty if using API key
+                </p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[12px] font-medium text-muted-foreground">Default OCR Engine</label>
+                <label className="text-muted-foreground text-[12px] font-medium">
+                  Default OCR Engine
+                </label>
                 <select
-                  className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-2 text-[13px]"
+                  className="border-border bg-background mt-1.5 h-9 w-full rounded-md border px-2 text-[13px]"
                   value={ocrEngine}
-                  onChange={(e) => { setOcrEngine(e.target.value); }}
+                  onChange={(e) => {
+                    setOcrEngine(e.target.value);
+                  }}
                 >
                   <option value="auto">Auto-detect (recommended)</option>
                   <option value="doctr">DocTR (deep learning)</option>
@@ -1549,26 +1885,32 @@ function OrgSettingsPage() {
                 <label className="flex items-center gap-2">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-border"
+                    className="border-border h-4 w-4 rounded"
                     checked={ocrAutoProcess}
-                    onChange={(e) => { setOcrAutoProcess(e.target.checked); }}
+                    onChange={(e) => {
+                      setOcrAutoProcess(e.target.checked);
+                    }}
                   />
                   <span className="text-[13px] font-medium">Auto-process on upload</span>
                 </label>
-                <p className="ml-6 text-[11px] text-muted-foreground">Automatically run OCR when documents are uploaded</p>
+                <p className="text-muted-foreground ml-6 text-[11px]">
+                  Automatically run OCR when documents are uploaded
+                </p>
               </div>
             </div>
 
             <div className="flex justify-end">
               <Button
-                onClick={() => void updateOrg.mutateAsync({
-                  ocrApiUrl: ocrApiUrl || null,
-                  ocrApiKey: ocrApiKey || null,
-                  ocrApiUsername: ocrUsername || null,
-                  ocrApiPassword: ocrPassword || null,
-                  ocrDefaultEngine: ocrEngine || null,
-                  ocrAutoProcess,
-                })}
+                onClick={() =>
+                  void updateOrg.mutateAsync({
+                    ocrApiUrl: ocrApiUrl || null,
+                    ocrApiKey: ocrApiKey || null,
+                    ocrApiUsername: ocrUsername || null,
+                    ocrApiPassword: ocrPassword || null,
+                    ocrDefaultEngine: ocrEngine || null,
+                    ocrAutoProcess,
+                  })
+                }
                 loading={updateOrg.isPending}
               >
                 <Trans>Save OCR Settings</Trans>

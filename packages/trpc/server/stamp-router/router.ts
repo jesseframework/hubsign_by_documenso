@@ -109,10 +109,12 @@ export const stampRouter = router({
     }));
   }),
 
-  /** Whether AI stamp generation is configured server-side. */
-  aiAvailable: authenticatedProcedure.query(() => ({
-    available: isAiStampGenerationConfigured(),
-  })),
+  /** Whether AI stamp generation is set up for the caller's organization. */
+  aiAvailable: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await resolveOrganization(ctx.user.id);
+
+    return { available: await isAiStampGenerationConfigured(membership.organizationId) };
+  }),
 
   /**
    * Generate a stamp from a natural-language prompt. The model returns SVG;
@@ -136,6 +138,7 @@ export const stampRouter = router({
       });
 
       const result = await generateStampFromPrompt({
+        organizationId: membership.organizationId,
         prompt: input.prompt,
         organizationName: org?.name,
         primaryColor: org?.brandingPrimaryColor ?? undefined,

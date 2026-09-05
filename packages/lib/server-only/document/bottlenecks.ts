@@ -1,5 +1,6 @@
 import { prisma } from '@documenso/prisma';
 
+import type { DueDateBasis } from '../../universal/payment-terms';
 import { vendorCoreName } from '../../universal/vendor-match';
 import { getOrganizationDueDates } from '../inbox/invoice-due';
 import { getDocumentResponsibility } from './responsibility';
@@ -92,6 +93,13 @@ export type SigningBottlenecks = {
         documentTitle: string;
         dueAt: Date | null;
         daysPastDue: number;
+        /**
+         * Where that date came from. Carried to the client because a date printed
+         * on the invoice and a date derived from a terms code are different kinds
+         * of fact, and the panel showed them identically — leaving no way to tell
+         * a supplier's own deadline from one this product inferred on its behalf.
+         */
+        basis: DueDateBasis;
         /**
          * How long the invoice has been in the queue, and whether it was already
          * past its due date when it got here. Without these a back-dated invoice
@@ -321,6 +329,7 @@ const vendorOverdue = async (organizationId: number): Promise<SigningBottlenecks
         documentTitle: due.documentTitle,
         dueAt: due.dueAt,
         daysPastDue: due.daysPastDue,
+        basis: due.basis,
         daysHeld: due.daysHeld,
         arrivedOverdue: due.arrivedOverdue,
       });

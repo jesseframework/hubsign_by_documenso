@@ -16,12 +16,19 @@ import { markInboxEmailRead } from '@documenso/lib/server-only/inbox/mark-email-
 import { pollWorkHubInboxForOrg } from '@documenso/lib/server-only/inbox/poll-workhub-inbox';
 import { runAttachmentOcr } from '@documenso/lib/server-only/inbox/run-attachment-ocr';
 import { rememberTemplateForSender } from '@documenso/lib/server-only/inbox/resolve-ocr-template';
+import {
+  WorkHubWebhookError,
+  getMailWatchPortalUrl,
+  registerMailWatch,
+} from '@documenso/lib/server-only/inbox/workhub-mail-webhook';
 import { SLA_ORG_SELECT, evaluateItemsSla, slaClockStart } from '@documenso/lib/server-only/inbox/sla';
 import { getInboxItemTimeline } from '@documenso/lib/server-only/inbox/timeline';
 import { reassignRecipient } from '@documenso/lib/server-only/recipient/reassign-recipient';
 import { nanoid } from '@documenso/lib/universal/id';
 import { vendorCoreName } from '@documenso/lib/universal/vendor-match';
+import { env } from '@documenso/lib/utils/env';
 import { prisma } from '@documenso/prisma';
+import { OrganizationRole } from '@prisma/client';
 
 import { requireOrgMember } from '../lib/require-org-member';
 import { authenticatedProcedure, router } from '../trpc';
@@ -1095,4 +1102,161 @@ export const inboxRouter = router({
     const membership = await requireOrgMember(ctx.user.id);
     return pollWorkHubInboxForOrg(membership.organizationId);
   }),
+
+  /**
+   * Realtime-mail status.
+   *
+   * Three separate things have to be true before mail arrives by push, and an
+   * admin needs to see which one is missing: WorkHub holds a watch, we hold the
+   * Svix signing secret, and our address is reachable from the internet. Showing
+   * one "enabled" boolean would hide the usual failure — a watch registered but
+   * the secret never copied out of the portal, which fails closed and silently.
+   */
+  realtimeMailStatus: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await requireOrgMember(ctx.user.id);
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: membership.organizationId },
+      select: {
+        workhubApiKey: true,
+        workhubMailboxId: true,
+        workhubWebhookId: true,
+        workhubWebhookSecret: true,
+      },
+    });
+
+    const appUrl = (env('NEXT_PUBLIC_WEBAPP_URL') ?? '').trim();
+    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[?::1\]?)/i.test(appUrl);
+
+    return {
+      registered: Boolean(organization?.workhubWebhookId),
+      hasSecret: Boolean(organization?.workhubWebhookSecret),
+      canRegister: Boolean(organization?.workhubApiKey && organization?.workhubMailboxId),
+      isAdmin: membership.role === OrganizationRole.ORG_ADMIN,
+      /*
+        Svix delivers over the public internet. On a localhost deployment
+        registration succeeds and then nothing ever arrives, which is a
+        miserable thing to debug — so say it up front.
+      */
+      deliverable: Boolean(appUrl) && !isLocal,
+      endpointUrl: appUrl ? `${appUrl.replace(/\/$/, '')}/api/webhooks/workhub-mail` : null,
+    };
+  }),
+
+  /**
+   * The Svix portal link, re-fetched on demand.
+   *
+   * Registration returns this once, and the signing secret exists ONLY inside
+   * that portal — so an admin who reloads the page before finishing setup would
+   * otherwise be stranded with no way back in. Kept out of `realtimeMailStatus`
+   * deliberately: that query runs on every settings page load, and it should not
+   * start depending on WorkHub being reachable.
+   *
+   * Returns null rather than throwing, so a WorkHub outage degrades the card to
+   * "no link right now" instead of breaking the page.
+   */
+  realtimeMailPortal: authenticatedProcedure.query(async ({ ctx }) => {
+    const membership = await requireOrgMember(ctx.user.id);
+
+    if (membership.role !== OrganizationRole.ORG_ADMIN) {
+      return { portalUrl: null };
+    }
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: membership.organizationId },
+      select: { workhubApiKey: true, workhubApiBase: true },
+    });
+
+    if (!organization?.workhubApiKey) {
+      return { portalUrl: null };
+    }
+
+    try {
+      const portalUrl = await getMailWatchPortalUrl({
+        apiKey: organization.workhubApiKey,
+        apiBase: organization.workhubApiBase,
+      });
+
+      return { portalUrl };
+    } catch (err) {
+      console.error('[realtime-mail] could not fetch the portal link:', err);
+      return { portalUrl: null };
+    }
+  }),
+
+  /** Register this org's mailbox for push notifications. Returns the Svix portal URL. */
+  enableRealtimeMail: authenticatedProcedure.mutation(async ({ ctx }) => {
+    const membership = await requireOrgMember(ctx.user.id);
+
+    if (membership.role !== OrganizationRole.ORG_ADMIN) {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Only an organization admin can change mail delivery.',
+      });
+    }
+
+    const organization = await prisma.organization.findUnique({
+      where: { id: membership.organizationId },
+      select: { workhubApiKey: true, workhubApiBase: true, workhubMailboxId: true },
+    });
+
+    if (!organization?.workhubApiKey || !organization.workhubMailboxId) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Set the WorkHub API key and mailbox for this organization first.',
+      });
+    }
+
+    try {
+      const watch = await registerMailWatch({
+        apiKey: organization.workhubApiKey,
+        apiBase: organization.workhubApiBase,
+        mailboxId: organization.workhubMailboxId,
+      });
+
+      await prisma.organization.update({
+        where: { id: membership.organizationId },
+        data: { workhubWebhookId: watch.id },
+      });
+
+      // The signing secret is not in this response — it only exists inside the
+      // Svix portal, so an admin has to fetch it by hand and paste it back.
+      return { watchId: watch.id, portalUrl: watch.portalUrl };
+    } catch (err) {
+      if (err instanceof WorkHubWebhookError) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: err.message });
+      }
+      throw err;
+    }
+  }),
+
+  /** Store the Svix signing secret copied out of the portal. */
+  setRealtimeMailSecret: authenticatedProcedure
+    .input(z.object({ secret: z.string().nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const membership = await requireOrgMember(ctx.user.id);
+
+      if (membership.role !== OrganizationRole.ORG_ADMIN) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only an organization admin can change mail delivery.',
+        });
+      }
+
+      const secret = input.secret?.trim() || null;
+
+      if (secret !== null && !secret.startsWith('whsec_')) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'That does not look like a Svix signing secret — they begin with "whsec_".',
+        });
+      }
+
+      await prisma.organization.update({
+        where: { id: membership.organizationId },
+        data: { workhubWebhookSecret: secret },
+      });
+
+      return { hasSecret: secret !== null };
+    }),
 });

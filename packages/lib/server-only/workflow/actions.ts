@@ -8,6 +8,7 @@
  */
 
 import type { TWorkflowAction } from '../../types/workflow';
+import { containsKeyword, parseKeywords } from '../../universal/keyword-match';
 import { normalizeMetadataKey } from '../../universal/metadata';
 import {
   type MetadataSigner,
@@ -437,12 +438,9 @@ const recordExtra = (record: { data?: unknown }): Record<string, unknown> =>
     ? (record.data as Record<string, unknown>)
     : {};
 
-/** A record's keywords (stored on data.keywords as an array or comma-string). */
-const recordKeywords = (record: { data?: unknown }): string[] => {
-  const raw = recordExtra(record).keywords;
-  const list = Array.isArray(raw) ? raw.map(String) : typeof raw === 'string' ? raw.split(',') : [];
-  return list.map((k) => k.trim().toLowerCase()).filter(Boolean);
-};
+/** A record's keywords (stored on data.keywords as an array or delimited string). */
+const recordKeywords = (record: { data?: unknown }): string[] =>
+  parseKeywords(recordExtra(record).keywords);
 
 const lookupMetadata: WorkflowActionHandler<
   Extract<TWorkflowAction, { action: 'LOOKUP_METADATA' }>
@@ -530,8 +528,9 @@ const lookupMetadata: WorkflowActionHandler<
     };
   }
 
-  // KEYWORD mode — scan text for each record's keywords, return the first match.
-  // Default haystack = every OCR field the event carried, plus type + title.
+  // KEYWORD mode — scan text for each record's keywords.
+  // Default haystack = every OCR field the event carried, plus type + title,
+  // and — only when asked for — the document's full OCR text.
   let haystack = config.keywordText ? renderTemplate(config.keywordText, data) : '';
   if (!haystack) {
     const payload = (data as { payload?: Record<string, unknown> })?.payload ?? {};
@@ -543,6 +542,29 @@ const lookupMetadata: WorkflowActionHandler<
     if (payload.documentType) parts.push(String(payload.documentType));
     const doc = payload.document as { title?: unknown } | undefined;
     if (doc?.title) parts.push(String(doc.title));
+
+    // The extracted fields are ~15 short values, so a keyword the OCR template
+    // has no field for is unfindable without the body text. It is read here
+    // rather than carried on the event because that payload is persisted on
+    // every WorkflowRun and pushed to Teams — fetching it lazily keeps the cost
+    // on the lookups that actually asked for it.
+    if (config.searchDocumentText) {
+      const inboxItemId = payload.inboxItemId;
+      if (!inboxItemId) {
+        logger.warn(
+          '[workflow:LOOKUP_METADATA] searchDocumentText is set but this event carries no ' +
+            'inboxItemId — matching extracted fields only',
+        );
+      } else {
+        const item = await prisma.signatureInboxItem.findUnique({
+          where: { id: String(inboxItemId) },
+          select: { ocrText: true },
+        });
+        if (item?.ocrText) parts.push(item.ocrText);
+        else logger.info('[workflow:LOOKUP_METADATA] no OCR text stored for this document');
+      }
+    }
+
     haystack = parts.join(' ');
   }
   haystack = haystack.toLowerCase();
@@ -555,22 +577,50 @@ const lookupMetadata: WorkflowActionHandler<
   const records = await prisma.metadataRecord.findMany({
     where: { organizationId, category: config.category },
   });
+
+  const hits: { record: (typeof records)[number]; keyword: string }[] = [];
   for (const record of records) {
-    const matched = recordKeywords(record).find((kw) => haystack.includes(kw));
-    if (matched) {
-      logger.info(`[workflow:LOOKUP_METADATA] matched "${record.label}" on keyword "${matched}"`);
-      return {
-        found: true,
-        matchedKeyword: matched,
-        key: record.key,
-        label: record.label,
-        email: record.email,
-        ...recordExtra(record),
-      };
-    }
+    const keyword = recordKeywords(record).find((kw) => containsKeyword(haystack, kw));
+    if (keyword) hits.push({ record, keyword });
   }
 
-  return { found: false };
+  const [best, ...rest] = hits;
+  if (!best) return { found: false };
+
+  // More than one record claims the document. NAME mode refuses to guess here,
+  // but a keyword list is a deliberately loose net and returning nothing would
+  // break the workflows already relying on first-match; so the first is still
+  // used and the collision is logged and put on the result, where a CONDITION
+  // step can gate on it. This is the "a generic keyword like 'consulting' on
+  // one vendor silently captures every invoice" failure, made visible.
+  if (rest.length > 0) {
+    logger.warn(
+      `[workflow:LOOKUP_METADATA] ${hits.length} "${config.category}" records match — using ` +
+        `"${best.record.label}" (on "${best.keyword}"); also ` +
+        rest.map((h) => `"${h.record.label}" (on "${h.keyword}")`).join(', '),
+    );
+  }
+
+  logger.info(
+    `[workflow:LOOKUP_METADATA] matched "${best.record.label}" on keyword "${best.keyword}"`,
+  );
+
+  return {
+    found: true,
+    matchedKeyword: best.keyword,
+    key: best.record.key,
+    label: best.record.label,
+    email: best.record.email,
+    ambiguous: rest.length > 0,
+    matchCount: hits.length,
+    matches: hits.map((h) => ({
+      key: h.record.key,
+      label: h.record.label,
+      email: h.record.email,
+      matchedKeyword: h.keyword,
+    })),
+    ...recordExtra(best.record),
+  };
 };
 
 /**

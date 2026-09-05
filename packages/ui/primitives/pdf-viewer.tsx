@@ -11,9 +11,14 @@ import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 
 import { PDF_VIEWER_PAGE_SELECTOR } from '@documenso/lib/constants/pdf-viewer';
+import { ANNOTATION_COLORS } from '@documenso/lib/types/document-annotation';
 import { getFile } from '@documenso/lib/universal/upload/get-file';
 
 import { cn } from '../lib/utils';
+import { PDFAnnotationLayer } from './pdf-annotations/pdf-annotation-layer';
+import { PDFAnnotationToolbar } from './pdf-annotations/pdf-annotation-toolbar';
+import type { AnnotationTool } from './pdf-annotations/types';
+import { usePdfAnnotations } from './pdf-annotations/use-pdf-annotations';
 import { useToast } from './use-toast';
 
 export type LoadedPDFDocument = PDFDocumentProxy;
@@ -57,6 +62,18 @@ export type PDFViewerProps = {
   onDocumentLoad?: (_doc: LoadedPDFDocument) => void;
   onPageClick?: OnPDFViewerPageClick;
   showZoomControls?: boolean;
+  /**
+   * Turns on PDF markup — highlights, freehand pen and notes drawn over the
+   * pages and flattened into the document when it is sealed.
+   *
+   * Off by default: most of the places this viewer is used (the field editor,
+   * template authoring, embeds) need every click on the page for themselves.
+   * Enabling it also needs one of `annotationDocumentId` or `annotationToken`
+   * to say which document the markup belongs to and who is drawing it.
+   */
+  enableAnnotations?: boolean;
+  annotationDocumentId?: number;
+  annotationToken?: string;
   [key: string]: unknown;
 } & Omit<React.HTMLAttributes<HTMLDivElement>, 'onPageClick'>;
 
@@ -66,12 +83,29 @@ export const PDFViewer = ({
   onDocumentLoad,
   onPageClick,
   showZoomControls = true,
+  enableAnnotations = false,
+  annotationDocumentId,
+  annotationToken,
   ...props
 }: PDFViewerProps) => {
   const { _ } = useLingui();
   const { toast } = useToast();
 
   const $el = useRef<HTMLDivElement>(null);
+
+  const [annotationTool, setAnnotationTool] = useState<AnnotationTool>('none');
+  const [annotationColor, setAnnotationColor] = useState<string>(ANNOTATION_COLORS[0]);
+
+  const {
+    annotations,
+    isSaving: isSavingAnnotation,
+    create: onCreateAnnotation,
+    remove: onDeleteAnnotation,
+  } = usePdfAnnotations({
+    documentId: annotationDocumentId,
+    token: annotationToken,
+    enabled: enableAnnotations,
+  });
 
   const [isDocumentBytesLoading, setIsDocumentBytesLoading] = useState(false);
   const [documentBytes, setDocumentBytes] = useState<Uint8Array | null>(null);
@@ -183,42 +217,56 @@ export const PDFViewer = ({
 
   return (
     <div ref={$el} className={cn('relative flex flex-col overflow-hidden', className)} {...props}>
-      {/* Zoom controls — top bar */}
-      {showZoomControls && !isLoading && numPages > 0 && (
-        <div className="flex items-center justify-between border-b border-border bg-muted/50 px-3 py-1.5">
-          <span className="text-[11px] text-muted-foreground">
+      {/* Zoom and markup controls — top bar */}
+      {(showZoomControls || enableAnnotations) && !isLoading && numPages > 0 && (
+        <div className="border-border bg-muted/50 flex flex-wrap items-center justify-between gap-2 border-b px-3 py-1.5">
+          <span className="text-muted-foreground text-[11px]">
             {numPages} {numPages === 1 ? 'page' : 'pages'}
           </span>
 
-          <div className="inline-flex items-center gap-0.5 rounded-md border border-border bg-card px-1 py-0.5">
-            <button
-              type="button"
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
-              onClick={onZoomOut}
-              disabled={zoom <= ZOOM_MIN}
-              title="Zoom out"
-            >
-              <Minus className="h-3 w-3" />
-            </button>
+          <div className="flex items-center gap-2">
+            {enableAnnotations && (
+              <PDFAnnotationToolbar
+                tool={annotationTool}
+                onToolChange={setAnnotationTool}
+                color={annotationColor}
+                onColorChange={setAnnotationColor}
+                isSaving={isSavingAnnotation}
+              />
+            )}
 
-            <button
-              type="button"
-              className="flex h-6 min-w-[2.5rem] items-center justify-center px-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-              onClick={onZoomReset}
-              title="Reset zoom"
-            >
-              {zoomPercent}%
-            </button>
+            {showZoomControls && (
+              <div className="border-border bg-card inline-flex items-center gap-0.5 rounded-md border px-1 py-0.5">
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:bg-muted hover:text-foreground flex h-6 w-6 items-center justify-center rounded transition-colors disabled:opacity-30"
+                  onClick={onZoomOut}
+                  disabled={zoom <= ZOOM_MIN}
+                  title="Zoom out"
+                >
+                  <Minus className="h-3 w-3" />
+                </button>
 
-            <button
-              type="button"
-              className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-30"
-              onClick={onZoomIn}
-              disabled={zoom >= ZOOM_MAX}
-              title="Zoom in"
-            >
-              <Plus className="h-3 w-3" />
-            </button>
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-foreground flex h-6 min-w-[2.5rem] items-center justify-center px-1 text-[11px] font-medium transition-colors"
+                  onClick={onZoomReset}
+                  title="Reset zoom"
+                >
+                  {zoomPercent}%
+                </button>
+
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:bg-muted hover:text-foreground flex h-6 w-6 items-center justify-center rounded transition-colors disabled:opacity-30"
+                  onClick={onZoomIn}
+                  disabled={zoom >= ZOOM_MAX}
+                  title="Zoom in"
+                >
+                  <Plus className="h-3 w-3" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -276,7 +324,7 @@ export const PDFViewer = ({
               .fill(null)
               .map((_, i) => (
                 <div key={i} className="last:-mb-2">
-                  <div className="border-border overflow-hidden rounded border will-change-transform">
+                  <div className="border-border relative overflow-hidden rounded border will-change-transform">
                     <PDFPage
                       pageNumber={i + 1}
                       width={width}
@@ -285,6 +333,18 @@ export const PDFViewer = ({
                       loading={() => ''}
                       onClick={(e) => onDocumentPageClick(e, i + 1)}
                     />
+
+                    {enableAnnotations && (
+                      <PDFAnnotationLayer
+                        pageIndex={i}
+                        annotations={annotations}
+                        tool={annotationTool}
+                        color={annotationColor}
+                        onCreate={onCreateAnnotation}
+                        onDelete={onDeleteAnnotation}
+                        isEditing
+                      />
+                    )}
                   </div>
                   <p className="text-muted-foreground/80 my-2 text-center text-[11px]">
                     <Trans>
@@ -296,7 +356,6 @@ export const PDFViewer = ({
           </PDFDocument>
         </div>
       )}
-
     </div>
   );
 };

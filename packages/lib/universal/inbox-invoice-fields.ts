@@ -1,4 +1,8 @@
 import { ocrFieldNames } from '../utils/ocr-fields';
+import type { DateOrder } from './ocr-date';
+import { parseOcrDateValue } from './ocr-date';
+import type { OcrCanonicalField } from './ocr-fields';
+import { readOcrField } from './ocr-fields';
 
 /**
  * The invoice fields the Signature Inbox reads out of OCR output.
@@ -33,6 +37,26 @@ export const ocrFieldString = (item: { extractedData?: unknown }, keys: string[]
   return '';
 };
 
+/**
+ * Exact-key lookup first, then the canonical normalised reader.
+ *
+ * The exact lookup stays the primary path, for the reasons above. The fallback is
+ * confined to the three fields the due-date calculation depends on, because there
+ * are two alias registries in this codebase and only one of them could see a due
+ * date the extractor had spelled `payment_due_date`, `pay_by`, or plain `dueDate`.
+ * `universal/ocr-fields.ts` read those perfectly well while this file returned
+ * blank, and blank here does not surface as a missing date — it falls through to
+ * the vendor's standing terms and surfaces as a date that is simply *wrong*.
+ *
+ * Both the grid and the spreadsheet export read `invoiceFields`, so widening it
+ * moves them together and they cannot disagree.
+ */
+const canonicalOr = (
+  item: { extractedData?: unknown },
+  keys: string[],
+  canonical: OcrCanonicalField,
+): string => ocrFieldString(item, keys) || readOcrField(item.extractedData, canonical) || '';
+
 /** All invoice fields the grid surfaces — sourced ONLY from BMS ML metadata. */
 export const invoiceFields = (item: { extractedData?: unknown }) => ({
   invoiceNumber: ocrFieldString(item, ['invoice_number', 'invoiceNumber', 'invoice_no']),
@@ -46,8 +70,15 @@ export const invoiceFields = (item: { extractedData?: unknown }) => ({
   total: ocrFieldString(item, [...ocrFieldNames('total_amount'), 'invoice_amount', 'grand_total']),
   tax: ocrFieldString(item, [...ocrFieldNames('tax_amount'), 'vat']),
   net: ocrFieldString(item, ['subtotal', 'net_amount', 'net']),
-  invoiceDate: ocrFieldString(item, ['invoice_date', 'date', 'issue_date']),
-  dueDate: ocrFieldString(item, [...ocrFieldNames('due_date'), 'payment_due']),
+  invoiceDate: canonicalOr(item, ['invoice_date', 'date', 'issue_date'], 'invoiceDate'),
+  dueDate: canonicalOr(item, [...ocrFieldNames('due_date'), 'payment_due'], 'dueDate'),
+  /**
+   * The credit terms printed on the invoice — "Net 30", "Payment due within 30
+   * days." The due-date calculation ranks these above the vendor directory's
+   * standing terms code, and without them an invoice whose extractor echoed the
+   * invoice date into the due-date field has nothing to fall back on.
+   */
+  paymentTerms: canonicalOr(item, ['payment_terms', 'terms', 'payment_term'], 'paymentTerms'),
   customerName: ocrFieldString(item, ocrFieldNames('customer_name')),
 });
 
@@ -98,32 +129,15 @@ export const parseAmount = (raw: string): number | null => {
  * Parse an OCR date value into a real Date, for spreadsheet cells that should
  * sort and filter as dates rather than as text.
  *
- * Returns null when the value is not a date the runtime recognises; the caller
- * writes the original string instead, because a date the extractor produced in
- * some unexpected format is still information worth exporting.
+ * Delegates to the shared parser rather than carrying its own, which it used to.
+ * The two disagreed: this one handed anything non-ISO to `new Date()`, so
+ * `03/04/2026` exported as 4 March — the runtime's convention, not the invoice's
+ * — while the overdue calculation discarded the same value. One number was a
+ * guess and the other was absent, and nothing on either screen said so.
+ *
+ * Returns null when the value is not a date that can be read without guessing;
+ * the caller writes the original string instead, because a date the extractor
+ * produced in some unexpected format is still information worth exporting.
  */
-export const parseOcrDate = (raw: string): Date | null => {
-  if (!raw) return null;
-
-  // Anchor the common ISO-ish prefix at midnight UTC rather than letting the
-  // runtime apply the server's timezone, which would shift 2026-06-12 to the
-  // 11th for anyone west of Greenwich.
-  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (iso) {
-    const parsed = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00.000Z`);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  }
-
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) return null;
-
-  // "06/01/2026" and "June 1, 2026" parse to midnight in the *server's*
-  // timezone, which is a different calendar day in UTC for anyone east of
-  // Greenwich — a June 1 invoice would export as May 31. Rebuild date-only
-  // values at UTC midnight so the day survives the trip into the spreadsheet.
-  if (parsed.getHours() === 0 && parsed.getMinutes() === 0 && parsed.getSeconds() === 0) {
-    return new Date(Date.UTC(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()));
-  }
-
-  return parsed;
-};
+export const parseOcrDate = (raw: string, order: DateOrder | null = null): Date | null =>
+  parseOcrDateValue(raw, order);

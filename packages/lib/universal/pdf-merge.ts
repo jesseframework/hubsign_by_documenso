@@ -1,8 +1,12 @@
 import { PDFDocument } from 'pdf-lib';
 
+import { unlockPdf } from '../client-only/unlock-pdf';
+
 /**
  * Merges multiple PDF files into a single PDF document.
- * Works in both browser and Node.js environments.
+ *
+ * Browser only — restricted PDFs are unlocked through the app's API before
+ * merging, since pdf-lib refuses to load them.
  */
 export async function mergePdfFiles(files: File[]): Promise<File> {
   if (files.length === 0) {
@@ -16,8 +20,8 @@ export async function mergePdfFiles(files: File[]): Promise<File> {
   const mergedPdf = await PDFDocument.create();
 
   for (const file of files) {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await PDFDocument.load(arrayBuffer);
+    const { bytes } = await unlockPdf(await file.arrayBuffer(), file.name);
+    const pdf = await PDFDocument.load(bytes);
     const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
 
     for (const page of pages) {
@@ -30,7 +34,8 @@ export async function mergePdfFiles(files: File[]): Promise<File> {
 
   // Use the first file's name as the merged document name
   const baseName = files[0].name.replace(/\.pdf$/i, '');
-  const mergedName = files.length > 1 ? `${baseName} (+${files.length - 1} merged).pdf` : files[0].name;
+  const mergedName =
+    files.length > 1 ? `${baseName} (+${files.length - 1} merged).pdf` : files[0].name;
 
   return new File([mergedBlob], mergedName, { type: 'application/pdf' });
 }

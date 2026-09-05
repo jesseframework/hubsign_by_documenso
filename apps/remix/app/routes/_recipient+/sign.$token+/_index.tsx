@@ -8,6 +8,7 @@ import { getOptionalSession } from '@documenso/auth/server/lib/utils/get-session
 import { useOptionalSession } from '@documenso/lib/client-only/providers/session';
 import { getDocumentAndSenderByToken } from '@documenso/lib/server-only/document/get-document-by-token';
 import { isRecipientAuthorized } from '@documenso/lib/server-only/document/is-recipient-authorized';
+import { getVendorSpendMeter } from '@documenso/lib/server-only/document/vendor-spend-meter';
 import { viewedDocument } from '@documenso/lib/server-only/document/viewed-document';
 import { getCompletedFieldsForToken } from '@documenso/lib/server-only/field/get-completed-fields-for-token';
 import { getFieldsForToken } from '@documenso/lib/server-only/field/get-fields-for-token';
@@ -21,10 +22,13 @@ import { extractDocumentAuthMethods } from '@documenso/lib/utils/document-auth';
 import { Button } from '@documenso/ui/primitives/button';
 
 import { DocumentSigningAuthPageView } from '~/components/general/document-signing/document-signing-auth-page';
-import { DocumentTitleRow, OutcomeCard } from '~/components/general/document-signing/signing-outcome-card';
 import { DocumentSigningAuthProvider } from '~/components/general/document-signing/document-signing-auth-provider';
 import { DocumentSigningPageView } from '~/components/general/document-signing/document-signing-page-view';
 import { DocumentSigningProvider } from '~/components/general/document-signing/document-signing-provider';
+import {
+  DocumentTitleRow,
+  OutcomeCard,
+} from '~/components/general/document-signing/signing-outcome-card';
 import { superLoaderJson, useSuperLoaderData } from '~/utils/super-json-loader';
 
 import type { Route } from './+types/_index';
@@ -139,6 +143,29 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const stampPlacements = await getStampPlacementsForToken({ token });
 
+  /**
+   * The vendor spend meter, for organization members only.
+   *
+   * Resolved here rather than fetched by the panel, so it does not exist in the
+   * browser at all unless the server decided this viewer may see it. A signing
+   * link works for anyone holding the token, and the person signing a vendor's
+   * invoice may well work for that vendor — a client-side query gated on the
+   * same condition would still have shipped the figures to them.
+   *
+   * `getVendorSpendMeter` makes the membership check itself; passing the viewer
+   * is the whole of this caller's responsibility.
+   */
+  const spendMeter = document.organizationId
+    ? await getVendorSpendMeter({
+        organizationId: document.organizationId,
+        documentId: document.id,
+        viewerUserId: user?.id,
+      })
+        // A meter that fails to compute must not take down the page someone is
+        // trying to sign on.
+        .catch(() => null)
+    : null;
+
   return superLoaderJson({
     isDocumentAccessValid: true,
     document,
@@ -149,6 +176,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     completedFields,
     isRecipientsTurn,
     stampPlacements,
+    spendMeter,
   } as const);
 }
 
@@ -176,6 +204,7 @@ export default function SigningPage() {
     allRecipients,
     recipientWithFields,
     stampPlacements,
+    spendMeter,
   } = data;
 
   if (document.deletedAt || document.status === DocumentStatus.REJECTED) {
@@ -236,7 +265,7 @@ export default function SigningPage() {
             the card, and only for someone who has no account to go back to.
           */}
           {!user && (
-            <p className="text-center text-[12px] text-muted-foreground">
+            <p className="text-muted-foreground text-center text-[12px]">
               <Trans>
                 Want to send signing links like this one?{' '}
                 <Link to="https://hubsign.io" className="text-primary hover:underline">
@@ -272,6 +301,7 @@ export default function SigningPage() {
           isRecipientsTurn={isRecipientsTurn}
           allRecipients={allRecipients}
           stampPlacements={stampPlacements}
+          spendMeter={spendMeter}
         />
       </DocumentSigningAuthProvider>
     </DocumentSigningProvider>

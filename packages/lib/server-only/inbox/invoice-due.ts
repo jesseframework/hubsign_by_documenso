@@ -135,6 +135,11 @@ export const evaluateItemsDueDates = async ({
     const resolved = resolveDueDate({
       ocrDueDate: fields.dueDate || null,
       invoiceDate: fields.invoiceDate || null,
+      // The terms the invoice states for itself, which outrank the vendor's
+      // standing code — and which are the only thing standing between an invoice
+      // whose due date was echoed from its invoice date and a month of imaginary
+      // lateness.
+      invoiceTerms: fields.paymentTerms || null,
       arrivedAt,
       termsCode: targets.termsCode ?? null,
       now,

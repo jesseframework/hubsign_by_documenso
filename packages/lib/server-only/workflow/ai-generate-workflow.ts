@@ -2,14 +2,19 @@
  * AI workflow generator — turn a natural-language prompt into a valid workflow
  * definition so end users don't hand-write JSON.
  *
- * Provider-flexible: prefers OpenAI/GPT-4 (`NEXT_PRIVATE_OPENAI_API_KEY`, model
- * `NEXT_PRIVATE_OPENAI_MODEL`, default gpt-4o) and falls back to Anthropic/Claude
- * (`NEXT_PRIVATE_ANTHROPIC_API_KEY`) if OpenAI errors (e.g. out of quota). Force
- * a single provider with `NEXT_PRIVATE_WORKFLOW_AI_PROVIDER` = openai | anthropic.
+ * Runs through the WorkHub AI bridge; HubSign holds no provider key. Pin the
+ * model with `NEXT_PRIVATE_WORKFLOW_AI_MODEL` and the vendor with
+ * `NEXT_PRIVATE_WORKFLOW_AI_PROVIDER` (openai | anthropic); unset, WorkHub routes
+ * to whichever shared provider is active.
  *
- * Structured output is enforced via a forced tool/function call; the result is
- * validated against `ZWorkflowDefinitionSchema` and retried once with the
- * validation errors fed back.
+ * This used to hand-roll both an OpenAI and an Anthropic call and fail over
+ * between them, because a dry OpenAI account was HubSign's problem to survive.
+ * The bridge normalises tool calls across vendors and owns provider health, so
+ * both paths collapse into one request.
+ *
+ * Structured output is enforced via a forced tool call; the result is validated
+ * against `ZWorkflowDefinitionSchema` and retried once with the validation
+ * errors fed back.
  */
 
 import { AppError, AppErrorCode } from '../../errors/app-error';
@@ -20,12 +25,24 @@ import {
   ZWorkflowDefinitionSchema,
 } from '../../types/workflow';
 import { env } from '../../utils/env';
+import { type AiVendor, AiBridgeError, callAiBridge } from '../ai/bridge';
+import { isAiConfiguredForOrg, resolveAiApiKey } from '../ai/resolve-ai-key';
 
-export const isWorkflowAiConfigured = (): boolean =>
-  Boolean(env('NEXT_PRIVATE_OPENAI_API_KEY') || env('NEXT_PRIVATE_ANTHROPIC_API_KEY'));
+/** The AI key is per-organization, configured on the AI Credits screen. */
+export const isWorkflowAiConfigured = (organizationId: number | null): Promise<boolean> =>
+  isAiConfiguredForOrg(organizationId);
 
-const OPENAI_MODEL = env('NEXT_PRIVATE_OPENAI_MODEL') || 'gpt-4o';
-const ANTHROPIC_MODEL = 'claude-sonnet-4-6';
+/** Optional per-call pins. Unset means "whatever WorkHub has active". */
+const workflowModel = (): string | undefined =>
+  (env('NEXT_PRIVATE_WORKFLOW_AI_MODEL') || env('NEXT_PRIVATE_OPENAI_MODEL') || '').trim() ||
+  undefined;
+
+const workflowVendor = (): AiVendor | undefined => {
+  const forced = (env('NEXT_PRIVATE_WORKFLOW_AI_PROVIDER') || '').trim().toLowerCase();
+  return forced === 'openai' || forced === 'anthropic' || forced === 'azure_openai' || forced === 'ollama'
+    ? (forced as AiVendor)
+    : undefined;
+};
 
 const eventLines = WORKFLOW_EVENTS.map((e) => `  - ${e.key} (${e.group}): ${e.label}`).join('\n');
 
@@ -64,8 +81,9 @@ ACTIONS (the "config" of an ACTION step; allowed action values: ${WORKFLOW_ACTIO
 - LOOKUP_METADATA:      { "action":"LOOKUP_METADATA", "category":"vendor", "key":"{{payload.extractedData.vendor_name}}", "saveAs":"vendor" }
   (Looks up an org metadata record and stores the match in a run variable. Two modes:
    • EXACT: pass "key" (a template) to match a record's name, e.g. the vendor name.
-   • KEYWORD: OMIT "key" to match records by their keywords against the invoice's OCR fields — best for "trigger a sign request by keyword", e.g. { "action":"LOOKUP_METADATA", "category":"signee", "saveAs":"signer" } finds the signee whose keyword appears anywhere in the OCR data. Optionally pass "keywordText" to scan specific text.
-   After it runs, later steps read {{vars.<saveAs>.found}}, {{vars.<saveAs>.email}}, {{vars.<saveAs>.contactName}}, {{vars.<saveAs>.role}}, {{vars.<saveAs>.matchedKeyword}}. Typical flow: LOOKUP_METADATA(signee, keyword) → CONDITION on {{vars.signer.found}} → SEND_FOR_SIGNATURE to {{vars.signer.email}}. Chain steps with "next".)
+   • KEYWORD: OMIT "key" to match records by their keywords against the invoice's OCR fields — best for "trigger a sign request by keyword", e.g. { "action":"LOOKUP_METADATA", "category":"signee", "saveAs":"signer" } finds the signee whose keyword appears anywhere in the OCR data. Optionally pass "keywordText" to scan specific text. Keywords match whole words only.
+     Add "searchDocumentText": true to also scan the document's FULL OCR text rather than only the ~15 extracted fields — use it when the keyword the user describes is not one of the extracted fields (a project code, a site name, a phrase like "net 30"). Inbox events only.
+   After it runs, later steps read {{vars.<saveAs>.found}}, {{vars.<saveAs>.email}}, {{vars.<saveAs>.contactName}}, {{vars.<saveAs>.role}}, {{vars.<saveAs>.matchedKeyword}}, and — when several records matched — {{vars.<saveAs>.ambiguous}} / {{vars.<saveAs>.matchCount}}. Typical flow: LOOKUP_METADATA(signee, keyword) → CONDITION on {{vars.signer.found}} → SEND_FOR_SIGNATURE to {{vars.signer.email}}. Chain steps with "next".)
 
 JSONLOGIC (for conditions/branches/assignments) — examples:
   { "==": [ { "var": "PATH" }, "value" ] }              equals
@@ -108,94 +126,48 @@ const TOOL_PARAMETERS = {
 
 type ToolResult = { name?: unknown; description?: unknown; definition?: unknown };
 
-const fail = (provider: string, status: number, text: string): never => {
-  console.error(`[ai-workflow] ${provider} API failed:`, status, text);
-  let detail = '';
-  try {
-    detail = (JSON.parse(text) as { error?: { message?: string } }).error?.message ?? '';
-  } catch {
-    // ignore
-  }
-  throw new AppError(AppErrorCode.UNKNOWN_ERROR, {
-    message: detail || `AI generation failed (${status}). Please try again.`,
-  });
-};
+/**
+ * One forced tool call through the bridge — the model has no choice but to
+ * answer as a `build_workflow` call, which is how structured output is enforced.
+ */
+const generateOnce = async (apiKey: string, userContent: string): Promise<ToolResult> => {
+  let result;
 
-const callOpenAI = async (apiKey: string, userContent: string): Promise<ToolResult> => {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      temperature: 0.2,
-      max_tokens: 4000,
+  try {
+    result = await callAiBridge({
+      apiKey,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userContent },
       ],
-      tools: [{ type: 'function', function: { name: TOOL_NAME, description: TOOL_DESCRIPTION, parameters: TOOL_PARAMETERS } }],
-      tool_choice: { type: 'function', function: { name: TOOL_NAME } },
-    }),
-  });
+      tools: [{ name: TOOL_NAME, description: TOOL_DESCRIPTION, parameters: TOOL_PARAMETERS }],
+      toolChoice: { name: TOOL_NAME },
+      model: workflowModel(),
+      vendor: workflowVendor(),
+      maxTokens: 4000,
+      temperature: 0.2,
+    });
+  } catch (err) {
+    if (err instanceof AiBridgeError) {
+      // `userMessage` is already written for a user and never repeats the
+      // vendor's wording; the upstream text stayed in the bridge's log.
+      throw new AppError(AppErrorCode.UNKNOWN_ERROR, { message: err.userMessage });
+    }
+    throw err;
+  }
 
-  if (!response.ok) fail('OpenAI', response.status, await response.text().catch(() => ''));
-
-  const body = (await response.json()) as {
-    choices?: Array<{ message?: { tool_calls?: Array<{ function?: { name?: string; arguments?: string } }> } }>;
-  };
-  const args = body.choices?.[0]?.message?.tool_calls?.find((c) => c.function?.name === TOOL_NAME)
-    ?.function?.arguments;
+  const args = result.toolCalls.find((call) => call.name === TOOL_NAME)?.arguments;
   if (!args) {
     throw new AppError(AppErrorCode.UNKNOWN_ERROR, { message: 'AI did not return a workflow.' });
   }
-  return JSON.parse(args) as ToolResult;
-};
 
-const callAnthropic = async (apiKey: string, userContent: string): Promise<ToolResult> => {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: 4000,
-      system: SYSTEM_PROMPT,
-      tools: [{ name: TOOL_NAME, description: TOOL_DESCRIPTION, input_schema: TOOL_PARAMETERS }],
-      tool_choice: { type: 'tool', name: TOOL_NAME },
-      messages: [{ role: 'user', content: userContent }],
-    }),
-  });
-
-  if (!response.ok) fail('Anthropic', response.status, await response.text().catch(() => ''));
-
-  const body = (await response.json()) as {
-    content?: Array<{ type: string; name?: string; input?: ToolResult }>;
-  };
-  const input = body.content?.find((c) => c.type === 'tool_use' && c.name === TOOL_NAME)?.input;
-  if (!input) {
-    throw new AppError(AppErrorCode.UNKNOWN_ERROR, { message: 'AI did not return a workflow.' });
+  try {
+    return JSON.parse(args) as ToolResult;
+  } catch {
+    throw new AppError(AppErrorCode.UNKNOWN_ERROR, {
+      message: 'AI returned a malformed workflow. Try rephrasing your request.',
+    });
   }
-  return input;
-};
-
-type Provider = { name: string; call: (userContent: string) => Promise<ToolResult> };
-
-/** Providers to try, in order, based on configured keys + optional override. */
-const resolveProviders = (): Provider[] => {
-  const openaiKey = env('NEXT_PRIVATE_OPENAI_API_KEY');
-  const anthropicKey = env('NEXT_PRIVATE_ANTHROPIC_API_KEY');
-  const forced = (env('NEXT_PRIVATE_WORKFLOW_AI_PROVIDER') || 'auto').toLowerCase();
-
-  const openai: Provider | null = openaiKey
-    ? { name: 'OpenAI', call: (c) => callOpenAI(openaiKey, c) }
-    : null;
-  const anthropic: Provider | null = anthropicKey
-    ? { name: 'Anthropic', call: (c) => callAnthropic(anthropicKey, c) }
-    : null;
-
-  if (forced === 'openai') return [openai].filter(Boolean) as Provider[];
-  if (forced === 'anthropic') return [anthropic].filter(Boolean) as Provider[];
-  // auto: prefer OpenAI/GPT-4, fall back to Anthropic.
-  return [openai, anthropic].filter(Boolean) as Provider[];
 };
 
 export type GeneratedWorkflow = {
@@ -204,9 +176,9 @@ export type GeneratedWorkflow = {
   definition: TWorkflowDefinition;
 };
 
-/** Call one provider, validate, and retry once with the validation errors. */
-const attempt = async (provider: Provider, base: string): Promise<GeneratedWorkflow> => {
-  let result = await provider.call(base);
+/** Generate, validate, and retry once with the validation errors fed back. */
+const attempt = async (apiKey: string, base: string): Promise<GeneratedWorkflow> => {
+  let result = await generateOnce(apiKey, base);
   let parsed = ZWorkflowDefinitionSchema.safeParse(result.definition);
 
   if (!parsed.success) {
@@ -216,7 +188,7 @@ const attempt = async (provider: Provider, base: string): Promise<GeneratedWorkf
     const retry =
       `${base}\n\nYour previous definition was INVALID:\n${JSON.stringify(result.definition)}\n\n` +
       `Validation errors:\n${issues}\n\nReturn a corrected workflow via ${TOOL_NAME}.`;
-    result = await provider.call(retry);
+    result = await generateOnce(apiKey, retry);
     parsed = ZWorkflowDefinitionSchema.safeParse(result.definition);
   }
 
@@ -234,11 +206,14 @@ const attempt = async (provider: Provider, base: string): Promise<GeneratedWorkf
 };
 
 export const generateWorkflowFromPrompt = async ({
+  organizationId,
   prompt,
   organizationName,
   metadataContext,
   emailTemplateContext,
 }: {
+  /** Whose AI key to bill this against. */
+  organizationId: number;
   prompt: string;
   organizationName?: string;
   /** Summary of the org's metadata directory so lookups target real categories/keywords. */
@@ -246,11 +221,11 @@ export const generateWorkflowFromPrompt = async ({
   /** The org's saved email templates, so SEND_EMAIL steps reference real keys. */
   emailTemplateContext?: string;
 }): Promise<GeneratedWorkflow> => {
-  const providers = resolveProviders();
-  if (providers.length === 0) {
+  const apiKey = await resolveAiApiKey(organizationId);
+  if (!apiKey) {
     throw new AppError(AppErrorCode.NOT_SETUP, {
       message:
-        "AI workflow generation isn't configured (set NEXT_PRIVATE_OPENAI_API_KEY or NEXT_PRIVATE_ANTHROPIC_API_KEY).",
+        "AI workflow generation isn't set up — an organization admin needs to add an AI key on the AI Credits screen.",
     });
   }
 
@@ -260,17 +235,5 @@ export const generateWorkflowFromPrompt = async ({
     (metadataContext ? `\n\n${metadataContext}` : '') +
     (emailTemplateContext ? `\n\n${emailTemplateContext}` : '');
 
-  let lastError: unknown;
-  for (const provider of providers) {
-    try {
-      return await attempt(provider, base);
-    } catch (err) {
-      lastError = err;
-      console.error(`[ai-workflow] ${provider.name} attempt failed, trying next:`, err);
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new AppError(AppErrorCode.UNKNOWN_ERROR, { message: 'AI generation failed.' });
+  return attempt(apiKey, base);
 };

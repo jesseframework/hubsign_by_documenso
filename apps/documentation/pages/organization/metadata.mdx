@@ -147,10 +147,12 @@ a cell containing commas has to be quoted in CSV, and hand-edited files frequent
 are not, so `a; b; c` survives where `a, b, c` unquoted would not.
 
 <Callout type="warning">
-  Keyword matching is a **substring** match, and the **first** matching record wins.
-  A keyword of `north` would also match "Northern Tools" and "Northgate" — whichever
-  is found first. Keep keywords specific enough to be unambiguous, and avoid short
-  fragments.
+  Keywords match **whole words**, so `it` will not fire on "unit" — but a keyword of
+  `north` still matches "Northgate Supplies" as a word on its own, and the **first**
+  matching record wins. When several records match, the first is still used and the
+  result carries `ambiguous: true` and a `matches` list; the run log names every
+  record that collided. Gate on `{{vars.<saveAs>.ambiguous}}` if a wrong pick would
+  be expensive.
 </Callout>
 
 ## How a workflow uses it
@@ -189,6 +191,32 @@ none.
   }
 }
 ```
+
+### Searching the whole document
+
+Those OCR fields are around fifteen short values, so a keyword that is not *in* one
+of them cannot be found — a project code, a site name, a phrase like `net 30`. Add
+`searchDocumentText` and the scan covers the document's full OCR text as well:
+
+```json
+{
+  "type": "ACTION",
+  "config": {
+    "action": "LOOKUP_METADATA",
+    "category": "vendor",
+    "searchDocumentText": true,
+    "saveAs": "vendor"
+  }
+}
+```
+
+It is off by default because it genuinely changes which records match — a whole page
+of text offers far more for a loose keyword to catch than fifteen fields do. Turn it
+on where you need it, and keep those keywords specific.
+
+This applies to documents arriving through the
+[Signature Inbox](/organization/signature-inbox), which is where the full text is stored. It is read at match time rather than carried
+on the event, so it costs nothing for workflows that do not ask for it.
 
 Either way the match lands in the run variable you name, and later steps use it:
 

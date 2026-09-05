@@ -1,7 +1,8 @@
 import sharp from 'sharp';
 
 import { AppError, AppErrorCode } from '../../errors/app-error';
-import { env } from '../../utils/env';
+import { AiBridgeError, callAiBridge } from '../ai/bridge';
+import { isAiConfiguredForOrg, resolveAiApiKey } from '../ai/resolve-ai-key';
 
 /**
  * AI Studio — generate a stamp from a natural-language description.
@@ -11,17 +12,19 @@ import { env } from '../../utils/env';
  * us reuse the entire UPLOADED → DocumentData → embed-on-PDF pipeline with
  * zero new code. Layout-JSON re-edit support comes later in Slice 2.
  *
- * Calls Anthropic's Messages API with a single forced-tool to enforce
- * structured output (the SVG string).
- *
- * Bails clean if NEXT_PRIVATE_ANTHROPIC_API_KEY isn't set so the feature can
- * ship dark on deployments without a key.
+ * Runs through the WorkHub AI bridge with a single forced tool call to enforce
+ * structured output (the SVG string), vendor-pinned to Anthropic because the
+ * prompt is tuned for Claude's SVG output. Bails clean if the bridge isn't
+ * configured, so the feature can ship dark.
  */
 
-export const isAiStampGenerationConfigured = () =>
-  Boolean(env('NEXT_PRIVATE_ANTHROPIC_API_KEY'));
+/** The AI key is per-organization, configured on the AI Credits screen. */
+export const isAiStampGenerationConfigured = (organizationId: number | null) =>
+  isAiConfiguredForOrg(organizationId);
 
 export type GenerateStampOptions = {
+  /** Whose AI key to bill this against. */
+  organizationId: number;
   prompt: string;
   /** Optional context the model can fold into the design. */
   organizationName?: string;
@@ -52,7 +55,9 @@ Do NOT respond with any text outside the tool call.`;
 const RENDER_STAMP_TOOL = {
   name: 'render_stamp',
   description: 'Submit the final SVG for the stamp.',
-  input_schema: {
+  // `parameters`, not Anthropic's `input_schema` — the bridge takes one neutral
+  // shape and translates per vendor.
+  parameters: {
     type: 'object' as const,
     required: ['svg', 'name'],
     properties: {
@@ -94,14 +99,16 @@ const sanitizeSvg = (svg: string) => {
 };
 
 export const generateStampFromPrompt = async ({
+  organizationId,
   prompt,
   organizationName,
   primaryColor,
 }: GenerateStampOptions): Promise<GeneratedStamp> => {
-  const apiKey = env('NEXT_PRIVATE_ANTHROPIC_API_KEY');
+  const apiKey = await resolveAiApiKey(organizationId);
   if (!apiKey) {
     throw new AppError(AppErrorCode.NOT_SETUP, {
-      message: 'AI stamp generation isn\'t configured for this deployment.',
+      message:
+        'AI stamp generation isn\'t set up — an organization admin needs to add an AI key on the AI Credits screen.',
     });
   }
 
@@ -113,56 +120,48 @@ export const generateStampFromPrompt = async ({
     .filter(Boolean)
     .join('\n');
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4000,
-      system: SYSTEM_PROMPT,
+  let result;
+  try {
+    result = await callAiBridge({
+      apiKey,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
       tools: [RENDER_STAMP_TOOL],
-      tool_choice: { type: 'tool', name: 'render_stamp' },
-      messages: [{ role: 'user', content: userMessage }],
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => '');
-    console.error('[ai-stamp] Anthropic API failed:', response.status, text);
-
-    // Surface the real Anthropic error message when present (e.g. credit
-    // balance too low, rate limited, invalid model). Falls back to a
-    // generic message if parsing fails.
-    let detail = '';
-    try {
-      const parsed = JSON.parse(text) as { error?: { message?: string } };
-      detail = parsed.error?.message ?? '';
-    } catch {
-      // ignore parse failure
-    }
-
-    throw new AppError(AppErrorCode.UNKNOWN_ERROR, {
-      message: detail || `AI generation failed (${response.status}). Please try again.`,
+      toolChoice: { name: RENDER_STAMP_TOOL.name },
+      model: 'claude-sonnet-4-6',
+      vendor: 'anthropic',
+      maxTokens: 4000,
     });
+  } catch (err) {
+    // This used to deliberately surface the vendor's own text — the comment
+    // here named "credit balance too low" as a case worth passing through.
+    // That is precisely the message that reads, to a user, as their HubSign
+    // credits being gone. The bridge maps it; the raw text stays in its log.
+    if (err instanceof AiBridgeError) {
+      throw new AppError(AppErrorCode.UNKNOWN_ERROR, { message: err.userMessage });
+    }
+    throw err;
   }
 
-  const body = (await response.json()) as {
-    content: Array<{ type: string; name?: string; input?: { svg?: string; name?: string } }>;
-  };
+  const call = result.toolCalls.find((toolCall) => toolCall.name === RENDER_STAMP_TOOL.name);
 
-  const toolUse = body.content?.find((c) => c.type === 'tool_use' && c.name === 'render_stamp');
-  if (!toolUse?.input?.svg) {
+  let input: { svg?: string; name?: string } = {};
+  try {
+    input = call ? (JSON.parse(call.arguments) as { svg?: string; name?: string }) : {};
+  } catch {
+    // Falls through to the "no usable stamp" message below.
+  }
+
+  if (!input.svg) {
     throw new AppError(AppErrorCode.UNKNOWN_ERROR, {
       message: 'AI did not return a usable stamp. Please rephrase the prompt and try again.',
     });
   }
 
-  const svg = sanitizeSvg(toolUse.input.svg);
-  const name = (toolUse.input.name ?? '').trim().slice(0, 40) || 'AI stamp';
+  const svg = sanitizeSvg(input.svg);
+  const name = (input.name ?? '').trim().slice(0, 40) || 'AI stamp';
 
   // Rasterize the SVG to a high-resolution PNG so it stays sharp at any scale
   // on the PDF. 800px is a good balance — large enough for retina rendering,

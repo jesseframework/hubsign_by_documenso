@@ -161,8 +161,23 @@ export const ZWorkflowActionSchema = z.discriminatedUnion('action', [
      * KEYWORD mode (when `key` is omitted): scan this text for each record's
      * keywords and return the first match. Supports {{templating}}. Defaults to
      * all of the event's OCR fields when left blank.
+     *
+     * Keywords match on whole words, so "it" no longer hits "unit".
      */
     keywordText: z.string().optional(),
+    /**
+     * KEYWORD mode: also scan the document's full OCR text, not just the
+     * extracted fields.
+     *
+     * Off by default because it changes which records match: the extracted
+     * fields are ~15 short values, while the body is the whole page. Turn it on
+     * for keywords the OCR template has no field for — a project code, a site
+     * name, "net 30" — which are otherwise unfindable.
+     *
+     * Only has an effect on inbox events (the payload must carry an
+     * `inboxItemId`) and when `keywordText` is left blank.
+     */
+    searchDocumentText: z.boolean().default(false).optional(),
     /** Run variable to store the match in (use as {{vars.<saveAs>.email}}). */
     saveAs: z.string().min(1).default('lookup'),
   }),

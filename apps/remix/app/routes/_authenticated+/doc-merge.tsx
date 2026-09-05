@@ -23,7 +23,9 @@ import { Trans } from '@lingui/react/macro';
 import { ArrowRight, FileText, Loader2, Trash2, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router';
 
+import { unlockPdf } from '@documenso/lib/client-only/unlock-pdf';
 import { DEFAULT_DOCUMENT_TIME_ZONE, TIME_ZONES } from '@documenso/lib/constants/time-zones';
+import { PdfPasswordRequiredError } from '@documenso/lib/universal/pdf-errors';
 import { putPdfFile } from '@documenso/lib/universal/upload/put-file';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
@@ -126,12 +128,23 @@ export default function DocMergePage() {
       setIsProcessingFiles(true);
       try {
         const newSources: SourceFile[] = [];
+        const unlockedNames: string[] = [];
         for (const f of accepted) {
           if (f.type !== 'application/pdf' && !f.name.toLowerCase().endsWith('.pdf')) continue;
+
+          // Restricted PDFs (scanners and government forms love them) render
+          // fine but can't be merged, so swap in unlocked bytes up front —
+          // that way the thumbnails show exactly what we're going to merge.
+          const { bytes, wasUnlocked } = await unlockPdf(await f.arrayBuffer(), f.name);
+
+          if (wasUnlocked) {
+            unlockedNames.push(f.name);
+          }
+
           newSources.push({
             id: crypto.randomUUID(),
             name: f.name,
-            bytes: await f.arrayBuffer(),
+            bytes,
           });
         }
         if (newSources.length === 0) {
@@ -156,11 +169,29 @@ export default function DocMergePage() {
           const first = newSources[0].name.replace(/\.pdf$/i, '');
           setTitle(`${first} (merged)`);
         }
+
+        if (unlockedNames.length > 0) {
+          toast({
+            title: _(msg`Unlocked for merging`),
+            description: _(
+              msg`Protected or damaged, so we rebuilt a copy first: ${unlockedNames.join(', ')}`,
+            ),
+            duration: 6000,
+          });
+        }
       } catch (err) {
         console.error('[doc-merge] failed to load file:', err);
         toast({
-          title: _(msg`Couldn't read that PDF`),
-          description: err instanceof Error ? err.message : undefined,
+          title:
+            err instanceof PdfPasswordRequiredError
+              ? _(msg`That PDF is password protected`)
+              : _(msg`Couldn't read that PDF`),
+          description:
+            err instanceof PdfPasswordRequiredError
+              ? _(msg`Open it with the password and save an unlocked copy, then add that instead.`)
+              : err instanceof Error
+                ? err.message
+                : undefined,
           variant: 'destructive',
         });
       } finally {
@@ -368,9 +399,7 @@ export default function DocMergePage() {
           <div className="mt-8 flex items-center justify-between">
             <h2 className="text-lg font-medium">
               <Trans>Page order</Trans>
-              <span className="text-muted-foreground ml-2 text-sm font-normal">
-                ({totalPages})
-              </span>
+              <span className="text-muted-foreground ml-2 text-sm font-normal">({totalPages})</span>
             </h2>
             <p className="text-muted-foreground text-xs">
               <Trans>Drag to reorder · click × to remove</Trans>

@@ -9,6 +9,7 @@ import { DEFAULT_DOCUMENT_DATE_FORMAT } from '@documenso/lib/constants/date-form
 import { PDF_VIEWER_PAGE_SELECTOR } from '@documenso/lib/constants/pdf-viewer';
 import { DEFAULT_DOCUMENT_TIME_ZONE } from '@documenso/lib/constants/time-zones';
 import type { DocumentAndSender } from '@documenso/lib/server-only/document/get-document-by-token';
+import type { VendorSpendMeter } from '@documenso/lib/server-only/document/vendor-spend-meter';
 import type { StampPlacementForToken } from '@documenso/lib/server-only/stamps/get-stamp-placements-for-token';
 import {
   ZCheckboxFieldMeta,
@@ -21,7 +22,6 @@ import type { CompletedField } from '@documenso/lib/types/fields';
 import type { FieldWithSignatureAndFieldMeta } from '@documenso/prisma/types/field-with-signature-and-fieldmeta';
 import type { RecipientWithFields } from '@documenso/prisma/types/recipient-with-fields';
 import { DocumentReadOnlyFields } from '@documenso/ui/components/document/document-read-only-fields';
-import { Card, CardContent } from '@documenso/ui/primitives/card';
 import { ElementVisible } from '@documenso/ui/primitives/element-visible';
 import { PDFViewer } from '@documenso/ui/primitives/pdf-viewer';
 
@@ -50,6 +50,12 @@ export type DocumentSigningPageViewProps = {
   isRecipientsTurn: boolean;
   allRecipients?: RecipientWithFields[];
   stampPlacements?: StampPlacementForToken[];
+  /**
+   * Vendor spend against the organization's limit. Resolved in the loader and
+   * null for anyone who is not a member of the document's organization — see the
+   * note there before passing this from anywhere else.
+   */
+  spendMeter?: VendorSpendMeter | null;
 };
 
 export const DocumentSigningPageView = ({
@@ -60,6 +66,7 @@ export const DocumentSigningPageView = ({
   isRecipientsTurn,
   allRecipients = [],
   stampPlacements = [],
+  spendMeter = null,
 }: DocumentSigningPageViewProps) => {
   const { documentData, documentMeta } = document;
 
@@ -81,19 +88,26 @@ export const DocumentSigningPageView = ({
   return (
     <DocumentSigningRecipientProvider recipient={recipient} targetSigner={selectedSigner ?? null}>
       <div className="mx-auto w-full max-w-screen-xl">
-        <h1
-          className="mt-4 block max-w-[20rem] truncate text-2xl font-semibold md:max-w-[30rem] md:text-3xl"
-          title={document.title}
-        >
-          {document.title}
-        </h1>
+        {/*
+          Title, who sent it, and the way out — one header row rather than a
+          heading, a paragraph and a button each finding their own line. The
+          document's name is the largest thing on the page and everything else
+          about the invitation sits under it at reading size.
+        */}
+        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0">
+            <h1
+              className="text-foreground block max-w-[20rem] truncate text-xl font-semibold tracking-tight md:max-w-[34rem] md:text-2xl"
+              title={document.title}
+            >
+              {document.title}
+            </h1>
 
-        <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-6">
-          <div className="max-w-[50ch]">
-            <span className="text-muted-foreground truncate" title={senderName}>
-              {senderName} {senderEmail}
-            </span>{' '}
-            <span className="text-muted-foreground">
+            <p className="text-muted-foreground mt-1.5 max-w-[60ch] text-[13px] leading-relaxed">
+              <span className="text-foreground font-medium" title={senderName}>
+                {senderName}
+              </span>{' '}
+              {senderEmail}{' '}
               {match(recipient.role)
                 .with(RecipientRole.VIEWER, () =>
                   document.teamId && !shouldUseTeamDetails ? (
@@ -132,21 +146,33 @@ export const DocumentSigningPageView = ({
                   ),
                 )
                 .otherwise(() => null)}
-            </span>
+            </p>
           </div>
 
           <DocumentSigningRejectDialog document={document} token={recipient.token} />
         </div>
 
-        <div className="mt-8 grid grid-cols-12 gap-y-8 lg:gap-x-8 lg:gap-y-0">
-          <Card
-            className="col-span-12 rounded-xl before:rounded-xl lg:col-span-7 xl:col-span-8"
-            gradient
-          >
-            <CardContent className="p-2">
-              <PDFViewer key={documentData.id} documentData={documentData} document={document} />
-            </CardContent>
-          </Card>
+        <div className="mt-5 grid grid-cols-12 gap-y-5 lg:gap-x-6 lg:gap-y-0">
+          {/*
+            A plain surface for the PDF, not the gradient-masked double border
+            with its grey glow. The document is the content — the frame around it
+            should be the same border every other panel on the page uses.
+          */}
+          <div className="border-border bg-card col-span-12 overflow-hidden rounded-[var(--r-lg)] border p-2 lg:col-span-7 xl:col-span-8">
+            {/*
+              Markup for the signer. The token is the credential here — it is
+              what tells the server which document this is and which recipient
+              is drawing, so their own highlights and notes come back editable
+              and everyone else's do not.
+            */}
+            <PDFViewer
+              key={documentData.id}
+              documentData={documentData}
+              document={document}
+              enableAnnotations
+              annotationToken={recipient.token}
+            />
+          </div>
 
           <div className="col-span-12 lg:col-span-5 xl:col-span-4">
             <DocumentSigningForm
@@ -157,6 +183,7 @@ export const DocumentSigningPageView = ({
               isRecipientsTurn={isRecipientsTurn}
               allRecipients={allRecipients}
               setSelectedSignerId={setSelectedSignerId}
+              spendMeter={spendMeter}
             />
           </div>
         </div>

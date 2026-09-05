@@ -42,6 +42,7 @@ export type VendorInvoice = {
   documentTitle: string;
   dueAt: string | Date | null;
   daysPastDue: number;
+  basis: 'invoice' | 'invoice-terms' | 'terms' | 'terms-from-arrival' | 'invoice-echoed' | 'none';
   daysHeld: number | null;
   arrivedOverdue: boolean;
 };
@@ -288,6 +289,51 @@ export type BottleneckDetail = 'waiting' | 'stuck' | 'vendors' | null;
 const th = 'px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground';
 const td = 'px-2 py-1.5 text-[12px] align-top';
 
+/**
+ * Where a due date came from, said out loud — but only when it is not simply
+ * printed on the invoice.
+ *
+ * A date the supplier put on the page and a date this product worked out from a
+ * terms code are different kinds of fact, and the panel used to render them
+ * identically, which is how a derived date gets read as the vendor's own deadline
+ * and argued about. The ordinary case stays unlabelled so the noise falls only on
+ * the rows that have earned it.
+ */
+const DueDateBasisNote = ({ basis }: { basis: VendorInvoice['basis'] }) => {
+  switch (basis) {
+    case 'invoice-terms':
+      return (
+        <span className="block text-[10px] text-muted-foreground">
+          <Trans>from invoice terms</Trans>
+        </span>
+      );
+    case 'terms':
+      return (
+        <span className="block text-[10px] text-muted-foreground">
+          <Trans>from vendor terms</Trans>
+        </span>
+      );
+    case 'terms-from-arrival':
+      return (
+        <span className="block text-[10px] text-muted-foreground">
+          <Trans>est. from arrival</Trans>
+        </span>
+      );
+    // The extractor echoed the invoice date into the due-date field and nothing —
+    // no terms on the page, no terms code on the vendor — was available to correct
+    // it. The figure is the best available and is very likely too harsh; saying so
+    // is the difference between a number someone can act on and one they cannot.
+    case 'invoice-echoed':
+      return (
+        <span className="block text-[10px] text-amber-600 dark:text-amber-400">
+          <Trans>no due date printed</Trans>
+        </span>
+      );
+    default:
+      return null;
+  }
+};
+
 export const BottleneckDetailDialog = ({
   detail,
   onClose,
@@ -457,9 +503,10 @@ export const BottleneckDetailDialog = ({
               <DialogDescription>
                 <Trans>
                   Invoices past the date the vendor is owed by, and still awaiting signature. The
-                  due date is the one printed on the invoice; where it states none, the vendor's
-                  terms code is applied to the invoice date. One already signed is history and is
-                  not counted here.
+                  due date is the one printed on the invoice; where it states none, the terms
+                  printed on the invoice are applied to the invoice date, and failing those the
+                  vendor's terms code. Any date not taken straight off the page is labelled as
+                  such. One already signed is history and is not counted here.
                 </Trans>{' '}
                 {/*
                   Said plainly, because the figure is read as a reproach otherwise.
@@ -518,10 +565,13 @@ export const BottleneckDetailDialog = ({
                               </span>
                             )}
                           </span>
-                          <span className="flex-shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                            {invoice.dueAt
-                              ? new Date(invoice.dueAt).toISOString().slice(0, 10)
-                              : '—'}
+                          <span className="flex-shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
+                            <span className="block">
+                              {invoice.dueAt
+                                ? new Date(invoice.dueAt).toISOString().slice(0, 10)
+                                : '—'}
+                            </span>
+                            <DueDateBasisNote basis={invoice.basis} />
                           </span>
                           {/*
                             Two numbers, because one of them was being misread as

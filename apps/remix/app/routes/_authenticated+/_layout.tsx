@@ -12,6 +12,7 @@ import { SITE_SETTINGS_BANNER_ID } from '@documenso/lib/server-only/site-setting
 import { AppBanner } from '~/components/general/app-banner';
 import { AppBottomNav } from '~/components/general/app-bottom-nav';
 import { AppSidebar } from '~/components/general/app-sidebar';
+import { AubreyFab } from '~/components/general/aubrey/aubrey-fab';
 import { AppTopbar } from '~/components/general/app-topbar';
 import { ConsoleShell } from '~/components/general/console-shell';
 import { OrgBrandingProvider } from '~/components/general/org-branding-provider';
@@ -86,6 +87,7 @@ export default function Layout({ loaderData }: Route.ComponentProps) {
       </div>
 
       <AppBottomNav />
+      <AubreyFab />
       <PushAutoSync />
       <OrgBrandingProvider />
     </LimitsProvider>

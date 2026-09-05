@@ -21,6 +21,7 @@ import { fieldsContainUnsignedRequiredField } from '../../utils/advanced-fields-
 import { shouldIncludeSigningCertificate } from '../../utils/signing-certificate';
 import { decryptSecondaryData } from '../crypto/decrypt';
 import { getCertificatePdf } from '../htmltopdf/get-certificate-pdf';
+import { embedAnnotationsOnPdf } from '../annotations/embed-annotations-on-pdf';
 import { addRejectionStampToPdf } from '../pdf/add-rejection-stamp-to-pdf';
 import { encryptPdfWithPassword } from '../pdf/encrypt-pdf';
 import { flattenAnnotations } from '../pdf/flatten-annotations';
@@ -191,6 +192,11 @@ export const sealDocument = async ({
   // a broken placement logs and is skipped rather than aborting the seal.
   if (!isRejected) {
     await embedStampsOnPdf(doc, document.id);
+
+    // Markup — highlights, pen strokes and notes — goes on last so it reads as
+    // annotation over the finished document rather than something a stamp or a
+    // signature can land on top of. Best-effort for the same reason as stamps.
+    await embedAnnotationsOnPdf(doc, document.id);
   }
 
   // Re-flatten post-insertion to handle fields that create arcoFields
