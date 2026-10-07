@@ -91,8 +91,26 @@ export const handleOAuthCallbackUrl = async (options: HandleOAuthCallbackUrlOpti
   const sub = claims.sub;
 
   if (typeof email !== 'string' || typeof name !== 'string' || typeof sub !== 'string') {
+    /*
+      Name which claims are missing.
+
+      "Invalid claims" is true but unactionable, and this is the step that fails
+      when a provider is connected with too narrow a scope — the ID token comes
+      back without `email`, and the admin has no way to tell that from a token
+      that came back malformed. The values themselves are not logged, only which
+      of the three were absent.
+    */
+    const missing = [
+      typeof email !== 'string' && 'email',
+      typeof name !== 'string' && 'name',
+      typeof sub !== 'string' && 'sub',
+    ].filter(Boolean);
+
     throw new AppError(AuthenticationErrorCode.InvalidRequest, {
-      message: 'Invalid claims',
+      message:
+        `The identity provider's ID token is missing required claims: ${missing.join(', ')}. ` +
+        'Check that the application requests — and the provider releases — the openid, ' +
+        'email and profile scopes.',
     });
   }
 

@@ -9,7 +9,7 @@ import { useForm } from 'react-hook-form';
 import { match } from 'ts-pattern';
 import { z } from 'zod';
 
-import { AppError } from '@documenso/lib/errors/app-error';
+import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import { fieldsContainUnsignedRequiredField } from '@documenso/lib/utils/advanced-fields-helpers';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
@@ -83,7 +83,6 @@ export const DocumentSigningCompleteDialog = ({
   /** Which role group to send it to, as "roleType\u0000roleKey". */
   const [overrideRole, setOverrideRole] = useState('');
 
-
   const requestOverride = trpc.businessRule.requestOverride.useMutation({
     onSuccess: () => setOverrideAsked(true),
   });
@@ -98,13 +97,23 @@ export const DocumentSigningCompleteDialog = ({
    * explanation and looked to the signer like the button was broken.
    */
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  /**
+   * Whether the last refusal was a policy decision rather than a fault.
+   *
+   * Only a policy refusal can be waived by a human, so only a policy refusal
+   * gets offered the exception request below. An infrastructure error — the mail
+   * provider returning a 502, say — was being offered it too, which invited the
+   * signer to ask their sender for permission to work around someone else's
+   * outage.
+   */
+  const [isPolicyRefusal, setIsPolicyRefusal] = useState(false);
   /*
     Fetched only once the signer is actually blocked and offered the request, so a
     normal signature costs no extra query. Returns labels only — see the endpoint.
   */
   const { data: approverOptions } = trpc.businessRule.overrideApproverOptions.useQuery(
     { token: signingToken ?? '' },
-    { enabled: Boolean(signingToken) && Boolean(submissionError) },
+    { enabled: Boolean(signingToken) && isPolicyRefusal },
   );
 
   const roleGroups = approverOptions?.roleGroups ?? [];
@@ -133,11 +142,13 @@ export const DocumentSigningCompleteDialog = ({
 
     setIsEditingNextSigner(false);
     setSubmissionError(null);
+    setIsPolicyRefusal(false);
     setShowDialog(open);
   };
 
   const onFormSubmit = async (data: TNextSignerFormSchema) => {
     setSubmissionError(null);
+    setIsPolicyRefusal(false);
 
     try {
       if (allowDictateNextSigner && data.name && data.email) {
@@ -152,6 +163,10 @@ export const DocumentSigningCompleteDialog = ({
       // one. Falling back through both beats showing nothing, but a bare generic
       // line is used rather than leaking an unexpected internal error verbatim.
       const parsed = AppError.parseError(error);
+
+      // INVALID_REQUEST is what the DOCUMENT_SIGN gate raises for an authored
+      // business rule, and it is the only refusal a sender can waive.
+      setIsPolicyRefusal(parsed.code === AppErrorCode.INVALID_REQUEST);
 
       setSubmissionError(
         parsed.userMessage ||
@@ -344,11 +359,14 @@ export const DocumentSigningCompleteDialog = ({
               into a single sentence, which read as one long piece of policy
               prose rather than a list of things to fix.
             */}
-            <div className="text-destructive space-y-1 text-sm">
-              {submissionError.split('\n').filter(Boolean).map((line, index) => (
-                <p key={index}>{line}</p>
-              ))}
-            </div>
+                  <div className="text-destructive space-y-1 text-sm">
+                    {submissionError
+                      .split('\n')
+                      .filter(Boolean)
+                      .map((line, index) => (
+                        <p key={index}>{line}</p>
+                      ))}
+                  </div>
                 </div>
               )}
 
@@ -364,8 +382,8 @@ export const DocumentSigningCompleteDialog = ({
                 with authority approves it, and only the rules that actually
                 blocked this signature can be waived.
               */}
-              {submissionError && signingToken && (
-                <div className="mt-3 rounded-md border border-border bg-muted/40 p-3">
+              {submissionError && signingToken && isPolicyRefusal && (
+                <div className="border-border bg-muted/40 mt-3 rounded-md border p-3">
                   {overrideAsked ? (
                     <div className="flex gap-2">
                       <CheckCircle2Icon className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-600" />
@@ -373,7 +391,7 @@ export const DocumentSigningCompleteDialog = ({
                         <p className="font-medium">
                           <Trans>Your request has been sent</Trans>
                         </p>
-                        <p className="mt-0.5 text-[13px] text-muted-foreground">
+                        <p className="text-muted-foreground mt-0.5 text-[13px]">
                           <Trans>
                             We have asked the sender to approve an exception. You can close this
                             page — come back to this link and press Sign again once they have.
@@ -386,7 +404,7 @@ export const DocumentSigningCompleteDialog = ({
                       <p className="text-sm font-medium">
                         <Trans>Cannot fix this?</Trans>
                       </p>
-                      <p className="mt-0.5 text-[13px] text-muted-foreground">
+                      <p className="text-muted-foreground mt-0.5 text-[13px]">
                         <Trans>
                           Ask the sender to approve an exception for this document. They will see
                           what blocked you.
@@ -400,7 +418,7 @@ export const DocumentSigningCompleteDialog = ({
                       */}
                       {roleGroups.length > 0 && (
                         <select
-                          className="mt-2 w-full rounded-md border border-border bg-background p-2 text-[13px]"
+                          className="border-border bg-background mt-2 w-full rounded-md border p-2 text-[13px]"
                           value={overrideRole}
                           onChange={(e) => setOverrideRole(e.target.value)}
                         >
@@ -417,7 +435,7 @@ export const DocumentSigningCompleteDialog = ({
                       )}
 
                       <textarea
-                        className="mt-2 min-h-[60px] w-full resize-y rounded-md border border-border bg-background p-2 text-[13px]"
+                        className="border-border bg-background mt-2 min-h-[60px] w-full resize-y rounded-md border p-2 text-[13px]"
                         placeholder="Why should this be allowed? (optional)"
                         value={overrideReason}
                         onChange={(e) => setOverrideReason(e.target.value)}

@@ -4,7 +4,7 @@ import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
 import { Trans } from '@lingui/react/macro';
 import { type Document, DocumentStatus, FieldType, RecipientRole } from '@prisma/client';
-import { ArrowLeft, BanIcon, CheckIcon, Clock8, FileSearch } from 'lucide-react';
+import { AlertTriangleIcon, ArrowLeft, BanIcon, CheckIcon, Clock8, FileSearch } from 'lucide-react';
 import { Link, useRevalidator } from 'react-router';
 import { match } from 'ts-pattern';
 
@@ -85,9 +85,22 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
   const canSignUp = !isExistingUser && env('NEXT_PUBLIC_DISABLE_SIGNUP') !== 'true';
 
+  /*
+    Set by the signing form when a notification email could not be handed to the
+    mail provider. It says nothing about the signature, which is already
+    recorded — see `completeDocumentWithToken`, which no longer lets a mail
+    fault fail a signing.
+
+    Read from the URL rather than from navigation state so that it survives a
+    reload, and treated as a display hint only: a signer who edits it into their
+    own address bar gets a warning they can safely ignore.
+  */
+  const emailUndelivered = new URL(request.url).searchParams.get('email') === 'undelivered';
+
   return {
     isDocumentAccessValid: true,
     canSignUp,
+    emailUndelivered,
     // Distinguishes "no sign-up panel because they already have an account"
     // from "no sign-up panel because sign-up is switched off" — the page offers
     // a different next step for each.
@@ -115,6 +128,7 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
     document,
     recipient,
     recipientEmail,
+    emailUndelivered,
   } = loaderData;
 
   if (!isDocumentAccessValid) {
@@ -228,6 +242,45 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
           </div>
         </OutcomeCard>
 
+        {/*
+          Signed, but the notification did not go out.
+
+          This is deliberately a warning attached to a confirmation rather than
+          an error in place of one. It used to be the opposite: a mail-provider
+          fault rejected the whole signing request, so the signer was shown
+          "the document was not completed" about a document that was signed, and
+          pressing Sign again answered "you have already signed" — leaving them
+          with two contradictory statements and no idea which was true.
+
+          The tone is therefore reassurance first, problem second. The signature
+          is the thing they care about, and it is fine.
+        */}
+        {emailUndelivered && (
+          <div
+            role="status"
+            className="border-status-pending-text/25 bg-status-pending-bg w-full rounded-[var(--r-lg)] border p-4"
+          >
+            <div className="flex gap-2.5">
+              <AlertTriangleIcon
+                className="text-status-pending-text mt-0.5 h-4 w-4 flex-shrink-0"
+                strokeWidth={1.7}
+              />
+              <div>
+                <p className="text-foreground text-[13px] font-medium">
+                  <Trans>Your signature is saved — but our email did not go out</Trans>
+                </p>
+                <p className="text-muted-foreground mt-1 text-[13px] leading-relaxed">
+                  <Trans>
+                    The document is signed and nothing needs to be signed again. Our mail provider
+                    would not accept the confirmation email, so it may not arrive. If you need a
+                    copy for your records, download it above or contact the sender.
+                  </Trans>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex w-full flex-col items-center">
           {/*
             A signer who already has an account gets no sign-up panel
@@ -239,8 +292,8 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
             now says that itself, so repeating it two inches lower added nothing.
           */}
           {!canSignUp && !user && isExistingUser && (
-            <div className="w-full rounded-[var(--r-lg)] border border-border bg-card p-6 text-center">
-              <p className="text-[13px] leading-relaxed text-muted-foreground">
+            <div className="border-border bg-card w-full rounded-[var(--r-lg)] border p-6 text-center">
+              <p className="text-muted-foreground text-[13px] leading-relaxed">
                 <Trans>
                   You already have a HubSign account. Sign in to keep this document and your
                   signature with the rest of your records.
@@ -255,13 +308,15 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
           )}
 
           {canSignUp && (
-            <div className="w-full rounded-[var(--r-lg)] border border-border bg-card p-6 sm:p-8">
+            <div className="border-border bg-card w-full rounded-[var(--r-lg)] border p-6 sm:p-8">
               <h2 className="text-center text-lg font-semibold tracking-tight">
                 <Trans>Need to sign documents?</Trans>
               </h2>
 
-              <p className="mt-2 text-center text-[13px] leading-relaxed text-muted-foreground">
-                <Trans>Create a free HubSign account and keep your signed documents together.</Trans>
+              <p className="text-muted-foreground mt-2 text-center text-[13px] leading-relaxed">
+                <Trans>
+                  Create a free HubSign account and keep your signed documents together.
+                </Trans>
               </p>
 
               <ClaimAccount defaultName={recipientName} defaultEmail={recipient.email} />
@@ -269,7 +324,7 @@ export default function CompletedSigningPage({ loaderData }: Route.ComponentProp
           )}
 
           {user && (
-            <Button asChild variant="ghost" className="text-[13px] text-muted-foreground">
+            <Button asChild variant="ghost" className="text-muted-foreground text-[13px]">
               <Link to="/documents">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 <Trans>Back to my documents</Trans>

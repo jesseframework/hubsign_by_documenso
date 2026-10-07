@@ -23,10 +23,23 @@ import {
   ZWebhookDocumentSchema,
   mapDocumentToWebhookDocumentPayload,
 } from '../../types/webhook-payload';
-import { getIsRecipientsTurnToSign } from '../recipient/get-is-recipient-turn';
 import { publishInboxEventForDocument } from '../inbox/publish-document-change';
+import { getIsRecipientsTurnToSign } from '../recipient/get-is-recipient-turn';
 import { triggerWebhook } from '../webhooks/trigger/trigger-webhook';
 import { sendPendingEmail } from './send-pending-email';
+
+export type CompleteDocumentWithTokenResponse = {
+  /**
+   * False when a notification email could not be handed to the mail provider.
+   *
+   * The signature is recorded either way — this exists so the UI can show a
+   * warning *beside* the confirmation rather than an error *instead* of it. The
+   * provider's own message is deliberately not returned: it is infrastructure
+   * detail ("WorkHub BulkSender error [http_502]") that means nothing to an
+   * external signer, and it goes to the server log instead.
+   */
+  emailDelivered: boolean;
+};
 
 export type CompleteDocumentWithTokenOptions = {
   token: string;
@@ -69,7 +82,7 @@ export const completeDocumentWithToken = async ({
   // Present when a signed-in user is signing; absent for token-only signers.
   // Feeds the rule context's `actor.*` namespace.
   userId,
-}: CompleteDocumentWithTokenOptions) => {
+}: CompleteDocumentWithTokenOptions): Promise<CompleteDocumentWithTokenResponse> => {
   const document = await getDocument({ token, documentId });
 
   if (document.status !== DocumentStatus.PENDING) {
@@ -203,139 +216,225 @@ export const completeDocumentWithToken = async ({
     });
   });
 
-  await jobs.triggerJob({
-    name: 'send.recipient.signed.email',
-    payload: {
-      documentId: document.id,
-      recipientId: recipient.id,
-    },
-  });
+  // ───────────────────────────────────────────────────────────────────────────
+  // The signature is committed. Everything below is a consequence of it, and
+  // nothing below may throw.
+  //
+  // A failure here used to reject the whole mutation, so the signer was told
+  // "the document was not completed" about a document that had in fact just
+  // been signed — and their retry was then refused with "Recipient N has
+  // already signed", which reads as the system contradicting itself. The usual
+  // trigger was a transient mail-provider fault (an HTTP 502 from the send
+  // API): someone else's outage, reported to the signer as their failure to
+  // sign, with no way forward.
+  //
+  // Delivery problems are collected and returned instead, so the caller can say
+  // "signed — but we could not email you" rather than "it did not work".
+  // ───────────────────────────────────────────────────────────────────────────
 
-  const pendingRecipients = await prisma.recipient.findMany({
-    select: {
-      id: true,
-      signingOrder: true,
-      name: true,
-      email: true,
-      role: true,
-    },
-    where: {
-      documentId: document.id,
-      signingStatus: {
-        not: SigningStatus.SIGNED,
+  let emailDelivered = true;
+
+  /**
+   * Runs one post-signature side effect. A failure is logged and, when the
+   * signer would notice the absence of it, remembered — but never raised.
+   */
+  const sideEffect = async (
+    label: string,
+    run: () => Promise<unknown>,
+    options?: { isEmail?: boolean },
+  ): Promise<void> => {
+    try {
+      await run();
+    } catch (err) {
+      console.error(
+        `[complete-document] ${label} failed for document ${document.id}. ` +
+          'The signature is already recorded and stands.',
+        err,
+      );
+
+      if (options?.isEmail) {
+        emailDelivered = false;
+      }
+    }
+  };
+
+  await sideEffect(
+    'recipient-signed email',
+    async () =>
+      jobs.triggerJob({
+        name: 'send.recipient.signed.email',
+        payload: {
+          documentId: document.id,
+          recipientId: recipient.id,
+        },
+      }),
+    { isEmail: true },
+  );
+
+  const pendingRecipients = await prisma.recipient
+    .findMany({
+      select: {
+        id: true,
+        signingOrder: true,
+        name: true,
+        email: true,
+        role: true,
       },
-      role: {
-        not: RecipientRole.CC,
+      where: {
+        documentId: document.id,
+        signingStatus: {
+          not: SigningStatus.SIGNED,
+        },
+        role: {
+          not: RecipientRole.CC,
+        },
       },
-    },
-    // Composite sort so our next recipient is always the one with the lowest signing order or id
-    // if there is a tie.
-    orderBy: [{ signingOrder: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
-  });
+      // Composite sort so our next recipient is always the one with the lowest signing order or id
+      // if there is a tie.
+      orderBy: [{ signingOrder: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }],
+    })
+    // Only used to decide who to notify next, so an unreadable list costs a
+    // notification — not the signature.
+    .catch((err) => {
+      console.error(
+        `[complete-document] could not load pending recipients for document ${document.id}.`,
+        err,
+      );
+
+      emailDelivered = false;
+
+      return [];
+    });
 
   if (pendingRecipients.length > 0) {
-    await sendPendingEmail({ documentId, recipientId: recipient.id });
+    // This is the call that produced the original bug: a direct, unguarded
+    // `mailer.sendMail` to the person who just signed.
+    await sideEffect(
+      'document-pending email',
+      async () => sendPendingEmail({ documentId, recipientId: recipient.id }),
+      { isEmail: true },
+    );
 
     if (document.documentMeta?.signingOrder === DocumentSigningOrder.SEQUENTIAL) {
       const [nextRecipient] = pendingRecipients;
 
-      await prisma.$transaction(async (tx) => {
-        if (nextSigner && document.documentMeta?.allowDictateNextSigner) {
-          await tx.documentAuditLog.create({
-            data: createDocumentAuditLogData({
-              type: DOCUMENT_AUDIT_LOG_TYPE.RECIPIENT_UPDATED,
-              documentId: document.id,
-              user: {
-                name: recipient.name,
-                email: recipient.email,
-              },
-              requestMetadata,
+      await sideEffect(
+        'next-signer handoff',
+        async () =>
+          prisma.$transaction(async (tx) => {
+            if (nextSigner && document.documentMeta?.allowDictateNextSigner) {
+              await tx.documentAuditLog.create({
+                data: createDocumentAuditLogData({
+                  type: DOCUMENT_AUDIT_LOG_TYPE.RECIPIENT_UPDATED,
+                  documentId: document.id,
+                  user: {
+                    name: recipient.name,
+                    email: recipient.email,
+                  },
+                  requestMetadata,
+                  data: {
+                    recipientEmail: nextRecipient.email,
+                    recipientName: nextRecipient.name,
+                    recipientId: nextRecipient.id,
+                    recipientRole: nextRecipient.role,
+                    changes: [
+                      {
+                        type: RECIPIENT_DIFF_TYPE.NAME,
+                        from: nextRecipient.name,
+                        to: nextSigner.name,
+                      },
+                      {
+                        type: RECIPIENT_DIFF_TYPE.EMAIL,
+                        from: nextRecipient.email,
+                        to: nextSigner.email,
+                      },
+                    ],
+                  },
+                }),
+              });
+            }
+
+            await tx.recipient.update({
+              where: { id: nextRecipient.id },
               data: {
-                recipientEmail: nextRecipient.email,
-                recipientName: nextRecipient.name,
-                recipientId: nextRecipient.id,
-                recipientRole: nextRecipient.role,
-                changes: [
-                  {
-                    type: RECIPIENT_DIFF_TYPE.NAME,
-                    from: nextRecipient.name,
-                    to: nextSigner.name,
-                  },
-                  {
-                    type: RECIPIENT_DIFF_TYPE.EMAIL,
-                    from: nextRecipient.email,
-                    to: nextSigner.email,
-                  },
-                ],
+                sendStatus: SendStatus.SENT,
+                ...(nextSigner && document.documentMeta?.allowDictateNextSigner
+                  ? {
+                      name: nextSigner.name,
+                      email: nextSigner.email,
+                    }
+                  : {}),
               },
-            }),
-          });
-        }
+            });
 
-        await tx.recipient.update({
-          where: { id: nextRecipient.id },
-          data: {
-            sendStatus: SendStatus.SENT,
-            ...(nextSigner && document.documentMeta?.allowDictateNextSigner
-              ? {
-                  name: nextSigner.name,
-                  email: nextSigner.email,
-                }
-              : {}),
-          },
-        });
-
-        await jobs.triggerJob({
-          name: 'send.signing.requested.email',
-          payload: {
-            userId: document.userId,
-            documentId: document.id,
-            recipientId: nextRecipient.id,
-            requestMetadata,
-          },
-        });
-      });
+            await jobs.triggerJob({
+              name: 'send.signing.requested.email',
+              payload: {
+                userId: document.userId,
+                documentId: document.id,
+                recipientId: nextRecipient.id,
+                requestMetadata,
+              },
+            });
+          }),
+        { isEmail: true },
+      );
     }
   }
 
-  const haveAllRecipientsSigned = await prisma.document.findFirst({
-    where: {
-      id: document.id,
-      recipients: {
-        every: {
-          OR: [{ signingStatus: SigningStatus.SIGNED }, { role: RecipientRole.CC }],
+  const haveAllRecipientsSigned = await prisma.document
+    .findFirst({
+      where: {
+        id: document.id,
+        recipients: {
+          every: {
+            OR: [{ signingStatus: SigningStatus.SIGNED }, { role: RecipientRole.CC }],
+          },
         },
       },
-    },
-  });
+    })
+    .catch((err) => {
+      console.error(
+        `[complete-document] could not check completion state for document ${document.id}.`,
+        err,
+      );
+
+      return null;
+    });
 
   if (haveAllRecipientsSigned) {
-    await jobs.triggerJob({
-      name: 'internal.seal-document',
-      payload: {
-        documentId: document.id,
-        requestMetadata,
-      },
-    });
+    await sideEffect('seal-document job', async () =>
+      jobs.triggerJob({
+        name: 'internal.seal-document',
+        payload: {
+          documentId: document.id,
+          requestMetadata,
+        },
+      }),
+    );
   }
 
-  const updatedDocument = await prisma.document.findFirstOrThrow({
-    where: {
-      id: document.id,
-    },
-    include: {
-      documentMeta: true,
-      recipients: true,
-    },
-  });
+  await sideEffect('document-signed webhook', async () => {
+    const updatedDocument = await prisma.document.findFirstOrThrow({
+      where: {
+        id: document.id,
+      },
+      include: {
+        documentMeta: true,
+        recipients: true,
+      },
+    });
 
-  await triggerWebhook({
-    event: WebhookTriggerEvents.DOCUMENT_SIGNED,
-    data: ZWebhookDocumentSchema.parse(mapDocumentToWebhookDocumentPayload(updatedDocument)),
-    userId: updatedDocument.userId,
-    teamId: updatedDocument.teamId ?? undefined,
+    await triggerWebhook({
+      event: WebhookTriggerEvents.DOCUMENT_SIGNED,
+      data: ZWebhookDocumentSchema.parse(mapDocumentToWebhookDocumentPayload(updatedDocument)),
+      userId: updatedDocument.userId,
+      teamId: updatedDocument.teamId ?? undefined,
+    });
   });
 
   // Move any open Signature Inbox view watching this document.
-  await publishInboxEventForDocument(document.id);
+  await sideEffect('inbox event publish', async () => publishInboxEventForDocument(document.id));
+
+  return { emailDelivered };
 };

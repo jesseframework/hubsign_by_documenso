@@ -158,7 +158,7 @@ export const DocumentSigningForm = ({
       ...(nextSigner?.email && nextSigner?.name ? { nextSigner } : {}),
     };
 
-    await completeDocumentWithToken(payload);
+    const result = await completeDocumentWithToken(payload);
 
     analytics.capture('App: Recipient has completed signing', {
       signerId: recipient.id,
@@ -169,7 +169,15 @@ export const DocumentSigningForm = ({
     if (redirectUrl) {
       window.location.href = redirectUrl;
     } else {
-      await navigate(`/sign/${recipient.token}/complete`);
+      /*
+        The signature is recorded whether or not the notification email went
+        out, so this only decides whether the confirmation page adds a warning
+        to it. It is carried in the URL rather than in navigation state so the
+        warning survives a reload of the confirmation page.
+      */
+      const search = result?.emailDelivered === false ? '?email=undelivered' : '';
+
+      await navigate(`/sign/${recipient.token}/complete${search}`);
     }
   };
 
