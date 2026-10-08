@@ -72,7 +72,7 @@ RUN npx turbo run build --filter=!@documenso/remix...
 # Build remix app
 WORKDIR /app/apps/remix
 
-#RUN npx lingui extract && npx lingui compile
+RUN npm run translate --prefix ../../
 RUN ls -la /app/apps/remix/app
 
 RUN npm run build:app
