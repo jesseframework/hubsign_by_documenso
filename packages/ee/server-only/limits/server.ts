@@ -244,7 +244,10 @@ const handleUserLimits = async ({ email }: HandleUserLimitsOptions) => {
           quota.dmsEnabled = true;
           remaining.dmsEnabled = true;
         }
-        if (licenseQuota.documents > quota.documents && licenseQuota.recipients > quota.recipients) {
+        if (
+          licenseQuota.documents > quota.documents ||
+          (licenseQuota.documents === quota.documents && licenseQuota.recipients > quota.recipients)
+        ) {
           const dmsWasEnabled = quota.dmsEnabled;
           quota = licenseQuota;
           remaining = structuredClone(quota);
@@ -271,8 +274,16 @@ const handleUserLimits = async ({ email }: HandleUserLimitsOptions) => {
         remaining.dmsEnabled = true;
       }
 
-      // Use the subscription with the highest quota.
-      if (currentQuota.documents > quota.documents && currentQuota.recipients > quota.recipients) {
+      // Use the subscription with the highest quota. Primary key is
+      // documents — a subscription that beats the current pick on documents
+      // wins outright (e.g. Starter's 20 vs Free's 5, even though both have
+      // 10 recipients); recipients only breaks an exact documents tie.
+      // Requiring improvement on BOTH fields (the old `&&`) meant Starter
+      // could never beat Free, since they tie on recipients — see F-1.
+      if (
+        currentQuota.documents > quota.documents ||
+        (currentQuota.documents === quota.documents && currentQuota.recipients > quota.recipients)
+      ) {
         const dmsWasEnabled = quota.dmsEnabled;
         quota = currentQuota;
         remaining = structuredClone(quota);
@@ -283,9 +294,6 @@ const handleUserLimits = async ({ email }: HandleUserLimitsOptions) => {
         }
       }
     }
-
-    // Assume all active subscriptions provide unlimited direct templates.
-    remaining.directTemplates = Infinity;
   }
 
   // Signature requests are counted at send, not creation — see
