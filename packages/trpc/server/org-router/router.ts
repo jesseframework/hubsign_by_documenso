@@ -141,15 +141,33 @@ const assignSeatToMember = async ({
     });
   }
 
-  const targetMember = await prisma.organizationMember.findUniqueOrThrow({
+  const targetMember = await prisma.organizationMember.findUnique({
     where: { id: memberId },
   });
+
+  // Scope to the org that owns this seat plan — a member id from another
+  // organization must never be reachable here. Member ids are not secret
+  // (they appear in Stripe subscription metadata and org.getMyOrganization),
+  // so this has to be enforced, not assumed from the caller's own org.
+  if (!targetMember || targetMember.organizationId !== organizationId) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Member not found' });
+  }
 
   // A member holds exactly one tier at a time (same as M365 licensing: a user
   // has one SKU even if the tenant offers several), so this is a no-op rather
   // than stacking a second tier. Switching tiers means unassign-then-assign.
   if (targetMember.seatTier) {
     return targetMember;
+  }
+
+  // Capacity is checked before anything with an external side effect
+  // (notably, before the Stripe cancellation below) — a full seat plan must
+  // never cost the target member their personal subscription.
+  if (seatPlan.assigned >= seatPlan.quantity) {
+    throw new TRPCError({
+      code: 'BAD_REQUEST',
+      message: 'All seats are assigned. Purchase more seats.',
+    });
   }
 
   // Re-checked server-side regardless of whether the client already called
@@ -182,13 +200,6 @@ const assignSeatToMember = async ({
       // goal — not double-billing — already holds, so don't block the seat.
       console.warn('Failed to cancel personal subscription during seat assignment:', err);
     }
-  }
-
-  if (seatPlan.assigned >= seatPlan.quantity) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'All seats are assigned. Purchase more seats.',
-    });
   }
 
   await prisma.orgSeatPlan.update({
@@ -2211,9 +2222,17 @@ export const orgRouter = router({
 
       if (!myMembership) throw new TRPCError({ code: 'FORBIDDEN' });
 
-      const member = await prisma.organizationMember.findUniqueOrThrow({
+      const member = await prisma.organizationMember.findUnique({
         where: { id: input.memberId },
       });
+
+      // Scope to the caller's own organization — a member id from another
+      // org must never be reachable here (ids are not secret: they appear
+      // in Stripe subscription metadata and org.getMyOrganization). Mirrors
+      // the same check in the bulk `unassignSeats` below.
+      if (!member || member.organizationId !== myMembership.organizationId) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Member not found' });
+      }
 
       // Admins can't change their own seat — but only when another
       // ORG_ADMIN (the role required to call this) actually exists to do it.
