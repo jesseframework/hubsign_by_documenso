@@ -537,10 +537,13 @@ function OrgBillingPage() {
   const billedTotal =
     seatPlans?.reduce((sum, p) => {
       const seatPrice = seatPriceFor(pricing, p.tier, p.billingInterval);
-      const dmsPrice = p.dmsEnabled ? dmsPriceFor(pricing, p.tier, p.billingInterval) : 0;
+      // No `dmsPrice` term here deliberately: DMS is bundled free into
+      // Business/Enterprise (`dmsEnabled`), never a separate Stripe charge —
+      // `dmsAddonAvailable` is false on every current org tier, so there is
+      // no `org_dms` line item to reflect. See F-13.
       const docBlockCost = p.docBlockQuantity * docBlockPriceFor(pricing, p.tier, p.billingInterval);
       const seatCount = TIER_CONFIG[p.tier as keyof typeof TIER_CONFIG]?.flatRate ? 1 : p.quantity;
-      return sum + (seatPrice + dmsPrice) * seatCount + docBlockCost;
+      return sum + seatPrice * seatCount + docBlockCost;
     }, 0) ?? 0;
 
   // Computed from the two independent live Stripe prices rather than a
@@ -602,9 +605,8 @@ function OrgBillingPage() {
             <span className={TIER_CONFIG[membership.seatTier as keyof typeof TIER_CONFIG]?.color}>
               {TIER_CONFIG[membership.seatTier as keyof typeof TIER_CONFIG]?.name}
             </span>{' '}
-            — $
-            {seatPriceFor(pricing, membership.seatTier, orgInterval) +
-              (membership.dmsAddon ? dmsPriceFor(pricing, membership.seatTier, orgInterval) : 0)}
+            {/* No DMS add-on price here either — see the `billedTotal` comment above. */}
+            — ${seatPriceFor(pricing, membership.seatTier, orgInterval)}
             {priceSuffix(
               TIER_CONFIG[membership.seatTier as keyof typeof TIER_CONFIG]?.flatRate ?? false,
               orgInterval,
@@ -882,11 +884,11 @@ function OrgBillingPage() {
           <div className="divide-y divide-border">
             {seatPlans.map((plan) => {
               const config = TIER_CONFIG[plan.tier as keyof typeof TIER_CONFIG];
-              // All-in per-seat rate (base + DMS if purchased) — shown
-              // consistently everywhere a per-seat price appears, so it
-              // never contradicts the all-in total or the "Your Plan" card.
-              const dmsPrice = plan.dmsEnabled ? dmsPriceFor(pricing, plan.tier, plan.billingInterval) : 0;
-              const allInSeatPrice = seatPriceFor(pricing, plan.tier, plan.billingInterval) + dmsPrice;
+              // Per-seat rate. No DMS add-on term (see the `billedTotal`
+              // comment above) — shown consistently everywhere a per-seat
+              // price appears, so it never contradicts the all-in total or
+              // the "Your Plan" card.
+              const allInSeatPrice = seatPriceFor(pricing, plan.tier, plan.billingInterval);
               const docBlockCost = plan.docBlockQuantity * docBlockPriceFor(pricing, plan.tier, plan.billingInterval);
               const planDocs = docsForTier(plan.tier);
               // Annual plans pool the full year's allowance rather than a

@@ -32,7 +32,8 @@ const resolveStripePlanNameAndPrice = async (priceId: string) => {
 
   const planName = typeof product === 'string' || product.deleted ? 'Plan' : product.name;
   const unitAmount = price.unit_amount ?? 0;
-  const priceFormatted = `$${(unitAmount / 100).toFixed(2)}/month`;
+  const interval = price.recurring?.interval === 'year' ? 'year' : 'month';
+  const priceFormatted = `$${(unitAmount / 100).toFixed(2)}/${interval}`;
 
   return { planName, priceFormatted };
 };
@@ -165,36 +166,42 @@ export const runDueSubscriptionRenewalReminders = async (): Promise<{
 
     const seatPlans = organization.seatPlans;
 
-    const totalCents = seatPlans.reduce((sum, plan) => {
-      const interval = (plan.billingInterval === 'year' ? 'year' : 'month') as OrgBillingInterval;
+    // A Stripe subscription can't mix monthly/yearly items (purchaseSeats/
+    // changePlan's own invariant — see org-router.ts), so every plan this
+    // org holds shares one interval; read it once rather than per plan.
+    const orgInterval: OrgBillingInterval = seatPlans[0]?.billingInterval === 'year' ? 'year' : 'month';
 
+    const totalCents = seatPlans.reduce((sum, plan) => {
       const seatPrice = matchOrgPrice(orgPrices, {
         type: 'org_seat',
         tier: plan.tier,
-        interval,
+        interval: orgInterval,
         deployment: plan.tier === 'ENTERPRISE' ? deployment : undefined,
       });
 
-      const dmsPrice = plan.dmsEnabled
-        ? matchOrgPrice(orgPrices, { type: 'org_dms', tier: plan.tier, interval })
+      // No `org_dms` term: DMS is bundled free into Business/Enterprise
+      // (`dmsEnabled`), never a separate charge today — see F-13, the same
+      // fix applied to the org billing page's own total.
+      const docBlockPrice = plan.docBlockQuantity
+        ? matchOrgPrice(orgPrices, { type: 'org_doc_block', tier: plan.tier, interval: orgInterval })
         : null;
 
-      const docBlockPrice = plan.docBlockQuantity
-        ? matchOrgPrice(orgPrices, { type: 'org_doc_block', tier: plan.tier, interval })
-        : null;
+      // Every current org tier is flat-rate (`ORG_SEAT_TIERS[tier].flatRate`)
+      // — billed to Stripe as quantity 1 regardless of `plan.quantity`, which
+      // for a flat tier holds the seat *cap* (e.g. Team's 20, or the
+      // unlimited sentinel), not a billed quantity. Mirrors `purchaseSeats`'
+      // own `tierLimits.flatRate ? 1 : input.quantity`.
+      const seatQuantity = ORG_SEAT_TIERS[plan.tier].flatRate ? 1 : plan.quantity;
 
       return (
-        sum +
-        (seatPrice?.unit_amount ?? 0) * plan.quantity +
-        (dmsPrice?.unit_amount ?? 0) * plan.quantity +
-        (docBlockPrice?.unit_amount ?? 0) * plan.docBlockQuantity
+        sum + (seatPrice?.unit_amount ?? 0) * seatQuantity + (docBlockPrice?.unit_amount ?? 0) * plan.docBlockQuantity
       );
     }, 0);
 
     const planName =
       seatPlans.length === 1
-        ? `${ORG_SEAT_TIERS[seatPlans[0].tier].name} (${seatPlans[0].quantity} seat${seatPlans[0].quantity > 1 ? 's' : ''})`
-        : `Organization seats (${seatPlans.reduce((sum, plan) => sum + plan.quantity, 0)} total)`;
+        ? ORG_SEAT_TIERS[seatPlans[0].tier].name
+        : `Organization (${seatPlans.length} tiers)`;
 
     await jobs.triggerJob({
       name: 'send.subscription.renewal-reminder.email',
@@ -202,7 +209,7 @@ export const runDueSubscriptionRenewalReminders = async (): Promise<{
         email: orgAdmin.email,
         name: orgAdmin.name || undefined,
         planName,
-        priceFormatted: `$${(totalCents / 100).toFixed(2)}/month`,
+        priceFormatted: `$${(totalCents / 100).toFixed(2)}/${orgInterval}`,
         periodEnd: periodEnd.toISOString(),
         billingUrl: `${baseUrl}/org/billing`,
       },
