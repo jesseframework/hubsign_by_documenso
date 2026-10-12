@@ -50,6 +50,32 @@ const countFreeEquivalentUsage = async (userId: number) => {
 };
 
 /**
+ * The shared fail-closed response for every `getOrgSeatLimits` branch that
+ * denies this member the tier's paid limits (no seat, expired license grant,
+ * or — see the `billingStatus` check below — a Stripe seat plan that isn't
+ * actually being paid for right now). Free limits reduced by actual usage,
+ * not the raw table: without that reduction a member denied a paid tier
+ * would read as freshly unused every time (F-3).
+ */
+const buildFreeFallbackLimits = async (
+  organizationId: number,
+  userId: number,
+): Promise<TLimitsResponseSchema> => {
+  const ocrQuota = await getOrgOcrQuota({ organizationId });
+  const usage = await countFreeEquivalentUsage(userId);
+  return {
+    quota: { ...FREE_PLAN_LIMITS, dmsEnabled: false, ocrPages: ocrQuota.quota },
+    remaining: {
+      ...FREE_PLAN_LIMITS,
+      dmsEnabled: false,
+      documents: Math.max(FREE_PLAN_LIMITS.documents - usage.documents, 0),
+      directTemplates: Math.max(FREE_PLAN_LIMITS.directTemplates - usage.directTemplates, 0),
+      ocrPages: ocrQuota.remaining,
+    },
+  };
+};
+
+/**
  * Check if user is in an organization with an assigned seat.
  * If so, use the seat's plan limits instead of personal subscription.
  */
@@ -57,7 +83,9 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
   const user = await prisma.user.findFirst({
     where: { email },
     include: {
-      organizationMemberships: true,
+      organizationMemberships: {
+        include: { organization: { select: { billingStatus: true } } },
+      },
     },
   });
 
@@ -83,37 +111,16 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
       if (!paidPlan) {
         // OCR quota is org-wide (see getOrgOcrQuota) — even though this
         // member has no usable seat, the org itself may hold other plans
-        // generating real Smart OCR usage.
-        const ocrQuota = await getOrgOcrQuota({ organizationId: membership.organizationId });
-        const usage = await countFreeEquivalentUsage(user.id);
-        return {
-          quota: { ...FREE_PLAN_LIMITS, dmsEnabled: false, ocrPages: ocrQuota.quota },
-          remaining: {
-            ...FREE_PLAN_LIMITS,
-            dmsEnabled: false,
-            documents: Math.max(FREE_PLAN_LIMITS.documents - usage.documents, 0),
-            directTemplates: Math.max(FREE_PLAN_LIMITS.directTemplates - usage.directTemplates, 0),
-            ocrPages: ocrQuota.remaining,
-          },
-        };
+        // generating real Smart OCR usage. (OCR's own org-wide fallback is
+        // folded into buildFreeFallbackLimits.)
+        return buildFreeFallbackLimits(membership.organizationId, user.id);
       }
     }
   }
 
   // If no seat assigned, user is in org but has no plan → treat as free
   if (!membership.seatTier) {
-    const ocrQuota = await getOrgOcrQuota({ organizationId: membership.organizationId });
-    const usage = await countFreeEquivalentUsage(user.id);
-    return {
-      quota: { ...FREE_PLAN_LIMITS, dmsEnabled: false, ocrPages: ocrQuota.quota },
-      remaining: {
-        ...FREE_PLAN_LIMITS,
-        dmsEnabled: false,
-        documents: Math.max(FREE_PLAN_LIMITS.documents - usage.documents, 0),
-        directTemplates: Math.max(FREE_PLAN_LIMITS.directTemplates - usage.directTemplates, 0),
-        ocrPages: ocrQuota.remaining,
-      },
-    };
+    return buildFreeFallbackLimits(membership.organizationId, user.id);
   }
 
   // Map seat tier to limits, resolving the canonical table's `null` ("unlimited")
@@ -126,9 +133,31 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
   const seatPlan = tierConfig
     ? await prisma.orgSeatPlan.findFirst({
         where: { organizationId: membership.organizationId, tier: membership.seatTier },
-        select: { docBlockQuantity: true, billingInterval: true, periodStart: true, createdAt: true },
+        select: {
+          docBlockQuantity: true,
+          billingInterval: true,
+          periodStart: true,
+          createdAt: true,
+          source: true,
+        },
       })
     : null;
+
+  // A Stripe-backed seat only grants its tier's paid limits while Stripe
+  // confirms the org is actually paying for it right now — mirrors the
+  // personal path's own strictness (`handleUserLimits` only counts
+  // `SubscriptionStatus.ACTIVE`; no grace for `past_due`). `onOrgSubscriptionDeleted`
+  // (cancellation, incl. dunning) deliberately clears only the `Organization`
+  // row, leaving `OrgSeatPlan` and this member's `seatTier` alone so
+  // resubscribing restores them — but that means nothing here ever re-checked
+  // billing status, so a cancelled org kept full paid access forever (F-4).
+  // The same gate also denies paid quota to a seat "purchased" while billing
+  // was off (F-5), which likewise has no active Stripe subscription behind it.
+  // License-key seats aren't gated here — they're Stripe-independent and
+  // already fail closed via the expiry+grace check above.
+  if (seatPlan?.source === 'stripe' && membership.organization.billingStatus !== 'active') {
+    return buildFreeFallbackLimits(membership.organizationId, user.id);
+  }
 
   const period: 'month' | 'year' = seatPlan?.billingInterval === 'year' ? 'year' : 'month';
 
