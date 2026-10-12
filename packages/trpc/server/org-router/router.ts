@@ -1288,6 +1288,26 @@ export const orgRouter = router({
         }
       }
 
+      // A `flatRate` tier (Business/Enterprise) never sells additional seats
+      // — `seatQuantity` above is forced to 1 no matter what the client
+      // requested — so once a *live* subscription already carries the tier,
+      // the only thing a repeat purchase can actually add is more doc-request
+      // blocks. With 0 requested and no seat for this admin to claim, there
+      // is nothing to purchase, but the `isTopUp` branch below still
+      // "succeeds" regardless: it re-syncs the unchanged Stripe item and
+      // unconditionally sends a fresh purchase-confirmation email (F-17).
+      // Scoped to `isTopUp` (a live Stripe subscription), not just
+      // `hasExistingTierPlan` — a cancelled org can have a stale OrgSeatPlan
+      // row with no subscription behind it (F-4/F-5), and re-subscribing
+      // that org for the same tier with 0 extra blocks is a legitimate fresh
+      // Checkout, not a no-op.
+      if (isTopUp && hasExistingTierPlan && tierLimits.flatRate && requestedDocBlocks === 0 && !adminNeedsSeat) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Nothing to purchase — request at least one signature request block.',
+        });
+      }
+
       if (!IS_BILLING_ENABLED()) {
         // Billing not enabled — just track it locally, synchronously (no
         // Stripe involved either way, so there's nothing to wait on).
