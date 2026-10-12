@@ -23,6 +23,33 @@ import type { TLimitsResponseSchema, TLimitsSchema } from './schema';
 import { ZLimitsSchema } from './schema';
 
 /**
+ * This calendar month's usage for the two `getOrgSeatLimits` branches that
+ * fall back to Free (no usable seat, or an expired license past grace) —
+ * both are always monthly, unlike the seated path below which may pool
+ * annually. Mirrors that path's own counting query exactly (F-3: these two
+ * branches used to return `remaining` un-reduced by actual usage, so a
+ * no-seat org member or an expired-license org was never capped at all).
+ */
+const countFreeEquivalentUsage = async (userId: number) => {
+  const startOfCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+  const [documents, directTemplates] = await Promise.all([
+    prisma.document.count({
+      where: {
+        userId,
+        sentAt: { gte: startOfCalendarMonth },
+        source: { not: 'TEMPLATE_DIRECT_LINK' },
+      },
+    }),
+    prisma.template.count({
+      where: { userId, directLink: { isNot: null } },
+    }),
+  ]);
+
+  return { documents, directTemplates };
+};
+
+/**
  * Check if user is in an organization with an assigned seat.
  * If so, use the seat's plan limits instead of personal subscription.
  */
@@ -58,9 +85,16 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
         // member has no usable seat, the org itself may hold other plans
         // generating real Smart OCR usage.
         const ocrQuota = await getOrgOcrQuota({ organizationId: membership.organizationId });
+        const usage = await countFreeEquivalentUsage(user.id);
         return {
           quota: { ...FREE_PLAN_LIMITS, dmsEnabled: false, ocrPages: ocrQuota.quota },
-          remaining: { ...FREE_PLAN_LIMITS, dmsEnabled: false, ocrPages: ocrQuota.remaining },
+          remaining: {
+            ...FREE_PLAN_LIMITS,
+            dmsEnabled: false,
+            documents: Math.max(FREE_PLAN_LIMITS.documents - usage.documents, 0),
+            directTemplates: Math.max(FREE_PLAN_LIMITS.directTemplates - usage.directTemplates, 0),
+            ocrPages: ocrQuota.remaining,
+          },
         };
       }
     }
@@ -69,9 +103,16 @@ const getOrgSeatLimits = async (email: string): Promise<TLimitsResponseSchema | 
   // If no seat assigned, user is in org but has no plan → treat as free
   if (!membership.seatTier) {
     const ocrQuota = await getOrgOcrQuota({ organizationId: membership.organizationId });
+    const usage = await countFreeEquivalentUsage(user.id);
     return {
       quota: { ...FREE_PLAN_LIMITS, dmsEnabled: false, ocrPages: ocrQuota.quota },
-      remaining: { ...FREE_PLAN_LIMITS, dmsEnabled: false, ocrPages: ocrQuota.remaining },
+      remaining: {
+        ...FREE_PLAN_LIMITS,
+        dmsEnabled: false,
+        documents: Math.max(FREE_PLAN_LIMITS.documents - usage.documents, 0),
+        directTemplates: Math.max(FREE_PLAN_LIMITS.directTemplates - usage.directTemplates, 0),
+        ocrPages: ocrQuota.remaining,
+      },
     };
   }
 
