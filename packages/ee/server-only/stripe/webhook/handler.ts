@@ -23,9 +23,39 @@ const resolvePlanNameAndPrice = (subscription: Stripe.Subscription) => {
   const planName = typeof product === 'string' || product.deleted ? 'Plan' : product.name;
 
   const unitAmount = item.price.unit_amount ?? 0;
-  const priceFormatted = `$${((unitAmount * (item.quantity ?? 1)) / 100).toFixed(2)}/month`;
+  const interval = item.price.recurring?.interval === 'year' ? 'year' : 'month';
+  const priceFormatted = `$${((unitAmount * (item.quantity ?? 1)) / 100).toFixed(2)}/${interval}`;
 
   return { planName, priceFormatted };
+};
+
+/**
+ * `invoice.subscription` existed through API version 2022-11-15 (this app's
+ * own pinned outgoing SDK version — see `server-only/stripe/index.ts`), but
+ * later API versions (e.g. 2025-03-31.basil) moved it to
+ * `invoice.parent.subscription_details.subscription`. The *webhook payload*
+ * is shaped by whatever API version the Stripe account/endpoint is actually
+ * sending — independent of this app's outgoing SDK pin — so a newer account
+ * was getting `invoice.payment_succeeded`/`invoice.payment_failed` with no
+ * usable `subscription` field at all, 500ing "Invalid invoice" on every
+ * renewal. Reads whichever shape the payload actually has.
+ */
+const resolveInvoiceSubscriptionId = (invoice: Stripe.Invoice): string | null => {
+  if (invoice.subscription) {
+    return typeof invoice.subscription === 'string'
+      ? invoice.subscription
+      : invoice.subscription.id;
+  }
+
+  const parentSubscription = (
+    invoice as unknown as {
+      parent?: { subscription_details?: { subscription?: string | { id: string } | null } | null } | null;
+    }
+  ).parent?.subscription_details?.subscription;
+
+  if (!parentSubscription) return null;
+
+  return typeof parentSubscription === 'string' ? parentSubscription : parentSubscription.id;
 };
 
 type StripeWebhookResponse = {
@@ -342,10 +372,7 @@ export const stripeWebhookHandler = async (req: Request): Promise<Response> => {
         const customerId =
           typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
 
-        const subscriptionId =
-          typeof invoice.subscription === 'string'
-            ? invoice.subscription
-            : invoice.subscription?.id;
+        const subscriptionId = resolveInvoiceSubscriptionId(invoice);
 
         if (!customerId || !subscriptionId) {
           return Response.json(
@@ -444,10 +471,7 @@ export const stripeWebhookHandler = async (req: Request): Promise<Response> => {
         const customerId =
           typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
 
-        const subscriptionId =
-          typeof invoice.subscription === 'string'
-            ? invoice.subscription
-            : invoice.subscription?.id;
+        const subscriptionId = resolveInvoiceSubscriptionId(invoice);
 
         if (!customerId || !subscriptionId) {
           return Response.json(
