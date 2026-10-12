@@ -575,6 +575,19 @@ export const documentRouter = router({
       const { teamId, user } = ctx;
       const { documentId } = input;
 
+      // Duplicating creates a brand-new document, same as createDocument
+      // just above — it needs the identical cap. This had no check at all
+      // (F-2): any account could create unlimited documents past its quota
+      // by duplicating an existing one instead of uploading a new one.
+      const { remaining } = await getServerLimits({ email: user.email, teamId });
+
+      if (remaining.documents <= 0) {
+        throw new AppError(AppErrorCode.LIMIT_EXCEEDED, {
+          message: `You have reached your document limit for this ${remaining.period}. Please upgrade your plan.`,
+          statusCode: 400,
+        });
+      }
+
       return await duplicateDocument({
         userId: user.id,
         teamId,
