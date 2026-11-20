@@ -25,6 +25,7 @@ import {
 import type { RequestMetadata } from '../../universal/extract-request-metadata';
 import { createDocumentAuditLogData } from '../../utils/document-audit-logs';
 import { validateFieldAuth } from '../document/validate-field-auth';
+import { trimSignatureImage } from './trim-signature-image';
 
 export type SignFieldWithTokenOptions = {
   token: string;
@@ -200,7 +201,10 @@ export const signFieldWithToken = async ({
 
   let customText = !isSignatureField ? value : undefined;
 
-  const signatureImageAsBase64 = isSignatureField && isBase64 ? value : undefined;
+  // Cropped to the ink, so the size the signer picks applies to their signature
+  // and not to the empty canvas around it.
+  const signatureImageAsBase64 =
+    isSignatureField && isBase64 ? await trimSignatureImage(value) : undefined;
   const typedSignature = isSignatureField && !isBase64 ? value : undefined;
 
   if (field.type === FieldType.DATE) {

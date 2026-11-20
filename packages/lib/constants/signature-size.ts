@@ -7,7 +7,7 @@
  * signature the person actually produced, and there was no way for the signer to
  * say so.
  *
- * Three presets rather than a slider. Signing is not the moment to offer fine
+ * A few presets rather than a slider. Signing is not the moment to offer fine
  * control over typography: the signer wants "that's too small", one click, done.
  *
  * The fraction is stored with the signature rather than the preset name, because
@@ -16,8 +16,11 @@
  */
 
 export type SignatureSizePreset = {
-  key: 'S' | 'M' | 'L';
-  /** Fraction of the field the signature is fitted into, 0–1. */
+  key: 'S' | 'M' | 'L' | 'XL' | 'XXL';
+  /**
+   * Fraction of the field the signature is fitted into. Up to 1 it stays inside
+   * the field; above 1 it deliberately spills over the edges, centred.
+   */
   fill: number;
 };
 
@@ -25,6 +28,11 @@ export const SIGNATURE_SIZE_PRESETS: SignatureSizePreset[] = [
   { key: 'S', fill: 0.6 },
   { key: 'M', fill: 0.8 },
   { key: 'L', fill: 1 },
+  // For the signer who has already picked L and still wants more. These two are the
+  // only presets that leave the field's box, so they are the signer's call, never a
+  // default.
+  { key: 'XL', fill: 1.5 },
+  { key: 'XXL', fill: 2 },
 ];
 
 /**
@@ -35,9 +43,15 @@ export const SIGNATURE_SIZE_PRESETS: SignatureSizePreset[] = [
  */
 export const DEFAULT_SIGNATURE_FILL = 0.8;
 
-/** Bounds accepted from a client, so a hand-made request cannot fill the page. */
+/**
+ * Bounds accepted from a client, so a hand-made request cannot fill the page.
+ *
+ * The ceiling is the largest preset: anything above it could only come from a
+ * hand-made request, and a signature that covers the paragraph around it is not
+ * a size a signer chose by clicking.
+ */
 export const MIN_SIGNATURE_FILL = 0.3;
-export const MAX_SIGNATURE_FILL = 1;
+export const MAX_SIGNATURE_FILL = 2;
 
 /**
  * Ceiling on enlarging a signature beyond its captured size.
@@ -68,6 +82,9 @@ export const clampSignatureFill = (fill: number): number =>
  * `fill` null means the signature was made before this existed: those keep the
  * old behaviour exactly — fit the field, never enlarge — so a document signed
  * last month does not change shape the next time it is sealed.
+ *
+ * Up to a fill of 1 the signature never overflows its field, on either axis.
+ * Above 1 it is scaled past the field and centred on it.
  */
 export const signatureImageScale = ({
   imageWidth,

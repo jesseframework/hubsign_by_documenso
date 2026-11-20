@@ -51,6 +51,7 @@ import { teamGlobalSettingsToBranding } from '../../utils/team-global-settings-t
 import { formatDocumentsPath } from '../../utils/teams';
 import { sendDocument } from '../document/send-document';
 import { validateFieldAuth } from '../document/validate-field-auth';
+import { trimSignatureImage } from '../field/trim-signature-image';
 import { triggerWebhook } from '../webhooks/trigger/trigger-webhook';
 import { resolveOrganizationId } from '../workflow/resolve-organization-id';
 
@@ -230,7 +231,8 @@ export const createDocumentFromDirectTemplate = async ({
 
       let customText = !isSignatureField ? value : '';
 
-      const signatureImageAsBase64 = isSignatureField && isBase64 ? value : undefined;
+      const signatureImageAsBase64 =
+        isSignatureField && isBase64 && value ? await trimSignatureImage(value) : undefined;
       const typedSignature = isSignatureField && !isBase64 ? value : undefined;
 
       if (templateField.type === FieldType.DATE) {

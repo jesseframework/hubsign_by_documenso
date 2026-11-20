@@ -316,11 +316,15 @@ export const DocumentSigningSignatureField = ({
         // Centred at the chosen fraction of the field, which is the same geometry
         // the PDF is sealed with — so what the signer approves here is what the
         // finished document carries.
+        //
+        // Above 100% it overflows the field on purpose, so it must be allowed to:
+        // the base styles cap an image at its container's width, and a flex item
+        // shrinks to fit unless told not to.
         <div className="flex h-full w-full items-center justify-center">
           <img
             src={signature.signatureImageAsBase64}
             alt={`Signature for ${recipient.name}`}
-            className="object-contain"
+            className="max-h-none max-w-none shrink-0 object-contain"
             style={{ width: `${fill * 100}%`, height: `${fill * 100}%` }}
           />
         </div>
@@ -343,7 +347,7 @@ export const DocumentSigningSignatureField = ({
             <button
               key={preset.key}
               type="button"
-              className={`h-5 w-5 rounded text-[10px] font-semibold ${
+              className={`h-5 min-w-[1.25rem] rounded px-1 text-[10px] font-semibold ${
                 preset.key === selectedPreset.key
                   ? 'bg-primary text-primary-foreground'
                   : 'text-muted-foreground hover:bg-muted'
